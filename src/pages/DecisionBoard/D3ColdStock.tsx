@@ -1,0 +1,679 @@
+// ==========================================
+// D3决策：冷料库龄分析页面
+// ==========================================
+// 职责: 展示冷料库龄分布和压库风险，支持按机组查看结构缺口
+// ==========================================
+
+import React, { useEffect, useMemo, useState } from 'react';
+import { Card, Row, Col, Statistic, Tag, Spin, Alert, Space, Select, Descriptions, Table } from 'antd';
+import {
+  WarningOutlined,
+  DatabaseOutlined,
+  InfoCircleOutlined,
+} from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
+import { useSearchParams } from 'react-router-dom';
+import { useColdStockProfile } from '../../hooks/queries/use-decision-queries';
+import { useActiveVersionId } from '../../stores/use-global-store';
+import { ColdStockChart } from '../../components/charts/ColdStockChart';
+import type { ColdStockBucket, AgeBin, PressureLevel, ReasonItem } from '../../types/decision';
+
+// ==========================================
+// 压力等级颜色映射
+// ==========================================
+const PRESSURE_LEVEL_COLORS: Record<PressureLevel, string> = {
+  LOW: '#52c41a',
+  MEDIUM: '#1677ff',
+  HIGH: '#faad14',
+  CRITICAL: '#ff4d4f',
+};
+
+const PRESSURE_LEVEL_LABELS: Record<PressureLevel, string> = {
+  LOW: '低压',
+  MEDIUM: '中压',
+  HIGH: '高压',
+  CRITICAL: '严重',
+};
+
+// ==========================================
+// 库龄区间标签
+// ==========================================
+const AGE_BIN_LABELS: Record<AgeBin, string> = {
+  '0-7': '0-7天',
+  '8-14': '8-14天',
+  '15-30': '15-30天',
+  '30+': '30天以上',
+};
+
+const AGE_BIN_COLORS: Record<AgeBin, string> = {
+  '0-7': '#52c41a',
+  '8-14': '#1677ff',
+  '15-30': '#faad14',
+  '30+': '#ff4d4f',
+};
+
+// ==========================================
+// 结构缺口（兼容旧枚举值 + 当前后端的描述性文本）
+// ==========================================
+function hasStructureGap(gap: string | null | undefined): boolean {
+  if (!gap) return false;
+  const trimmed = gap.trim();
+  return trimmed !== '' && trimmed !== 'NONE' && trimmed !== '无';
+}
+
+function formatStructureGap(gap: string): string {
+  const trimmed = (gap || '').trim();
+  const labels: Record<string, string> = {
+    SIZE_MISMATCH: '尺寸不匹配',
+    GRADE_CONFLICT: '钢种冲突',
+    NO_CAMPAIGN: '无换辊计划',
+    CAPACITY_FULL: '产能满载',
+    NONE: '无缺口',
+    无: '无缺口',
+  };
+  return labels[trimmed] ?? trimmed;
+}
+
+// ==========================================
+// 主组件
+// ==========================================
+
+export const D3ColdStock: React.FC = () => {
+  const versionId = useActiveVersionId();
+  const [searchParams] = useSearchParams();
+  const [selectedMachine, setSelectedMachine] = useState<string | null>(null);
+  const [selectedAgeBin, setSelectedAgeBin] = useState<AgeBin | null>(null);
+  const [selectedPressureLevel, setSelectedPressureLevel] = useState<PressureLevel | null>(null);
+
+  // 获取冷料数据（不默认筛掉低/中压，避免驾驶舱 drill-down 后“页面为空”）
+  const { data, isLoading, error } = useColdStockProfile(
+    { versionId: versionId || '' },
+    { enabled: !!versionId }
+  );
+
+  const handleSelectMachine = (machine: string | null) => {
+    setSelectedMachine(machine);
+    // 切换机组时清空桶定位，避免“定位到不存在的桶”
+    setSelectedAgeBin(null);
+    setSelectedPressureLevel(null);
+  };
+
+  // 支持 Dashboard drill-down：
+  // /decision/d3-cold-stock?machine=H031&ageBin=0-7&pressureLevel=HIGH
+  useEffect(() => {
+    const machine = searchParams.get('machine');
+    const ageBin = searchParams.get('ageBin');
+    const pressureLevelRaw = searchParams.get('pressureLevel');
+
+    if (machine) {
+      setSelectedMachine(machine);
+    }
+
+    if (ageBin && (['0-7', '8-14', '15-30', '30+'] as string[]).includes(ageBin)) {
+      setSelectedAgeBin(ageBin as AgeBin);
+    }
+
+    if (pressureLevelRaw) {
+      const normalized = pressureLevelRaw.toUpperCase();
+      if ((['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as string[]).includes(normalized)) {
+        setSelectedPressureLevel(normalized as PressureLevel);
+      }
+    }
+  }, [searchParams]);
+
+  // 按机组分组统计
+  const machineStats = useMemo(() => {
+    if (!data?.items || data.items.length === 0) return [];
+
+    const machineMap = new Map<string, ColdStockBucket[]>();
+
+    data.items.forEach((bucket) => {
+      const existing = machineMap.get(bucket.machineCode) || [];
+      existing.push(bucket);
+      machineMap.set(bucket.machineCode, existing);
+    });
+
+    return Array.from(machineMap.entries()).map(([machine, buckets]) => {
+      const totalCount = buckets.reduce((sum, b) => sum + b.count, 0);
+      const totalWeight = buckets.reduce((sum, b) => sum + b.weightT, 0);
+      const maxPressureScore = Math.max(...buckets.map((b) => b.pressureScore));
+      const avgAge = buckets.reduce((sum, b) => sum + b.avgAgeDays * b.count, 0) / totalCount;
+      const maxAge = Math.max(...buckets.map((b) => b.maxAgeDays));
+
+      // 确定最高压力等级
+      const highestPressureLevel = buckets.reduce((max, b) => {
+        const levelOrder: Record<PressureLevel, number> = {
+          LOW: 0,
+          MEDIUM: 1,
+          HIGH: 2,
+          CRITICAL: 3,
+        };
+        return levelOrder[b.pressureLevel] > levelOrder[max] ? b.pressureLevel : max;
+      }, 'LOW' as PressureLevel);
+
+      return {
+        machine,
+        buckets,
+        totalCount,
+        totalWeight,
+        maxPressureScore,
+        avgAge,
+        maxAge,
+        highestPressureLevel,
+      };
+    }).sort((a, b) => b.maxPressureScore - a.maxPressureScore);
+  }, [data]);
+
+  // 全局统计
+  const globalStats = useMemo(() => {
+    if (!data?.items || data.items.length === 0) {
+      return {
+        totalMachines: 0,
+        totalColdStock: 0,
+        totalWeight: 0,
+        highPressureCount: 0,
+      };
+    }
+
+    const uniqueMachines = new Set(data.items.map((b) => b.machineCode));
+    const totalColdStock = data.items.reduce((sum, b) => sum + b.count, 0);
+    const totalWeight = data.items.reduce((sum, b) => sum + b.weightT, 0);
+    const highPressureCount = data.items.filter(
+      (b) => b.pressureLevel === 'HIGH' || b.pressureLevel === 'CRITICAL'
+    ).reduce((sum, b) => sum + b.count, 0);
+
+    return {
+      totalMachines: uniqueMachines.size,
+      totalColdStock,
+      totalWeight,
+      highPressureCount,
+    };
+  }, [data]);
+
+  // 选中机组的数据
+  const selectedMachineData = useMemo(() => {
+    if (!selectedMachine) return null;
+    return machineStats.find((m) => m.machine === selectedMachine) || null;
+  }, [selectedMachine, machineStats]);
+
+  const selectedBucket = useMemo(() => {
+    if (!selectedMachineData) return null;
+    if (!selectedAgeBin && !selectedPressureLevel) return null;
+
+    return (
+      selectedMachineData.buckets.find((b) => {
+        if (selectedAgeBin && b.ageBin !== selectedAgeBin) return false;
+        if (selectedPressureLevel && b.pressureLevel !== selectedPressureLevel) return false;
+        return true;
+      }) || null
+    );
+  }, [selectedMachineData, selectedAgeBin, selectedPressureLevel]);
+
+  // ==========================================
+  // 加载状态
+  // ==========================================
+
+  if (isLoading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '100px 0' }}>
+        <Spin size="large" tip="正在加载冷料库龄数据...">
+          <div style={{ minHeight: 80 }} />
+        </Spin>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // 错误状态
+  // ==========================================
+
+  if (error) {
+    return (
+      <Alert
+        message="数据加载失败"
+        description={error.message || '未知错误'}
+        type="error"
+        showIcon
+        style={{ margin: '20px' }}
+      />
+    );
+  }
+
+  if (!versionId) {
+    return (
+      <Alert
+        message="未选择排产版本"
+        description="请先在主界面选择一个排产版本"
+        type="warning"
+        showIcon
+        style={{ margin: '20px' }}
+      />
+    );
+  }
+
+  // ==========================================
+  // 主界面
+  // ==========================================
+
+  return (
+    <div style={{ padding: '24px' }}>
+      {/* 页面标题 */}
+      <div style={{ marginBottom: '24px' }}>
+        <h2>
+          <DatabaseOutlined style={{ marginRight: '8px' }} />
+          D3决策：冷料库龄分析
+        </h2>
+        <p style={{ color: '#8c8c8c', marginBottom: '16px' }}>
+          展示各机组冷料库龄分布，识别压库风险和结构缺口
+        </p>
+
+        {/* 机组选择器 */}
+        <Space>
+          <span>选择机组：</span>
+          <Select
+            value={selectedMachine}
+            onChange={handleSelectMachine}
+            style={{ width: 200 }}
+            placeholder="查看全部机组"
+            allowClear
+            options={machineStats.map((m) => ({
+              label: `${m.machine} (${m.totalCount}个材料)`,
+              value: m.machine,
+            }))}
+          />
+        </Space>
+      </div>
+
+      {/* 统计卡片 */}
+      <Row gutter={16} style={{ marginBottom: '24px' }}>
+        <Col span={6}>
+          <Card>
+            <Statistic
+              title="涉及机组数"
+              value={globalStats.totalMachines}
+              prefix={<DatabaseOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic
+              title="冷料总数"
+              value={globalStats.totalColdStock}
+              suffix="个"
+              valueStyle={{
+                color: globalStats.totalColdStock > 100 ? '#faad14' : '#52c41a',
+              }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic
+              title="冷料总重量"
+              value={globalStats.totalWeight.toFixed(1)}
+              suffix="吨"
+              valueStyle={{
+                color: globalStats.totalWeight > 1000 ? '#faad14' : '#52c41a',
+              }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic
+              title="高压库存数"
+              value={globalStats.highPressureCount}
+              prefix={<WarningOutlined />}
+              valueStyle={{
+                color: globalStats.highPressureCount > 0 ? '#ff4d4f' : '#52c41a',
+              }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* 库龄分布图表 */}
+      <Card
+        title="库龄分布图（按机组）"
+        style={{ marginBottom: '24px' }}
+        extra={
+          <Space>
+            <InfoCircleOutlined />
+            <span style={{ fontSize: '12px', color: '#8c8c8c' }}>
+              点击柱状图查看机组详情
+            </span>
+          </Space>
+        }
+      >
+        {data && data.items.length > 0 ? (
+          <ColdStockChart
+            data={data.items}
+            onMachineClick={handleSelectMachine}
+            selectedMachine={selectedMachine}
+          />
+        ) : (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: '#8c8c8c' }}>
+            暂无数据
+          </div>
+        )}
+      </Card>
+
+      {/* 机组统计表 */}
+      <Card title="机组冷料统计" style={{ marginBottom: '24px' }}>
+        <MachineStatsTable data={machineStats} onRowClick={handleSelectMachine} />
+      </Card>
+
+      {/* 选中机组的详细信息 */}
+      {selectedMachineData && (
+        <Card
+          title={`${selectedMachineData.machine} 冷料详情`}
+          extra={
+            <Tag color={PRESSURE_LEVEL_COLORS[selectedMachineData.highestPressureLevel]}>
+              {PRESSURE_LEVEL_LABELS[selectedMachineData.highestPressureLevel]}
+            </Tag>
+          }
+        >
+          <Descriptions column={4} bordered size="small" style={{ marginBottom: '16px' }}>
+            <Descriptions.Item label="冷料总数">
+              {selectedMachineData.totalCount}个
+            </Descriptions.Item>
+            <Descriptions.Item label="冷料总重量">
+              {selectedMachineData.totalWeight.toFixed(1)}吨
+            </Descriptions.Item>
+            <Descriptions.Item label="平均库龄">
+              {selectedMachineData.avgAge.toFixed(1)}天
+            </Descriptions.Item>
+            <Descriptions.Item label="最大库龄">
+              {selectedMachineData.maxAge}天
+            </Descriptions.Item>
+          </Descriptions>
+
+          {/* 库龄分布详情 */}
+          <h4 style={{ marginTop: '16px', marginBottom: '8px' }}>库龄分布</h4>
+          <Row gutter={16} style={{ marginBottom: '16px' }}>
+            {selectedMachineData.buckets.map((bucket) => (
+              <Col key={bucket.ageBin} span={6}>
+                <Card
+                  size="small"
+                  style={{
+                    borderLeft: `4px solid ${AGE_BIN_COLORS[bucket.ageBin]}`,
+                    cursor: 'pointer',
+                    boxShadow:
+                      selectedBucket?.ageBin === bucket.ageBin ? '0 0 0 2px rgba(22, 119, 255, 0.35) inset' : undefined,
+                    background:
+                      selectedBucket?.ageBin === bucket.ageBin ? 'rgba(22, 119, 255, 0.06)' : undefined,
+                  }}
+                  onClick={() => {
+                    setSelectedAgeBin(bucket.ageBin);
+                    setSelectedPressureLevel(bucket.pressureLevel);
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
+                    {AGE_BIN_LABELS[bucket.ageBin]}
+                  </div>
+                  <div>数量: {bucket.count}个</div>
+                  <div>重量: {bucket.weightT.toFixed(1)}吨</div>
+                  <div>
+                    压力:
+                    <Tag
+                      color={PRESSURE_LEVEL_COLORS[bucket.pressureLevel]}
+                      style={{ marginLeft: '4px' }}
+                    >
+                      {bucket.pressureScore.toFixed(0)}
+                    </Tag>
+                  </div>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+
+          {/* 结构缺口 */}
+          {(selectedBucket ? [selectedBucket] : selectedMachineData.buckets).some((b) =>
+            hasStructureGap(b.structureGap)
+          ) && (
+            <>
+              <h4 style={{ marginTop: '16px', marginBottom: '8px' }}>结构缺口</h4>
+              <Space direction="vertical" style={{ width: '100%' }}>
+                {(selectedBucket ? [selectedBucket] : selectedMachineData.buckets)
+                  .filter((b) => hasStructureGap(b.structureGap))
+                  .map((bucket, index) => (
+                    <Card key={index} size="small" type="inner">
+                      <Space wrap>
+                        <Tag color={AGE_BIN_COLORS[bucket.ageBin]}>
+                          {AGE_BIN_LABELS[bucket.ageBin]}
+                        </Tag>
+                        <Tag color="red">结构缺口</Tag>
+                        <span style={{ color: '#595959' }}>
+                          {formatStructureGap(bucket.structureGap)}
+                        </span>
+                      </Space>
+                    </Card>
+                  ))}
+              </Space>
+            </>
+          )}
+
+          {/* 压库原因 */}
+          {(selectedBucket ? [selectedBucket] : selectedMachineData.buckets).some(
+            (b) => b.reasons.length > 0
+          ) && (
+            <>
+              <h4 style={{ marginTop: '16px', marginBottom: '8px' }}>压库原因</h4>
+              <ReasonsTable
+                reasons={(selectedBucket ? [selectedBucket] : selectedMachineData.buckets).flatMap(
+                  (b) => b.reasons
+                )}
+              />
+            </>
+          )}
+
+          {/* 趋势信息 */}
+          {(selectedBucket ? [selectedBucket] : selectedMachineData.buckets).some((b) => b.trend) && (
+            <>
+              <h4 style={{ marginTop: '16px', marginBottom: '8px' }}>趋势分析</h4>
+              <Space direction="vertical" style={{ width: '100%' }}>
+                {(selectedBucket ? [selectedBucket] : selectedMachineData.buckets)
+                  .filter((b) => b.trend)
+                  .map((bucket, index) => (
+                    <Card key={index} size="small" type="inner">
+                      <Space>
+                        <Tag color={AGE_BIN_COLORS[bucket.ageBin]}>
+                          {AGE_BIN_LABELS[bucket.ageBin]}
+                        </Tag>
+                        <span>
+                          {bucket.trend!.direction === 'RISING' && '↑ 上升'}
+                          {bucket.trend!.direction === 'STABLE' && '→ 稳定'}
+                          {bucket.trend!.direction === 'FALLING' && '↓ 下降'}
+                        </span>
+                        <span style={{ color: '#8c8c8c' }}>
+                          变化率: {bucket.trend!.changeRatePct.toFixed(1)}%
+                        </span>
+                      </Space>
+                    </Card>
+                  ))}
+              </Space>
+            </>
+          )}
+        </Card>
+      )}
+    </div>
+  );
+};
+
+// ==========================================
+// 机组统计表格
+// ==========================================
+
+interface MachineStatsTableProps {
+  data: Array<{
+    machine: string;
+    totalCount: number;
+    totalWeight: number;
+    maxPressureScore: number;
+    avgAge: number;
+    maxAge: number;
+    highestPressureLevel: PressureLevel;
+  }>;
+  onRowClick: (machine: string) => void;
+}
+
+const MachineStatsTable: React.FC<MachineStatsTableProps> = ({ data, onRowClick }) => {
+  const columns: ColumnsType<typeof data[0]> = [
+    {
+      title: '机组',
+      dataIndex: 'machine',
+      key: 'machine',
+      width: 120,
+      render: (machine: string) => <Tag color="blue">{machine}</Tag>,
+    },
+    {
+      title: '冷料数量',
+      dataIndex: 'totalCount',
+      key: 'totalCount',
+      width: 100,
+      sorter: (a, b) => a.totalCount - b.totalCount,
+    },
+    {
+      title: '冷料重量(吨)',
+      dataIndex: 'totalWeight',
+      key: 'totalWeight',
+      width: 120,
+      render: (weight: number) => weight.toFixed(1),
+      sorter: (a, b) => a.totalWeight - b.totalWeight,
+    },
+    {
+      title: '平均库龄(天)',
+      dataIndex: 'avgAge',
+      key: 'avgAge',
+      width: 120,
+      render: (age: number) => age.toFixed(1),
+      sorter: (a, b) => a.avgAge - b.avgAge,
+    },
+    {
+      title: '最大库龄(天)',
+      dataIndex: 'maxAge',
+      key: 'maxAge',
+      width: 120,
+      sorter: (a, b) => a.maxAge - b.maxAge,
+    },
+    {
+      title: '压力等级',
+      dataIndex: 'highestPressureLevel',
+      key: 'highestPressureLevel',
+      width: 100,
+      render: (level: PressureLevel) => (
+        <Tag color={PRESSURE_LEVEL_COLORS[level]}>
+          {PRESSURE_LEVEL_LABELS[level]}
+        </Tag>
+      ),
+      sorter: (a, b) => {
+        const order: Record<PressureLevel, number> = {
+          LOW: 0,
+          MEDIUM: 1,
+          HIGH: 2,
+          CRITICAL: 3,
+        };
+        return order[a.highestPressureLevel] - order[b.highestPressureLevel];
+      },
+      defaultSortOrder: 'descend',
+    },
+    {
+      title: '压力分数',
+      dataIndex: 'maxPressureScore',
+      key: 'maxPressureScore',
+      width: 100,
+      render: (score: number) => score.toFixed(0),
+      sorter: (a, b) => a.maxPressureScore - b.maxPressureScore,
+    },
+  ];
+
+  return (
+    <Table
+      columns={columns}
+      dataSource={data}
+      rowKey="machine"
+      size="small"
+      pagination={false}
+      onRow={(record) => ({
+        onClick: () => onRowClick(record.machine),
+        style: { cursor: 'pointer' },
+      })}
+    />
+  );
+};
+
+// ==========================================
+// 原因表格组件
+// ==========================================
+
+interface ReasonsTableProps {
+  reasons: ReasonItem[];
+}
+
+const ReasonsTable: React.FC<ReasonsTableProps> = ({ reasons }) => {
+  // 去重并合并相同code的原因
+  const uniqueReasons = useMemo(() => {
+    const map = new Map<string, ReasonItem>();
+    reasons.forEach((reason) => {
+      const existing = map.get(reason.code);
+      if (existing) {
+        // 合并权重和影响数
+        existing.weight = Math.max(existing.weight, reason.weight);
+        if (existing.affectedCount && reason.affectedCount) {
+          existing.affectedCount += reason.affectedCount;
+        }
+      } else {
+        map.set(reason.code, { ...reason });
+      }
+    });
+    return Array.from(map.values());
+  }, [reasons]);
+
+  const columns: ColumnsType<ReasonItem> = [
+    {
+      title: '原因代码',
+      dataIndex: 'code',
+      key: 'code',
+      width: 150,
+      render: (code: string) => <Tag>{code}</Tag>,
+    },
+    {
+      title: '原因描述',
+      dataIndex: 'msg',
+      key: 'msg',
+      ellipsis: true,
+    },
+    {
+      title: '权重',
+      dataIndex: 'weight',
+      key: 'weight',
+      width: 100,
+      render: (weight: number) => <span>{(weight * 100).toFixed(1)}%</span>,
+      sorter: (a, b) => a.weight - b.weight,
+      defaultSortOrder: 'descend',
+    },
+    {
+      title: '影响材料数',
+      dataIndex: 'affectedCount',
+      key: 'affectedCount',
+      width: 120,
+      render: (count?: number) => count || '-',
+    },
+  ];
+
+  return (
+    <Table
+      columns={columns}
+      dataSource={uniqueReasons}
+      rowKey="code"
+      size="small"
+      pagination={false}
+    />
+  );
+};
+
+// ==========================================
+// 默认导出（用于React.lazy）
+// ==========================================
+export default D3ColdStock;

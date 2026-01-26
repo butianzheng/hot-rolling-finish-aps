@@ -1,0 +1,47 @@
+# Rust
+/target/
+Cargo.lock
+
+# Tauri
+src-tauri/target/
+
+# Node.js
+node_modules/
+dist/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+*.db.bak.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build outputs
+dist/
+build/
+
+# Claude (may contain sensitive context)
+.claude/
+
+# Test files
+test-api.html
+
+# Logs
+*.log
+
+# Sensitive documents
+*.docx

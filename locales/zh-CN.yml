@@ -1,0 +1,55 @@
+# 中文翻译文件
+# 热轧精整排产系统
+
+# 通用消息
+common:
+  success: "操作成功"
+  failed: "操作失败"
+  unknown_error: "未知错误"
+
+# 文件导入相关
+import:
+  # 文件错误
+  file_not_found: "文件不存在: %{path}"
+  file_format_unsupported: "不支持的文件格式: %{format}"
+  file_parse_error: "文件解析失败: %{reason}"
+
+  # 数据错误
+  field_mapping_error: "字段映射失败 (行 %{row}): %{reason}"
+  data_type_error: "数据类型错误 (行 %{row}, 字段 %{field}): %{reason}"
+  required_field_missing: "必填字段缺失 (行 %{row}): %{field}"
+  value_out_of_range: "数值超出范围 (行 %{row}, 字段 %{field}): %{value}"
+
+  # 冲突错误
+  duplicate_material_id: "重复的材料号: %{material_id}"
+  duplicate_within_batch: "批次内重复 (行 %{row}): %{material_id}"
+  duplicate_cross_batch: "跨批次重复 (行 %{row}): %{material_id}"
+
+  # 数据库错误
+  database_insert_failed: "数据库插入失败: %{reason}"
+  database_query_failed: "数据库查询失败: %{reason}"
+
+  # 进度消息
+  started: "开始导入材料数据"
+  parsing_file: "正在解析文件..."
+  mapping_fields: "正在映射字段..."
+  cleaning_data: "正在清洗数据..."
+  validating_data: "正在校验数据..."
+  detecting_conflicts: "正在检测冲突..."
+  inserting_data: "正在插入数据..."
+  completed: "导入完成"
+
+  # 统计消息
+  summary: "导入统计: 总计 %{total} 条, 成功 %{success} 条, 冲突 %{conflict} 条, 耗时 %{elapsed_ms} 毫秒"
+
+# 配置相关
+config:
+  load_failed: "配置加载失败: %{reason}"
+  invalid_value: "配置值无效 (%{key}): %{value}"
+  missing_required: "缺少必需的配置项: %{key}"
+
+# 引擎相关
+engine:
+  derivation_failed: "字段派生失败: %{reason}"
+  state_derivation_failed: "状态派生失败 (材料 %{material_id}): %{reason}"
+  validation_failed: "校验失败: %{reason}"

@@ -1,0 +1,120 @@
+```mermaid
+erDiagram
+  MACHINE_MASTER ||--o{ CAPACITY_POOL : has
+  MACHINE_MASTER ||--o{ PLAN_ITEM : schedules
+  MATERIAL_MASTER ||--|| MATERIAL_STATE : has
+  PLAN ||--o{ PLAN_VERSION : has
+  PLAN_VERSION ||--o{ PLAN_ITEM : contains
+  PLAN_VERSION ||--o{ RISK_SNAPSHOT : generates
+  PLAN_VERSION ||--o{ ROLLER_CAMPAIGN : controls
+  PLAN_VERSION ||--o{ ACTION_LOG : logs
+
+  MATERIAL_MASTER {
+    TEXT material_id PK
+    TEXT contract_no
+    TEXT due_date
+    TEXT rush_flag
+    TEXT next_machine_code
+    TEXT rework_machine_code
+    TEXT current_machine_code
+    REAL width_mm
+    REAL thickness_mm
+    REAL weight_t
+    INTEGER output_age_days_raw
+    INTEGER stock_age_days
+    TEXT status_updated_at
+  }
+
+  MATERIAL_STATE {
+    TEXT material_id PK, FK
+    TEXT sched_state
+    INTEGER lock_flag
+    INTEGER force_release_flag
+    TEXT urgent_level
+    INTEGER rolling_output_age_days
+    INTEGER ready_in_days
+    TEXT earliest_sched_date
+  }
+
+  CAPACITY_POOL {
+    TEXT pool_id PK
+    TEXT machine_code FK
+    TEXT plan_date
+    REAL target_capacity_t
+    REAL limit_capacity_t
+    INTEGER is_frozen
+  }
+
+  PLAN {
+    TEXT plan_id PK
+    TEXT plan_name
+    TEXT plan_type
+  }
+
+  PLAN_VERSION {
+    TEXT version_id PK
+    TEXT plan_id FK
+    INTEGER version_no
+    TEXT frozen_from_date
+    INTEGER recalc_window_days
+  }
+
+  PLAN_ITEM {
+    TEXT version_id PK, FK
+    TEXT material_id PK, FK
+    TEXT machine_code FK
+    TEXT plan_date
+    INTEGER seq_no
+    REAL weight_t
+    TEXT source_type
+    INTEGER locked_in_plan
+  }
+
+  ROLLER_CAMPAIGN {
+    TEXT version_id PK, FK
+    TEXT machine_code PK, FK
+    INTEGER campaign_no PK
+    REAL cum_weight_t
+    REAL suggest_threshold_t
+    REAL hard_limit_t
+    TEXT status
+  }
+
+  RISK_SNAPSHOT {
+    TEXT version_id PK, FK
+    TEXT machine_code PK, FK
+    TEXT plan_date PK
+    TEXT risk_level
+    REAL used_capacity_t
+    REAL target_capacity_t
+    REAL limit_capacity_t
+  }
+
+  ACTION_LOG {
+    TEXT action_id PK
+    TEXT version_id FK
+    TEXT action_type
+    TEXT action_ts
+  }
+
+  IMPORT_CONFLICT {
+    TEXT conflict_id PK
+    TEXT source_batch_id
+    TEXT material_id
+    TEXT conflict_type
+    TEXT resolution_status
+  }
+
+  CONFIG_SCOPE ||--o{ CONFIG_KV : contains
+  CONFIG_SCOPE {
+    TEXT scope_id PK
+    TEXT scope_type
+    TEXT scope_key
+  }
+
+  CONFIG_KV {
+    TEXT scope_id PK, FK
+    TEXT key PK
+    TEXT value
+  }
+```

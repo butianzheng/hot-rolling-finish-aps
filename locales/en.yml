@@ -1,0 +1,55 @@
+# English Translation File
+# Hot Rolling Finishing Scheduling System
+
+# Common Messages
+common:
+  success: "Operation successful"
+  failed: "Operation failed"
+  unknown_error: "Unknown error"
+
+# Import Related
+import:
+  # File Errors
+  file_not_found: "File not found: %{path}"
+  file_format_unsupported: "Unsupported file format: %{format}"
+  file_parse_error: "File parsing failed: %{reason}"
+
+  # Data Errors
+  field_mapping_error: "Field mapping failed (row %{row}): %{reason}"
+  data_type_error: "Data type error (row %{row}, field %{field}): %{reason}"
+  required_field_missing: "Required field missing (row %{row}): %{field}"
+  value_out_of_range: "Value out of range (row %{row}, field %{field}): %{value}"
+
+  # Conflict Errors
+  duplicate_material_id: "Duplicate material ID: %{material_id}"
+  duplicate_within_batch: "Duplicate within batch (row %{row}): %{material_id}"
+  duplicate_cross_batch: "Duplicate across batches (row %{row}): %{material_id}"
+
+  # Database Errors
+  database_insert_failed: "Database insert failed: %{reason}"
+  database_query_failed: "Database query failed: %{reason}"
+
+  # Progress Messages
+  started: "Starting material data import"
+  parsing_file: "Parsing file..."
+  mapping_fields: "Mapping fields..."
+  cleaning_data: "Cleaning data..."
+  validating_data: "Validating data..."
+  detecting_conflicts: "Detecting conflicts..."
+  inserting_data: "Inserting data..."
+  completed: "Import completed"
+
+  # Summary Messages
+  summary: "Import summary: total %{total}, success %{success}, conflicts %{conflict}, elapsed %{elapsed_ms} ms"
+
+# Configuration Related
+config:
+  load_failed: "Configuration load failed: %{reason}"
+  invalid_value: "Invalid configuration value (%{key}): %{value}"
+  missing_required: "Missing required configuration: %{key}"
+
+# Engine Related
+engine:
+  derivation_failed: "Field derivation failed: %{reason}"
+  state_derivation_failed: "State derivation failed (material %{material_id}): %{reason}"
+  validation_failed: "Validation failed: %{reason}"

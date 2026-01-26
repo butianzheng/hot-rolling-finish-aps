@@ -1,0 +1,83 @@
+{
+  "$schema": "https://schema.tauri.app/config/1",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:5173",
+    "distDir": "../dist"
+  },
+  "package": {
+    "productName": "热轧精整排产系统",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "all": false,
+        "open": false
+      },
+      "dialog": {
+        "all": false,
+        "open": true,
+        "save": false
+      },
+      "fs": {
+        "all": false,
+        "readFile": true,
+        "writeFile": false,
+        "readDir": false,
+        "copyFile": false,
+        "createDir": false,
+        "removeDir": false,
+        "removeFile": false,
+        "renameFile": false,
+        "exists": false
+      }
+    },
+    "bundle": {
+      "active": true,
+      "category": "Productivity",
+      "copyright": "",
+      "deb": {
+        "depends": []
+      },
+      "externalBin": [],
+      "icon": [],
+      "identifier": "com.trae.hot-rolling-aps",
+      "longDescription": "热轧精整排产决策支持系统",
+      "macOS": {
+        "entitlements": null,
+        "exceptionDomain": "",
+        "frameworks": [],
+        "providerShortName": null,
+        "signingIdentity": null
+      },
+      "resources": [],
+      "shortDescription": "热轧精整排产系统",
+      "targets": "all",
+      "windows": {
+        "certificateThumbprint": null,
+        "digestAlgorithm": "sha256",
+        "timestampUrl": ""
+      }
+    },
+    "security": {
+      "csp": null
+    },
+    "updater": {
+      "active": false
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "height": 800,
+        "resizable": true,
+        "title": "热轧精整排产系统",
+        "width": 1400,
+        "minWidth": 1200,
+        "minHeight": 700
+      }
+    ]
+  }
+}
