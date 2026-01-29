@@ -3,7 +3,7 @@ import { Space, Tabs } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import ErrorBoundary from '../components/ErrorBoundary';
 import PageSkeleton from '../components/PageSkeleton';
-import StrategyDraftComparison from '../components/comparison/StrategyDraftComparison';
+import StrategyDraftComparison from '../components/strategy-draft';
 import DecisionFlowGuide from '../components/flow/DecisionFlowGuide';
 
 const PlanManagement = React.lazy(() => import('../components/PlanManagement'));
