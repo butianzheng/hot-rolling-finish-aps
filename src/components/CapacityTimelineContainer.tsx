@@ -16,7 +16,7 @@ import { formatDate } from '../utils/formatters';
 
 const { RangePicker } = DatePicker;
 
-export const CapacityTimelineContainer: React.FC = () => {
+export const CapacityTimelineContainer: React.FC<{ machineCode?: string | null }> = ({ machineCode }) => {
   const [timelineData, setTimelineData] = useState<CapacityTimelineData[]>([]);
   const [loading, setLoading] = useState(false);
   const [machineOptions, setMachineOptions] = useState<Array<{ label: string; value: string }>>(
@@ -29,9 +29,14 @@ export const CapacityTimelineContainer: React.FC = () => {
   const [selectedMachine, setSelectedMachine] = useState<string>('all');
   const activeVersionId = useActiveVersionId();
 
+  useEffect(() => {
+    if (!machineCode) return;
+    setSelectedMachine(machineCode);
+  }, [machineCode]);
+
   // 预加载机组选项（从材料列表中聚合，避免额外的 machine_master API）
   const loadMachineOptions = async () => {
-    const result = await materialApi.listMaterials({ limit: 0, offset: 0 });
+    const result = await materialApi.listMaterials({ limit: 1000, offset: 0 });
     const codes = new Set<string>();
     (Array.isArray(result) ? result : []).forEach((m: any) => {
       const code = String(m?.machine_code ?? '').trim();
@@ -71,7 +76,11 @@ export const CapacityTimelineContainer: React.FC = () => {
 
       const [capacityPools, planItems] = await Promise.all([
         capacityApi.getCapacityPools(machineCodes, dateFrom, dateTo, activeVersionId),
-        planApi.listPlanItems(activeVersionId),
+        planApi.listPlanItems(activeVersionId, {
+          plan_date_from: dateFrom,
+          plan_date_to: dateTo,
+          machine_code: selectedMachine && selectedMachine !== 'all' ? selectedMachine : undefined,
+        }),
       ]);
 
       const pools = Array.isArray(capacityPools) ? capacityPools : [];

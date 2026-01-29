@@ -79,7 +79,7 @@ impl BottleneckRepository {
         start_date: &str,
         end_date: &str,
     ) -> Result<Vec<MachineBottleneckProfile>, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         let machine_filter = machine_code.map(|_| "machine_code = ?");
 
@@ -203,7 +203,7 @@ impl BottleneckRepository {
         start_date: &str,
         end_date: &str,
     ) -> Result<Vec<MachineBottleneckProfile>, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         // 按机组-日聚合数据
         let mut bottleneck_map: HashMap<(String, String), MachineBottleneckAggregateData> =
@@ -771,7 +771,7 @@ mod tests {
     fn test_get_bottleneck_profile() {
         let conn_arc = setup_test_db();
         {
-            let conn = conn_arc.lock().unwrap();
+            let conn = conn_arc.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
             insert_test_capacity_data(&conn);
             insert_test_plan_items(&conn);
         }
@@ -803,7 +803,7 @@ mod tests {
     fn test_get_top_bottlenecks() {
         let conn_arc = setup_test_db();
         {
-            let conn = conn_arc.lock().unwrap();
+            let conn = conn_arc.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
             insert_test_capacity_data(&conn);
             insert_test_plan_items(&conn);
         }
@@ -821,7 +821,7 @@ mod tests {
     fn test_get_bottleneck_heatmap() {
         let conn_arc = setup_test_db();
         {
-            let conn = conn_arc.lock().unwrap();
+            let conn = conn_arc.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
             insert_test_capacity_data(&conn);
             insert_test_plan_items(&conn);
         }
@@ -846,7 +846,7 @@ mod tests {
     fn test_filter_by_machine_code() {
         let conn_arc = setup_test_db();
         {
-            let conn = conn_arc.lock().unwrap();
+            let conn = conn_arc.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
             insert_test_capacity_data(&conn);
             insert_test_plan_items(&conn);
         }

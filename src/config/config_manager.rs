@@ -8,6 +8,7 @@
 // ==========================================
 
 use crate::config::import_config_trait::ImportConfigReader;
+use crate::config::strategy_profile::CustomStrategyProfile;
 use crate::domain::types::{Season, SeasonMode};
 use async_trait::async_trait;
 use chrono::{Datelike, NaiveDate};
@@ -47,7 +48,7 @@ impl ConfigManager {
     /// - Some(String): 配置值
     /// - None: 配置不存在
     fn get_config_value(&self, key: &str) -> Result<Option<String>, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         let result = conn.query_row(
             "SELECT value FROM config_kv WHERE scope_id = 'global' AND key = ?1",
@@ -60,6 +61,31 @@ impl ConfigManager {
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(Box::new(e)),
         }
+    }
+
+    /// 读取 global scope 的配置值（公开方法，供其他模块复用）
+    pub fn get_global_config_value(&self, key: &str) -> Result<Option<String>, Box<dyn Error>> {
+        self.get_config_value(key)
+    }
+
+    /// 读取自定义策略配置（存储于 config_kv: custom_strategy/{strategy_id}）
+    pub fn get_custom_strategy_profile(
+        &self,
+        strategy_id: &str,
+    ) -> Result<Option<CustomStrategyProfile>, Box<dyn Error>> {
+        let id = strategy_id.trim();
+        if id.is_empty() {
+            return Ok(None);
+        }
+
+        let key = format!("custom_strategy/{}", id);
+        let raw = match self.get_config_value(&key)? {
+            Some(v) => v,
+            None => return Ok(None),
+        };
+
+        let profile: CustomStrategyProfile = serde_json::from_str(&raw)?;
+        Ok(Some(profile))
     }
 
     /// 从 config_kv 表读取配置值，带默认值
@@ -81,7 +107,7 @@ impl ConfigManager {
     /// - 在创建/重算版本时记录配置快照
     /// - 保证版本回滚时配置一致性
     pub fn get_config_snapshot(&self) -> Result<String, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         // 查询所有global scope的配置
         let mut stmt = conn.prepare(
@@ -122,13 +148,17 @@ impl ConfigManager {
         // 解析JSON
         let config_map: HashMap<String, String> = serde_json::from_str(snapshot_json)?;
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         // 开启事务
         conn.execute("BEGIN TRANSACTION", [])?;
 
         let mut count = 0;
         for (key, value) in config_map.iter() {
+            // 版本的 config_snapshot_json 里可能包含元信息（例如版本中文命名），不应回写到 config_kv。
+            if key.starts_with("__meta_") {
+                continue;
+            }
             // 使用UPSERT语法（SQLite 3.24.0+）
             let affected = conn.execute(
                 "INSERT INTO config_kv (scope_id, key, value) VALUES ('global', ?1, ?2)

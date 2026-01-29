@@ -9,6 +9,7 @@ import {
   Modal,
   InputNumber,
   Input,
+  Alert,
   message,
   Row,
   Col,
@@ -18,8 +19,8 @@ import { ReloadOutlined, EditOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
 import { useNavigate } from 'react-router-dom';
-import { capacityApi } from '../api/tauri';
-import { useActiveVersionId } from '../stores/use-global-store';
+import { capacityApi, materialApi } from '../api/tauri';
+import { useActiveVersionId, useCurrentUser, useGlobalStore } from '../stores/use-global-store';
 import { formatCapacity, formatPercent, formatDate } from '../utils/formatters';
 import { tableEmptyConfig } from './CustomEmpty';
 import NoActiveVersionGuide from './NoActiveVersionGuide';
@@ -44,7 +45,9 @@ const CapacityPoolManagement: React.FC<CapacityPoolManagementProps> = ({ onNavig
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [capacityPools, setCapacityPools] = useState<CapacityPool[]>([]);
-  const [selectedMachines, setSelectedMachines] = useState<string[]>(['H031', 'H032', 'H033', 'H034']);
+  const [machineOptions, setMachineOptions] = useState<string[]>([]);
+  const [selectedMachines, setSelectedMachines] = useState<string[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
     dayjs(),
     dayjs().add(7, 'day'),
@@ -54,16 +57,50 @@ const CapacityPoolManagement: React.FC<CapacityPoolManagementProps> = ({ onNavig
   const [targetCapacity, setTargetCapacity] = useState(0);
   const [limitCapacity, setLimitCapacity] = useState(0);
   const [updateReason, setUpdateReason] = useState('');
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [selectedPools, setSelectedPools] = useState<CapacityPool[]>([]);
+  const [batchModalVisible, setBatchModalVisible] = useState(false);
+  const [batchTargetCapacity, setBatchTargetCapacity] = useState<number | null>(null);
+  const [batchLimitCapacity, setBatchLimitCapacity] = useState<number | null>(null);
+  const [batchReason, setBatchReason] = useState('');
   const activeVersionId = useActiveVersionId();
-  const navigateToPlan = onNavigateToPlan || (() => navigate('/plan'));
+  const currentUser = useCurrentUser();
+  const preferredMachineCode = useGlobalStore((state) => state.workbenchFilters.machineCode);
+  const navigateToPlan = onNavigateToPlan || (() => navigate('/comparison'));
+
+  const loadMachineOptions = async () => {
+    try {
+      const result = await materialApi.listMaterials({ limit: 1000, offset: 0 });
+      const codes = new Set<string>();
+      (Array.isArray(result) ? result : []).forEach((m: any) => {
+        const code = String(m?.machine_code ?? '').trim();
+        if (code) codes.add(code);
+      });
+      const list = Array.from(codes).sort();
+      setMachineOptions(list);
+      setSelectedMachines((prev) => {
+        if (prev.length > 0) return prev;
+        if (preferredMachineCode && list.includes(preferredMachineCode)) return [preferredMachineCode];
+        return list;
+      });
+    } catch (e) {
+      console.error('加载机组选项失败:', e);
+      message.error('加载机组选项失败');
+    }
+  };
 
   const loadCapacityPools = async () => {
     if (!dateRange) {
       message.warning('请选择日期范围');
       return;
     }
+    if (selectedMachines.length === 0) {
+      message.warning('请选择机组');
+      return;
+    }
 
     setLoading(true);
+    setLoadError(null);
     try {
       const result = await capacityApi.getCapacityPools(
         selectedMachines,
@@ -90,9 +127,14 @@ const CapacityPoolManagement: React.FC<CapacityPoolManagementProps> = ({ onNavig
       });
 
       setCapacityPools(normalized);
+      setSelectedRowKeys([]);
+      setSelectedPools([]);
       message.success(`成功加载 ${normalized.length} 条产能池数据`);
     } catch (error: any) {
       console.error('加载产能池失败:', error);
+      const msg = String(error?.message || error || '加载失败');
+      setLoadError(msg);
+      message.error(`加载失败: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -115,18 +157,90 @@ const CapacityPoolManagement: React.FC<CapacityPoolManagementProps> = ({ onNavig
 
     setLoading(true);
     try {
+      const operator = currentUser || 'system';
       await capacityApi.updateCapacityPool(
         editingPool.machine_code,
         editingPool.plan_date,
         targetCapacity,
         limitCapacity,
-        updateReason
+        updateReason,
+        operator,
+        activeVersionId || undefined
       );
       message.success('产能池更新成功');
       setEditModalVisible(false);
       await loadCapacityPools();
     } catch (error: any) {
       console.error('更新产能池失败:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBatchUpdate = async () => {
+    if (selectedPools.length === 0) {
+      message.warning('请先选择需要批量调整的记录');
+      return;
+    }
+    if (!batchReason.trim()) {
+      message.warning('请输入调整原因');
+      return;
+    }
+    if (batchTargetCapacity === null && batchLimitCapacity === null) {
+      message.warning('请至少填写一个需要批量调整的字段（目标/极限）');
+      return;
+    }
+
+    const updates = selectedPools.map((p) => {
+      const target = batchTargetCapacity === null ? p.target_capacity_t : batchTargetCapacity;
+      const limit = batchLimitCapacity === null ? p.limit_capacity_t : batchLimitCapacity;
+      return {
+        machine_code: p.machine_code,
+        plan_date: p.plan_date,
+        target_capacity_t: target,
+        limit_capacity_t: limit,
+      };
+    });
+
+    const invalid = updates.find((u) => u.target_capacity_t < 0 || u.limit_capacity_t < 0 || u.limit_capacity_t < u.target_capacity_t);
+    if (invalid) {
+      message.error(`参数不合法：${invalid.machine_code} ${invalid.plan_date}（极限不能小于目标，且不能为负）`);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const operator = currentUser || 'system';
+      const resp = await capacityApi.batchUpdateCapacityPools(
+        updates,
+        batchReason,
+        operator,
+        activeVersionId || undefined
+      );
+
+      const updated = Number(resp?.updated ?? 0);
+      const skipped = Number(resp?.skipped ?? 0);
+      message.success(`${resp?.message || '批量更新完成'}：更新 ${updated} 条，跳过 ${skipped} 条`);
+
+      if (resp?.refresh) {
+        const refresh = resp.refresh as any;
+        const text = String(refresh?.message || '').trim();
+        if (text) {
+          if (refresh?.success) message.info(text);
+          else message.warning(text);
+        }
+      }
+
+      setBatchModalVisible(false);
+      setBatchTargetCapacity(null);
+      setBatchLimitCapacity(null);
+      setBatchReason('');
+      setSelectedRowKeys([]);
+      setSelectedPools([]);
+      await loadCapacityPools();
+    } catch (error: any) {
+      console.error('批量更新产能池失败:', error);
+      message.error(error?.message || '批量更新失败');
     } finally {
       setLoading(false);
     }
@@ -212,10 +326,14 @@ const CapacityPoolManagement: React.FC<CapacityPoolManagementProps> = ({ onNavig
   ];
 
   useEffect(() => {
-    if (activeVersionId) {
-      loadCapacityPools();
-    }
+    loadMachineOptions().catch(() => void 0);
   }, [activeVersionId]);
+
+  useEffect(() => {
+    if (!activeVersionId) return;
+    if (selectedMachines.length === 0) return;
+    loadCapacityPools().catch(() => void 0);
+  }, [activeVersionId, selectedMachines]);
 
   const totalStats = capacityPools.reduce(
     (acc, pool) => ({
@@ -244,11 +362,40 @@ const CapacityPoolManagement: React.FC<CapacityPoolManagementProps> = ({ onNavig
           <h2 style={{ margin: 0 }}>产能池管理</h2>
         </Col>
         <Col>
-          <Button icon={<ReloadOutlined />} onClick={loadCapacityPools}>
-            刷新
-          </Button>
+          <Space>
+            <Button icon={<ReloadOutlined />} onClick={loadCapacityPools}>
+              刷新
+            </Button>
+            <Button
+              icon={<EditOutlined />}
+              disabled={selectedPools.length === 0}
+              onClick={() => {
+                setBatchTargetCapacity(null);
+                setBatchLimitCapacity(null);
+                setBatchReason('');
+                setBatchModalVisible(true);
+              }}
+            >
+              批量调整{selectedPools.length > 0 ? `(${selectedPools.length})` : ''}
+            </Button>
+          </Space>
         </Col>
       </Row>
+
+      {loadError && (
+        <Alert
+          type="error"
+          showIcon
+          message="产能池加载失败"
+          description={loadError}
+          action={
+            <Button size="small" onClick={loadCapacityPools}>
+              重试
+            </Button>
+          }
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
       {/* 统计卡片 */}
       <Row gutter={16} style={{ marginBottom: 16 }}>
@@ -295,10 +442,11 @@ const CapacityPoolManagement: React.FC<CapacityPoolManagementProps> = ({ onNavig
             value={selectedMachines}
             onChange={setSelectedMachines}
           >
-            <Option value="H031">H031</Option>
-            <Option value="H032">H032</Option>
-            <Option value="H033">H033</Option>
-            <Option value="H034">H034</Option>
+            {machineOptions.map((code) => (
+              <Option key={code} value={code}>
+                {code}
+              </Option>
+            ))}
           </Select>
 
           <RangePicker
@@ -319,14 +467,22 @@ const CapacityPoolManagement: React.FC<CapacityPoolManagementProps> = ({ onNavig
           columns={columns}
           dataSource={capacityPools}
           loading={loading}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: (keys, rows) => {
+              setSelectedRowKeys(keys);
+              setSelectedPools(rows as CapacityPool[]);
+            },
+          }}
           rowKey={(record) => `${record.machine_code}-${record.plan_date}`}
           locale={tableEmptyConfig}
+          virtual
           pagination={{
             pageSize: 20,
             showSizeChanger: true,
             showTotal: (total) => `共 ${total} 条记录`,
           }}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 1000, y: 520 }}
           size="small"
         />
       </Card>
@@ -379,6 +535,57 @@ const CapacityPoolManagement: React.FC<CapacityPoolManagementProps> = ({ onNavig
             </div>
           </Space>
         )}
+      </Modal>
+
+      {/* 批量调整模态框 */}
+      <Modal
+        title={`批量调整产能池（已选 ${selectedPools.length} 条）`}
+        open={batchModalVisible}
+        onOk={handleBatchUpdate}
+        onCancel={() => setBatchModalVisible(false)}
+        okButtonProps={{ disabled: selectedPools.length === 0 }}
+        confirmLoading={loading}
+      >
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Alert
+            type="info"
+            showIcon
+            message="提示"
+            description="留空表示保持原值；批量提交后会自动触发一次决策刷新（可在Header看到刷新状态）。"
+          />
+          <div>
+            <label>目标产能(吨)：</label>
+            <InputNumber
+              style={{ width: '100%', marginTop: 8 }}
+              min={0}
+              max={10000}
+              value={batchTargetCapacity}
+              placeholder="留空表示不改"
+              onChange={(val) => setBatchTargetCapacity(typeof val === 'number' ? val : null)}
+            />
+          </div>
+          <div>
+            <label>极限产能(吨)：</label>
+            <InputNumber
+              style={{ width: '100%', marginTop: 8 }}
+              min={0}
+              max={10000}
+              value={batchLimitCapacity}
+              placeholder="留空表示不改"
+              onChange={(val) => setBatchLimitCapacity(typeof val === 'number' ? val : null)}
+            />
+          </div>
+          <div>
+            <label>调整原因(必填)：</label>
+            <Input.TextArea
+              style={{ marginTop: 8 }}
+              placeholder="请输入调整原因"
+              value={batchReason}
+              onChange={(e) => setBatchReason(e.target.value)}
+              rows={3}
+            />
+          </div>
+        </Space>
       </Modal>
     </div>
   );

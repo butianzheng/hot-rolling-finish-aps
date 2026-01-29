@@ -74,7 +74,7 @@ impl DaySummaryRepository {
         start_date: &str,
         end_date: &str,
     ) -> Result<Vec<DaySummary>, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         let sql = SqlQueryBuilder::new(
             r#"SELECT
@@ -154,7 +154,7 @@ impl DaySummaryRepository {
         start_date: &str,
         end_date: &str,
     ) -> Result<Vec<DaySummary>, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         let mut stmt = conn.prepare(
             r#"
@@ -442,7 +442,7 @@ mod tests {
     fn test_get_day_summary() {
         let conn_arc = setup_test_db();
         {
-            let conn = conn_arc.lock().unwrap();
+            let conn = conn_arc.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
             insert_test_data(&conn);
         }
 
@@ -463,7 +463,7 @@ mod tests {
     fn test_get_top_risky_days() {
         let conn_arc = setup_test_db();
         {
-            let conn = conn_arc.lock().unwrap();
+            let conn = conn_arc.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
             insert_test_data(&conn);
         }
 

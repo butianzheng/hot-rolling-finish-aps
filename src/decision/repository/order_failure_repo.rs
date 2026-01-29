@@ -31,7 +31,7 @@ impl OrderFailureRepository {
         version_id: &str,
         fail_type: Option<&str>,
     ) -> SqlResult<Vec<OrderFailure>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         let base_sql = r#"
             SELECT
@@ -81,7 +81,7 @@ impl OrderFailureRepository {
         version_id: &str,
         contract_no: &str,
     ) -> SqlResult<Option<OrderFailure>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         let sql = r#"
             SELECT
@@ -114,7 +114,7 @@ impl OrderFailureRepository {
 
     /// 统计失败订单数量
     pub fn count_failures(&self, version_id: &str) -> SqlResult<FailureStats> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         let sql = r#"
             SELECT
@@ -160,7 +160,7 @@ impl OrderFailureRepository {
             return Ok(HashMap::new());
         }
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
         let in_clause = build_in_clause("contract_no", contract_nos);
         let sql = format!(
             r#"
@@ -256,7 +256,7 @@ impl OrderFailureRepository {
 
     /// 刷新 D2 读模型 (全量刷新)
     pub fn refresh_full(&self, version_id: &str) -> SqlResult<usize> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         // 1. 删除旧数据
         conn.execute(
@@ -274,7 +274,7 @@ impl OrderFailureRepository {
         version_id: &str,
         contract_nos: &[String],
     ) -> SqlResult<usize> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         // 1. 删除受影响的记录
         if !contract_nos.is_empty() {

@@ -12,8 +12,10 @@ use std::sync::Mutex;
 
 use crate::api::error::{ApiError, ApiResult};
 use crate::config::config_manager::ConfigManager;
+use crate::config::strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
 use crate::domain::action_log::ActionLog;
 use crate::repository::action_log_repo::ActionLogRepository;
+use crate::engine::ScheduleStrategy;
 
 // ==========================================
 // ConfigApi - 配置管理 API
@@ -31,6 +33,8 @@ pub struct ConfigApi {
     config_manager: Arc<ConfigManager>,
     action_log_repo: Arc<ActionLogRepository>,
 }
+
+const CUSTOM_STRATEGY_KEY_PREFIX: &str = "custom_strategy/";
 
 impl ConfigApi {
     /// 创建新的ConfigApi实例
@@ -52,7 +56,8 @@ impl ConfigApi {
     /// - Ok(Vec<ConfigItem>): 配置列表
     /// - Err(ApiError): API错误
     pub fn list_configs(&self) -> ApiResult<Vec<ConfigItem>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock()
+            .map_err(|e| ApiError::DatabaseError(format!("锁获取失败: {}", e)))?;
 
         let mut stmt = conn
             .prepare("SELECT scope_id, key, value FROM config_kv ORDER BY scope_id, key")
@@ -84,7 +89,8 @@ impl ConfigApi {
     /// - Ok(None): 配置不存在
     /// - Err(ApiError): API错误
     pub fn get_config(&self, scope_id: &str, key: &str) -> ApiResult<Option<ConfigItem>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock()
+            .map_err(|e| ApiError::DatabaseError(format!("锁获取失败: {}", e)))?;
 
         let result = conn.query_row(
             "SELECT scope_id, key, value FROM config_kv WHERE scope_id = ?1 AND key = ?2",
@@ -136,7 +142,8 @@ impl ConfigApi {
             return Err(ApiError::InvalidInput("操作原因不能为空".to_string()));
         }
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock()
+            .map_err(|e| ApiError::DatabaseError(format!("锁获取失败: {}", e)))?;
 
         // 使用UPSERT语法
         conn.execute(
@@ -198,7 +205,8 @@ impl ConfigApi {
             return Err(ApiError::InvalidInput("操作原因不能为空".to_string()));
         }
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock()
+            .map_err(|e| ApiError::DatabaseError(format!("锁获取失败: {}", e)))?;
 
         conn.execute("BEGIN TRANSACTION", [])
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
@@ -315,6 +323,147 @@ impl ConfigApi {
 
         Ok(count)
     }
+
+    // ==========================================
+    // 自定义策略（P2）
+    // ==========================================
+
+    /// 保存自定义策略（持久化到 config_kv，不改表结构）
+    ///
+    /// 存储规则：
+    /// - scope_id 固定为 'global'
+    /// - key = "custom_strategy/{strategy_id}"
+    /// - value = CustomStrategyProfile 的 JSON
+    ///
+    /// # 注意
+    /// - 本接口只负责“保存 + 校验 + 审计(ActionLog)”，不直接影响排产结果；
+    /// - 后续在草案对比/一键优化选择“自定义策略”时，可复用该存储。
+    pub fn save_custom_strategy(
+        &self,
+        mut profile: CustomStrategyProfile,
+        operator: &str,
+        reason: &str,
+    ) -> ApiResult<SaveCustomStrategyResponse> {
+        if operator.trim().is_empty() {
+            return Err(ApiError::InvalidInput("操作人不能为空".to_string()));
+        }
+        if reason.trim().is_empty() {
+            return Err(ApiError::InvalidInput("操作原因不能为空".to_string()));
+        }
+
+        profile.strategy_id = profile.strategy_id.trim().to_string();
+        profile.title = profile.title.trim().to_string();
+        if let Some(desc) = profile.description.as_ref() {
+            let trimmed = desc.trim().to_string();
+            profile.description = if trimmed.is_empty() { None } else { Some(trimmed) };
+        }
+
+        validate_custom_strategy_profile(&profile)?;
+
+        let key = format!("{}{}", CUSTOM_STRATEGY_KEY_PREFIX, profile.strategy_id);
+        let value = serde_json::to_string(&profile)
+            .map_err(|e| ApiError::ValidationError(format!("序列化自定义策略失败: {}", e)))?;
+
+        let conn = self.conn.lock()
+            .map_err(|e| ApiError::DatabaseError(format!("锁获取失败: {}", e)))?;
+
+        // 判断是新增还是覆盖（用于返回与审计提示）
+        let existed: bool = conn
+            .query_row(
+                "SELECT 1 FROM config_kv WHERE scope_id = 'global' AND key = ?1 LIMIT 1",
+                params![&key],
+                |_| Ok::<_, rusqlite::Error>(()),
+            )
+            .is_ok();
+
+        conn.execute(
+            "INSERT INTO config_kv (scope_id, key, value) VALUES ('global', ?1, ?2)
+             ON CONFLICT(scope_id, key) DO UPDATE SET value = ?2, updated_at = datetime('now')",
+            params![&key, &value],
+        )
+        .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        drop(conn);
+
+        // 记录ActionLog（可解释性红线：所有写操作必须有审计）
+        let action_log = ActionLog {
+            action_id: uuid::Uuid::new_v4().to_string(),
+            version_id: "N/A".to_string(),
+            action_type: "SAVE_CUSTOM_STRATEGY".to_string(),
+            action_ts: chrono::Local::now().naive_local(),
+            actor: operator.to_string(),
+            payload_json: Some(serde_json::json!({
+                "strategy_id": profile.strategy_id,
+                "title": profile.title,
+                "base_strategy": profile.base_strategy,
+                "parameters": profile.parameters,
+                "reason": reason,
+                "stored_key": key,
+            })),
+            impact_summary_json: Some(serde_json::json!({
+                "existed": existed,
+            })),
+            machine_code: None,
+            date_range_start: None,
+            date_range_end: None,
+            detail: Some(format!(
+                "{}自定义策略: {} ({})",
+                if existed { "更新" } else { "新增" },
+                profile.title,
+                profile.strategy_id
+            )),
+        };
+
+        self.action_log_repo
+            .insert(&action_log)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        Ok(SaveCustomStrategyResponse {
+            strategy_id: profile.strategy_id,
+            stored_key: key,
+            existed,
+            message: if existed {
+                "自定义策略已更新".to_string()
+            } else {
+                "自定义策略已保存".to_string()
+            },
+        })
+    }
+
+    /// 查询所有自定义策略（从 config_kv 扫描 key 前缀）
+    pub fn list_custom_strategies(&self) -> ApiResult<Vec<CustomStrategyProfile>> {
+        let conn = self.conn.lock()
+            .map_err(|e| ApiError::DatabaseError(format!("锁获取失败: {}", e)))?;
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT key, value FROM config_kv WHERE scope_id = 'global' AND key LIKE ?1 ORDER BY key",
+            )
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        let like = format!("{}%", CUSTOM_STRATEGY_KEY_PREFIX);
+
+        let rows = stmt
+            .query_map(params![like], |row| {
+                let _key: String = row.get(0)?;
+                let value: String = row.get(1)?;
+                Ok(value)
+            })
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        let mut out = Vec::new();
+        for row in rows {
+            let raw = row.map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+            let profile: CustomStrategyProfile = serde_json::from_str(&raw).map_err(|e| {
+                ApiError::ValidationError(format!("解析自定义策略失败（请检查 config_kv 的 JSON）: {}", e))
+            })?;
+            // 读取时也做一次基础校验，避免脏数据污染前端
+            validate_custom_strategy_profile(&profile)?;
+            out.push(profile);
+        }
+
+        Ok(out)
+    }
 }
 
 // ==========================================
@@ -332,6 +481,96 @@ pub struct ConfigItem {
 
     /// 配置值
     pub value: String,
+}
+
+/// 保存自定义策略响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SaveCustomStrategyResponse {
+    pub strategy_id: String,
+    pub stored_key: String,
+    pub existed: bool,
+    pub message: String,
+}
+
+fn validate_custom_strategy_profile(profile: &CustomStrategyProfile) -> ApiResult<()> {
+    if profile.strategy_id.trim().is_empty() {
+        return Err(ApiError::InvalidInput("strategy_id 不能为空".to_string()));
+    }
+    if profile.strategy_id.len() > 64 {
+        return Err(ApiError::InvalidInput("strategy_id 过长（最多64字符）".to_string()));
+    }
+    if !profile
+        .strategy_id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
+        return Err(ApiError::InvalidInput(
+            "strategy_id 只能包含字母/数字/下划线/连字符".to_string(),
+        ));
+    }
+
+    if profile.title.trim().is_empty() {
+        return Err(ApiError::InvalidInput("title 不能为空".to_string()));
+    }
+    if profile.title.len() > 80 {
+        return Err(ApiError::InvalidInput("title 过长（最多80字符）".to_string()));
+    }
+
+    // base_strategy 必须是已知预设之一，避免把“临时字符串”误当作策略导致不可复现。
+    profile
+        .base_strategy
+        .parse::<ScheduleStrategy>()
+        .map_err(|e| ApiError::InvalidInput(format!("base_strategy 无效: {}", e)))?;
+
+    validate_custom_strategy_parameters(&profile.parameters)?;
+
+    Ok(())
+}
+
+fn validate_custom_strategy_parameters(params: &CustomStrategyParameters) -> ApiResult<()> {
+    fn check_weight(name: &str, v: Option<f64>) -> ApiResult<()> {
+        if let Some(x) = v {
+            if !x.is_finite() {
+                return Err(ApiError::InvalidInput(format!("{} 必须为有效数字", name)));
+            }
+            if x < 0.0 || x > 100.0 {
+                return Err(ApiError::InvalidInput(format!(
+                    "{} 超出范围（0~100）",
+                    name
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    check_weight("urgent_weight", params.urgent_weight)?;
+    check_weight("capacity_weight", params.capacity_weight)?;
+    check_weight("cold_stock_weight", params.cold_stock_weight)?;
+    check_weight("due_date_weight", params.due_date_weight)?;
+    check_weight("rolling_output_age_weight", params.rolling_output_age_weight)?;
+
+    if let Some(days) = params.cold_stock_age_threshold_days {
+        if days < 0 || days > 365 {
+            return Err(ApiError::InvalidInput(
+                "cold_stock_age_threshold_days 超出范围（0~365）".to_string(),
+            ));
+        }
+    }
+
+    if let Some(pct) = params.overflow_tolerance_pct {
+        if !pct.is_finite() {
+            return Err(ApiError::InvalidInput(
+                "overflow_tolerance_pct 必须为有效数字".to_string(),
+            ));
+        }
+        if pct < 0.0 || pct > 1.0 {
+            return Err(ApiError::InvalidInput(
+                "overflow_tolerance_pct 超出范围（0~1）".to_string(),
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

@@ -131,7 +131,8 @@ impl RefreshQueue {
 
     /// 确保刷新任务队列表存在
     fn ensure_queue_table(&self) -> Result<(), Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock()
+            .map_err(|e| format!("锁获取失败: {}", e))?;
         conn.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS decision_refresh_queue (
@@ -164,7 +165,8 @@ impl RefreshQueue {
 
     /// 提交刷新任务到队列
     pub fn enqueue(&self, task: RefreshTask) -> Result<String, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock()
+            .map_err(|e| format!("锁获取失败: {}", e))?;
 
         // 检查是否已有相同版本的运行中任务
         let running_count: i64 = conn.query_row(
@@ -232,7 +234,8 @@ impl RefreshQueue {
 
     /// 获取下一个待执行任务
     pub fn dequeue(&self) -> Result<Option<RefreshTask>, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock()
+            .map_err(|e| format!("锁获取失败: {}", e))?;
 
         // 查找最早的待执行任务（状态为 PENDING）
         let task_opt = conn
@@ -343,7 +346,8 @@ impl RefreshQueue {
                 task.status = RefreshStatus::Completed;
                 task.completed_at = Some(Utc::now().to_rfc3339());
 
-                let conn = self.conn.lock().unwrap();
+                let conn = self.conn.lock()
+                    .map_err(|e| format!("锁获取失败: {}", e))?;
                 conn.execute(
                     "UPDATE decision_refresh_queue SET status = 'COMPLETED', completed_at = ?1, refresh_id = ?2 WHERE task_id = ?3",
                     rusqlite::params![task.completed_at, refresh_id, task.task_id],
@@ -363,7 +367,8 @@ impl RefreshQueue {
                 task.error_message = Some(e.to_string());
                 task.retry_count += 1;
 
-                let conn = self.conn.lock().unwrap();
+                let conn = self.conn.lock()
+                    .map_err(|e| format!("锁获取失败: {}", e))?;
 
                 // 如果可以重试，更新为 PENDING 状态
                 if task.can_retry() {
@@ -440,7 +445,8 @@ impl RefreshQueue {
 
     /// 获取任务状态
     pub fn get_task_status(&self, task_id: &str) -> Result<Option<RefreshTask>, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock()
+            .map_err(|e| format!("锁获取失败: {}", e))?;
 
         let task_opt = conn
             .query_row(
@@ -525,7 +531,8 @@ impl RefreshQueue {
 
     /// 取消任务
     pub fn cancel_task(&self, task_id: &str) -> Result<bool, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock()
+            .map_err(|e| format!("锁获取失败: {}", e))?;
 
         let rows_affected = conn.execute(
             "UPDATE decision_refresh_queue SET status = 'CANCELLED' WHERE task_id = ?1 AND status = 'PENDING'",
@@ -537,7 +544,8 @@ impl RefreshQueue {
 
     /// 获取队列统计信息
     pub fn get_queue_stats(&self) -> Result<QueueStats, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock()
+            .map_err(|e| format!("锁获取失败: {}", e))?;
 
         let pending_count: i64 = conn.query_row(
             "SELECT COUNT(*) FROM decision_refresh_queue WHERE status = 'PENDING'",

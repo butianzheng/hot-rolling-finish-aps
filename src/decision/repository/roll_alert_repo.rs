@@ -40,7 +40,7 @@ impl RollAlertRepository {
         version_id: &str,
         alert_level: Option<&str>,
     ) -> SqlResult<Vec<RollAlert>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         let base_sql = r#"
             SELECT
@@ -112,7 +112,7 @@ impl RollAlertRepository {
         version_id: &str,
         machine_code: &str,
     ) -> SqlResult<Vec<RollAlert>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         let sql = r#"
             SELECT
@@ -168,7 +168,7 @@ impl RollAlertRepository {
 
     /// 统计换辊预警
     pub fn get_roll_alert_summary(&self, version_id: &str) -> SqlResult<RollAlertSummary> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         // 查询总体统计
         let mut stmt = conn.prepare(
@@ -241,7 +241,7 @@ impl RollAlertRepository {
     /// 3. 计算预警等级和指标
     /// 4. 生成建议措施
     pub fn refresh_full(&self, version_id: &str) -> SqlResult<usize> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         // 1. 删除旧数据
         conn.execute(
@@ -294,7 +294,7 @@ impl RollAlertRepository {
             return Ok(0);
         }
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         // 1. 删除受影响机组的记录
         let in_clause = build_in_clause("machine_code", machine_codes);
@@ -577,12 +577,16 @@ mod tests {
         conn.execute(
             r#"
             CREATE TABLE IF NOT EXISTS roller_campaign (
+                version_id TEXT NOT NULL,
                 machine_code TEXT NOT NULL,
                 campaign_no INTEGER NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT,
+                cum_weight_t REAL NOT NULL DEFAULT 0,
                 status TEXT NOT NULL,
                 suggest_threshold_t REAL NOT NULL,
                 hard_limit_t REAL NOT NULL,
-                PRIMARY KEY (machine_code, campaign_no)
+                PRIMARY KEY (version_id, machine_code, campaign_no)
             )
             "#,
             [],
@@ -623,7 +627,7 @@ mod tests {
 
         // H032: 正常 (5000t / 10000t = 50%)
         conn.execute(
-            "INSERT INTO roller_campaign VALUES ('H032', 1, 'ACTIVE', 10000.0, 12000.0)",
+            "INSERT INTO roller_campaign (version_id, machine_code, campaign_no, start_date, end_date, cum_weight_t, status, suggest_threshold_t, hard_limit_t) VALUES ('V001', 'H032', 1, '2026-01-01', NULL, 0.0, 'ACTIVE', 10000.0, 12000.0)",
             [],
         )
         .unwrap();
@@ -643,7 +647,7 @@ mod tests {
 
         // H033: 警告 (9000t / 10000t = 90%)
         conn.execute(
-            "INSERT INTO roller_campaign VALUES ('H033', 1, 'ACTIVE', 10000.0, 12000.0)",
+            "INSERT INTO roller_campaign (version_id, machine_code, campaign_no, start_date, end_date, cum_weight_t, status, suggest_threshold_t, hard_limit_t) VALUES ('V001', 'H033', 1, '2026-01-01', NULL, 0.0, 'ACTIVE', 10000.0, 12000.0)",
             [],
         )
         .unwrap();
@@ -663,7 +667,7 @@ mod tests {
 
         // H034: 严重 (10500t / 10000t = 105%)
         conn.execute(
-            "INSERT INTO roller_campaign VALUES ('H034', 1, 'ACTIVE', 10000.0, 12000.0)",
+            "INSERT INTO roller_campaign (version_id, machine_code, campaign_no, start_date, end_date, cum_weight_t, status, suggest_threshold_t, hard_limit_t) VALUES ('V001', 'H034', 1, '2026-01-01', NULL, 0.0, 'ACTIVE', 10000.0, 12000.0)",
             [],
         )
         .unwrap();

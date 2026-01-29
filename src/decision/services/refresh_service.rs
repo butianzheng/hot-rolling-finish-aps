@@ -89,7 +89,8 @@ impl DecisionRefreshService {
         let refresh_id = Uuid::new_v4().to_string();
         let started_at = Utc::now().to_rfc3339();
 
-        let mut conn = self.conn.lock().unwrap();
+        let mut conn = self.conn.lock()
+            .map_err(|e| format!("锁获取失败: {}", e))?;
         let tx = conn.transaction()?;
 
         // 记录刷新开始

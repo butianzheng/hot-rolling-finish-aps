@@ -29,6 +29,7 @@ import {
   LockOutlined,
   UnlockOutlined,
   FireOutlined,
+  StopOutlined,
   MoreOutlined,
   WarningOutlined,
   InfoCircleOutlined,
@@ -44,8 +45,9 @@ import { FrozenZoneBadge } from './guards/FrozenZoneBadge';
 import { RedLineGuard, createFrozenZoneViolation, createMaturityViolation } from './guards/RedLineGuard';
 import type { RedLineViolation } from './guards/RedLineGuard';
 import { FONT_FAMILIES } from '../theme';
-import { useActiveVersionId, useCurrentUser, useAdminOverrideMode } from '../stores/use-global-store';
+import { useActiveVersionId, useCurrentUser, useAdminOverrideMode, useGlobalStore } from '../stores/use-global-store';
 import { formatDate } from '../utils/formatters';
+import { normalizeSchedState } from '../utils/schedState';
 import type { CapacityTimelineData } from '../types/capacity';
 
 const { TextArea } = Input;
@@ -73,11 +75,12 @@ const MaterialManagement: React.FC = () => {
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   const [inspectorVisible, setInspectorVisible] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalType, setModalType] = useState<'lock' | 'unlock' | 'urgent'>('lock');
+  const [modalType, setModalType] = useState<'lock' | 'unlock' | 'urgent' | 'clearUrgent' | 'forceRelease'>('lock');
   const [reason, setReason] = useState('');
   const currentUser = useCurrentUser();
   const adminOverrideMode = useAdminOverrideMode();
   const activeVersionId = useActiveVersionId();
+  const preferredMachineCode = useGlobalStore((state) => state.workbenchFilters.machineCode);
 
   // 产能时间线（来自实际排产版本+产能池）
   const [machineOptions, setMachineOptions] = useState<Array<{ label: string; value: string }>>([]);
@@ -88,7 +91,7 @@ const MaterialManagement: React.FC = () => {
   const [timelineError, setTimelineError] = useState<string | null>(null);
 
   const loadMachineOptions = useCallback(async () => {
-    const result = await materialApi.listMaterials({ limit: 0, offset: 0 });
+    const result = await materialApi.listMaterials({ limit: 1000, offset: 0 });
     const codes = new Set<string>();
     (Array.isArray(result) ? result : []).forEach((m: any) => {
       const code = String(m?.machine_code ?? '').trim();
@@ -206,12 +209,19 @@ const MaterialManagement: React.FC = () => {
   useEffect(() => {
     loadMachineOptions()
       .then((options) => {
-        setTimelineMachine((prev) => prev || options[0]?.value);
+        setTimelineMachine((prev) => {
+          if (prev) return prev;
+          const preferred =
+            preferredMachineCode && options.some((o) => o.value === preferredMachineCode)
+              ? preferredMachineCode
+              : undefined;
+          return preferred || options[0]?.value;
+        });
       })
       .catch((e) => {
         console.error('加载机组列表失败:', e);
       });
-  }, [loadMachineOptions]);
+  }, [loadMachineOptions, preferredMachineCode]);
 
   // 激活版本 / 选择变化时刷新时间线
   useEffect(() => {
@@ -231,7 +241,13 @@ const MaterialManagement: React.FC = () => {
   const checkFrozenViolation = (material: Material, operation: string): RedLineViolation | null => {
     if (adminOverrideMode) return null; // 管理员覆盖模式下跳过检查
 
-    if (material.is_frozen && (operation === 'lock' || operation === 'unlock' || operation === 'urgent')) {
+    if (
+      material.is_frozen &&
+      (operation === 'lock' ||
+        operation === 'unlock' ||
+        operation === 'urgent' ||
+        operation === 'clearUrgent')
+    ) {
       return createFrozenZoneViolation(
         [material.material_id],
         '该材料位于冻结区，不允许修改状态'
@@ -339,35 +355,54 @@ const MaterialManagement: React.FC = () => {
       width: 120,
       valueType: 'select',
       valueEnum: {
-        Ready: { text: '就绪', status: 'Success' },
-        Scheduled: { text: '已排产', status: 'Processing' },
-        Locked: { text: '已锁定', status: 'Warning' },
-        Frozen: { text: '冻结', status: 'Default' },
+        READY: { text: '就绪', status: 'Success' },
+        PENDING_MATURE: { text: '未成熟', status: 'Default' },
+        FORCE_RELEASE: { text: '强制放行', status: 'Processing' },
+        LOCKED: { text: '已锁定', status: 'Warning' },
+        SCHEDULED: { text: '已排产', status: 'Processing' },
+        BLOCKED: { text: '阻断', status: 'Error' },
+        UNKNOWN: { text: '未知', status: 'Default' },
       },
       render: (_, record) => {
         const stateConfig: Record<string, { color: string; text: string; tooltip: string }> = {
-          Ready: {
+          READY: {
             color: '#52c41a',
             text: '就绪',
             tooltip: '就绪状态 - 材料已适温,可以进入产能池参与排产',
           },
-          Scheduled: {
+          PENDING_MATURE: {
+            color: '#8c8c8c',
+            text: '未成熟',
+            tooltip: '未成熟/冷料 - 材料尚未达到适温要求,不可排产',
+          },
+          FORCE_RELEASE: {
+            color: '#1677ff',
+            text: '强制放行',
+            tooltip: '强制放行 - 绕过适温限制,允许参与排产',
+          },
+          SCHEDULED: {
             color: '#1677ff',
             text: '已排产',
             tooltip: '已排产 - 材料已分配到具体日期和机组,等待执行',
           },
-          Locked: {
+          LOCKED: {
             color: '#faad14',
             text: '已锁定',
             tooltip: '已锁定 - 材料被人工锁定,不可自动调整位置',
           },
-          Frozen: {
+          BLOCKED: {
+            color: '#ff4d4f',
+            text: '阻断',
+            tooltip: '阻断 - 数据质量问题导致材料不可排产,需要先修复数据',
+          },
+          UNKNOWN: {
             color: '#8c8c8c',
-            text: '冻结',
-            tooltip: '冻结区 - 材料位于冻结区,受 Red Line 保护,不可修改',
+            text: '未知',
+            tooltip: '未知状态 - 材料状态缺失或未被正确计算',
           },
         };
-        const config = stateConfig[record.sched_state] || stateConfig.Ready;
+        const state = normalizeSchedState(record.sched_state);
+        const config = stateConfig[state] || stateConfig.UNKNOWN;
         return (
           <Tooltip title={config.tooltip}>
             <Tag color={config.color} style={{ cursor: 'help' }}>
@@ -461,10 +496,17 @@ const MaterialManagement: React.FC = () => {
           },
           {
             key: 'urgent',
-            label: '设为紧急',
-            icon: <FireOutlined />,
+            label: record.manual_urgent_flag ? '取消紧急' : '设为紧急',
+            icon: record.manual_urgent_flag ? <StopOutlined /> : <FireOutlined />,
+            danger: !record.manual_urgent_flag,
+            onClick: () => handleSingleOperation(record, record.manual_urgent_flag ? 'clearUrgent' : 'urgent'),
+          },
+          {
+            key: 'forceRelease',
+            label: '强制放行',
+            icon: <WarningOutlined />,
             danger: true,
-            onClick: () => handleSingleOperation(record, 'urgent'),
+            onClick: () => handleSingleOperation(record, 'forceRelease'),
           },
         ];
 
@@ -482,7 +524,7 @@ const MaterialManagement: React.FC = () => {
     try {
       const result = await materialApi.listMaterials({
         machine_code: params.machine_code,
-        limit: 0,
+        limit: 1000,
         offset: 0,
       });
 
@@ -490,7 +532,8 @@ const MaterialManagement: React.FC = () => {
       let filtered = result;
 
       if (params.sched_state) {
-        filtered = filtered.filter((m: Material) => m.sched_state === params.sched_state);
+        const want = normalizeSchedState(params.sched_state);
+        filtered = filtered.filter((m: Material) => normalizeSchedState(m.sched_state) === want);
       }
       if (params.urgent_level) {
         filtered = filtered.filter((m: Material) => m.urgent_level === params.urgent_level);
@@ -536,7 +579,7 @@ const MaterialManagement: React.FC = () => {
   };
 
   // 单个材料操作
-  const handleSingleOperation = (record: Material, type: 'lock' | 'unlock' | 'urgent') => {
+  const handleSingleOperation = (record: Material, type: 'lock' | 'unlock' | 'urgent' | 'clearUrgent' | 'forceRelease') => {
     // 检查 Red Line 违规
     const violations = checkRedLineViolations(record, type);
     if (violations.length > 0) {
@@ -578,7 +621,7 @@ const MaterialManagement: React.FC = () => {
   };
 
   // 批量操作
-  const handleBatchOperation = async (type: 'lock' | 'unlock' | 'urgent') => {
+  const handleBatchOperation = async (type: 'lock' | 'unlock' | 'urgent' | 'clearUrgent' | 'forceRelease') => {
     if (selectedRowKeys.length === 0) {
       message.warning('请先选择材料');
       return;
@@ -586,7 +629,7 @@ const MaterialManagement: React.FC = () => {
 
     // 批量检查 Red Line 违规
     if (!adminOverrideMode) {
-      const result = await materialApi.listMaterials({ limit: 0, offset: 0 });
+      const result = await materialApi.listMaterials({ limit: 1000, offset: 0 });
       const selectedMaterials = result.filter((m: Material) =>
         selectedRowKeys.includes(m.material_id)
       );
@@ -650,16 +693,23 @@ const MaterialManagement: React.FC = () => {
     try {
       const materialIds = selectedRowKeys as string[];
       const operator = currentUser || 'admin';
+      const validationMode = adminOverrideMode ? 'AutoFix' : undefined;
 
       if (modalType === 'lock') {
-        await materialApi.batchLockMaterials(materialIds, true, operator, reason);
+        await materialApi.batchLockMaterials(materialIds, true, operator, reason, validationMode);
         message.success('锁定成功');
       } else if (modalType === 'unlock') {
-        await materialApi.batchLockMaterials(materialIds, false, operator, reason);
+        await materialApi.batchLockMaterials(materialIds, false, operator, reason, validationMode);
         message.success('解锁成功');
       } else if (modalType === 'urgent') {
         await materialApi.batchSetUrgent(materialIds, true, operator, reason);
         message.success('设置紧急标志成功');
+      } else if (modalType === 'clearUrgent') {
+        await materialApi.batchSetUrgent(materialIds, false, operator, reason);
+        message.success('取消紧急标志成功');
+      } else if (modalType === 'forceRelease') {
+        await materialApi.batchForceRelease(materialIds, operator, reason, validationMode);
+        message.success('强制放行成功');
       }
 
       setModalVisible(false);
@@ -681,6 +731,10 @@ const MaterialManagement: React.FC = () => {
         return `解锁材料 (${count} 件)`;
       case 'urgent':
         return `设置紧急标志 (${count} 件)`;
+      case 'clearUrgent':
+        return `取消紧急标志 (${count} 件)`;
+      case 'forceRelease':
+        return `强制放行 (${count} 件)`;
       default:
         return '操作';
     }
@@ -819,6 +873,21 @@ const MaterialManagement: React.FC = () => {
             >
               批量设为紧急
             </Button>
+            <Button
+              size="small"
+              icon={<StopOutlined />}
+              onClick={() => handleBatchOperation('clearUrgent')}
+            >
+              批量取消紧急
+            </Button>
+            <Button
+              size="small"
+              danger
+              icon={<WarningOutlined />}
+              onClick={() => handleBatchOperation('forceRelease')}
+            >
+              批量强制放行
+            </Button>
             <Button size="small" onClick={() => setSelectedRowKeys([])}>
               取消选择
             </Button>
@@ -859,6 +928,7 @@ const MaterialManagement: React.FC = () => {
         onLock={() => handleSingleOperation(selectedMaterial!, 'lock')}
         onUnlock={() => handleSingleOperation(selectedMaterial!, 'unlock')}
         onSetUrgent={() => handleSingleOperation(selectedMaterial!, 'urgent')}
+        onClearUrgent={() => handleSingleOperation(selectedMaterial!, 'clearUrgent')}
       />
 
       {/* 操作确认模态框 */}
@@ -899,6 +969,15 @@ const MaterialManagement: React.FC = () => {
                 </div>
               </Space>
             </div>
+          )}
+
+          {!adminOverrideMode && modalType === 'forceRelease' && (
+            <Alert
+              type="info"
+              showIcon
+              message="提示"
+              description="严格模式下，若存在未适温材料会阻止“强制放行”。如需放行未适温材料，请开启“管理员覆盖模式”。"
+            />
           )}
 
           <div>

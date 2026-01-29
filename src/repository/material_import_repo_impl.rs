@@ -183,7 +183,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
         &self,
         materials: Vec<MaterialMaster>,
     ) -> Result<usize, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
         let tx = conn.unchecked_transaction()?;
 
         let count = Self::batch_insert_material_master_tx(&tx, &materials)?;
@@ -197,7 +197,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
         &self,
         states: Vec<MaterialState>,
     ) -> Result<usize, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
         let tx = conn.unchecked_transaction()?;
 
         let count = Self::batch_insert_material_state_tx(&tx, &states)?;
@@ -208,7 +208,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
 
     /// 插入单个冲突记录
     async fn insert_conflict(&self, conflict: ImportConflict) -> Result<(), Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         conn.execute(
             r#"
@@ -239,7 +239,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
         &self,
         conflicts: Vec<ImportConflict>,
     ) -> Result<usize, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
         let tx = conn.unchecked_transaction()?;
 
         let mut stmt = tx.prepare(
@@ -280,7 +280,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
         &self,
         batch_id: &str,
     ) -> Result<Vec<ImportConflict>, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         let mut stmt = conn.prepare(
             r#"
@@ -325,7 +325,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
         &self,
         material_id: &str,
     ) -> Result<Vec<ImportConflict>, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         let mut stmt = conn.prepare(
             r#"
@@ -364,7 +364,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
 
     /// 标记冲突为已解决
     async fn mark_conflict_resolved(&self, conflict_id: &str) -> Result<(), Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         conn.execute(
             r#"
@@ -385,7 +385,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
         limit: i32,
         offset: i32,
     ) -> Result<Vec<ImportConflict>, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         let conflicts: Vec<ImportConflict> = match status {
             Some(s) => {
@@ -463,7 +463,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
         &self,
         status: Option<&str>,
     ) -> Result<i64, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         let count: i64 = match status {
             Some(s) => conn.query_row(
@@ -486,7 +486,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
         &self,
         conflict_id: &str,
     ) -> Result<Option<ImportConflict>, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         let mut stmt = conn.prepare(
             r#"
@@ -531,7 +531,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
         action: &str,
         note: Option<&str>,
     ) -> Result<(), Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         conn.execute(
             r#"
@@ -555,7 +555,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
 
     /// 插入导入批次记录
     async fn insert_batch(&self, batch: ImportBatch) -> Result<(), Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         conn.execute(
             r#"
@@ -586,7 +586,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
 
     /// 查询最近的导入批次
     async fn get_recent_batches(&self, limit: usize) -> Result<Vec<ImportBatch>, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         let mut stmt = conn.prepare(
             r#"
@@ -625,7 +625,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
 
     /// 检查材料号是否已存在
     async fn exists_material(&self, material_id: &str) -> Result<bool, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         let count: i64 = conn.query_row(
             "SELECT COUNT(*) FROM material_master WHERE material_id = ?1",
@@ -641,7 +641,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
         &self,
         material_ids: Vec<String>,
     ) -> Result<Vec<String>, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         // 构建 IN 子句的占位符
         let placeholders = material_ids
@@ -672,7 +672,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
 
     /// 统计 material_master 表记录数
     async fn count_materials(&self) -> Result<usize, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         let count: i64 = conn.query_row(
             "SELECT COUNT(*) FROM material_master",
@@ -685,7 +685,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
 
     /// 统计 material_state 表记录数
     async fn count_states(&self) -> Result<usize, Box<dyn Error>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         let count: i64 = conn.query_row(
             "SELECT COUNT(*) FROM material_state",

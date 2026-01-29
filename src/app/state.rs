@@ -32,6 +32,8 @@ use crate::repository::{
     risk_repo::RiskSnapshotRepository,
     capacity_repo::CapacityPoolRepository,
     roller_repo::RollerCampaignRepository,
+    strategy_draft_repo::StrategyDraftRepository,
+    decision_refresh_repo::DecisionRefreshRepository,
 };
 use crate::engine::{
     eligibility::EligibilityEngine,
@@ -100,6 +102,10 @@ impl AppState {
         // 创建数据库连接（共享连接）
         let conn = Connection::open(&db_path)
             .map_err(|e| format!("无法打开数据库: {}", e))?;
+        // Best-effort: keep DB optimizations from blocking app startup.
+        if let Err(e) = ensure_action_log_indexes(&conn) {
+            tracing::warn!("action_log 索引初始化失败(将继续启动): {}", e);
+        }
         let conn = Arc::new(Mutex::new(conn));
 
         // ==========================================
@@ -123,6 +129,8 @@ impl AppState {
 
         // 其他Repository
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
+        // 策略草案仓储（草案持久化：避免刷新/重启丢失）
+        let strategy_draft_repo = Arc::new(StrategyDraftRepository::new(conn.clone()));
         let risk_snapshot_repo = Arc::new(
             RiskSnapshotRepository::new(&db_path)
                 .map_err(|e| format!("无法创建RiskSnapshotRepository: {}", e))?
@@ -200,7 +208,8 @@ impl AppState {
                 {
                     // 注意：不要在持有 conn 锁时调用 queue 方法，避免死锁。
                     let needs_refresh = {
-                        let c = conn.lock().unwrap();
+                        let c = conn.lock()
+                            .map_err(|e| format!("启动时锁获取失败: {}", e))?;
                         let d1_count: i64 = c
                             .query_row(
                                 "SELECT COUNT(*) FROM decision_day_summary WHERE version_id = ?1",
@@ -304,8 +313,11 @@ impl AppState {
             plan_repo,
             plan_version_repo,
             plan_item_repo.clone(),
+            material_state_repo.clone(),
+            strategy_draft_repo.clone(),
             action_log_repo.clone(),
             risk_snapshot_repo.clone(),
+            config_manager.clone(),
             recalc_engine,
             risk_engine,
             event_publisher,
@@ -331,9 +343,11 @@ impl AppState {
         ));
 
         // 驾驶舱API（封装 DecisionApi）
+        let decision_refresh_repo = Arc::new(DecisionRefreshRepository::new(conn.clone()));
         let dashboard_api = Arc::new(DashboardApi::new(
             decision_api.clone(),
             action_log_repo.clone(),
+            decision_refresh_repo,
         ));
 
         // 配置管理API
@@ -372,6 +386,20 @@ impl AppState {
     pub fn get_db_path(&self) -> &str {
         &self.db_path
     }
+}
+
+fn ensure_action_log_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
+    conn.execute_batch(
+        r#"
+        -- action_log is frequently queried by time window; keep this fast for UX (workbench/strategy compare).
+        CREATE INDEX IF NOT EXISTS idx_action_ts ON action_log(action_ts);
+        CREATE INDEX IF NOT EXISTS idx_action_type_ts ON action_log(action_type, action_ts);
+        CREATE INDEX IF NOT EXISTS idx_action_actor_ts ON action_log(actor, action_ts);
+        CREATE INDEX IF NOT EXISTS idx_action_machine_ts ON action_log(machine_code, action_ts);
+        CREATE INDEX IF NOT EXISTS idx_action_date_range ON action_log(date_range_start, date_range_end);
+        "#,
+    )?;
+    Ok(())
 }
 
 // ==========================================
