@@ -9,9 +9,13 @@
 
 use serde::{Deserialize, Serialize};
 use chrono::NaiveDate;
+use tauri::Manager;
+use uuid::Uuid;
 
 use crate::app::state::AppState;
 use crate::api::error::ApiError;
+use crate::domain::action_log::ActionLog;
+use crate::engine::ScheduleStrategy;
 
 // ==========================================
 // 错误响应类型
@@ -72,6 +76,105 @@ fn parse_date(date_str: &str) -> Result<NaiveDate, String> {
         .map_err(|e| format!("日期格式错误（应为YYYY-MM-DD）: {}", e))
 }
 
+/// best-effort: emit a frontend event; do not fail the command if emitting fails.
+fn emit_frontend_event(app: &tauri::AppHandle, event: &str, payload: serde_json::Value) {
+    if let Err(e) = app.emit_all(event, payload) {
+        tracing::warn!("emit_all failed: event={}, error={}", event, e);
+    }
+}
+
+// ==========================================
+// 前端遥测/错误上报
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReportFrontendEventResponse {
+    pub success: bool,
+    pub message: String,
+}
+
+/// 前端日志/错误上报：写入 action_log（便于复用现有查询界面）
+///
+/// 约定：
+/// - action_type: FRONTEND_ERROR / FRONTEND_WARN / FRONTEND_INFO / FRONTEND_DEBUG / FRONTEND_EVENT
+/// - payload_json: 由前端组织，后端仅做落库
+#[tauri::command(rename_all = "snake_case")]
+pub async fn report_frontend_event(
+    state: tauri::State<'_, AppState>,
+    version_id: Option<String>,
+    actor: Option<String>,
+    level: String,
+    message: String,
+    payload_json: serde_json::Value,
+) -> Result<String, String> {
+    // 尽量关联到一个“可追溯”的版本：
+    // - 优先使用前端传入的 version_id（通常是当前激活版本）
+    // - 否则尝试回填“最近激活版本”
+    let mut resolved_version_id = version_id
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    if resolved_version_id.is_none() {
+        resolved_version_id = state
+            .plan_api
+            .get_latest_active_version_id()
+            .map_err(map_api_error)?
+            .filter(|s| !s.trim().is_empty());
+    }
+
+    // 若仍无法关联版本，则跳过写入（best-effort，不影响前端流程）
+    let Some(version_id) = resolved_version_id else {
+        let resp = ReportFrontendEventResponse {
+            success: true,
+            message: "未找到可关联的激活版本，已跳过写入".to_string(),
+        };
+        return serde_json::to_string(&resp).map_err(|e| format!("序列化失败: {}", e));
+    };
+
+    let actor = actor
+        .unwrap_or_else(|| "unknown".to_string())
+        .trim()
+        .to_string();
+
+    let level_norm = level.trim().to_lowercase();
+    let action_type = match level_norm.as_str() {
+        "error" => "FRONTEND_ERROR",
+        "warn" | "warning" => "FRONTEND_WARN",
+        "info" => "FRONTEND_INFO",
+        "debug" => "FRONTEND_DEBUG",
+        _ => "FRONTEND_EVENT",
+    };
+
+    let log = ActionLog {
+        action_id: Uuid::new_v4().to_string(),
+        version_id,
+        action_type: action_type.to_string(),
+        action_ts: chrono::Local::now().naive_local(),
+        actor,
+        payload_json: Some(serde_json::json!({
+            "level": level_norm,
+            "message": message,
+            "payload": payload_json,
+        })),
+        impact_summary_json: None,
+        machine_code: None,
+        date_range_start: None,
+        date_range_end: None,
+        detail: Some(message),
+    };
+
+    // best-effort: 上报失败不应影响前端流程
+    if let Err(e) = state.action_log_repo.insert(&log) {
+        tracing::warn!("report_frontend_event insert failed: {}", e);
+    }
+
+    let resp = ReportFrontendEventResponse {
+        success: true,
+        message: "OK".to_string(),
+    };
+    serde_json::to_string(&resp).map_err(|e| format!("序列化失败: {}", e))
+}
+
 // ==========================================
 // 材料相关命令
 // ==========================================
@@ -124,6 +227,7 @@ pub async fn list_ready_materials(
 /// 批量锁定/解锁材料
 #[tauri::command(rename_all = "snake_case")]
 pub async fn batch_lock_materials(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     material_ids: Vec<String>,
     lock_flag: bool,
@@ -132,6 +236,8 @@ pub async fn batch_lock_materials(
     mode: Option<String>,
 ) -> Result<String, String> {
     use crate::api::ValidationMode;
+
+    let material_count = material_ids.len();
 
     // 解析校验模式，默认为Strict
     let validation_mode = match mode.as_deref() {
@@ -144,12 +250,19 @@ pub async fn batch_lock_materials(
         .batch_lock_materials(material_ids, lock_flag, &operator, &reason, validation_mode)
         .map_err(map_api_error)?;
 
+    emit_frontend_event(
+        &app,
+        "material_state_changed",
+        serde_json::json!({ "count": material_count, "lock_flag": lock_flag }),
+    );
+
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
 
 /// 批量强制放行材料
 #[tauri::command(rename_all = "snake_case")]
 pub async fn batch_force_release(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     material_ids: Vec<String>,
     operator: String,
@@ -157,6 +270,8 @@ pub async fn batch_force_release(
     mode: Option<String>,
 ) -> Result<String, String> {
     use crate::api::ValidationMode;
+
+    let material_count = material_ids.len();
 
     // 解析校验模式，默认为Strict
     let validation_mode = match mode.as_deref() {
@@ -169,22 +284,33 @@ pub async fn batch_force_release(
         .batch_force_release(material_ids, &operator, &reason, validation_mode)
         .map_err(map_api_error)?;
 
+    emit_frontend_event(&app, "material_state_changed", serde_json::json!({ "count": material_count }));
+
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
 
 /// 批量设置紧急标志
 #[tauri::command(rename_all = "snake_case")]
 pub async fn batch_set_urgent(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     material_ids: Vec<String>,
     manual_urgent_flag: bool,
     operator: String,
     reason: String,
 ) -> Result<String, String> {
+    let material_count = material_ids.len();
+
     let result = state
         .material_api
         .batch_set_urgent(material_ids, manual_urgent_flag, &operator, &reason)
         .map_err(map_api_error)?;
+
+    emit_frontend_event(
+        &app,
+        "material_state_changed",
+        serde_json::json!({ "count": material_count, "manual_urgent_flag": manual_urgent_flag }),
+    );
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
@@ -337,6 +463,7 @@ pub async fn list_versions(
 /// 激活版本
 #[tauri::command(rename_all = "snake_case")]
 pub async fn activate_version(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     version_id: String,
     operator: String,
@@ -346,7 +473,37 @@ pub async fn activate_version(
         .activate_version(&version_id, &operator)
         .map_err(map_api_error)?;
 
+    // 版本切换后，多个页面需要联动刷新（plan items / decision read models / KPI）。
+    emit_frontend_event(&app, "plan_updated", serde_json::json!({ "version_id": version_id }));
+    emit_frontend_event(&app, "risk_snapshot_updated", serde_json::json!({}));
+
     Ok("{}".to_string()) // 返回空JSON对象表示成功
+}
+
+/// 版本回滚（激活历史版本 + 恢复配置快照）
+#[tauri::command(rename_all = "snake_case")]
+pub async fn rollback_version(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    plan_id: String,
+    target_version_id: String,
+    operator: String,
+    reason: String,
+) -> Result<String, String> {
+    let result = state
+        .plan_api
+        .rollback_version(&plan_id, &target_version_id, &operator, &reason)
+        .map_err(map_api_error)?;
+
+    // 回滚后，多个页面需要联动刷新（plan items / decision read models / KPI）。
+    emit_frontend_event(
+        &app,
+        "plan_updated",
+        serde_json::json!({ "version_id": target_version_id }),
+    );
+    emit_frontend_event(&app, "risk_snapshot_updated", serde_json::json!({}));
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
 
 /// 试算接口（沙盘模式）
@@ -357,13 +514,20 @@ pub async fn simulate_recalc(
     base_date: String,
     frozen_date: Option<String>,
     operator: String,
+    strategy: Option<String>,
 ) -> Result<String, String> {
     let base_date = parse_date(&base_date)?;
     let frozen_date = frozen_date.map(|s| parse_date(&s)).transpose()?;
 
+    let strategy = strategy
+        .as_deref()
+        .unwrap_or("balanced")
+        .parse::<ScheduleStrategy>()
+        .map_err(|e| format!("策略类型解析失败: {}", e))?;
+
     let result = state
         .plan_api
-        .simulate_recalc(&version_id, base_date, frozen_date, &operator)
+        .simulate_recalc_with_strategy(&version_id, base_date, frozen_date, &operator, strategy)
         .map_err(map_api_error)?;
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
@@ -372,18 +536,141 @@ pub async fn simulate_recalc(
 /// 一键重算
 #[tauri::command(rename_all = "snake_case")]
 pub async fn recalc_full(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     version_id: String,
     base_date: String,
     frozen_date: Option<String>,
     operator: String,
+    strategy: Option<String>,
 ) -> Result<String, String> {
     let base_date = parse_date(&base_date)?;
     let frozen_date = frozen_date.map(|s| parse_date(&s)).transpose()?;
 
+    let strategy = strategy
+        .as_deref()
+        .unwrap_or("balanced")
+        .parse::<ScheduleStrategy>()
+        .map_err(|e| format!("策略类型解析失败: {}", e))?;
+
     let result = state
         .plan_api
-        .recalc_full(&version_id, base_date, frozen_date, &operator)
+        .recalc_full_with_strategy(&version_id, base_date, frozen_date, &operator, strategy)
+        .map_err(map_api_error)?;
+
+    let version_id_for_event = result.version_id.clone();
+    emit_frontend_event(
+        &app,
+        "plan_updated",
+        serde_json::json!({ "version_id": version_id_for_event }),
+    );
+    emit_frontend_event(&app, "risk_snapshot_updated", serde_json::json!({}));
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
+}
+
+/// 获取预设策略列表（用于策略草案对比）
+#[tauri::command(rename_all = "snake_case")]
+pub async fn get_strategy_presets(
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    let result = state
+        .plan_api
+        .get_strategy_presets()
+        .map_err(map_api_error)?;
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
+}
+
+/// 生成多策略草案（dry-run，不落库）
+#[tauri::command(rename_all = "snake_case")]
+pub async fn generate_strategy_drafts(
+    state: tauri::State<'_, AppState>,
+    base_version_id: String,
+    plan_date_from: String,
+    plan_date_to: String,
+    strategies: Vec<String>,
+    operator: String,
+) -> Result<String, String> {
+    let from = parse_date(&plan_date_from)?;
+    let to = parse_date(&plan_date_to)?;
+
+    let result = state
+        .plan_api
+        .generate_strategy_drafts(&base_version_id, from, to, strategies, &operator)
+        .map_err(map_api_error)?;
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
+}
+
+/// 发布策略草案：生成正式版本（落库）
+#[tauri::command(rename_all = "snake_case")]
+pub async fn apply_strategy_draft(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    draft_id: String,
+    operator: String,
+) -> Result<String, String> {
+    let result = state
+        .plan_api
+        .apply_strategy_draft(&draft_id, &operator)
+        .map_err(map_api_error)?;
+
+    let version_id_for_event = result.version_id.clone();
+    emit_frontend_event(
+        &app,
+        "plan_updated",
+        serde_json::json!({ "version_id": version_id_for_event }),
+    );
+    emit_frontend_event(&app, "risk_snapshot_updated", serde_json::json!({}));
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
+}
+
+/// 查询策略草案变更明细（用于前端抽屉展示）
+#[tauri::command(rename_all = "snake_case")]
+pub async fn get_strategy_draft_detail(
+    state: tauri::State<'_, AppState>,
+    draft_id: String,
+) -> Result<String, String> {
+    let result = state
+        .plan_api
+        .get_strategy_draft_detail(&draft_id)
+        .map_err(map_api_error)?;
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
+}
+
+/// 列出策略草案（用于页面刷新/重启后的恢复）
+#[tauri::command(rename_all = "snake_case")]
+pub async fn list_strategy_drafts(
+    state: tauri::State<'_, AppState>,
+    base_version_id: String,
+    plan_date_from: String,
+    plan_date_to: String,
+    status_filter: Option<String>,
+    limit: Option<i64>,
+) -> Result<String, String> {
+    let from = parse_date(&plan_date_from)?;
+    let to = parse_date(&plan_date_to)?;
+
+    let result = state
+        .plan_api
+        .list_strategy_drafts(&base_version_id, from, to, status_filter, limit)
+        .map_err(map_api_error)?;
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
+}
+
+/// 清理过期草案（避免草案表无限增长）
+#[tauri::command(rename_all = "snake_case")]
+pub async fn cleanup_expired_strategy_drafts(
+    state: tauri::State<'_, AppState>,
+    keep_days: i64,
+) -> Result<String, String> {
+    let result = state
+        .plan_api
+        .cleanup_expired_strategy_drafts(keep_days)
         .map_err(map_api_error)?;
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
@@ -394,11 +681,56 @@ pub async fn recalc_full(
 pub async fn list_plan_items(
     state: tauri::State<'_, AppState>,
     version_id: String,
+    plan_date_from: Option<String>,
+    plan_date_to: Option<String>,
+    machine_code: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
 ) -> Result<String, String> {
-    let result = state
-        .plan_api
-        .list_plan_items(&version_id)
-        .map_err(map_api_error)?;
+    let from = plan_date_from
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(parse_date)
+        .transpose()?;
+
+    let to = plan_date_to
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(parse_date)
+        .transpose()?;
+
+    let machine_code = machine_code
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+
+    let has_filters = from.is_some()
+        || to.is_some()
+        || machine_code.is_some()
+        || limit.is_some()
+        || offset.is_some();
+
+    let result = if has_filters {
+        state
+            .plan_api
+            .list_plan_items_filtered(
+                &version_id,
+                machine_code.as_deref(),
+                from,
+                to,
+                limit,
+                offset,
+            )
+            .map_err(map_api_error)?
+    } else {
+        state
+            .plan_api
+            .list_plan_items(&version_id)
+            .map_err(map_api_error)?
+    };
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
@@ -435,18 +767,38 @@ pub async fn compare_versions(
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
 
+/// 版本对比 KPI 汇总（聚合）
+#[tauri::command(rename_all = "snake_case")]
+pub async fn compare_versions_kpi(
+    state: tauri::State<'_, AppState>,
+    version_id_a: String,
+    version_id_b: String,
+) -> Result<String, String> {
+    let result = state
+        .plan_api
+        .compare_versions_kpi(&version_id_a, &version_id_b)
+        .map_err(map_api_error)?;
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
+}
+
 /// 移动排产项
 ///
 /// # 参数
 /// - version_id: 版本ID
 /// - moves: 移动项列表 (JSON字符串)
 /// - mode: 校验模式 (AUTO_FIX/STRICT)
+/// - operator: 操作人（写入操作日志）
+/// - reason: 操作原因（可选）
 #[tauri::command(rename_all = "snake_case")]
 pub async fn move_items(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     version_id: String,
     moves: String,
     mode: Option<String>,
+    operator: String,
+    reason: Option<String>,
 ) -> Result<String, String> {
     use crate::api::ValidationMode;
     use crate::api::plan_api::MoveItemRequest;
@@ -463,8 +815,15 @@ pub async fn move_items(
 
     let result = state
         .plan_api
-        .move_items(&version_id, move_requests, validation_mode)
+        .move_items(&version_id, move_requests, validation_mode, &operator, reason.as_deref())
         .map_err(map_api_error)?;
+
+    emit_frontend_event(
+        &app,
+        "plan_updated",
+        serde_json::json!({ "version_id": version_id, "has_violations": result.has_violations }),
+    );
+    emit_frontend_event(&app, "risk_snapshot_updated", serde_json::json!({}));
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
@@ -512,7 +871,7 @@ pub async fn get_most_risky_date(
 ) -> Result<String, String> {
     let result = state
         .dashboard_api
-        .get_most_risky_date(&version_id)
+        .get_most_risky_date(&version_id, None, None, None, None)
         .map_err(map_api_error)?;
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
@@ -522,11 +881,11 @@ pub async fn get_most_risky_date(
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_unsatisfied_urgent_materials(
     state: tauri::State<'_, AppState>,
-    version_id: Option<String>,
+    version_id: String,
 ) -> Result<String, String> {
     let result = state
         .dashboard_api
-        .get_unsatisfied_urgent_materials(version_id.as_deref())
+        .get_unsatisfied_urgent_materials(&version_id, None, None, None)
         .map_err(map_api_error)?;
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
@@ -544,7 +903,7 @@ pub async fn get_cold_stock_materials(
 
     let result = state
         .dashboard_api
-        .get_cold_stock_materials_full(&version_id, None, None, Some(100))
+        .get_cold_stock_materials(&version_id, None, None, None)
         .map_err(map_api_error)?;
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
@@ -558,7 +917,36 @@ pub async fn get_most_congested_machine(
 ) -> Result<String, String> {
     let result = state
         .dashboard_api
-        .get_most_congested_machine_full(&version_id, None, None, None, None, Some(10))
+        .get_most_congested_machine(&version_id, None, None, None, None, None)
+        .map_err(map_api_error)?;
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
+}
+
+/// 获取决策数据刷新状态（P0-2）
+#[tauri::command(rename_all = "snake_case")]
+pub async fn get_refresh_status(
+    state: tauri::State<'_, AppState>,
+    version_id: String,
+) -> Result<String, String> {
+    let result = state
+        .dashboard_api
+        .get_refresh_status(&version_id)
+        .map_err(map_api_error)?;
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
+}
+
+/// 手动触发决策读模型刷新（P0-2：失败可重试）
+#[tauri::command(rename_all = "snake_case")]
+pub async fn manual_refresh_decision(
+    state: tauri::State<'_, AppState>,
+    version_id: String,
+    operator: String,
+) -> Result<String, String> {
+    let result = state
+        .plan_api
+        .manual_refresh_decision(&version_id, &operator)
         .map_err(map_api_error)?;
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
@@ -587,6 +975,33 @@ pub async fn list_action_logs(
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
 
+/// 查询操作日志（按材料ID + 时间范围）
+#[tauri::command(rename_all = "snake_case")]
+pub async fn list_action_logs_by_material(
+    state: tauri::State<'_, AppState>,
+    material_id: String,
+    start_time: String,
+    end_time: String,
+    limit: Option<i32>,
+) -> Result<String, String> {
+    use chrono::NaiveDateTime;
+
+    let start = NaiveDateTime::parse_from_str(&start_time, "%Y-%m-%d %H:%M:%S")
+        .map_err(|e| format!("开始时间格式错误: {}", e))?;
+
+    let end = NaiveDateTime::parse_from_str(&end_time, "%Y-%m-%d %H:%M:%S")
+        .map_err(|e| format!("结束时间格式错误: {}", e))?;
+
+    let limit = limit.unwrap_or(50);
+
+    let result = state
+        .dashboard_api
+        .list_action_logs_by_material(&material_id, start, end, limit)
+        .map_err(map_api_error)?;
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
+}
+
 /// 查询操作日志（按版本）
 #[tauri::command(rename_all = "snake_case")]
 pub async fn list_action_logs_by_version(
@@ -606,11 +1021,45 @@ pub async fn list_action_logs_by_version(
 pub async fn get_recent_actions(
     state: tauri::State<'_, AppState>,
     limit: i32,
+    offset: Option<i32>,
+    start_time: Option<String>,
+    end_time: Option<String>,
 ) -> Result<String, String> {
-    let result = state
-        .dashboard_api
-        .get_recent_actions(limit)
-        .map_err(map_api_error)?;
+    use chrono::NaiveDateTime;
+
+    let offset = offset.unwrap_or(0);
+
+    let start = start_time
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
+                .map_err(|e| format!("开始时间格式错误: {}", e))
+        })
+        .transpose()?;
+
+    let end = end_time
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
+                .map_err(|e| format!("结束时间格式错误: {}", e))
+        })
+        .transpose()?;
+
+    let result = if offset != 0 || start.is_some() || end.is_some() {
+        state
+            .dashboard_api
+            .get_recent_actions_filtered(limit, offset, start, end)
+            .map_err(map_api_error)?
+    } else {
+        state
+            .dashboard_api
+            .get_recent_actions(limit)
+            .map_err(map_api_error)?
+    };
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
@@ -706,6 +1155,40 @@ pub async fn restore_config_from_snapshot(
 
     serde_json::to_string(&serde_json::json!({ "restored_count": count }))
         .map_err(|e| format!("序列化失败: {}", e))
+}
+
+/// 保存自定义策略（持久化到 config_kv）
+#[tauri::command(rename_all = "snake_case")]
+pub async fn save_custom_strategy(
+    state: tauri::State<'_, AppState>,
+    strategy_json: String,
+    operator: String,
+    reason: String,
+) -> Result<String, String> {
+    use crate::config::strategy_profile::CustomStrategyProfile;
+
+    let profile: CustomStrategyProfile =
+        serde_json::from_str(&strategy_json).map_err(|e| format!("解析自定义策略失败: {}", e))?;
+
+    let resp = state
+        .config_api
+        .save_custom_strategy(profile, &operator, &reason)
+        .map_err(map_api_error)?;
+
+    serde_json::to_string(&resp).map_err(|e| format!("序列化失败: {}", e))
+}
+
+/// 查询所有自定义策略
+#[tauri::command(rename_all = "snake_case")]
+pub async fn list_custom_strategies(
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    let result = state
+        .config_api
+        .list_custom_strategies()
+        .map_err(map_api_error)?;
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
 
 // ==========================================
@@ -1228,6 +1711,7 @@ pub async fn get_capacity_opportunity(
 /// 导入材料数据
 #[tauri::command(rename_all = "snake_case")]
 pub async fn import_materials(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     file_path: String,
     source_batch_id: String,
@@ -1253,6 +1737,11 @@ pub async fn import_materials(
         })?;
 
     tracing::info!("[import_materials] 导入成功: {:?}", result);
+    emit_frontend_event(
+        &app,
+        "material_state_changed",
+        serde_json::json!({ "source_batch_id": source_batch_id }),
+    );
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
 
@@ -1287,6 +1776,7 @@ pub async fn list_import_conflicts(
 /// - 失败: 错误消息
 #[tauri::command(rename_all = "snake_case")]
 pub async fn resolve_import_conflict(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     conflict_id: String,
     action: String,
@@ -1332,6 +1822,8 @@ pub async fn resolve_import_conflict(
     if let Err(e) = state.action_log_repo.insert(&action_log) {
         tracing::warn!(error = %e, "记录冲突解决操作日志失败");
     }
+
+    emit_frontend_event(&app, "material_state_changed", serde_json::json!({}));
 
     Ok("{}".to_string())
 }
@@ -1400,6 +1892,7 @@ pub async fn get_capacity_pools(
 /// - 失败: 错误消息
 #[tauri::command(rename_all = "snake_case")]
 pub async fn update_capacity_pool(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     machine_code: String,
     plan_date: String,
@@ -1407,6 +1900,7 @@ pub async fn update_capacity_pool(
     limit_capacity_t: f64,
     reason: String,
     operator: String,
+    version_id: Option<String>,
 ) -> Result<String, String> {
     use chrono::NaiveDate;
     use crate::domain::capacity::CapacityPool;
@@ -1472,13 +1966,20 @@ pub async fn update_capacity_pool(
         .upsert_single(&pool)
         .map_err(|e| format!("更新产能池失败: {}", e))?;
 
+    let version_id_for_log = version_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("N/A")
+        .to_string();
+
     // 记录 ActionLog（红线5：可解释性/审计追踪）
     let action_log = ActionLog {
         action_id: uuid::Uuid::new_v4().to_string(),
-        version_id: "N/A".to_string(),
+        version_id: version_id_for_log,
         action_type: "UPDATE_CAPACITY_POOL".to_string(),
         action_ts: chrono::Local::now().naive_local(),
-        actor: operator,
+        actor: operator.clone(),
         payload_json: Some(serde_json::json!({
             "machine_code": machine_code,
             "plan_date": plan_date,
@@ -1503,5 +2004,254 @@ pub async fn update_capacity_pool(
         tracing::warn!(error = %e, "记录产能池更新操作日志失败");
     }
 
+    // 可选：触发决策读模型刷新（产能池参数修改可能影响超限/瓶颈等口径）
+    if let Some(version_id) = version_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        if let Err(e) = state.plan_api.manual_refresh_decision(version_id, &operator) {
+            tracing::warn!("产能池更新后触发决策刷新失败: {}", e);
+        }
+
+        emit_frontend_event(
+            &app,
+            "risk_snapshot_updated",
+            serde_json::json!({ "version_id": version_id, "source": "update_capacity_pool" }),
+        );
+    }
+
     Ok("{}".to_string())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CapacityPoolUpdate {
+    pub machine_code: String,
+    pub plan_date: String,
+    pub target_capacity_t: f64,
+    pub limit_capacity_t: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchUpdateCapacityPoolsResponse {
+    pub requested: usize,
+    pub updated: usize,
+    pub skipped: usize,
+    pub upserted_rows: usize,
+    pub refresh: Option<crate::api::plan_api::ManualRefreshDecisionResponse>,
+    pub message: String,
+}
+
+/// 批量更新产能池参数（P2-1）
+///
+/// # 参数
+/// - updates: JSON数组字符串，元素结构同 CapacityPoolUpdate
+/// - reason: 修改原因（必填）
+/// - operator: 操作人
+/// - version_id: 关联版本（可选；若传入则会 best-effort 触发决策刷新）
+///
+/// # 返回
+/// - 成功: JSON字符串, BatchUpdateCapacityPoolsResponse
+/// - 失败: 错误消息
+#[tauri::command(rename_all = "snake_case")]
+pub async fn batch_update_capacity_pools(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    updates: String,
+    reason: String,
+    operator: String,
+    version_id: Option<String>,
+) -> Result<String, String> {
+    use chrono::NaiveDate;
+    use crate::domain::capacity::CapacityPool;
+    use crate::domain::action_log::ActionLog;
+
+    if reason.trim().is_empty() {
+        return Err("请输入调整原因".to_string());
+    }
+    if operator.trim().is_empty() {
+        return Err("操作人不能为空".to_string());
+    }
+
+    let items: Vec<CapacityPoolUpdate> =
+        serde_json::from_str(&updates).map_err(|e| format!("updates格式错误: {}", e))?;
+    if items.is_empty() {
+        return Err("updates不能为空".to_string());
+    }
+
+    let mut pools_to_upsert: Vec<CapacityPool> = Vec::new();
+    let mut skipped = 0usize;
+
+    let mut min_date: Option<NaiveDate> = None;
+    let mut max_date: Option<NaiveDate> = None;
+
+    // 为了避免 ActionLog payload 过大，对明细做截断（只保留 sample）
+    let mut change_samples: Vec<serde_json::Value> = Vec::new();
+    let max_samples: usize = 200;
+
+    for it in &items {
+        let date = NaiveDate::parse_from_str(&it.plan_date, "%Y-%m-%d")
+            .map_err(|e| format!("日期格式错误（应为YYYY-MM-DD）: {}", e))?;
+
+        // 验证参数
+        if it.target_capacity_t < 0.0 {
+            return Err(format!(
+                "目标产能不能为负数: {} {}",
+                it.machine_code, it.plan_date
+            ));
+        }
+        if it.limit_capacity_t < 0.0 {
+            return Err(format!(
+                "上限产能不能为负数: {} {}",
+                it.machine_code, it.plan_date
+            ));
+        }
+        if it.limit_capacity_t < it.target_capacity_t {
+            return Err(format!(
+                "上限产能不能小于目标产能: {} {}",
+                it.machine_code, it.plan_date
+            ));
+        }
+
+        let existing = state
+            .capacity_pool_repo
+            .find_by_machine_and_date(&it.machine_code, date)
+            .map_err(|e| format!("查询产能池失败: {}", e))?;
+
+        // 跳过无变化项（避免无意义的 OR REPLACE + 审计噪音）
+        let unchanged = existing.as_ref().is_some_and(|p| {
+            (p.target_capacity_t - it.target_capacity_t).abs() < f64::EPSILON
+                && (p.limit_capacity_t - it.limit_capacity_t).abs() < f64::EPSILON
+        });
+        if unchanged {
+            skipped += 1;
+            continue;
+        }
+
+        let old_target = existing.as_ref().map(|p| p.target_capacity_t);
+        let old_limit = existing.as_ref().map(|p| p.limit_capacity_t);
+
+        let pool = match existing {
+            Some(mut p) => {
+                p.target_capacity_t = it.target_capacity_t;
+                p.limit_capacity_t = it.limit_capacity_t;
+                p
+            }
+            None => CapacityPool {
+                machine_code: it.machine_code.clone(),
+                plan_date: date,
+                target_capacity_t: it.target_capacity_t,
+                limit_capacity_t: it.limit_capacity_t,
+                used_capacity_t: 0.0,
+                overflow_t: 0.0,
+                frozen_capacity_t: 0.0,
+                accumulated_tonnage_t: 0.0,
+                roll_campaign_id: None,
+            },
+        };
+
+        pools_to_upsert.push(pool);
+
+        if change_samples.len() < max_samples {
+            change_samples.push(serde_json::json!({
+                "machine_code": it.machine_code,
+                "plan_date": it.plan_date,
+                "old_target": old_target,
+                "new_target": it.target_capacity_t,
+                "old_limit": old_limit,
+                "new_limit": it.limit_capacity_t,
+            }));
+        }
+
+        min_date = Some(min_date.map(|d| d.min(date)).unwrap_or(date));
+        max_date = Some(max_date.map(|d| d.max(date)).unwrap_or(date));
+    }
+
+    let updated = pools_to_upsert.len();
+    let requested = items.len();
+
+    let upserted_rows = if pools_to_upsert.is_empty() {
+        0
+    } else {
+        state
+            .capacity_pool_repo
+            .upsert_batch(pools_to_upsert)
+            .map_err(|e| format!("批量更新产能池失败: {}", e))?
+    };
+
+    let version_id_for_log = version_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("N/A")
+        .to_string();
+
+    let action_log = ActionLog {
+        action_id: uuid::Uuid::new_v4().to_string(),
+        version_id: version_id_for_log,
+        action_type: "BATCH_UPDATE_CAPACITY_POOL".to_string(),
+        action_ts: chrono::Local::now().naive_local(),
+        actor: operator.clone(),
+        payload_json: Some(serde_json::json!({
+            "requested": requested,
+            "updated": updated,
+            "skipped": skipped,
+            "reason": reason,
+            "changes_sample": change_samples,
+            "sample_truncated": requested.saturating_sub(skipped) > max_samples,
+        })),
+        impact_summary_json: Some(serde_json::json!({
+            "requested": requested,
+            "updated": updated,
+            "skipped": skipped,
+            "upserted_rows": upserted_rows,
+        })),
+        machine_code: None,
+        date_range_start: min_date,
+        date_range_end: max_date,
+        detail: Some("批量更新产能池参数".to_string()),
+    };
+
+    if let Err(e) = state.action_log_repo.insert(&action_log) {
+        tracing::warn!(error = %e, "记录批量产能池更新操作日志失败");
+    }
+
+    // best-effort：若提供 version_id，则触发决策刷新，并 emit 一个事件让前端及时拉取刷新状态。
+    let refresh = if updated == 0 {
+        None
+    } else if let Some(vid) = version_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        let resp = match state.plan_api.manual_refresh_decision(vid, &operator) {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!("批量更新产能池后触发决策刷新失败: {}", e);
+                crate::api::plan_api::ManualRefreshDecisionResponse {
+                    version_id: vid.to_string(),
+                    task_id: None,
+                    success: false,
+                    message: format!("触发决策刷新失败: {}", e),
+                }
+            }
+        };
+
+        emit_frontend_event(
+            &app,
+            "risk_snapshot_updated",
+            serde_json::json!({ "version_id": vid, "source": "batch_update_capacity_pools" }),
+        );
+
+        Some(resp)
+    } else {
+        None
+    };
+
+    let resp = BatchUpdateCapacityPoolsResponse {
+        requested,
+        updated,
+        skipped,
+        upserted_rows,
+        refresh,
+        message: if updated == 0 {
+            "无变更，已跳过".to_string()
+        } else {
+            "批量更新完成".to_string()
+        },
+    };
+
+    serde_json::to_string(&resp).map_err(|e| format!("序列化失败: {}", e))
 }

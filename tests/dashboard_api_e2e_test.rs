@@ -17,6 +17,7 @@ mod dashboard_api_e2e_test {
     // 导入 DashboardAPI
     use hot_rolling_aps::api::dashboard_api::DashboardApi;
     use hot_rolling_aps::repository::action_log_repo::ActionLogRepository;
+    use hot_rolling_aps::repository::decision_refresh_repo::DecisionRefreshRepository;
 
     // 导入 DecisionAPI 相关（使用重导出路径）
     use hot_rolling_aps::decision::api::{DecisionApi, DecisionApiImpl};
@@ -57,11 +58,13 @@ mod dashboard_api_e2e_test {
 
         // ActionLog Repository
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
+        let decision_refresh_repo = Arc::new(DecisionRefreshRepository::new(conn.clone()));
 
         // DashboardAPI（封装 DecisionApi）
         let dashboard_api = Arc::new(DashboardApi::new(
             decision_api,
             action_log_repo,
+            decision_refresh_repo,
         ));
 
         // 刷新服务
@@ -107,9 +110,10 @@ mod dashboard_api_e2e_test {
         )
         .unwrap();
 
-        // 2. 创建测试数据
-        let date1 = NaiveDate::from_ymd_opt(2026, 1, 25).unwrap();
-        let date2 = NaiveDate::from_ymd_opt(2026, 1, 26).unwrap();
+        // 2. 创建测试数据（D1 简化接口默认查询“今天起未来 30 天”，避免固定日期导致用例随时间漂移）
+        let today = chrono::Local::now().date_naive();
+        let date1 = today + chrono::Duration::days(1);
+        let date2 = today + chrono::Duration::days(2);
 
         conn.execute(
             "INSERT INTO risk_snapshot (version_id, snapshot_date, machine_code, risk_level, risk_reasons, target_capacity_t, used_capacity_t, limit_capacity_t)
@@ -146,7 +150,8 @@ mod dashboard_api_e2e_test {
         // 验证第一条记录是最高风险
         let first_item = &response.items[0];
         assert_eq!(first_item.plan_date, date1.to_string(), "第一条应该是风险最高的日期");
-        assert!((first_item.risk_score - 85.0).abs() < 6.0, "风险分数应该接近 85.0");
+        // D1 读模型目前按 risk_level 映射计算风险分数：HIGH≈70, MEDIUM≈40, CRITICAL≈90
+        assert!((first_item.risk_score - 70.0).abs() < 6.0, "风险分数应该接近 70.0");
     }
 
     // ==========================================
@@ -154,7 +159,7 @@ mod dashboard_api_e2e_test {
     // ==========================================
 
     #[test]
-    fn test_d1_get_most_risky_date_full() {
+    fn test_d1_get_most_risky_date() {
         let (_temp, db_path, dashboard_api, refresh_service) = setup_dashboard_test_env();
 
         let version_id = "dashboard_d1_full_v001";
@@ -205,7 +210,7 @@ mod dashboard_api_e2e_test {
 
         // 4. 调用 DashboardAPI 完整参数版本（指定日期范围和风险等级过滤）
         let response = dashboard_api
-            .get_most_risky_date_full(
+            .get_most_risky_date(
                 version_id,
                 Some(&date1.to_string()),
                 Some(&date2.to_string()),
@@ -384,6 +389,124 @@ mod dashboard_api_e2e_test {
         assert_eq!(logs.len(), 1, "应该只返回 VERSION_001 的日志");
         assert_eq!(logs[0].action_id, "LOG_V1", "日志应该是 LOG_V1");
         assert_eq!(logs[0].version_id, "VERSION_001", "版本ID 应该是 VERSION_001");
+    }
+
+    // ==========================================
+    // 测试6.1: 操作日志查询 - 按材料ID + 时间范围
+    // ==========================================
+
+    #[test]
+    fn test_action_log_by_material_id_in_time_range() {
+        let (_temp, db_path, dashboard_api, _refresh_service) = setup_dashboard_test_env();
+        let conn = Connection::open(&db_path).unwrap();
+
+        let t1 = NaiveDateTime::parse_from_str("2026-01-24 10:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let t2 = NaiveDateTime::parse_from_str("2026-01-24 11:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let t3 = NaiveDateTime::parse_from_str("2026-01-24 12:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let t4 = NaiveDateTime::parse_from_str("2026-01-24 13:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let t5 = NaiveDateTime::parse_from_str("2026-01-24 14:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+
+        // 1) detail 命中（包含 material_id）
+        conn.execute(
+            "INSERT INTO action_log (action_id, version_id, action_type, detail, actor, action_ts)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![
+                "LOG_MAT_DETAIL",
+                "V001",
+                "MANUAL_SCHEDULE",
+                "移动物料 MAT001 到 H032/2026-01-24",
+                "test_user",
+                t1.to_string()
+            ],
+        )
+        .unwrap();
+
+        // 2) payload_json 命中（使用 \"MAT001\" token 匹配，避免 MAT0010 误匹配）
+        conn.execute(
+            "INSERT INTO action_log (action_id, version_id, action_type, payload_json, actor, action_ts, detail)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![
+                "LOG_MAT_PAYLOAD",
+                "V001",
+                "BATCH_MOVE_ITEMS",
+                r#"{"material_id":"MAT001","op":"move"}"#,
+                "test_user",
+                t2.to_string(),
+                "batch_move"
+            ],
+        )
+        .unwrap();
+
+        // 3) impact_summary_json 命中
+        conn.execute(
+            "INSERT INTO action_log (action_id, version_id, action_type, impact_summary_json, actor, action_ts, detail)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![
+                "LOG_MAT_IMPACT",
+                "V001",
+                "APPLY_STRATEGY_DRAFT",
+                r#"{"moved":["MAT001"],"added":[]}"#,
+                "test_user",
+                t3.to_string(),
+                "apply_draft"
+            ],
+        )
+        .unwrap();
+
+        // 4) 其他物料（不应命中）
+        conn.execute(
+            "INSERT INTO action_log (action_id, version_id, action_type, payload_json, actor, action_ts, detail)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![
+                "LOG_OTHER_MAT",
+                "V001",
+                "MANUAL_SCHEDULE",
+                r#"{"material_id":"MAT002"}"#,
+                "test_user",
+                t4.to_string(),
+                "其他物料"
+            ],
+        )
+        .unwrap();
+
+        // 5) 相似 material_id（MAT0010）在 JSON 中不应被 \"MAT001\" token 误匹配
+        conn.execute(
+            "INSERT INTO action_log (action_id, version_id, action_type, payload_json, actor, action_ts, detail)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![
+                "LOG_SIMILAR_MAT",
+                "V001",
+                "MANUAL_SCHEDULE",
+                r#"{"material_id":"MAT0010"}"#,
+                "test_user",
+                t5.to_string(),
+                "相似材料号"
+            ],
+        )
+        .unwrap();
+
+        let start_time = NaiveDateTime::parse_from_str("2026-01-24 09:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let end_time = NaiveDateTime::parse_from_str("2026-01-24 15:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+
+        // 1) 默认 limit 足够大，返回全部命中项（应按 action_ts DESC 排序）
+        let logs = dashboard_api
+            .list_action_logs_by_material("MAT001", start_time, end_time, 10)
+            .unwrap();
+
+        assert_eq!(logs.len(), 3, "应该返回 3 条命中日志（detail/payload/impact）");
+        assert_eq!(logs[0].action_id, "LOG_MAT_IMPACT", "应按时间降序排列：最新在前");
+        assert_eq!(logs[1].action_id, "LOG_MAT_PAYLOAD", "应按时间降序排列：其次");
+        assert_eq!(logs[2].action_id, "LOG_MAT_DETAIL", "应按时间降序排列：最早");
+
+        // 2) limit 生效
+        let logs_limited = dashboard_api
+            .list_action_logs_by_material("MAT001", start_time, end_time, 2)
+            .unwrap();
+        assert_eq!(logs_limited.len(), 2, "limit=2 应只返回 2 条");
+
+        // 3) 参数校验：空 material_id
+        let err = dashboard_api.list_action_logs_by_material("", start_time, end_time, 10);
+        assert!(err.is_err(), "空材料ID 应返回错误");
     }
 
     // ==========================================

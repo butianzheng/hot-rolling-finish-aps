@@ -34,6 +34,8 @@ mod full_business_flow_e2e_test {
         material_repo::{MaterialMasterRepository, MaterialStateRepository},
         plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository},
         risk_repo::RiskSnapshotRepository,
+        strategy_draft_repo::StrategyDraftRepository,
+        decision_refresh_repo::DecisionRefreshRepository,
     };
     use rusqlite::Connection;
     use std::sync::{Arc, Mutex};
@@ -72,6 +74,7 @@ mod full_business_flow_e2e_test {
         let plan_version_repo = Arc::new(PlanVersionRepository::new(conn.clone()));
         let plan_item_repo = Arc::new(PlanItemRepository::new(conn.clone()));
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
+        let strategy_draft_repo = Arc::new(StrategyDraftRepository::new(conn.clone()));
         let risk_snapshot_repo =
             Arc::new(RiskSnapshotRepository::new(&db_path).unwrap());
         let capacity_pool_repo =
@@ -144,8 +147,11 @@ mod full_business_flow_e2e_test {
             plan_repo,
             plan_version_repo,
             plan_item_repo.clone(),
+            material_state_repo.clone(),
+            strategy_draft_repo,
             action_log_repo.clone(),
             risk_snapshot_repo,
+            config_manager.clone(),
             recalc_engine,
             risk_engine,
             None, // refresh_queue (not needed in tests)
@@ -163,9 +169,11 @@ mod full_business_flow_e2e_test {
             d4_use_case,
         ));
 
+        let decision_refresh_repo = Arc::new(DecisionRefreshRepository::new(conn.clone()));
         let dashboard_api = Arc::new(DashboardApi::new(
             decision_api,
             action_log_repo,
+            decision_refresh_repo,
         ));
 
         // === Decision Refresh Service ===
@@ -219,7 +227,7 @@ mod full_business_flow_e2e_test {
     // 测试场景1: 完整业务流程（材料导入 → 排产 → 驾驶舱）
     // ==========================================
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_full_business_flow_import_to_dashboard() {
         println!("\n=== 端到端集成测试：完整业务流程 ===\n");
 
@@ -317,6 +325,9 @@ mod full_business_flow_e2e_test {
             recalc_result.plan_items_count
         );
 
+        // 注意：RecalcEngine 会创建派生版本并(默认)自动激活，新明细写入 recalc_result.version_id
+        let version_id = recalc_result.version_id.clone();
+
         // 7. 验证排产明细
         let plan_items = plan_item_repo
             .find_by_version(&version_id)
@@ -348,7 +359,7 @@ mod full_business_flow_e2e_test {
 
         // 9. 查询驾驶舱数据（D1: 最危险日期）
         let risky_days_response = dashboard_api
-            .get_most_risky_date_full(
+            .get_most_risky_date(
                 &version_id,
                 Some(&base_date.to_string()),
                 Some(&(base_date + Duration::days(6)).to_string()),
@@ -379,7 +390,7 @@ mod full_business_flow_e2e_test {
     // 测试场景2: 材料锁定 → 重算 → 冻结区保护验证
     // ==========================================
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_material_lock_and_frozen_zone_protection() {
         println!("\n=== 端到端集成测试：材料锁定与冻结区保护 ===\n");
 
