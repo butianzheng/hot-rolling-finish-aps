@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useDebounce } from '../hooks/useDebounce';
-import { Alert, Button, Card, Descriptions, Divider, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Divider, Input, InputNumber, Modal, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -10,243 +10,21 @@ import { capacityApi, planApi } from '../api/tauri';
 import { useCurrentUser, useGlobalActions } from '../stores/use-global-store';
 import dayjs from 'dayjs';
 import { formatDate } from '../utils/formatters';
-import type { BackendVersionComparisonKpiResult, BackendVersionComparisonResult, PlanItemSnapshot, VersionDiff } from '../types/comparison';
+import type { BackendVersionComparisonKpiResult, BackendVersionComparisonResult, PlanItemSnapshot } from '../types/comparison';
 import { exportCSV, exportJSON, exportHTML, exportMarkdown } from '../utils/exportUtils';
-
-const LazyECharts = React.lazy(() => import('echarts-for-react'));
-
-const Chart: React.FC<{ option: EChartsOption; height: number }> = ({ option, height }) => {
-  return (
-    <React.Suspense
-      fallback={
-        <div
-          style={{
-            height,
-            width: '100%',
-            background: '#fafafa',
-            border: '1px dashed #d9d9d9',
-            borderRadius: 6,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#8c8c8c',
-            fontSize: 12,
-          }}
-        >
-          图表加载中…
-        </div>
-      }
-    >
-      <LazyECharts option={option} style={{ height, width: '100%' }} notMerge lazyUpdate />
-    </React.Suspense>
-  );
-};
-
-interface Plan {
-  plan_id: string;
-  plan_name: string;
-  created_by: string;
-  created_at: string;
-}
-
-interface Version {
-  version_id: string;
-  version_no: number;
-  status: string;
-  recalc_window_days: number;
-  created_at: string;
-  config_snapshot_json?: string | null;
-}
-
-const RETROSPECTIVE_NOTE_KEY_PREFIX = 'aps_retrospective_note';
-
-function makeRetrospectiveKey(versionIdA: string, versionIdB: string): string {
-  const [a, b] = [String(versionIdA || ''), String(versionIdB || '')].sort();
-  return `${RETROSPECTIVE_NOTE_KEY_PREFIX}__${a}__${b}`;
-}
-
-type LocalVersionDiffSummary = {
-  totalChanges: number;
-  addedCount: number;
-  removedCount: number;
-  modifiedCount: number;
-  movedCount: number;
-};
-
-type LocalCapacityDeltaRow = {
-  machine_code: string;
-  date: string;
-  used_a: number;
-  used_b: number;
-  delta: number;
-  target_a: number | null;
-  limit_a: number | null;
-  target_b: number | null;
-  limit_b: number | null;
-};
-
-function normalizeDateOnly(date: string): string {
-  const trimmed = String(date || '').trim();
-  if (!trimmed) return '';
-  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10);
-  return trimmed;
-}
-
-function extractVersionNameCn(version: any): string | null {
-  const raw = version?.config_snapshot_json;
-  if (raw == null) return null;
-  const text = String(raw || '').trim();
-  if (!text) return null;
-  try {
-    const obj = JSON.parse(text);
-    const v = obj?.__meta_version_name_cn;
-    if (typeof v === 'string' && v.trim()) return v.trim();
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function formatVersionLabel(version: Version): string {
-  const nameCn = extractVersionNameCn(version);
-  if (nameCn) return nameCn;
-  const no = Number(version.version_no ?? 0);
-  if (Number.isFinite(no) && no > 0) return `V${no}`;
-  return version.version_id;
-}
-
-function normalizePlanItem(raw: any): PlanItemSnapshot | null {
-  const id = String(raw?.material_id ?? '').trim();
-  if (!id) return null;
-  return {
-    material_id: id,
-    machine_code: String(raw?.machine_code ?? ''),
-    plan_date: normalizeDateOnly(String(raw?.plan_date ?? '')),
-    seq_no: Number(raw?.seq_no ?? 0),
-    weight_t: raw?.weight_t == null ? undefined : Number(raw.weight_t),
-    urgent_level: raw?.urgent_level == null ? undefined : String(raw.urgent_level),
-    locked_in_plan: raw?.locked_in_plan == null ? undefined : !!raw.locked_in_plan,
-    force_release_in_plan: raw?.force_release_in_plan == null ? undefined : !!raw.force_release_in_plan,
-    sched_state: raw?.sched_state == null ? undefined : String(raw.sched_state),
-    assign_reason: raw?.assign_reason == null ? undefined : String(raw.assign_reason),
-  };
-}
-
-function computeVersionDiffs(itemsA: PlanItemSnapshot[], itemsB: PlanItemSnapshot[]): { diffs: VersionDiff[]; summary: LocalVersionDiffSummary } {
-  const mapA = new Map<string, PlanItemSnapshot>();
-  const mapB = new Map<string, PlanItemSnapshot>();
-  itemsA.forEach((it) => mapA.set(it.material_id, it));
-  itemsB.forEach((it) => mapB.set(it.material_id, it));
-
-  const allIds = new Set<string>([...mapA.keys(), ...mapB.keys()]);
-  const diffs: VersionDiff[] = [];
-
-  const isDifferent = (a: unknown, b: unknown) => {
-    if (a === b) return false;
-    if (a == null && b == null) return false;
-    return String(a ?? '') !== String(b ?? '');
-  };
-
-  const isWeightDifferent = (a: number | undefined, b: number | undefined) => {
-    const na = a == null || !Number.isFinite(a) ? null : Number(a);
-    const nb = b == null || !Number.isFinite(b) ? null : Number(b);
-    if (na == null && nb == null) return false;
-    if (na == null || nb == null) return true;
-    return Math.abs(na - nb) > 1e-6;
-  };
-
-  Array.from(allIds)
-    .sort()
-    .forEach((id) => {
-      const a = mapA.get(id) ?? null;
-      const b = mapB.get(id) ?? null;
-
-      if (!a && b) {
-        diffs.push({
-          materialId: id,
-          changeType: 'ADDED',
-          previousState: null,
-          currentState: b,
-        });
-        return;
-      }
-
-      if (a && !b) {
-        diffs.push({
-          materialId: id,
-          changeType: 'REMOVED',
-          previousState: a,
-          currentState: null,
-        });
-        return;
-      }
-
-      if (!a || !b) return;
-
-      const moved =
-        isDifferent(a.machine_code, b.machine_code) ||
-        isDifferent(a.plan_date, b.plan_date) ||
-        Number(a.seq_no ?? 0) !== Number(b.seq_no ?? 0);
-
-      const modified =
-        !moved &&
-        (isWeightDifferent(a.weight_t, b.weight_t) ||
-          isDifferent(a.urgent_level, b.urgent_level) ||
-          isDifferent(a.locked_in_plan, b.locked_in_plan) ||
-          isDifferent(a.force_release_in_plan, b.force_release_in_plan) ||
-          isDifferent(a.sched_state, b.sched_state) ||
-          isDifferent(a.assign_reason, b.assign_reason));
-
-      if (!moved && !modified) return;
-
-      diffs.push({
-        materialId: id,
-        changeType: moved ? 'MOVED' : 'MODIFIED',
-        previousState: a,
-        currentState: b,
-      });
-    });
-
-  const summary: LocalVersionDiffSummary = diffs.reduce(
-    (acc, d) => {
-      acc.totalChanges += 1;
-      if (d.changeType === 'ADDED') acc.addedCount += 1;
-      else if (d.changeType === 'REMOVED') acc.removedCount += 1;
-      else if (d.changeType === 'MOVED') acc.movedCount += 1;
-      else acc.modifiedCount += 1;
-      return acc;
-    },
-    { totalChanges: 0, addedCount: 0, removedCount: 0, modifiedCount: 0, movedCount: 0 }
-  );
-
-  return { diffs, summary };
-}
-
-function computeCapacityMap(items: PlanItemSnapshot[]): Map<string, number> {
-  const map = new Map<string, number>();
-  items.forEach((it) => {
-    const machine = String(it.machine_code ?? '').trim();
-    const date = normalizeDateOnly(String(it.plan_date ?? ''));
-    if (!machine || !date) return;
-    const weight = Number(it.weight_t ?? 0);
-    if (!Number.isFinite(weight) || weight <= 0) return;
-    const key = `${machine}__${date}`;
-    map.set(key, (map.get(key) ?? 0) + weight);
-  });
-  return map;
-}
-
-function computeDailyTotals(items: PlanItemSnapshot[]): Map<string, number> {
-  const map = new Map<string, number>();
-  items.forEach((it) => {
-    const date = normalizeDateOnly(String(it.plan_date ?? ''));
-    if (!date) return;
-    const weight = Number(it.weight_t ?? 0);
-    if (!Number.isFinite(weight) || weight <= 0) return;
-    map.set(date, (map.get(date) ?? 0) + weight);
-  });
-  return map;
-}
+import { VersionComparisonModal } from './comparison/VersionComparisonModal';
+import { Plan, Version, LocalCapacityDeltaRow } from './comparison/types';
+import {
+  normalizeDateOnly,
+  extractVersionNameCn,
+  formatVersionLabel,
+  normalizePlanItem,
+  computeVersionDiffs,
+  computeCapacityMap,
+  computeDailyTotals,
+  makeRetrospectiveKey,
+} from './comparison/utils';
+// Chart 组件用于显示图表 - 现在由VersionComparisonModal内部使用
 
 const PlanManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -706,7 +484,7 @@ const PlanManagement: React.FC = () => {
     }
   };
 
-  const exportRetrospectiveReport = () => {
+  const exportRetrospectiveReport = async (): Promise<void> => {
     if (!compareResult) return;
     const exportedAt = dayjs().format('YYYY-MM-DD HH:mm:ss');
     const report = {
@@ -849,57 +627,7 @@ const PlanManagement: React.FC = () => {
     versionsInCompare,
   ]);
 
-  const filteredDiffs = useMemo(() => {
-    const diffs = localDiffResult?.diffs ?? [];
-    const q = diffSearchText.trim().toLowerCase();
-    return diffs.filter((d) => {
-      if (diffTypeFilter !== 'ALL' && d.changeType !== diffTypeFilter) return false;
-      if (!q) return true;
-      const idMatch = d.materialId.toLowerCase().includes(q);
-      const from = d.previousState
-        ? `${d.previousState.machine_code}/${d.previousState.plan_date}/${d.previousState.seq_no}`
-        : '';
-      const to = d.currentState ? `${d.currentState.machine_code}/${d.currentState.plan_date}/${d.currentState.seq_no}` : '';
-      return idMatch || from.toLowerCase().includes(q) || to.toLowerCase().includes(q);
-    });
-  }, [diffSearchText, diffTypeFilter, localDiffResult?.diffs]);
-
-  const diffSummaryChartOption = useMemo<EChartsOption | null>(() => {
-    if (!localDiffResult) return null;
-    const seriesData = [
-      { name: '新增', value: localDiffResult.summary.addedCount, color: '#52c41a' },
-      { name: '删除', value: localDiffResult.summary.removedCount, color: '#ff4d4f' },
-      { name: '移动', value: localDiffResult.summary.movedCount, color: '#faad14' },
-      { name: '修改', value: localDiffResult.summary.modifiedCount, color: '#722ed1' },
-    ];
-    const total = seriesData.reduce((sum, item) => sum + item.value, 0);
-    if (total <= 0) return null;
-
-    return {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      grid: { left: 44, right: 16, top: 16, bottom: 36 },
-      xAxis: {
-        type: 'category',
-        data: seriesData.map((d) => d.name),
-        axisTick: { alignWithLabel: true },
-      },
-      yAxis: { type: 'value', minInterval: 1 },
-      series: [
-        {
-          name: '变更数量',
-          type: 'bar',
-          barMaxWidth: 44,
-          label: { show: true, position: 'top' },
-          data: seriesData.map((d) => ({
-            value: d.value,
-            itemStyle: { color: d.color },
-          })),
-        },
-      ],
-    };
-  }, [localDiffResult]);
-
-  const localCapacityRowsBase = useMemo(() => {
+    const localCapacityRowsBase = useMemo(() => {
     if (!compareModalVisible || !versionsInCompare || !loadLocalCompareDetail) return null;
     const mapA = computeCapacityMap(normalizedItemsA);
     const mapB = computeCapacityMap(normalizedItemsB);
@@ -1033,6 +761,36 @@ const PlanManagement: React.FC = () => {
     return { ...localCapacityRowsBase, rows, overflowRows };
   }, [capacityPoolsQueryA.data, capacityPoolsQueryB.data, localCapacityRowsBase]);
 
+  const diffSummaryChartOption = useMemo<EChartsOption | null>(() => {
+    if (!localDiffResult) return null;
+    const { addedCount, removedCount, movedCount, modifiedCount } = localDiffResult.summary;
+    return {
+      title: { text: '变更类型分布' },
+      tooltip: { trigger: 'item' },
+      legend: { orient: 'vertical', left: 'left' },
+      series: [
+        {
+          name: '变更数量',
+          type: 'pie',
+          radius: '50%',
+          data: [
+            { value: addedCount, name: '新增' },
+            { value: removedCount, name: '删除' },
+            { value: movedCount, name: '移动' },
+            { value: modifiedCount, name: '修改' },
+          ],
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(0, 0, 0, 0.5)',
+            },
+          },
+        },
+      ],
+    };
+  }, [localDiffResult]);
+
   const capacityTrendOption = useMemo<EChartsOption | null>(() => {
     if (!compareModalVisible || !versionsInCompare) return null;
     if (planItemsQueryA.isLoading || planItemsQueryB.isLoading) return null;
@@ -1122,7 +880,7 @@ const PlanManagement: React.FC = () => {
     };
   }, [compareResult?.risk_delta]);
 
-  const exportCapacityDelta = (format: 'csv' | 'json') => {
+  const exportCapacityDelta = async (format: 'csv' | 'json'): Promise<void> => {
     if (!compareResult || !localCapacityRows) return;
     const rows = localCapacityRows.rows.map((r) => ({
       date: r.date,
@@ -1140,7 +898,7 @@ const PlanManagement: React.FC = () => {
     else exportJSON(rows, filename);
   };
 
-  const exportDiffs = (format: 'csv' | 'json') => {
+  const exportDiffs = async (format: 'csv' | 'json'): Promise<void> => {
     if (!compareResult || !localDiffResult) return;
     const rows = localDiffResult.diffs.map((d) => ({
       change_type: d.changeType,
@@ -1162,7 +920,7 @@ const PlanManagement: React.FC = () => {
     else exportJSON(rows, filename);
   };
 
-  const exportReportMarkdown = () => {
+  const exportReportMarkdown = async (): Promise<void> => {
     if (!compareResult) return;
     const header = `# 版本对比报告\n\n- 导出时间：${dayjs().format('YYYY-MM-DD HH:mm:ss')}\n- 操作人：${currentUser}\n- 版本A：${compareResult.version_id_a}\n- 版本B：${compareResult.version_id_b}\n\n`;
     const backendSummary = `## 后端摘要\n\n- moved_count: ${compareResult.moved_count}\n- added_count: ${compareResult.added_count}\n- removed_count: ${compareResult.removed_count}\n- squeezed_out_count: ${compareResult.squeezed_out_count}\n\n`;
@@ -1205,7 +963,7 @@ const PlanManagement: React.FC = () => {
     }
   };
 
-  const exportReportHTML = () => {
+  const exportReportHTML = async (): Promise<void> => {
     if (!compareResult) return;
     const configChanges = Array.isArray(compareResult.config_changes) ? compareResult.config_changes : [];
     const diffSample = localDiffResult ? localDiffResult.diffs.slice(0, 200) : [];
@@ -1427,476 +1185,49 @@ const PlanManagement: React.FC = () => {
         </Space>
       </Modal>
 
-	      <Modal
-	        title="版本对比结果"
-	        open={compareModalVisible}
-	        onCancel={() => {
-	          setCompareModalVisible(false);
-	          setCompareResult(null);
-	        }}
-	        footer={[
-	          compareResult ? (
-	            <Button
-	              key="activateA"
-	              onClick={() => handleActivateVersion(compareResult.version_id_a)}
-	            >
-	              回滚到版本A
-	            </Button>
-	          ) : null,
-	          compareResult ? (
-	            <Button
-	              key="activateB"
-	              type="primary"
-	              onClick={() => handleActivateVersion(compareResult.version_id_b)}
-	            >
-	              回滚到版本B
-	            </Button>
-	          ) : null,
-	          <Button key="close" onClick={() => setCompareModalVisible(false)}>
-	            关闭
-	          </Button>,
-	        ]}
-        width={1100}
-        bodyStyle={{ maxHeight: 600, overflow: 'auto' }}
-      >
-        {compareResult && (
-          <Space direction="vertical" style={{ width: '100%' }}>
-            <Alert type="info" showIcon message={compareResult.message} />
-
-	            <Card title="对比摘要" size="small">
-	              <Descriptions size="small" column={2} bordered>
-	                <Descriptions.Item label="版本A">{compareResult.version_id_a}</Descriptions.Item>
-	                <Descriptions.Item label="版本B">{compareResult.version_id_b}</Descriptions.Item>
-	                <Descriptions.Item label="移动数量">{compareResult.moved_count}</Descriptions.Item>
-	                <Descriptions.Item label="新增数量">{compareResult.added_count}</Descriptions.Item>
-	                <Descriptions.Item label="删除数量">{compareResult.removed_count}</Descriptions.Item>
-	                <Descriptions.Item label="挤出数量">{compareResult.squeezed_out_count}</Descriptions.Item>
-	              </Descriptions>
-	            </Card>
-
-	            <Card title="KPI 总览（后端聚合）" size="small">
-	              {compareKpiQuery.isLoading ? (
-	                <Alert type="info" showIcon message="正在计算 KPI…" />
-	              ) : compareKpiQuery.error ? (
-	                <Alert
-	                  type="error"
-	                  showIcon
-	                  message="KPI 计算失败"
-	                  description={String((compareKpiQuery.error as any)?.message || compareKpiQuery.error)}
-	                />
-	              ) : !compareKpiQuery.data ? (
-	                <Alert type="info" showIcon message="暂无 KPI 数据" />
-	              ) : (
-	                <Space direction="vertical" style={{ width: '100%' }} size={10}>
-	                  <Alert type="info" showIcon message={compareKpiQuery.data.message} />
-	                  <Table
-	                    size="small"
-	                    pagination={false}
-	                    rowKey={(r) => String((r as any).key)}
-	                    dataSource={compareKpiRows ?? []}
-	                    columns={[
-	                      { title: '指标', dataIndex: 'metric', width: 180 },
-	                      { title: '版本A', dataIndex: 'a', width: 160 },
-	                      { title: '版本B', dataIndex: 'b', width: 160 },
-	                      { title: 'Δ(B-A)', dataIndex: 'delta' },
-	                    ]}
-	                  />
-	                </Space>
-	              )}
-	            </Card>
-
-	            <Card
-	              title="物料变更明细（本地计算）"
-	              size="small"
-	              extra={
-	                <Space>
-	                  <Button
-	                    size="small"
-	                    onClick={() => setLoadLocalCompareDetail(true)}
-	                    disabled={loadLocalCompareDetail}
-	                  >
-	                    {loadLocalCompareDetail ? '已加载明细' : '加载明细'}
-	                  </Button>
-	                  <Button size="small" onClick={() => exportDiffs('csv')} disabled={!localDiffResult}>
-	                    导出差异(CSV)
-	                  </Button>
-	                  <Button size="small" onClick={() => exportDiffs('json')} disabled={!localDiffResult}>
-	                    导出差异(JSON)
-	                  </Button>
-	                </Space>
-	              }
-            >
-	              {!loadLocalCompareDetail ? (
-	                <Alert
-	                  type="info"
-	                  showIcon
-	                  message="为提升性能，默认不加载全量排产明细"
-	                  description="点击右上角「加载明细」后，将拉取两个版本的 plan_item 用于本地计算：变更明细/产能变化等。"
-	                />
-	              ) : planItemsQueryA.isLoading || planItemsQueryB.isLoading ? (
-	                <Alert type="info" showIcon message="正在加载排产明细，用于计算差异…" />
-	              ) : planItemsQueryA.error || planItemsQueryB.error ? (
-	                <Alert
-	                  type="error"
-                  showIcon
-                  message="排产明细加载失败，无法生成本地差异"
-                  description={String((planItemsQueryA.error as any)?.message || planItemsQueryA.error || (planItemsQueryB.error as any)?.message || planItemsQueryB.error)}
-                />
-              ) : !localDiffResult ? (
-                <Alert type="info" showIcon message="暂无差异数据" />
-              ) : (
-                <Space direction="vertical" style={{ width: '100%' }} size={10}>
-                  <Space wrap>
-                    <Tag color="blue">总变更 {localDiffResult.summary.totalChanges}</Tag>
-                    <Tag color="green">新增 {localDiffResult.summary.addedCount}</Tag>
-                    <Tag color="red">删除 {localDiffResult.summary.removedCount}</Tag>
-                    <Tag color="gold">移动 {localDiffResult.summary.movedCount}</Tag>
-                    <Tag color="purple">修改 {localDiffResult.summary.modifiedCount}</Tag>
-                  </Space>
-
-                  {diffSummaryChartOption ? (
-                    <Chart option={diffSummaryChartOption} height={180} />
-                  ) : (
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      暂无可视化统计
-                    </Typography.Text>
-                  )}
-
-                  <Space wrap>
-                    <Input
-                      placeholder="搜索物料/From/To…"
-                      value={diffSearchText}
-                      onChange={(e) => setDiffSearchText(e.target.value)}
-                      style={{ width: 260 }}
-                      allowClear
-                    />
-                    <Select
-                      value={diffTypeFilter}
-                      style={{ width: 220 }}
-                      onChange={(v) => setDiffTypeFilter(v)}
-                      options={[
-                        { value: 'ALL', label: '全部类型' },
-                        { value: 'MOVED', label: '移动' },
-                        { value: 'MODIFIED', label: '修改' },
-                        { value: 'ADDED', label: '新增' },
-                        { value: 'REMOVED', label: '删除' },
-                      ]}
-                    />
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      显示 {filteredDiffs.length} / {localDiffResult.diffs.length}
-                    </Typography.Text>
-                  </Space>
-
-                  <Table<VersionDiff>
-                    size="small"
-                    rowKey={(r) => r.materialId}
-                    pagination={false}
-                    dataSource={filteredDiffs}
-                    columns={[
-                      {
-                        title: '类型',
-                        dataIndex: 'changeType',
-                        width: 90,
-                        render: (v) => {
-                          const color = v === 'REMOVED' ? 'red' : v === 'ADDED' ? 'green' : v === 'MOVED' ? 'gold' : 'purple';
-                          return <Tag color={color}>{v}</Tag>;
-                        },
-                      },
-                      {
-                        title: '物料',
-                        dataIndex: 'materialId',
-                        width: 200,
-                        render: (v) => (
-                          <Typography.Text code copyable>
-                            {String(v)}
-                          </Typography.Text>
-                        ),
-                      },
-                      {
-                        title: 'From',
-                        key: 'from',
-                        width: 260,
-                        render: (_, r) => {
-                          const s = r.previousState;
-                          return s ? `${s.machine_code}/${s.plan_date}/序${s.seq_no}` : '-';
-                        },
-                      },
-                      {
-                        title: 'To',
-                        key: 'to',
-                        width: 260,
-                        render: (_, r) => {
-                          const s = r.currentState;
-                          return s ? `${s.machine_code}/${s.plan_date}/序${s.seq_no}` : '-';
-                        },
-                      },
-                      {
-                        title: '紧急',
-                        key: 'urgent',
-                        width: 90,
-                        render: (_, r) => {
-                          const u = r.currentState?.urgent_level ?? r.previousState?.urgent_level ?? '';
-                          return u ? <Tag>{u}</Tag> : '-';
-                        },
-                      },
-                      {
-                        title: '重量',
-                        key: 'weight',
-                        width: 90,
-                        render: (_, r) => {
-                          const w = r.currentState?.weight_t ?? r.previousState?.weight_t ?? null;
-                          if (w == null || !Number.isFinite(Number(w))) return '-';
-                          return `${Number(w).toFixed(3)}t`;
-                        },
-                      },
-                    ]}
-                    virtual
-                    scroll={{ y: 320 }}
-                  />
-                </Space>
-              )}
-            </Card>
-
-            <Card
-              title="产能变化（本地计算）"
-              size="small"
-              extra={
-                <Space>
-                  <Button size="small" onClick={() => setShowAllCapacityRows((v) => !v)} disabled={!localCapacityRowsBase}>
-                    {showAllCapacityRows ? '仅看变化' : '查看全量'}
-                  </Button>
-                  <Button size="small" onClick={() => exportCapacityDelta('csv')} disabled={!localCapacityRows}>
-                    导出产能(CSV)
-                  </Button>
-                  <Button size="small" onClick={() => exportCapacityDelta('json')} disabled={!localCapacityRows}>
-                    导出产能(JSON)
-                  </Button>
-                </Space>
-              }
-            >
-	              {!loadLocalCompareDetail ? (
-	                <Alert
-	                  type="info"
-	                  showIcon
-	                  message="未加载排产明细"
-	                  description="点击上方「物料变更明细」区域右上角的「加载明细」，即可生成本地产能变化分析。"
-	                />
-	              ) : !localCapacityRowsBase ? (
-	                <Alert type="info" showIcon message="暂无产能差异数据" />
-	              ) : (
-	                <Space direction="vertical" style={{ width: '100%' }} size={10}>
-	                  {capacityTrendOption ? (
-	                    <Chart option={capacityTrendOption} height={220} />
-	                  ) : (
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      暂无产能趋势图
-                    </Typography.Text>
-                  )}
-
-                  <Space wrap>
-                    <Tag color="blue">总量A {localCapacityRowsBase.totalA.toFixed(1)}t</Tag>
-                    <Tag color="blue">总量B {localCapacityRowsBase.totalB.toFixed(1)}t</Tag>
-                    <Tag color={localCapacityRowsBase.totalB - localCapacityRowsBase.totalA >= 0 ? 'green' : 'red'}>
-                      Δ {(localCapacityRowsBase.totalB - localCapacityRowsBase.totalA).toFixed(1)}t
-                    </Tag>
-                    {localCapacityRows ? (
-                      <Tag color={localCapacityRows.overflowRows.length > 0 ? 'red' : 'green'}>
-                        预计超上限 {localCapacityRows.overflowRows.length}
-                      </Tag>
-                    ) : null}
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      {localCapacityRowsBase.dateFrom || '-'} ~ {localCapacityRowsBase.dateTo || '-'} · 机组 {localCapacityRowsBase.machines.length}
-                    </Typography.Text>
-                  </Space>
-
-                  {capacityPoolsQueryA.error || capacityPoolsQueryB.error ? (
-                    <Alert
-                      type="warning"
-                      showIcon
-                      message="产能池加载失败（仍可查看吨位差异）"
-                      description={String((capacityPoolsQueryA.error as any)?.message || capacityPoolsQueryA.error || (capacityPoolsQueryB.error as any)?.message || capacityPoolsQueryB.error)}
-                    />
-                  ) : null}
-
-                  <Table<LocalCapacityDeltaRow>
-                    size="small"
-                    rowKey={(r) => `${r.machine_code}__${r.date}`}
-                    pagination={false}
-                    dataSource={localCapacityRows?.rows ?? localCapacityRowsBase.rows}
-                    columns={[
-                      { title: '日期', dataIndex: 'date', width: 120 },
-                      { title: '机组', dataIndex: 'machine_code', width: 90 },
-                      {
-                        title: 'A已用(t)',
-                        dataIndex: 'used_a',
-                        width: 110,
-                        render: (v: number) => v.toFixed(1),
-                      },
-                      {
-                        title: 'B已用(t)',
-                        dataIndex: 'used_b',
-                        width: 110,
-                        render: (v: number, r) => {
-                          const threshold = r.limit_b ?? r.target_b ?? null;
-                          const over = threshold != null && v > threshold + 1e-9;
-                          return <span style={{ color: over ? '#cf1322' : undefined }}>{v.toFixed(1)}</span>;
-                        },
-                      },
-                      {
-                        title: 'Δ(t)',
-                        dataIndex: 'delta',
-                        width: 110,
-                        render: (v: number) => (
-                          <span style={{ color: v > 1e-9 ? '#3f8600' : v < -1e-9 ? '#cf1322' : undefined }}>
-                            {v.toFixed(1)}
-                          </span>
-                        ),
-                      },
-                      {
-                        title: 'B目标/上限',
-                        key: 'capB',
-                        width: 160,
-                        render: (_, r) => {
-                          const target = r.target_b;
-                          const limit = r.limit_b;
-                          if (target == null && limit == null) return '-';
-                          const t = target == null ? '-' : target.toFixed(1);
-                          const l = limit == null ? '-' : limit.toFixed(1);
-                          return `${t} / ${l}`;
-                        },
-                      },
-                    ]}
-                    virtual
-                    scroll={{ y: 320 }}
-                  />
-                </Space>
-              )}
-            </Card>
-
-            <Card title="配置变化" size="small">
-              {compareResult.config_changes && compareResult.config_changes.length > 0 ? (
-                <Table
-                  size="small"
-                  pagination={false}
-                  rowKey={(r) => r.key}
-                  dataSource={compareResult.config_changes}
-                  columns={[
-                    { title: 'Key', dataIndex: 'key', width: 220 },
-                    {
-                      title: '版本A',
-                      dataIndex: 'value_a',
-                      render: (v) => (v == null ? '-' : String(v)),
-                    },
-                    {
-                      title: '版本B',
-                      dataIndex: 'value_b',
-                      render: (v) => (v == null ? '-' : String(v)),
-                    },
-                  ]}
-                  scroll={{ y: 240 }}
-                />
-              ) : (
-                <Alert type="success" showIcon message="无配置变化" />
-              )}
-            </Card>
-
-            <Card title="风险/产能变化" size="small">
-              <Space direction="vertical" style={{ width: '100%' }} size={10}>
-                {compareResult.risk_delta ? (
-                  <Space direction="vertical" style={{ width: '100%' }} size={10}>
-                    {riskTrendOption ? (
-                      <Chart option={riskTrendOption} height={220} />
-                    ) : null}
-                    <Table
-                      size="small"
-                      pagination={false}
-                      rowKey={(r) => `${r.date}`}
-                      dataSource={compareResult.risk_delta}
-                      columns={[
-                        { title: '日期', dataIndex: 'date', width: 120 },
-                        { title: 'A风险', dataIndex: 'risk_score_a', width: 120 },
-                        { title: 'B风险', dataIndex: 'risk_score_b', width: 120 },
-                        { title: 'Δ', dataIndex: 'risk_score_delta' },
-                      ]}
-                      scroll={{ y: 200 }}
-                    />
-                  </Space>
-                ) : (
-                  <Alert
-                    type="info"
-                    showIcon
-                    message="风险变化对比暂不可用"
-                    description="后端 compare_versions 当前未返回 risk_delta（待 RiskSnapshotRepository 支持）。"
-                  />
-                )}
-
-                {compareResult.capacity_delta ? (
-                  <Table
-                    size="small"
-                    pagination={false}
-                    rowKey={(r) => `${r.machine_code}__${r.date}`}
-                    dataSource={compareResult.capacity_delta}
-                    columns={[
-                      { title: '机组', dataIndex: 'machine_code', width: 90 },
-                      { title: '日期', dataIndex: 'date', width: 120 },
-                      { title: 'A已用', dataIndex: 'used_capacity_a', width: 120 },
-                      { title: 'B已用', dataIndex: 'used_capacity_b', width: 120 },
-                      { title: 'Δ', dataIndex: 'capacity_delta' },
-                    ]}
-                    scroll={{ y: 200 }}
-                  />
-                ) : (
-                  <Alert
-                    type="info"
-                    showIcon
-                    message="产能变化对比暂不可用"
-                    description="后端 compare_versions 当前未返回 capacity_delta（待 CapacityPoolRepository 支持）。"
-                  />
-                )}
-              </Space>
-            </Card>
-
-            <Card
-              title="复盘总结"
-              size="small"
-              extra={
-                <Space>
-                  <Button size="small" onClick={saveRetrospectiveNote}>
-                    保存总结
-                  </Button>
-                  <Button size="small" onClick={exportRetrospectiveReport}>
-                    导出报告(JSON)
-                  </Button>
-                  <Button size="small" onClick={exportReportMarkdown} disabled={!compareResult}>
-                    导出报告(MD)
-                  </Button>
-                  <Button size="small" onClick={exportReportHTML} disabled={!compareResult}>
-                    导出报告(HTML)
-                  </Button>
-                </Space>
-              }
-            >
-              <Space direction="vertical" style={{ width: '100%' }} size={8}>
-                <Input.TextArea
-                  rows={5}
-                  value={retrospectiveNote}
-                  onChange={(e) => setRetrospectiveNote(e.target.value)}
-                  placeholder="记录本次决策要点、代价与后续关注项（本地保存，不会写入数据库）。"
-                />
-                <Alert
-                  type="info"
-                  showIcon
-                  message={
-                    retrospectiveSavedAt
-                      ? `已保存（本地）：${retrospectiveSavedAt}`
-                      : '未保存（本地）'
-                  }
-                />
-              </Space>
-            </Card>
-          </Space>
-        )}
-      </Modal>
+      <VersionComparisonModal
+        open={compareModalVisible}
+        onClose={() => {
+          setCompareModalVisible(false);
+          setCompareResult(null);
+        }}
+        compareResult={compareResult}
+        compareKpiRows={compareKpiRows ?? []}
+        compareKpiLoading={compareKpiQuery.isLoading}
+        compareKpiError={compareKpiQuery.error as Error | null}
+        localDiffResult={localDiffResult}
+        loadLocalCompareDetail={loadLocalCompareDetail}
+        planItemsLoading={planItemsQueryA.isLoading || planItemsQueryB.isLoading}
+        planItemsErrorA={planItemsQueryA.error as Error | null}
+        planItemsErrorB={planItemsQueryB.error as Error | null}
+        localCapacityRows={localCapacityRows}
+        localCapacityRowsBase={localCapacityRowsBase}
+        capacityPoolsErrorA={capacityPoolsQueryA.error as Error | null}
+        capacityPoolsErrorB={capacityPoolsQueryB.error as Error | null}
+        showAllCapacityRows={showAllCapacityRows}
+        retrospectiveNote={retrospectiveNote}
+        retrospectiveSavedAt={retrospectiveSavedAt}
+        diffSearchText={diffSearchText}
+        diffTypeFilter={diffTypeFilter}
+        diffSummaryChartOption={diffSummaryChartOption}
+        capacityTrendOption={capacityTrendOption}
+        riskTrendOption={riskTrendOption}
+        onActivateVersion={handleActivateVersion}
+        onLoadLocalCompareDetail={() => setLoadLocalCompareDetail(true)}
+        onToggleShowAllCapacityRows={() => setShowAllCapacityRows((v) => !v)}
+        onRetrospectiveNoteChange={(note) => setRetrospectiveNote(note)}
+        onRetrospectiveNoteSave={saveRetrospectiveNote}
+        onDiffSearchChange={(text) => setDiffSearchText(text)}
+        onDiffTypeFilterChange={(type) => setDiffTypeFilter(type)}
+        onExportDiffs={exportDiffs}
+        onExportCapacity={exportCapacityDelta}
+        onExportReport={(format) => {
+          if (format === 'json') return exportRetrospectiveReport();
+          if (format === 'markdown') return exportReportMarkdown();
+          if (format === 'html') return exportReportHTML();
+          return Promise.resolve();
+        }}
+      />
     </div>
   );
 };
