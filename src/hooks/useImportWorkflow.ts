@@ -9,7 +9,7 @@ import type { TablePaginationConfig } from 'antd/es/table';
 import { open } from '@tauri-apps/api/dialog';
 import { readTextFile } from '@tauri-apps/api/fs';
 import { useNavigate } from 'react-router-dom';
-import { parseCsvPreview } from '../utils/csvParser';
+import { parseCsvPreviewSmart } from '../utils/csvParser';
 import { safeReadImportHistory, safeWriteImportHistory } from '../utils/importHistoryStorage';
 import {
   REQUIRED_HEADERS,
@@ -155,7 +155,8 @@ export function useImportWorkflow(): UseImportWorkflowReturn {
     setPreviewLoading(true);
     try {
       const content = await readTextFile(filePath);
-      const parsed = parseCsvPreview(content, 20);
+      // 使用智能解析器：大文件自动使用 Web Worker
+      const parsed = await parseCsvPreviewSmart(content, 20);
       setPreviewHeaders(parsed.headers);
       setPreviewRows(parsed.rows);
       setPreviewTotalRows(parsed.totalRows);
