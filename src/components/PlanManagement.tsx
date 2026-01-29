@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useDebounce } from '../hooks/useDebounce';
 import { Button, Divider, Input, InputNumber, Modal, Space, Table, Typography, message } from 'antd';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
@@ -58,17 +58,9 @@ const PlanManagement: React.FC = () => {
   // 防抖搜索文本（延迟 300ms）
   const debouncedPlanSearchText = useDebounce(planSearchText, 300);
 
-  const planColumns = useMemo(
-    () => createPlanColumns(loadVersions, handleCreateVersion, handleDeletePlan),
-    []
-  );
+  // 先定义所有回调函数，再在 useMemo 中使用
 
-  const versionColumns = useMemo(
-    () => createVersionColumns(handleActivateVersion, handleRecalc, handleDeleteVersion),
-    []
-  );
-
-  const loadPlans = async () => {
+  const loadPlans = useCallback(async () => {
     setLoading(true);
     try {
       const result = await planApi.listPlans();
@@ -79,7 +71,7 @@ const PlanManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // 筛选排产方案
   const filterPlans = () => {
@@ -98,7 +90,7 @@ const PlanManagement: React.FC = () => {
     setFilteredPlans(filtered);
   };
 
-  const loadVersions = async (planId: string) => {
+  const loadVersions = useCallback(async (planId: string) => {
     setSelectedPlanId(planId);
     setLoading(true);
     try {
@@ -113,7 +105,7 @@ const PlanManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [setActiveVersion]);
 
   const handleCreatePlan = async () => {
     if (!planName.trim()) {
@@ -135,10 +127,10 @@ const PlanManagement: React.FC = () => {
     }
   };
 
-  const handleCreateVersion = (planId: string) => {
+  const handleCreateVersion = useCallback((planId: string) => {
     setSelectedPlanId(planId);
     setCreateVersionVisible(true);
-  };
+  }, []);
 
   const handleCreateVersionSubmit = async () => {
     if (!selectedPlanId) return;
@@ -157,7 +149,7 @@ const PlanManagement: React.FC = () => {
     }
   };
 
-  const handleActivateVersion = async (versionId: string) => {
+  const handleActivateVersion = useCallback(async (versionId: string) => {
     if (!selectedPlanId) {
       message.warning('请先选择方案');
       return;
@@ -219,9 +211,9 @@ const PlanManagement: React.FC = () => {
         }
       },
     });
-  };
+  }, [selectedPlanId, versions, currentUser, setActiveVersion, loadVersions]);
 
-  const handleDeletePlan = async (plan: Plan) => {
+  const handleDeletePlan = useCallback(async (plan: Plan) => {
     Modal.confirm({
       title: '确认删除排产方案？',
       icon: <ExclamationCircleOutlined />,
@@ -265,9 +257,9 @@ const PlanManagement: React.FC = () => {
         }
       },
     });
-  };
+  }, [currentUser, selectedPlanId, setActiveVersion, loadPlans]);
 
-  const handleDeleteVersion = async (version: Version) => {
+  const handleDeleteVersion = useCallback(async (version: Version) => {
     const label = formatVersionLabel(version);
     Modal.confirm({
       title: '确认删除版本？',
@@ -299,9 +291,9 @@ const PlanManagement: React.FC = () => {
         }
       },
     });
-  };
+  }, [currentUser, selectedPlanId, loadVersions]);
 
-  const handleRecalc = async (versionId: string) => {
+  const handleRecalc = useCallback(async (versionId: string) => {
     setRecalculating(true);
     try {
       const baseDate = formatDate(dayjs());
@@ -315,7 +307,18 @@ const PlanManagement: React.FC = () => {
     } finally {
       setRecalculating(false);
     }
-  };
+  }, [currentUser, selectedPlanId, loadVersions, setRecalculating]);
+
+  // 创建表格列（在所有回调函数定义之后）
+  const planColumns = useMemo(
+    () => createPlanColumns(loadVersions, handleCreateVersion, handleDeletePlan),
+    [loadVersions, handleCreateVersion, handleDeletePlan]
+  );
+
+  const versionColumns = useMemo(
+    () => createVersionColumns(handleActivateVersion, handleRecalc, handleDeleteVersion),
+    [handleActivateVersion, handleRecalc, handleDeleteVersion]
+  );
 
   const handleCompareVersions = async () => {
     if (selectedVersions.length !== 2) {
