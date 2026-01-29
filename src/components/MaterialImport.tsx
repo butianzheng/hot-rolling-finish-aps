@@ -1,207 +1,22 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import {
-  Alert,
-  Button,
-  Card,
-  Col,
-  Descriptions,
-  Divider,
-  Form,
-  Input,
-  Modal,
-  Row,
-  Select,
-  Space,
-  Spin,
-  Statistic,
-  Table,
-  Tabs,
-  Tag,
-  Typography,
-  message,
-} from 'antd';
-import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
-import {
-  CheckCircleOutlined,
-  ExclamationCircleOutlined,
-  FolderOpenOutlined,
-  ReloadOutlined,
-  UploadOutlined,
-} from '@ant-design/icons';
-import { open } from '@tauri-apps/api/dialog';
-import { readTextFile } from '@tauri-apps/api/fs';
+/**
+ * 材料导入主组件
+ * 协调各子组件和工作流状态
+ *
+ * 重构后：1028 行 → ~180 行 (-82%)
+ */
+
+import React from 'react';
+import { Alert, Tabs, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { importApi } from '../api/tauri';
 import { useCurrentUser, useGlobalActions } from '../stores/use-global-store';
+import { useImportWorkflow } from '../hooks/useImportWorkflow';
+import { safeWriteImportHistory } from '../utils/importHistoryStorage';
+import { ImportTabContent } from './material-import/ImportTabContent';
+import { ConflictsTabContent } from './material-import/ConflictsTabContent';
+import { HistoryTabContent } from './material-import/HistoryTabContent';
+import { RawDataModal } from './material-import/RawDataModal';
 
-const { Title, Text, Paragraph } = Typography;
-
-type DqViolation = {
-  row_number: number;
-  material_id: string | null;
-  level: 'Error' | 'Warning' | 'Info' | 'Conflict' | string;
-  field: string;
-  message: string;
-};
-
-type DqSummary = {
-  total_rows: number;
-  success: number;
-  blocked: number;
-  warning: number;
-  conflict: number;
-};
-
-type ImportMaterialsResponse = {
-  imported: number;
-  updated: number;
-  conflicts: number;
-  batch_id: string;
-  import_batch_id?: string;
-  dq_summary?: DqSummary;
-  dq_violations?: DqViolation[];
-  elapsed_ms?: number;
-};
-
-type ImportHistoryItem = {
-  id: string;
-  created_at: string;
-  operator: string;
-  file_path: string;
-  source_batch_id: string;
-  import_batch_id: string | null;
-  imported: number;
-  updated: number;
-  conflicts: number;
-  elapsed_ms: number | null;
-};
-
-type ImportConflict = {
-  conflict_id: string;
-  batch_id: string;
-  row_number: number;
-  material_id: string | null;
-  conflict_type: string;
-  raw_data: string;
-  reason: string;
-  resolved: boolean;
-  created_at: string;
-};
-
-type ImportConflictListResponse = {
-  conflicts: ImportConflict[];
-  total: number;
-  limit: number;
-  offset: number;
-};
-
-type PreviewRow = Record<string, string>;
-
-const REQUIRED_HEADERS = ['材料号', '材料实际重量', '下道机组代码'];
-const IMPORT_HISTORY_KEY = 'aps_import_history';
-const IMPORT_HISTORY_MAX = 30;
-
-function splitCsvLine(line: string): string[] {
-  // Minimal CSV splitter with basic quote handling; good enough for our fixture data.
-  const out: string[] = [];
-  let cur = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (ch === '"') {
-      const next = line[i + 1];
-      if (inQuotes && next === '"') {
-        cur += '"';
-        i += 1;
-        continue;
-      }
-      inQuotes = !inQuotes;
-      continue;
-    }
-
-    if (ch === ',' && !inQuotes) {
-      out.push(cur.trim());
-      cur = '';
-      continue;
-    }
-
-    cur += ch;
-  }
-
-  out.push(cur.trim());
-  return out;
-}
-
-function parseCsvPreview(content: string, maxRows: number): { headers: string[]; rows: PreviewRow[]; totalRows: number } {
-  const normalized = content.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  const allLines = normalized.split('\n').filter((l) => l.trim().length > 0);
-  if (allLines.length === 0) return { headers: [], rows: [], totalRows: 0 };
-
-  const headers = splitCsvLine(allLines[0]);
-  const dataLines = allLines.slice(1);
-  const rows: PreviewRow[] = dataLines.slice(0, maxRows).map((line) => {
-    const values = splitCsvLine(line);
-    const row: PreviewRow = {};
-    headers.forEach((h, idx) => {
-      row[h] = values[idx] ?? '';
-    });
-    return row;
-  });
-
-  return { headers, rows, totalRows: dataLines.length };
-}
-
-function formatMs(ms?: number): string {
-  if (typeof ms !== 'number' || Number.isNaN(ms)) return '-';
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(2)}s`;
-}
-
-function safeReadImportHistory(): ImportHistoryItem[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(IMPORT_HISTORY_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map((it: any) => ({
-        id: String(it?.id ?? ''),
-        created_at: String(it?.created_at ?? ''),
-        operator: String(it?.operator ?? ''),
-        file_path: String(it?.file_path ?? ''),
-        source_batch_id: String(it?.source_batch_id ?? ''),
-        import_batch_id: it?.import_batch_id == null ? null : String(it.import_batch_id),
-        imported: Number(it?.imported ?? 0),
-        updated: Number(it?.updated ?? 0),
-        conflicts: Number(it?.conflicts ?? 0),
-        elapsed_ms: it?.elapsed_ms == null ? null : Number(it.elapsed_ms),
-      }))
-      .filter((it) => it.id);
-  } catch {
-    return [];
-  }
-}
-
-function safeWriteImportHistory(items: ImportHistoryItem[]) {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(IMPORT_HISTORY_KEY, JSON.stringify(items));
-  } catch {
-    // ignore
-  }
-}
-
-function conflictTypeLabel(t: string): string {
-  const map: Record<string, string> = {
-    PrimaryKeyMissing: '主键缺失',
-    PrimaryKeyDuplicate: '主键重复',
-    ForeignKeyViolation: '外键/引用错误',
-    DataTypeError: '数据类型错误',
-  };
-  return map[t] || t || '-';
-}
+const { Title, Paragraph } = Typography;
 
 const MaterialImport: React.FC = () => {
   const navigate = useNavigate();
@@ -210,392 +25,40 @@ const MaterialImport: React.FC = () => {
 
   const isTauriRuntime = typeof window !== 'undefined' && !!(window as any).__TAURI__;
 
-  const [activeTab, setActiveTab] = useState<'import' | 'conflicts' | 'history'>('import');
-  const [selectedFilePath, setSelectedFilePath] = useState<string>('');
-  const [previewHeaders, setPreviewHeaders] = useState<string[]>([]);
-  const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
-  const [previewTotalRows, setPreviewTotalRows] = useState<number>(0);
-  const [previewLoading, setPreviewLoading] = useState(false);
+  // 使用 Hook 获取所有状态和方法
+  const workflow = useImportWorkflow();
 
-  const [batchId, setBatchId] = useState<string>(() => `BATCH_${Date.now()}`);
-  const [mappingProfileId, setMappingProfileId] = useState<string>('');
+  // 处理冲突解决
+  const handleResolveConflict = async (
+    conflictId: string,
+    action: 'KEEP_EXISTING' | 'OVERWRITE' | 'MERGE',
+  ) => {
+    await workflow.handleResolveConflict(conflictId, action, { currentUser: currentUser || 'admin' });
+  };
 
-  const [importLoading, setImportLoading] = useState(false);
-  const [importResult, setImportResult] = useState<ImportMaterialsResponse | null>(null);
+  // 处理查看冲突（从历史记录跳转）
+  const handleViewConflicts = async (batchId: string) => {
+    workflow.setConflictBatchId(batchId);
+    workflow.setConflictStatus('OPEN');
+    workflow.setActiveTab('conflicts');
+    await workflow.loadConflicts({ status: 'OPEN', batchId, page: 1 });
+  };
 
-  const [conflictsLoading, setConflictsLoading] = useState(false);
-  const [conflictStatus, setConflictStatus] = useState<'OPEN' | 'RESOLVED' | 'ALL'>('OPEN');
-  const [conflictBatchId, setConflictBatchId] = useState<string>('');
-  const [conflicts, setConflicts] = useState<ImportConflict[]>([]);
-  const [conflictPagination, setConflictPagination] = useState<TablePaginationConfig>({
-    current: 1,
-    pageSize: 20,
-    total: 0,
-    showSizeChanger: true,
-  });
-  const [importHistory, setImportHistory] = useState<ImportHistoryItem[]>(() => safeReadImportHistory());
-  const [rawModal, setRawModal] = useState<{ open: boolean; title: string; content: string }>({
-    open: false,
-    title: '',
-    content: '',
-  });
+  // 刷新历史记录
+  const handleRefreshHistory = () => {
+    window.location.reload();
+  };
 
-  const missingHeaders = useMemo(() => {
-    const headerSet = new Set(previewHeaders);
-    return REQUIRED_HEADERS.filter((h) => !headerSet.has(h));
-  }, [previewHeaders]);
+  // 清空历史记录
+  const handleClearHistory = () => {
+    safeWriteImportHistory([]);
+    window.location.reload();
+  };
 
-  const dqStats = useMemo(() => {
-    const summary = importResult?.dq_summary;
-    const violations = Array.isArray(importResult?.dq_violations) ? importResult!.dq_violations! : [];
-
-    const byLevel: Record<string, number> = {};
-    const byField: Record<string, number> = {};
-    for (const v of violations) {
-      byLevel[v.level] = (byLevel[v.level] ?? 0) + 1;
-      // field 可能包含多个字段，以逗号分隔；这里按原值统计即可
-      byField[v.field] = (byField[v.field] ?? 0) + 1;
-    }
-
-    const topFields = Object.entries(byField)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
-      .map(([field, count]) => ({ field, count }));
-
-    return { summary, byLevel, topFields, violations };
-  }, [importResult]);
-
-  const appendHistory = useCallback(
-    (result: ImportMaterialsResponse) => {
-      const now = new Date().toISOString();
-      const internalBatch = String(result?.import_batch_id || '').trim() || null;
-      const fallbackId = internalBatch || String(result?.batch_id || '').trim() || `IMPORT_${Date.now()}`;
-
-      const item: ImportHistoryItem = {
-        id: fallbackId,
-        created_at: now,
-        operator: currentUser || 'admin',
-        file_path: selectedFilePath || '-',
-        source_batch_id: batchId.trim() || '-',
-        import_batch_id: internalBatch,
-        imported: Number(result?.imported ?? 0),
-        updated: Number(result?.updated ?? 0),
-        conflicts: Number(result?.conflicts ?? 0),
-        elapsed_ms: typeof result?.elapsed_ms === 'number' ? result.elapsed_ms : null,
-      };
-
-      setImportHistory((prev) => {
-        const next = [item, ...prev.filter((x) => x.id !== item.id)].slice(0, IMPORT_HISTORY_MAX);
-        safeWriteImportHistory(next);
-        return next;
-      });
-    },
-    [batchId, currentUser, selectedFilePath]
-  );
-
-  const previewColumns: ColumnsType<PreviewRow> = useMemo(() => {
-    const cols = previewHeaders.map((h) => ({
-      title: h,
-      dataIndex: h,
-      key: h,
-      width: 140,
-      render: (v: any) => <span style={{ fontFamily: 'monospace' }}>{String(v ?? '')}</span>,
-    }));
-    return cols;
-  }, [previewHeaders]);
-
-  const loadPreview = useCallback(async (filePath: string) => {
-    setPreviewLoading(true);
-    try {
-      const content = await readTextFile(filePath);
-      const parsed = parseCsvPreview(content, 20);
-      setPreviewHeaders(parsed.headers);
-      setPreviewRows(parsed.rows);
-      setPreviewTotalRows(parsed.totalRows);
-    } catch (e: any) {
-      console.error('[MaterialImport] preview failed:', e);
-      setPreviewHeaders([]);
-      setPreviewRows([]);
-      setPreviewTotalRows(0);
-      message.error(e?.message || '读取文件失败');
-    } finally {
-      setPreviewLoading(false);
-    }
-  }, []);
-
-  const handleSelectFile = useCallback(async () => {
-    if (!isTauriRuntime) {
-      message.warning('材料导入需要在 Tauri 桌面端运行');
-      return;
-    }
-
-    try {
-      const selected = await open({
-        multiple: false,
-        filters: [{ name: 'CSV 文件', extensions: ['csv'] }],
-      });
-
-      if (selected && typeof selected === 'string') {
-        if (!selected.toLowerCase().endsWith('.csv')) {
-          message.error('当前仅支持 CSV (.csv) 格式文件');
-          return;
-        }
-
-        setSelectedFilePath(selected);
-        await loadPreview(selected);
-        message.success('文件已选择');
-      }
-    } catch (e: any) {
-      console.error('[MaterialImport] select file failed:', e);
-      message.error(e?.message || '文件选择失败');
-    }
-  }, [isTauriRuntime, loadPreview]);
-
-  const loadConflicts = useCallback(
-    async (opts?: {
-      status?: 'OPEN' | 'RESOLVED' | 'ALL';
-      batchId?: string;
-      page?: number;
-      pageSize?: number;
-    }): Promise<{ list: ImportConflict[]; total: number }> => {
-      const status = opts?.status ?? conflictStatus;
-      const batch = (opts?.batchId ?? conflictBatchId).trim();
-      const page = opts?.page ?? (conflictPagination.current as number) ?? 1;
-      const pageSize = opts?.pageSize ?? (conflictPagination.pageSize as number) ?? 20;
-
-      setConflictsLoading(true);
-      try {
-        const apiStatus = status === 'ALL' ? undefined : status;
-        const resp = (await importApi.listImportConflicts(
-          apiStatus,
-          pageSize,
-          (page - 1) * pageSize,
-          batch || undefined
-        )) as ImportConflictListResponse;
-
-        const list = Array.isArray(resp?.conflicts) ? resp.conflicts : [];
-        const total = typeof resp?.total === 'number' ? resp.total : list.length;
-        setConflicts(list);
-        setConflictPagination((prev) => ({
-          ...prev,
-          current: page,
-          pageSize,
-          total,
-        }));
-        return { list, total };
-      } catch (e: any) {
-        console.error('[MaterialImport] load conflicts failed:', e);
-        setConflicts([]);
-        setConflictPagination((prev) => ({ ...prev, total: 0 }));
-        message.error(e?.message || '加载冲突列表失败');
-        return { list: [], total: 0 };
-      } finally {
-        setConflictsLoading(false);
-      }
-    },
-    [conflictBatchId, conflictPagination.current, conflictPagination.pageSize, conflictStatus]
-  );
-
-  const doImport = useCallback(async () => {
-    setImportLoading(true);
-    setImporting(true);
-    setImportResult(null);
-
-    let shouldNavigateToWorkbench = false;
-
-    try {
-      const result = (await importApi.importMaterials(
-        selectedFilePath,
-        batchId.trim() || `BATCH_${Date.now()}`,
-        mappingProfileId.trim() || undefined
-      )) as ImportMaterialsResponse;
-
-      setImportResult(result);
-      appendHistory(result);
-
-      const internalBatch = String(result?.import_batch_id || '').trim();
-      if (internalBatch) {
-        setConflictBatchId(internalBatch);
-      }
-
-      message.success(`导入完成：成功 ${Number(result?.imported || 0)} 条，冲突 ${Number(result?.conflicts || 0)} 条`);
-
-      // 自动切到冲突页并加载本批次 OPEN 冲突
-      if (Number(result?.conflicts || 0) > 0 && internalBatch) {
-        setActiveTab('conflicts');
-        setConflictStatus('OPEN');
-        await loadConflicts({ status: 'OPEN', batchId: internalBatch, page: 1 });
-      } else {
-        // 无冲突：按重构方案，导入成功后自动跳转到计划工作台
-        shouldNavigateToWorkbench = true;
-      }
-    } catch (e: any) {
-      console.error('[MaterialImport] import failed:', e);
-      message.error(e?.message || '导入失败');
-    } finally {
-      setImportLoading(false);
-      setImporting(false);
-    }
-
-    if (shouldNavigateToWorkbench) {
-      navigate('/workbench', { replace: true });
-    }
-  }, [batchId, loadConflicts, mappingProfileId, navigate, selectedFilePath, setImporting]);
-
-  const handleImport = useCallback(async () => {
-    if (!selectedFilePath) {
-      message.warning('请先选择 CSV 文件');
-      return;
-    }
-
-    if (missingHeaders.length > 0) {
-      Modal.confirm({
-        title: '检测到列名缺失',
-        content: (
-          <div>
-            <p>
-              预览表头缺少必需列：<Text strong>{missingHeaders.join('、')}</Text>
-            </p>
-            <p>继续导入可能导致大量冲突/阻断，仍要继续吗？</p>
-          </div>
-        ),
-        okText: '继续导入',
-        cancelText: '取消',
-        onOk: async () => {
-          await doImport();
-        },
-      });
-      return;
-    }
-
-    await doImport();
-  }, [doImport, missingHeaders, selectedFilePath]);
-
-  const handleResolveConflict = useCallback(
-    async (conflictId: string, action: 'KEEP_EXISTING' | 'OVERWRITE' | 'MERGE') => {
-      try {
-        await importApi.resolveImportConflict(conflictId, action, `由${currentUser}处理`, currentUser);
-        message.success('冲突已处理');
-        const res = await loadConflicts();
-        if (conflictStatus === 'OPEN' && res.total === 0 && conflictBatchId.trim()) {
-          Modal.success({
-            title: '本批次冲突已全部处理',
-            content: '可以进入计划工作台继续排产操作。',
-            okText: '去计划工作台',
-            onOk: () => navigate('/workbench'),
-          });
-        }
-      } catch (e: any) {
-        console.error('[MaterialImport] resolve conflict failed:', e);
-        message.error(e?.message || '处理冲突失败');
-      }
-    },
-    [conflictBatchId, conflictStatus, currentUser, loadConflicts, navigate]
-  );
-
-  const conflictColumns: ColumnsType<ImportConflict> = useMemo(
-    () => [
-      {
-        title: '状态',
-        dataIndex: 'resolved',
-        key: 'resolved',
-        width: 90,
-        render: (resolved: boolean) => (
-          <Tag color={resolved ? 'green' : 'red'} icon={resolved ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}>
-            {resolved ? '已处理' : 'OPEN'}
-          </Tag>
-        ),
-      },
-      {
-        title: '批次',
-        dataIndex: 'batch_id',
-        key: 'batch_id',
-        width: 180,
-        ellipsis: true,
-        render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v}</span>,
-      },
-      {
-        title: '行号',
-        dataIndex: 'row_number',
-        key: 'row_number',
-        width: 80,
-      },
-      {
-        title: '材料号',
-        dataIndex: 'material_id',
-        key: 'material_id',
-        width: 140,
-        render: (v: string | null) => (v ? <Tag color="blue">{v}</Tag> : '-'),
-      },
-      {
-        title: '冲突类型',
-        dataIndex: 'conflict_type',
-        key: 'conflict_type',
-        width: 160,
-        render: (t: string) => conflictTypeLabel(t),
-      },
-      {
-        title: '原因',
-        dataIndex: 'reason',
-        key: 'reason',
-        ellipsis: true,
-        render: (v: string) => v || '-',
-      },
-      {
-        title: '原始数据',
-        dataIndex: 'raw_data',
-        key: 'raw_data',
-        width: 120,
-        render: (raw: string, record) => (
-          <Button
-            size="small"
-            onClick={() =>
-              setRawModal({
-                open: true,
-                title: `冲突原始数据（${record.material_id || record.conflict_id}）`,
-                content: raw || '{}',
-              })
-            }
-          >
-            查看
-          </Button>
-        ),
-      },
-      {
-        title: '处理',
-        key: 'actions',
-        width: 220,
-        render: (_: any, record) => (
-          <Space>
-            <Button
-              size="small"
-              disabled={record.resolved}
-              onClick={() => handleResolveConflict(record.conflict_id, 'KEEP_EXISTING')}
-            >
-              保留现有
-            </Button>
-            <Button
-              size="small"
-              danger
-              disabled={record.resolved}
-              onClick={() =>
-                Modal.confirm({
-                  title: '确认覆盖？',
-                  content: '将用导入数据覆盖现有材料主数据。此操作不可逆。',
-                  okText: '覆盖',
-                  cancelText: '取消',
-                  onOk: () => handleResolveConflict(record.conflict_id, 'OVERWRITE'),
-                })
-              }
-            >
-              覆盖
-            </Button>
-          </Space>
-        ),
-      },
-    ],
-    [handleResolveConflict]
-  );
+  // 复制 ID 到剪贴板
+  const handleCopyId = (id: string) => {
+    navigator.clipboard.writeText(id);
+  };
 
   return (
     <div style={{ padding: 24 }}>
@@ -603,7 +66,8 @@ const MaterialImport: React.FC = () => {
         材料导入
       </Title>
       <Paragraph type="secondary" style={{ marginTop: 8 }}>
-        当前导入通道基于后端 MaterialImporter：CSV 解析 → 字段映射 → 清洗/派生 → DQ 校验 → 冲突入队 → 落库。
+        当前导入通道基于后端 MaterialImporter：CSV 解析 → 字段映射 → 清洗/派生 → DQ 校验 → 冲突入队 →
+        落库。
       </Paragraph>
 
       {!isTauriRuntime && (
@@ -617,13 +81,12 @@ const MaterialImport: React.FC = () => {
       )}
 
       <Tabs
-        activeKey={activeTab}
+        activeKey={workflow.activeTab}
         onChange={(k) => {
           const key = k as 'import' | 'conflicts' | 'history';
-          setActiveTab(key);
+          workflow.setActiveTab(key);
           if (key === 'conflicts') {
-            // 进入冲突页时，如果已有批次ID则自动加载
-            loadConflicts({ page: 1 }).catch(() => void 0);
+            workflow.loadConflicts({ page: 1 }).catch(() => void 0);
           }
         }}
         items={[
@@ -631,396 +94,76 @@ const MaterialImport: React.FC = () => {
             key: 'import',
             label: '导入',
             children: (
-              <Row gutter={[16, 16]}>
-                <Col xs={24} lg={14}>
-                  <Card
-                    title="文件与参数"
-                    extra={
-                      <Space>
-                        <Button icon={<FolderOpenOutlined />} onClick={handleSelectFile} disabled={!isTauriRuntime}>
-                          选择 CSV
-                        </Button>
-                        <Button
-                          type="primary"
-                          icon={<UploadOutlined />}
-                          onClick={handleImport}
-                          loading={importLoading}
-                          disabled={!isTauriRuntime || !selectedFilePath}
-                        >
-                          开始导入
-                        </Button>
-                      </Space>
-                    }
-                  >
-                    <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                      <Alert
-                        type="info"
-                        showIcon
-                        message="文件格式要求（当前版本）"
-                        description={
-                          <div>
-                            <div>1) 仅支持 CSV（UTF-8，逗号分隔，首行为表头）</div>
-                            <div>
-                              2) 必需列：<Text strong>{REQUIRED_HEADERS.join('、')}</Text>
-                            </div>
-                          </div>
-                        }
-                      />
-
-                      <Descriptions column={1} size="small" bordered>
-                        <Descriptions.Item label="文件路径">
-                          {selectedFilePath ? (
-                            <Text style={{ fontFamily: 'monospace' }}>{selectedFilePath}</Text>
-                          ) : (
-                            <Text type="secondary">未选择</Text>
-                          )}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="预览行数">
-                          {previewTotalRows ? `${Math.min(20, previewTotalRows)}/${previewTotalRows}` : '-'}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="导入人">{currentUser}</Descriptions.Item>
-                      </Descriptions>
-
-                      <Form layout="vertical">
-                        <Row gutter={12}>
-                          <Col xs={24} md={12}>
-                            <Form.Item label="批次标识（source_batch_id）" tooltip="用于前端/审计标识；实际落库批次ID将在导入后返回">
-                              <Input value={batchId} onChange={(e) => setBatchId(e.target.value)} placeholder="例如：BATCH_20260126_001" />
-                            </Form.Item>
-                          </Col>
-                          <Col xs={24} md={12}>
-                            <Form.Item label="映射配置ID（可选）" tooltip="预留字段，当前后端未启用映射配置">
-                              <Input value={mappingProfileId} onChange={(e) => setMappingProfileId(e.target.value)} placeholder="可留空" />
-                            </Form.Item>
-                          </Col>
-                        </Row>
-                      </Form>
-
-                      <Divider style={{ margin: '8px 0' }} />
-
-                      <Card size="small" title="文件预览" styles={{ body: { padding: 0 } }}>
-                        <Spin spinning={previewLoading}>
-                          {selectedFilePath && previewHeaders.length > 0 ? (
-                            <>
-                              {missingHeaders.length > 0 && (
-                                <Alert
-                                  type="warning"
-                                  showIcon
-                                  message="预览表头缺少必需列"
-                                  description={`缺少：${missingHeaders.join('、')}`}
-                                  style={{ margin: 12 }}
-                                />
-                              )}
-                              <Table<PreviewRow>
-                                columns={previewColumns}
-                                dataSource={previewRows.map((r, idx) => ({ ...r, __key: String(idx) } as any))}
-                                rowKey="__key"
-                                size="small"
-                                pagination={false}
-                                scroll={{ x: 'max-content', y: 320 }}
-                              />
-                            </>
-                          ) : (
-                            <div style={{ padding: 16 }}>
-                              <Text type="secondary">选择文件后自动读取前 20 行用于预览</Text>
-                            </div>
-                          )}
-                        </Spin>
-                      </Card>
-                    </Space>
-                  </Card>
-                </Col>
-
-                <Col xs={24} lg={10}>
-                  <Card title="导入结果">
-                    {!importResult && <Text type="secondary">尚未执行导入</Text>}
-
-                    {importResult && (
-                      <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                        <Row gutter={12}>
-                          <Col span={12}>
-                            <Statistic title="成功导入" value={Number(importResult.imported || 0)} />
-                          </Col>
-                          <Col span={12}>
-                            <Statistic title="冲突入队" value={Number(importResult.conflicts || 0)} valueStyle={{ color: '#faad14' }} />
-                          </Col>
-                          <Col span={12}>
-                            <Statistic title="阻断 (ERROR)" value={Number(importResult.dq_summary?.blocked || 0)} valueStyle={{ color: '#ff4d4f' }} />
-                          </Col>
-                          <Col span={12}>
-                            <Statistic title="警告 (WARNING)" value={Number(importResult.dq_summary?.warning || 0)} valueStyle={{ color: '#1677ff' }} />
-                          </Col>
-                        </Row>
-
-                        <Descriptions column={1} size="small" bordered>
-                          <Descriptions.Item label="source_batch_id">
-                            <Text style={{ fontFamily: 'monospace' }}>{importResult.batch_id || '-'}</Text>
-                          </Descriptions.Item>
-                          <Descriptions.Item label="import_batch_id">
-                            <Text style={{ fontFamily: 'monospace' }}>{importResult.import_batch_id || '-'}</Text>
-                          </Descriptions.Item>
-                          <Descriptions.Item label="耗时">{formatMs(importResult.elapsed_ms)}</Descriptions.Item>
-                        </Descriptions>
-
-                        {dqStats.topFields.length > 0 && (
-                          <Card size="small" title="DQ 摘要（Top 字段）">
-                            <Table
-                              size="small"
-                              pagination={false}
-                              dataSource={dqStats.topFields.map((t) => ({ ...t, key: t.field }))}
-                              columns={[
-                                { title: '字段', dataIndex: 'field', key: 'field', ellipsis: true },
-                                { title: '次数', dataIndex: 'count', key: 'count', width: 90 },
-                              ]}
-                            />
-                          </Card>
-                        )}
-
-                        <Space>
-                          <Button onClick={() => navigate('/workbench')}>去计划工作台查看</Button>
-                          <Button
-                            icon={<ReloadOutlined />}
-                            onClick={() => {
-                              if (selectedFilePath) loadPreview(selectedFilePath);
-                            }}
-                            disabled={!selectedFilePath}
-                          >
-                            刷新预览
-                          </Button>
-                        </Space>
-                      </Space>
-                    )}
-                  </Card>
-                </Col>
-              </Row>
+              <ImportTabContent
+                isTauriRuntime={isTauriRuntime}
+                currentUser={currentUser || 'admin'}
+                selectedFilePath={workflow.selectedFilePath}
+                previewHeaders={workflow.previewHeaders}
+                previewRows={workflow.previewRows}
+                previewTotalRows={workflow.previewTotalRows}
+                previewLoading={workflow.previewLoading}
+                missingHeaders={workflow.missingHeaders}
+                batchId={workflow.batchId}
+                onBatchIdChange={workflow.setBatchId}
+                mappingProfileId={workflow.mappingProfileId}
+                onMappingProfileIdChange={workflow.setMappingProfileId}
+                importLoading={workflow.importLoading}
+                importResult={workflow.importResult}
+                dqStats={workflow.dqStats}
+                onSelectFile={() => workflow.handleSelectFile(isTauriRuntime)}
+                onImport={async () => {
+                  await workflow.doImport({
+                    currentUser: currentUser || 'admin',
+                    setImporting,
+                  });
+                }}
+                onRefreshPreview={workflow.loadPreview}
+                onNavigateToWorkbench={() => navigate('/workbench')}
+              />
             ),
           },
           {
             key: 'conflicts',
             label: '冲突处理',
             children: (
-              <Card
-                title="导入冲突队列"
-                extra={
-                  <Space>
-                    <Button icon={<ReloadOutlined />} onClick={() => loadConflicts({ page: 1 })} loading={conflictsLoading}>
-                      刷新
-                    </Button>
-                  </Space>
+              <ConflictsTabContent
+                conflictStatus={workflow.conflictStatus}
+                onStatusChange={workflow.setConflictStatus}
+                conflictBatchId={workflow.conflictBatchId}
+                onBatchIdChange={workflow.setConflictBatchId}
+                conflicts={workflow.conflicts}
+                conflictPagination={workflow.conflictPagination}
+                conflictsLoading={workflow.conflictsLoading}
+                onLoadConflicts={workflow.loadConflicts}
+                onResolveConflict={handleResolveConflict}
+                onViewRawData={(title, content) =>
+                  workflow.setRawModal({ open: true, title, content })
                 }
-              >
-                <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                  <Row gutter={12}>
-                    <Col xs={24} md={6}>
-                      <div style={{ marginBottom: 6 }}>状态</div>
-                      <Select
-                        value={conflictStatus}
-                        style={{ width: '100%' }}
-                        onChange={(v) => {
-                          setConflictStatus(v);
-                          loadConflicts({ status: v, page: 1 }).catch(() => void 0);
-                        }}
-                        options={[
-                          { value: 'OPEN', label: 'OPEN' },
-                          { value: 'RESOLVED', label: 'RESOLVED' },
-                          { value: 'ALL', label: '全部' },
-                        ]}
-                      />
-                    </Col>
-                    <Col xs={24} md={12}>
-                      <div style={{ marginBottom: 6 }}>批次ID（import_batch_id）</div>
-                      <Input
-                        value={conflictBatchId}
-                        placeholder="留空=查询所有批次"
-                        onChange={(e) => setConflictBatchId(e.target.value)}
-                        onPressEnter={() => loadConflicts({ page: 1 }).catch(() => void 0)}
-                      />
-                    </Col>
-                    <Col xs={24} md={6} style={{ display: 'flex', alignItems: 'end' }}>
-                      <Button type="primary" onClick={() => loadConflicts({ page: 1 })} loading={conflictsLoading}>
-                        查询
-                      </Button>
-                    </Col>
-                  </Row>
-
-                  <Table<ImportConflict>
-                    loading={conflictsLoading}
-                    columns={conflictColumns}
-                    dataSource={conflicts}
-                    rowKey="conflict_id"
-                    pagination={conflictPagination}
-                    virtual
-                    onChange={(pagination) => {
-                      const current = pagination.current ?? 1;
-                      const pageSize = pagination.pageSize ?? 20;
-                      loadConflicts({ page: current, pageSize }).catch(() => void 0);
-                    }}
-                    scroll={{ x: 1200, y: 520 }}
-                    size="middle"
-                  />
-                </Space>
-              </Card>
+              />
             ),
           },
           {
             key: 'history',
             label: '导入历史',
             children: (
-              <Card
-                title="最近导入记录（本机）"
-                extra={
-                  <Space>
-                    <Button
-                      icon={<ReloadOutlined />}
-                      onClick={() => setImportHistory(safeReadImportHistory())}
-                    >
-                      刷新
-                    </Button>
-                    <Button
-                      danger
-                      onClick={() => {
-                        Modal.confirm({
-                          title: '清空导入历史？',
-                          content: '仅清除本机 localStorage 记录，不影响后端数据。',
-                          okText: '清空',
-                          okButtonProps: { danger: true },
-                          cancelText: '取消',
-                          onOk: () => {
-                            safeWriteImportHistory([]);
-                            setImportHistory([]);
-                          },
-                        });
-                      }}
-                      disabled={importHistory.length === 0}
-                    >
-                      清空
-                    </Button>
-                  </Space>
-                }
-              >
-                <Alert
-                  type="info"
-                  showIcon
-                  message="说明"
-                  description="导入历史暂存于本机 localStorage，用于快速定位批次与冲突；如需全局导入审计/查询，需要后端提供 import_batch 列表接口。"
-                  style={{ marginBottom: 12 }}
-                />
-
-                <Table<ImportHistoryItem>
-                  rowKey={(r) => r.id}
-                  pagination={{ pageSize: 10 }}
-                  dataSource={importHistory}
-                  virtual
-                  columns={[
-                    {
-                      title: '时间',
-                      dataIndex: 'created_at',
-                      width: 180,
-                      render: (v) => <span style={{ fontFamily: 'monospace' }}>{String(v).replace('T', ' ').slice(0, 19)}</span>,
-                    },
-                    { title: '导入人', dataIndex: 'operator', width: 100 },
-                    {
-                      title: '批次ID',
-                      dataIndex: 'id',
-                      width: 200,
-                      ellipsis: true,
-                      render: (v) => <span style={{ fontFamily: 'monospace' }}>{String(v)}</span>,
-                    },
-                    {
-                      title: '文件',
-                      dataIndex: 'file_path',
-                      ellipsis: true,
-                      render: (v) => <span style={{ fontFamily: 'monospace' }}>{String(v || '-')}</span>,
-                    },
-                    {
-                      title: '结果',
-                      key: 'result',
-                      width: 200,
-                      render: (_, r) => (
-                        <Space size={8}>
-                          <Tag color="green">导入 {r.imported}</Tag>
-                          <Tag color="blue">更新 {r.updated}</Tag>
-                          <Tag color={r.conflicts > 0 ? 'red' : 'default'}>冲突 {r.conflicts}</Tag>
-                        </Space>
-                      ),
-                    },
-                    {
-                      title: '耗时',
-                      dataIndex: 'elapsed_ms',
-                      width: 100,
-                      render: (v) => <span style={{ fontFamily: 'monospace' }}>{formatMs(v == null ? undefined : Number(v))}</span>,
-                    },
-                    {
-                      title: '操作',
-                      key: 'actions',
-                      width: 160,
-                      render: (_, r) => (
-                        <Space>
-                          <Button
-                            size="small"
-                            disabled={!r.import_batch_id}
-                            onClick={async () => {
-                              if (!r.import_batch_id) return;
-                              setConflictBatchId(r.import_batch_id);
-                              setConflictStatus('OPEN');
-                              setActiveTab('conflicts');
-                              await loadConflicts({ status: 'OPEN', batchId: r.import_batch_id, page: 1 });
-                            }}
-                          >
-                            查看冲突
-                          </Button>
-                          <Button
-                            size="small"
-                            onClick={() => navigator.clipboard.writeText(r.id)}
-                          >
-                            复制ID
-                          </Button>
-                        </Space>
-                      ),
-                    },
-                  ]}
-                  scroll={{ x: 980, y: 520 }}
-                />
-              </Card>
+              <HistoryTabContent
+                importHistory={workflow.importHistory}
+                onRefresh={handleRefreshHistory}
+                onClearHistory={handleClearHistory}
+                onViewConflicts={handleViewConflicts}
+                onCopyId={handleCopyId}
+              />
             ),
           },
         ]}
       />
 
-      <Modal
-        title={rawModal.title}
-        open={rawModal.open}
-        onCancel={() => setRawModal((s) => ({ ...s, open: false }))}
-        footer={[
-          <Button
-            key="copy"
-            onClick={() => {
-              navigator.clipboard.writeText(rawModal.content || '').then(
-                () => message.success('已复制'),
-                () => message.error('复制失败')
-              );
-            }}
-          >
-            复制
-          </Button>,
-          <Button key="close" type="primary" onClick={() => setRawModal((s) => ({ ...s, open: false }))}>
-            关闭
-          </Button>,
-        ]}
-        width={900}
-        destroyOnClose
-      >
-        <pre style={{ maxHeight: 520, overflow: 'auto', margin: 0 }}>
-          {(() => {
-            try {
-              const obj = JSON.parse(rawModal.content || '{}');
-              return JSON.stringify(obj, null, 2);
-            } catch {
-              return rawModal.content || '';
-            }
-          })()}
-        </pre>
-      </Modal>
+      <RawDataModal
+        open={workflow.rawModal.open}
+        title={workflow.rawModal.title}
+        content={workflow.rawModal.content}
+        onClose={() => workflow.setRawModal({ open: false, title: '', content: '' })}
+      />
     </div>
   );
 };
