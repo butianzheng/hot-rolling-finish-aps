@@ -41,7 +41,7 @@ impl ColdStockRepository {
         version_id: &str,
         machine_code: Option<&str>,
     ) -> SqlResult<Vec<ColdStockProfile>> {
-        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+        let conn = self.conn.lock().expect("锁获取失败");
 
         let base_sql = r#"
             SELECT
@@ -117,7 +117,7 @@ impl ColdStockRepository {
 
     /// 统计冷料总量
     pub fn get_cold_stock_summary(&self, version_id: &str) -> SqlResult<ColdStockSummary> {
-        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+        let conn = self.conn.lock().expect("锁获取失败");
 
         // 查询总体统计
         let mut stmt = conn.prepare(
@@ -228,7 +228,7 @@ impl ColdStockRepository {
     /// 4. 分析结构缺口
     /// 5. 生成建议措施
     pub fn refresh_full(&self, version_id: &str) -> SqlResult<usize> {
-        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+        let conn = self.conn.lock().expect("锁获取失败");
 
         // 1. 删除旧数据
         conn.execute(
@@ -291,7 +291,7 @@ impl ColdStockRepository {
             return Ok(0);
         }
 
-        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+        let conn = self.conn.lock().expect("锁获取失败");
 
         // 1. 删除受影响机组的记录
         let in_clause = build_in_clause("machine_code", machine_codes);

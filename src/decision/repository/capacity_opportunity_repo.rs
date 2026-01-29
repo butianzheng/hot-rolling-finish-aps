@@ -551,7 +551,7 @@ mod tests {
     fn test_refresh_full() {
         let conn = setup_test_db();
         {
-            let c = conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+            let c = conn.lock().expect("锁获取失败");
 
             // 插入产能池数据
             c.execute(
@@ -592,7 +592,7 @@ mod tests {
         assert_eq!(rows, 3); // 应该有 3 条记录
 
         // 验证数据正确性
-        let c = conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+        let c = conn.lock().expect("锁获取失败");
         let count: i32 = c
             .query_row(
                 "SELECT COUNT(*) FROM decision_capacity_opportunity WHERE version_id = 'V001'",
@@ -607,7 +607,7 @@ mod tests {
     fn test_get_capacity_opportunity() {
         let conn = setup_test_db();
         {
-            let c = conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+            let c = conn.lock().expect("锁获取失败");
 
             // 插入测试数据
             c.execute(
@@ -660,7 +660,7 @@ mod tests {
     fn test_get_top_opportunities() {
         let conn = setup_test_db();
         {
-            let c = conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+            let c = conn.lock().expect("锁获取失败");
 
             // 插入 5 条测试数据
             for i in 1..=5 {
@@ -703,7 +703,7 @@ mod tests {
     fn test_get_optimization_summary() {
         let conn = setup_test_db();
         {
-            let c = conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+            let c = conn.lock().expect("锁获取失败");
 
             // 插入多条测试数据
             c.execute(
@@ -769,7 +769,7 @@ mod tests {
     fn test_refresh_incremental() {
         let conn = setup_test_db();
         {
-            let c = conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+            let c = conn.lock().expect("锁获取失败");
 
             // 插入产能池数据
             c.execute(
@@ -809,7 +809,7 @@ mod tests {
         assert_eq!(rows, 1); // 应该只刷新 1 条记录
 
         // 验证 H033 的数据仍然存在
-        let c = conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+        let c = conn.lock().expect("锁获取失败");
         let count: i32 = c
             .query_row(
                 "SELECT COUNT(*) FROM decision_capacity_opportunity WHERE version_id = 'V001'",

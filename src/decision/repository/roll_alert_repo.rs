@@ -40,7 +40,7 @@ impl RollAlertRepository {
         version_id: &str,
         alert_level: Option<&str>,
     ) -> SqlResult<Vec<RollAlert>> {
-        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+        let conn = self.conn.lock().expect("锁获取失败");
 
         let base_sql = r#"
             SELECT
@@ -112,7 +112,7 @@ impl RollAlertRepository {
         version_id: &str,
         machine_code: &str,
     ) -> SqlResult<Vec<RollAlert>> {
-        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+        let conn = self.conn.lock().expect("锁获取失败");
 
         let sql = r#"
             SELECT
@@ -168,7 +168,7 @@ impl RollAlertRepository {
 
     /// 统计换辊预警
     pub fn get_roll_alert_summary(&self, version_id: &str) -> SqlResult<RollAlertSummary> {
-        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+        let conn = self.conn.lock().expect("锁获取失败");
 
         // 查询总体统计
         let mut stmt = conn.prepare(
@@ -241,7 +241,7 @@ impl RollAlertRepository {
     /// 3. 计算预警等级和指标
     /// 4. 生成建议措施
     pub fn refresh_full(&self, version_id: &str) -> SqlResult<usize> {
-        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+        let conn = self.conn.lock().expect("锁获取失败");
 
         // 1. 删除旧数据
         conn.execute(
@@ -294,7 +294,7 @@ impl RollAlertRepository {
             return Ok(0);
         }
 
-        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+        let conn = self.conn.lock().expect("锁获取失败");
 
         // 1. 删除受影响机组的记录
         let in_clause = build_in_clause("machine_code", machine_codes);
