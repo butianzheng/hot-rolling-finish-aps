@@ -124,7 +124,11 @@ fn init_schema(conn: &Connection) -> Result<(), Box<dyn Error>> {
             stock_age_days INTEGER,
             scheduled_date TEXT,
             scheduled_machine_code TEXT,
+            -- material 当前所属机组(真实库字段,用于 D3 冷料压库口径)
+            machine_code TEXT,
             seq_no INTEGER,
+            -- 是否已适温(真实库字段,用于 D3 冷料压库口径)
+            is_mature INTEGER NOT NULL DEFAULT 0,
             manual_urgent_flag INTEGER NOT NULL DEFAULT 0,
             in_frozen_zone INTEGER NOT NULL DEFAULT 0,
             last_calc_version_id TEXT,
@@ -282,6 +286,40 @@ fn init_schema(conn: &Connection) -> Result<(), Box<dyn Error>> {
         [],
     )?;
 
+    // 创建 decision_strategy_draft 表（策略草案持久化）
+    conn.execute(
+        r#"
+        CREATE TABLE IF NOT EXISTS decision_strategy_draft (
+            draft_id TEXT PRIMARY KEY,
+            base_version_id TEXT NOT NULL REFERENCES plan_version(version_id),
+            plan_date_from TEXT NOT NULL,
+            plan_date_to TEXT NOT NULL,
+
+            strategy_key TEXT NOT NULL,
+            strategy_base TEXT NOT NULL,
+            strategy_title_cn TEXT NOT NULL,
+            strategy_params_json TEXT,
+
+            status TEXT NOT NULL,
+            created_by TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+            expires_at TEXT NOT NULL,
+            published_as_version_id TEXT,
+            published_by TEXT,
+            published_at TEXT,
+
+            locked_by TEXT,
+            locked_at TEXT,
+
+            summary_json TEXT NOT NULL,
+            diff_items_json TEXT NOT NULL,
+            diff_items_total INTEGER NOT NULL DEFAULT 0,
+            diff_items_truncated INTEGER NOT NULL DEFAULT 0
+        )
+        "#,
+        [],
+    )?;
+
     // 创建 risk_snapshot 表
     conn.execute(
         r#"
@@ -344,6 +382,25 @@ fn init_schema(conn: &Connection) -> Result<(), Box<dyn Error>> {
             end_date TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        "#,
+        [],
+    )?;
+
+    // 创建 roller_campaign 表 (真实库表,用于 D5 决策)
+    conn.execute(
+        r#"
+        CREATE TABLE IF NOT EXISTS roller_campaign (
+            version_id TEXT NOT NULL REFERENCES plan_version(version_id) ON DELETE CASCADE,
+            machine_code TEXT NOT NULL REFERENCES machine_master(machine_code),
+            campaign_no INTEGER NOT NULL,
+            start_date TEXT NOT NULL,
+            end_date TEXT,
+            cum_weight_t REAL NOT NULL DEFAULT 0,
+            suggest_threshold_t REAL NOT NULL,
+            hard_limit_t REAL NOT NULL,
+            status TEXT NOT NULL,
+            PRIMARY KEY (version_id, machine_code, campaign_no)
         )
         "#,
         [],
@@ -496,22 +553,21 @@ fn init_schema(conn: &Connection) -> Result<(), Box<dyn Error>> {
         r#"
         CREATE TABLE IF NOT EXISTS decision_roll_campaign_alert (
             version_id TEXT NOT NULL,
-            campaign_id TEXT NOT NULL,
-            campaign_no INTEGER NOT NULL,
             machine_code TEXT NOT NULL,
             cum_weight_t REAL NOT NULL,
-            hard_limit_t REAL NOT NULL,
             suggest_threshold_t REAL NOT NULL,
-            utilization_rate REAL NOT NULL,
+            hard_limit_t REAL NOT NULL,
+            campaign_no INTEGER NOT NULL,
             alert_level TEXT NOT NULL,
             reason TEXT,
             distance_to_suggest REAL NOT NULL,
             distance_to_hard REAL NOT NULL,
+            utilization_rate REAL NOT NULL,
             estimated_change_date TEXT,
             needs_immediate_change INTEGER NOT NULL DEFAULT 0,
             suggested_actions TEXT,
             refreshed_at TEXT NOT NULL DEFAULT (datetime('now')),
-            PRIMARY KEY (version_id, campaign_id)
+            PRIMARY KEY (version_id, machine_code, campaign_no)
         )
         "#,
         [],

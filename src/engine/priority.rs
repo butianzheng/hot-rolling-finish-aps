@@ -10,6 +10,8 @@
 
 use crate::domain::material::{MaterialMaster, MaterialState};
 use crate::domain::types::{SchedState, UrgentLevel};
+use crate::engine::strategy::ScheduleStrategy;
+use crate::config::strategy_profile::CustomStrategyParameters;
 use chrono::NaiveDate;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -53,6 +55,77 @@ impl PrioritySorter {
         mut materials: Vec<(MaterialMaster, MaterialState)>,
     ) -> Vec<(MaterialMaster, MaterialState)> {
         materials.sort_by(|a, b| self.compare(a, b));
+        materials
+    }
+
+    /// 按指定策略排序（用于策略草案/多策略对比）
+    pub fn sort_with_strategy(
+        &self,
+        mut materials: Vec<(MaterialMaster, MaterialState)>,
+        strategy: ScheduleStrategy,
+    ) -> Vec<(MaterialMaster, MaterialState)> {
+        if strategy == ScheduleStrategy::Balanced {
+            // 保持与现有行为一致，避免无意改变默认排程结果
+            materials.sort_by(|a, b| self.compare(a, b));
+            return materials;
+        }
+
+        materials.sort_by(|a, b| self.compare_with_strategy(a, b, strategy));
+        materials
+    }
+
+    /// 按“参数化策略”排序（用于自定义策略）
+    ///
+    /// 说明：
+    /// - FORCE_RELEASE / LOCKED 仍保持最高优先级（红线：锁定/强制放行不可被“策略”覆盖）。
+    /// - 若参数均为空（未设置），则退化为 `sort_with_strategy`（避免行为漂移）。
+    pub fn sort_with_parameters(
+        &self,
+        mut materials: Vec<(MaterialMaster, MaterialState)>,
+        base_strategy: ScheduleStrategy,
+        params: &CustomStrategyParameters,
+        today: NaiveDate,
+    ) -> Vec<(MaterialMaster, MaterialState)> {
+        let has_any = params.urgent_weight.is_some()
+            || params.capacity_weight.is_some()
+            || params.cold_stock_weight.is_some()
+            || params.due_date_weight.is_some()
+            || params.rolling_output_age_weight.is_some()
+            || params.cold_stock_age_threshold_days.is_some();
+
+        if !has_any {
+            return self.sort_with_strategy(materials, base_strategy);
+        }
+
+        // 预计算 score，避免 sort_by 中重复计算。
+        let mut score_by_id: HashMap<String, f64> = HashMap::with_capacity(materials.len());
+        for (master, state) in &materials {
+            let score = compute_param_score(master, state, params, today);
+            score_by_id.insert(master.material_id.clone(), score);
+        }
+
+        materials.sort_by(|a, b| {
+            let (master_a, state_a) = a;
+            let (master_b, state_b) = b;
+
+            if let Some(ord) = self.compare_sched_state(state_a.sched_state, state_b.sched_state)
+            {
+                return ord;
+            }
+
+            let sa = score_by_id.get(&master_a.material_id).copied().unwrap_or(0.0);
+            let sb = score_by_id.get(&master_b.material_id).copied().unwrap_or(0.0);
+
+            // 分数高者优先
+            match sb.total_cmp(&sa) {
+                Ordering::Equal => {
+                    // tie-break：回落到基于预设策略的稳定排序（可解释性更强，且避免不稳定）。
+                    self.compare_with_strategy(a, b, base_strategy)
+                }
+                other => other,
+            }
+        });
+
         materials
     }
 
@@ -174,6 +247,99 @@ impl PrioritySorter {
         due_a.cmp(&due_b)
     }
 
+    fn compare_with_strategy(
+        &self,
+        a: &(MaterialMaster, MaterialState),
+        b: &(MaterialMaster, MaterialState),
+        strategy: ScheduleStrategy,
+    ) -> Ordering {
+        let (master_a, state_a) = a;
+        let (master_b, state_b) = b;
+
+        // 0. 共享最高优先级：FORCE_RELEASE / LOCKED
+        if let Some(ord) = self.compare_sched_state(state_a.sched_state, state_b.sched_state) {
+            return ord;
+        }
+
+        match strategy {
+            ScheduleStrategy::Balanced => self.compare(a, b),
+            ScheduleStrategy::UrgentFirst => {
+                // 1) urgent_level 降序（L3 > L2 > L1 > L0）
+                match state_b.urgent_level.cmp(&state_a.urgent_level) {
+                    Ordering::Equal => {}
+                    other => return other,
+                }
+
+                // 2) due_date 升序（早交期优先）
+                let due_a = master_a.due_date.unwrap_or(NaiveDate::MAX);
+                let due_b = master_b.due_date.unwrap_or(NaiveDate::MAX);
+                match due_a.cmp(&due_b) {
+                    Ordering::Equal => {}
+                    other => return other,
+                }
+
+                // 3) stock_age_days 降序（冷料优先）
+                match state_b.stock_age_days.cmp(&state_a.stock_age_days) {
+                    Ordering::Equal => {}
+                    other => return other,
+                }
+
+                // 4) rolling_output_age_days 降序
+                match state_b.rolling_output_age_days.cmp(&state_a.rolling_output_age_days) {
+                    Ordering::Equal => {}
+                    other => return other,
+                }
+
+                Ordering::Equal
+            }
+            ScheduleStrategy::CapacityFirst => {
+                // 1) weight_t 降序（尽快填满产能）
+                let wa = master_a.weight_t.unwrap_or(0.0);
+                let wb = master_b.weight_t.unwrap_or(0.0);
+                let wa = if wa.is_finite() { wa } else { 0.0 };
+                let wb = if wb.is_finite() { wb } else { 0.0 };
+                match wb.total_cmp(&wa) {
+                    Ordering::Equal => {}
+                    other => return other,
+                }
+
+                // 2) due_date 升序（兜底）
+                let due_a = master_a.due_date.unwrap_or(NaiveDate::MAX);
+                let due_b = master_b.due_date.unwrap_or(NaiveDate::MAX);
+                match due_a.cmp(&due_b) {
+                    Ordering::Equal => {}
+                    other => return other,
+                }
+
+                // 3) stock_age_days 降序
+                match state_b.stock_age_days.cmp(&state_a.stock_age_days) {
+                    Ordering::Equal => {}
+                    other => return other,
+                }
+
+                Ordering::Equal
+            }
+            ScheduleStrategy::ColdStockFirst => {
+                // 1) stock_age_days 降序（冷坨优先）
+                match state_b.stock_age_days.cmp(&state_a.stock_age_days) {
+                    Ordering::Equal => {}
+                    other => return other,
+                }
+
+                // 2) rolling_output_age_days 降序（更“老”的优先）
+                match state_b.rolling_output_age_days.cmp(&state_a.rolling_output_age_days) {
+                    Ordering::Equal => {}
+                    other => return other,
+                }
+
+                // 3) due_date 升序（兜底）
+                let due_a = master_a.due_date.unwrap_or(NaiveDate::MAX);
+                let due_b = master_b.due_date.unwrap_or(NaiveDate::MAX);
+                due_a.cmp(&due_b)
+            }
+        }
+    }
+
     /// 比较状态优先级
     ///
     /// # 参数
@@ -237,6 +403,57 @@ impl PrioritySorter {
             primary_factor
         )
     }
+}
+
+fn compute_param_score(
+    master: &MaterialMaster,
+    state: &MaterialState,
+    params: &CustomStrategyParameters,
+    today: NaiveDate,
+) -> f64 {
+    let urgent_w = params.urgent_weight.unwrap_or(0.0);
+    let capacity_w = params.capacity_weight.unwrap_or(0.0);
+    let cold_w = params.cold_stock_weight.unwrap_or(0.0);
+    let due_w = params.due_date_weight.unwrap_or(0.0);
+    let roll_age_w = params.rolling_output_age_weight.unwrap_or(0.0);
+
+    let urgent_rank = match state.urgent_level {
+        UrgentLevel::L0 => 0.0,
+        UrgentLevel::L1 => 1.0,
+        UrgentLevel::L2 => 2.0,
+        UrgentLevel::L3 => 3.0,
+    };
+
+    let weight_t = master.weight_t.unwrap_or(0.0);
+    let weight_t = if weight_t.is_finite() { weight_t } else { 0.0 };
+
+    let mut cold_age = state.stock_age_days.max(0) as f64;
+    if let Some(threshold) = params.cold_stock_age_threshold_days {
+        if state.stock_age_days < threshold {
+            cold_age = 0.0;
+        }
+    }
+
+    let roll_age = state.rolling_output_age_days.max(0) as f64;
+
+    // due_urgency 越大越紧急：
+    // - overdue: days_to_due < 0 => due_urgency > 0
+    // - far future: days_to_due > 0 => due_urgency < 0
+    let due_date = master.due_date.unwrap_or(NaiveDate::MAX);
+    let mut days_to_due = (due_date - today).num_days();
+    // clamp，避免 due_date 缺失被 NaiveDate::MAX 放大到极端
+    if days_to_due > 3650 {
+        days_to_due = 3650;
+    } else if days_to_due < -3650 {
+        days_to_due = -3650;
+    }
+    let due_urgency = -(days_to_due as f64);
+
+    urgent_w * urgent_rank
+        + capacity_w * weight_t
+        + cold_w * cold_age
+        + due_w * due_urgency
+        + roll_age_w * roll_age
 }
 
 // ==========================================
@@ -1156,5 +1373,48 @@ mod tests {
 
         // 验证：材料C（stock_age_days = 30）不会影响 (H032, L2) 组的排序
         // 因为它们在不同的组中
+    }
+
+    #[test]
+    fn test_sort_with_parameters_capacity_weight_changes_order() {
+        let sorter = PrioritySorter::new();
+        let today = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+
+        let (mut master_light, state_light) = create_test_material(
+            "LIGHT",
+            Some("H032"),
+            SchedState::Ready,
+            UrgentLevel::L0,
+            0,
+            0,
+            None,
+        );
+        master_light.weight_t = Some(1.0);
+
+        let (mut master_heavy, state_heavy) = create_test_material(
+            "HEAVY",
+            Some("H032"),
+            SchedState::Ready,
+            UrgentLevel::L0,
+            0,
+            0,
+            None,
+        );
+        master_heavy.weight_t = Some(10.0);
+
+        let params = CustomStrategyParameters {
+            capacity_weight: Some(1.0),
+            ..Default::default()
+        };
+
+        let sorted = sorter.sort_with_parameters(
+            vec![(master_light, state_light), (master_heavy, state_heavy)],
+            ScheduleStrategy::Balanced,
+            &params,
+            today,
+        );
+
+        assert_eq!(sorted[0].0.material_id, "HEAVY");
+        assert_eq!(sorted[1].0.material_id, "LIGHT");
     }
 }

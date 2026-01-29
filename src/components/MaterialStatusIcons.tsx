@@ -9,6 +9,7 @@ import React from 'react';
 import { Tooltip, Space } from 'antd';
 import { LockOutlined, FireOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { STATE_COLORS } from '../theme';
+import { isScheduled } from '../utils/schedState';
 
 interface MaterialStatusIconsProps {
   lockFlag: boolean;
@@ -35,7 +36,7 @@ const MaterialStatusIconsComponent: React.FC<MaterialStatusIconsProps> = ({
         </Tooltip>
       )}
 
-      {schedState === 'Scheduled' && (
+      {isScheduled(schedState) && (
         <Tooltip title="已排产">
           <CheckCircleOutlined style={{ color: STATE_COLORS.READY, fontSize: 14 }} />
         </Tooltip>

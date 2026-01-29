@@ -33,7 +33,7 @@
 ///
 /// # 示例
 /// ```
-/// use hot_rolling_finish_aps::decision::common::sql_builder::build_optional_filter_sql;
+/// use hot_rolling_aps::decision::common::sql_builder::build_optional_filter_sql;
 ///
 /// let base = "SELECT * FROM decision_test WHERE version_id = ?";
 /// let order = "created_at DESC";
@@ -73,7 +73,7 @@ pub fn build_optional_filter_sql(
 ///
 /// # 示例
 /// ```
-/// use hot_rolling_finish_aps::decision::common::sql_builder::build_query_with_optional_limit;
+/// use hot_rolling_aps::decision::common::sql_builder::build_query_with_optional_limit;
 ///
 /// let base = "SELECT * FROM decision_test WHERE version_id = ? ORDER BY score DESC";
 ///
@@ -109,7 +109,7 @@ pub fn build_query_with_optional_limit(base_query: &str, limit: Option<usize>) -
 ///
 /// # 示例
 /// ```
-/// use hot_rolling_finish_aps::decision::common::sql_builder::build_date_range_filter;
+/// use hot_rolling_aps::decision::common::sql_builder::build_date_range_filter;
 ///
 /// let filter = build_date_range_filter("plan_date", "2026-01-24", "2026-01-31");
 /// assert_eq!(filter, "plan_date >= '2026-01-24' AND plan_date < '2026-01-31'");
@@ -129,7 +129,7 @@ pub fn build_date_range_filter(date_column: &str, start_date: &str, end_date: &s
 ///
 /// # 示例
 /// ```
-/// use hot_rolling_finish_aps::decision::common::sql_builder::SqlQueryBuilder;
+/// use hot_rolling_aps::decision::common::sql_builder::SqlQueryBuilder;
 ///
 /// let sql = SqlQueryBuilder::new("SELECT * FROM decision_test")
 ///     .where_clause("version_id = ?")

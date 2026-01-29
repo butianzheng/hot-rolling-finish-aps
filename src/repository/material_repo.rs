@@ -8,7 +8,8 @@
 use crate::domain::material::{MaterialMaster, MaterialState};
 use crate::domain::types::{RushLevel, SchedState, UrgentLevel};
 use crate::repository::error::{RepositoryError, RepositoryResult};
-use rusqlite::{params, Connection, Result as SqliteResult};
+use rusqlite::{params, Connection, Result as SqliteResult, ToSql};
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
 // ==========================================
@@ -407,6 +408,32 @@ pub struct MaterialStateRepository {
     conn: Arc<Mutex<Connection>>,
 }
 
+/// 轻量材料状态快照（用于前端解释/提示，不要求完整 MaterialState 映射）
+///
+/// 说明：
+/// - 仅包含“挤出/可排性”解释所需的关键字段；
+/// - 不包含 updated_at 等字段，避免因时间格式差异导致解析失败；
+/// - 字段命名保持与 material_state 表一致（snake_case），便于前端复用现有逻辑。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MaterialStateSnapshotLite {
+    pub material_id: String,
+    pub sched_state: Option<String>,
+    pub urgent_level: Option<String>,
+    pub rush_level: Option<String>,
+
+    pub lock_flag: Option<bool>,
+    pub force_release_flag: Option<bool>,
+    pub manual_urgent_flag: Option<bool>,
+    pub in_frozen_zone: Option<bool>,
+
+    pub ready_in_days: Option<i32>,
+    pub earliest_sched_date: Option<chrono::NaiveDate>,
+
+    pub scheduled_date: Option<chrono::NaiveDate>,
+    pub scheduled_machine_code: Option<String>,
+    pub seq_no: Option<i32>,
+}
+
 impl MaterialStateRepository {
     /// 创建新的 MaterialStateRepository 实例
     ///
@@ -632,6 +659,92 @@ impl MaterialStateRepository {
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e.into()),
         }
+    }
+
+    /// 批量查询材料状态快照（按 material_id 列表）
+    ///
+    /// 说明：
+    /// - 用于“策略草案变更明细”的解释提示，避免前端逐条查库；
+    /// - 由于 SQLite 参数数量限制，内部会分块查询。
+    pub fn find_snapshots_by_material_ids(
+        &self,
+        material_ids: &[String],
+    ) -> RepositoryResult<Vec<MaterialStateSnapshotLite>> {
+        if material_ids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // SQLite 默认变量上限通常为 999；留出余量，避免不同环境配置差异。
+        const CHUNK_SIZE: usize = 900;
+
+        let conn = self.get_conn()?;
+        let mut out: Vec<MaterialStateSnapshotLite> = Vec::with_capacity(material_ids.len());
+
+        for chunk in material_ids.chunks(CHUNK_SIZE) {
+            let placeholders = std::iter::repeat("?")
+                .take(chunk.len())
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            let sql = format!(
+                r#"
+                SELECT
+                    material_id,
+                    sched_state,
+                    lock_flag,
+                    force_release_flag,
+                    urgent_level,
+                    rush_level,
+                    ready_in_days,
+                    earliest_sched_date,
+                    scheduled_date,
+                    scheduled_machine_code,
+                    seq_no,
+                    manual_urgent_flag,
+                    in_frozen_zone
+                FROM material_state
+                WHERE material_id IN ({})
+                "#,
+                placeholders
+            );
+
+            let mut stmt = conn.prepare(&sql)?;
+            let params_vec: Vec<&dyn ToSql> = chunk.iter().map(|s| s as &dyn ToSql).collect();
+
+            let rows = stmt.query_map(params_vec.as_slice(), |row| {
+                let lock_flag_i: Option<i32> = row.get(2)?;
+                let force_release_i: Option<i32> = row.get(3)?;
+                let manual_urgent_i: Option<i32> = row.get(11)?;
+                let in_frozen_i: Option<i32> = row.get(12)?;
+
+                let earliest_str: Option<String> = row.get(7)?;
+                let scheduled_str: Option<String> = row.get(8)?;
+
+                Ok(MaterialStateSnapshotLite {
+                    material_id: row.get(0)?,
+                    sched_state: row.get(1)?,
+                    lock_flag: lock_flag_i.map(|v| v != 0),
+                    force_release_flag: force_release_i.map(|v| v != 0),
+                    urgent_level: row.get(4)?,
+                    rush_level: row.get(5)?,
+                    ready_in_days: row.get(6)?,
+                    earliest_sched_date: earliest_str
+                        .as_deref()
+                        .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()),
+                    scheduled_date: scheduled_str
+                        .as_deref()
+                        .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()),
+                    scheduled_machine_code: row.get(9)?,
+                    seq_no: row.get(10)?,
+                    manual_urgent_flag: manual_urgent_i.map(|v| v != 0),
+                    in_frozen_zone: in_frozen_i.map(|v| v != 0),
+                })
+            })?;
+
+            out.extend(rows.collect::<SqliteResult<Vec<_>>>()?);
+        }
+
+        Ok(out)
     }
 
     /// 查询适温待排材料（READY 状态）

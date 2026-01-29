@@ -30,7 +30,7 @@ use serde::{de::DeserializeOwned, Serialize};
 ///
 /// # 示例
 /// ```
-/// use hot_rolling_finish_aps::decision::common::json_utils::deserialize_json_array;
+/// use hot_rolling_aps::decision::common::json_utils::deserialize_json_array;
 ///
 /// let json = r#"["action1", "action2"]"#;
 /// let actions: Vec<String> = deserialize_json_array(json);
@@ -71,7 +71,7 @@ pub fn deserialize_json_array<T: DeserializeOwned>(json: &str) -> Vec<T> {
 ///
 /// # 示例
 /// ```
-/// use hot_rolling_finish_aps::decision::common::json_utils::deserialize_json_array_optional;
+/// use hot_rolling_aps::decision::common::json_utils::deserialize_json_array_optional;
 ///
 /// let json = Some(r#"["HIGH", "MEDIUM"]"#.to_string());
 /// let levels: Vec<String> = deserialize_json_array_optional(json.as_deref());
@@ -112,7 +112,7 @@ pub fn deserialize_json_array_optional<T: DeserializeOwned>(json: Option<&str>) 
 ///
 /// # 示例
 /// ```
-/// use hot_rolling_finish_aps::decision::common::json_utils::deserialize_json_optional;
+/// use hot_rolling_aps::decision::common::json_utils::deserialize_json_optional;
 /// use serde::Deserialize;
 ///
 /// #[derive(Debug, Deserialize, PartialEq)]
@@ -157,7 +157,7 @@ pub fn deserialize_json_optional<T: DeserializeOwned>(json: Option<&str>) -> Opt
 ///
 /// # 示例
 /// ```
-/// use hot_rolling_finish_aps::decision::common::json_utils::serialize_json_vec;
+/// use hot_rolling_aps::decision::common::json_utils::serialize_json_vec;
 ///
 /// let actions = vec!["重排计划", "调整机组"];
 /// let json = serialize_json_vec(&actions);
@@ -201,7 +201,7 @@ pub fn serialize_json_vec<T: Serialize>(vec: &[T]) -> Option<String> {
 ///
 /// # 示例
 /// ```
-/// use hot_rolling_finish_aps::decision::common::json_utils::serialize_json_optional;
+/// use hot_rolling_aps::decision::common::json_utils::serialize_json_optional;
 /// use serde::Serialize;
 ///
 /// #[derive(Serialize)]

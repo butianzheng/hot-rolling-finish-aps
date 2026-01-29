@@ -237,7 +237,7 @@ fn test_get_cold_stock_materials_无冷料() {
 
     // 测试: 查询冷料（使用 _full 版本传入 version_id）
     let result = env.dashboard_api
-        .get_cold_stock_materials_full(&version_id, None, None, Some(100))
+        .get_cold_stock_materials(&version_id, None, None, Some(100))
         .expect("查询失败");
 
     assert_eq!(result.items.len(), 0, "库存5天不应该��视为冷料");
@@ -281,7 +281,7 @@ fn test_get_cold_stock_materials_有冷料() {
 
     // 测试: 查询冷料（使用 _full 版本传入 version_id）
     let result = env.dashboard_api
-        .get_cold_stock_materials_full(&version_id, None, None, Some(100))
+        .get_cold_stock_materials(&version_id, None, None, Some(100))
         .expect("查询失败");
 
     // 注意: D3 查询的是 decision_cold_stock_profile 表，需要先刷新决策视图
@@ -311,7 +311,7 @@ fn test_get_most_congested_machine_无材料() {
 
     // 测试: 查询最拥堵机组（没有材料，使用 _full 版本传入 version_id）
     let result = env.dashboard_api
-        .get_most_congested_machine_full(&version_id, None, None, None, None, Some(10))
+        .get_most_congested_machine(&version_id, None, None, None, None, Some(10))
         .expect("查询失败");
 
     assert!(result.items.is_empty(), "没有材料时应该返回空列表");
@@ -364,7 +364,7 @@ fn test_get_most_congested_machine_有材料() {
 
     // 测试: 查询最拥堵机组（使用 _full 版本传入 version_id）
     let result = env.dashboard_api
-        .get_most_congested_machine_full(&version_id, None, None, None, None, Some(10))
+        .get_most_congested_machine(&version_id, None, None, None, None, Some(10))
         .expect("查询失败");
 
     // 注意: D4 查询的是 decision_machine_bottleneck 表，需要先刷新决策视图
@@ -499,7 +499,7 @@ fn test_get_cold_stock_materials_负阈值() {
 
     // 测试: 使用 _full 版本查询（负阈值参数已不再使用）
     let result = env.dashboard_api
-        .get_cold_stock_materials_full(&version_id, None, None, Some(100));
+        .get_cold_stock_materials(&version_id, None, None, Some(100));
 
     // 验证: 应该返回空结果（没有冷料数据）
     match result {

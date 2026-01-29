@@ -14,6 +14,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useSearchParams } from 'react-router-dom';
 import { useColdStockProfile } from '../../hooks/queries/use-decision-queries';
+import type { DrilldownSpec } from '../../hooks/useRiskOverviewData';
 import { useActiveVersionId } from '../../stores/use-global-store';
 import { ColdStockChart } from '../../components/charts/ColdStockChart';
 import type { ColdStockBucket, AgeBin, PressureLevel, ReasonItem } from '../../types/decision';
@@ -78,7 +79,12 @@ function formatStructureGap(gap: string): string {
 // 主组件
 // ==========================================
 
-export const D3ColdStock: React.FC = () => {
+interface D3ColdStockProps {
+  embedded?: boolean;
+  onOpenDrilldown?: (spec: DrilldownSpec) => void;
+}
+
+export const D3ColdStock: React.FC<D3ColdStockProps> = ({ embedded, onOpenDrilldown }) => {
   const versionId = useActiveVersionId();
   const [searchParams] = useSearchParams();
   const [selectedMachine, setSelectedMachine] = useState<string | null>(null);
@@ -92,6 +98,11 @@ export const D3ColdStock: React.FC = () => {
   );
 
   const handleSelectMachine = (machine: string | null) => {
+    if (embedded && onOpenDrilldown) {
+      setSelectedMachine(machine);
+      onOpenDrilldown({ kind: 'coldStock', machineCode: machine || undefined });
+      return;
+    }
     setSelectedMachine(machine);
     // 切换机组时清空桶定位，避免“定位到不存在的桶”
     setSelectedAgeBin(null);
@@ -215,7 +226,7 @@ export const D3ColdStock: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div style={{ textAlign: 'center', padding: '100px 0' }}>
+      <div style={{ textAlign: 'center', padding: embedded ? '40px 0' : '100px 0' }}>
         <Spin size="large" tip="正在加载冷料库龄数据...">
           <div style={{ minHeight: 80 }} />
         </Spin>
@@ -234,7 +245,7 @@ export const D3ColdStock: React.FC = () => {
         description={error.message || '未知错误'}
         type="error"
         showIcon
-        style={{ margin: '20px' }}
+        style={{ margin: embedded ? 0 : '20px' }}
       />
     );
   }
@@ -246,7 +257,7 @@ export const D3ColdStock: React.FC = () => {
         description="请先在主界面选择一个排产版本"
         type="warning"
         showIcon
-        style={{ margin: '20px' }}
+        style={{ margin: embedded ? 0 : '20px' }}
       />
     );
   }
@@ -256,38 +267,56 @@ export const D3ColdStock: React.FC = () => {
   // ==========================================
 
   return (
-    <div style={{ padding: '24px' }}>
-      {/* 页面标题 */}
-      <div style={{ marginBottom: '24px' }}>
-        <h2>
-          <DatabaseOutlined style={{ marginRight: '8px' }} />
-          D3决策：冷料库龄分析
-        </h2>
-        <p style={{ color: '#8c8c8c', marginBottom: '16px' }}>
-          展示各机组冷料库龄分布，识别压库风险和结构缺口
-        </p>
+    <div style={{ padding: embedded ? 0 : 24 }}>
+      {!embedded ? (
+        <div style={{ marginBottom: 24 }}>
+          <h2>
+            <DatabaseOutlined style={{ marginRight: 8 }} />
+            D3决策：冷料库龄分析
+          </h2>
+          <p style={{ color: '#8c8c8c', marginBottom: 16 }}>
+            展示各机组冷料库龄分布，识别压库风险和结构缺口
+          </p>
 
-        {/* 机组选择器 */}
-        <Space>
-          <span>选择机组：</span>
-          <Select
-            value={selectedMachine}
-            onChange={handleSelectMachine}
-            style={{ width: 200 }}
-            placeholder="查看全部机组"
-            allowClear
-            options={machineStats.map((m) => ({
-              label: `${m.machine} (${m.totalCount}个材料)`,
-              value: m.machine,
-            }))}
-          />
-        </Space>
-      </div>
+          <Space>
+            <span>选择机组：</span>
+            <Select
+              value={selectedMachine}
+              onChange={handleSelectMachine}
+              style={{ width: 200 }}
+              placeholder="查看全部机组"
+              allowClear
+              options={machineStats.map((m) => ({
+                label: `${m.machine} (${m.totalCount}个材料)`,
+                value: m.machine,
+              }))}
+            />
+          </Space>
+        </div>
+      ) : (
+        <div style={{ marginBottom: 12 }}>
+          <Space align="center" wrap>
+            <span>机组：</span>
+            <Select
+              size="small"
+              value={selectedMachine}
+              onChange={handleSelectMachine}
+              style={{ width: 200 }}
+              placeholder="全部"
+              allowClear
+              options={machineStats.map((m) => ({
+                label: `${m.machine} (${m.totalCount}个)`,
+                value: m.machine,
+              }))}
+            />
+          </Space>
+        </div>
+      )}
 
       {/* 统计卡片 */}
-      <Row gutter={16} style={{ marginBottom: '24px' }}>
+      <Row gutter={embedded ? 12 : 16} style={{ marginBottom: embedded ? 12 : 24 }}>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="涉及机组数"
               value={globalStats.totalMachines}
@@ -296,7 +325,7 @@ export const D3ColdStock: React.FC = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="冷料总数"
               value={globalStats.totalColdStock}
@@ -308,7 +337,7 @@ export const D3ColdStock: React.FC = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="冷料总重量"
               value={globalStats.totalWeight.toFixed(1)}
@@ -320,7 +349,7 @@ export const D3ColdStock: React.FC = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="高压库存数"
               value={globalStats.highPressureCount}
@@ -365,7 +394,7 @@ export const D3ColdStock: React.FC = () => {
       </Card>
 
       {/* 选中机组的详细信息 */}
-      {selectedMachineData && (
+      {!embedded && selectedMachineData && (
         <Card
           title={`${selectedMachineData.machine} 冷料详情`}
           extra={
@@ -405,6 +434,17 @@ export const D3ColdStock: React.FC = () => {
                       selectedBucket?.ageBin === bucket.ageBin ? 'rgba(22, 119, 255, 0.06)' : undefined,
                   }}
                   onClick={() => {
+                    if (embedded && onOpenDrilldown) {
+                      setSelectedAgeBin(bucket.ageBin);
+                      setSelectedPressureLevel(bucket.pressureLevel);
+                      onOpenDrilldown({
+                        kind: 'coldStock',
+                        machineCode: selectedMachineData.machine,
+                        ageBin: bucket.ageBin,
+                        pressureLevel: bucket.pressureLevel,
+                      });
+                      return;
+                    }
                     setSelectedAgeBin(bucket.ageBin);
                     setSelectedPressureLevel(bucket.pressureLevel);
                   }}

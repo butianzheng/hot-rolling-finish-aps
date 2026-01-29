@@ -19,6 +19,8 @@ use hot_rolling_aps::repository::{
     risk_repo::RiskSnapshotRepository,
     capacity_repo::CapacityPoolRepository,
     roller_repo::RollerCampaignRepository,
+    strategy_draft_repo::StrategyDraftRepository,
+    decision_refresh_repo::DecisionRefreshRepository,
 };
 use hot_rolling_aps::engine::{
     eligibility::EligibilityEngine,
@@ -111,6 +113,7 @@ impl ApiTestEnv {
         let plan_version_repo = Arc::new(PlanVersionRepository::new(conn.clone()));
         let plan_item_repo = Arc::new(PlanItemRepository::new(conn.clone()));
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
+        let strategy_draft_repo = Arc::new(StrategyDraftRepository::new(conn.clone()));
 
         let risk_snapshot_repo = Arc::new(
             RiskSnapshotRepository::new(&db_path)
@@ -184,8 +187,11 @@ impl ApiTestEnv {
             plan_repo.clone(),
             plan_version_repo.clone(),
             plan_item_repo.clone(),
+            material_state_repo.clone(),
+            strategy_draft_repo.clone(),
             action_log_repo.clone(),
             risk_snapshot_repo.clone(),
+            config_manager.clone(),
             recalc_engine,
             risk_engine,
             event_publisher,
@@ -215,9 +221,11 @@ impl ApiTestEnv {
             d6_use_case,
         ));
 
+        let decision_refresh_repo = Arc::new(DecisionRefreshRepository::new(conn.clone()));
         let dashboard_api = Arc::new(DashboardApi::new(
             decision_api,
             action_log_repo.clone(),
+            decision_refresh_repo,
         ));
 
         // ConfigApi

@@ -149,12 +149,18 @@ mod tests {
         )
         .unwrap();
 
+        // 注意：D2 读模型使用 UTC “今天”计算 days_to_due；测试数据需避免固定日期导致随时间漂移。
+        let today = chrono::Utc::now().date_naive();
+        let overdue_due_date = (today - chrono::Duration::days(4)).format("%Y-%m-%d").to_string();
+        let near_due_date = (today + chrono::Duration::days(2)).format("%Y-%m-%d").to_string();
+        let future_due_date = (today + chrono::Duration::days(10)).format("%Y-%m-%d").to_string();
+
         // 插入 3 个合同的紧急单材料
         // C001: L3, 5个材料, 2个已排产 (超期)
         for i in 1..=5 {
             conn.execute(
-                "INSERT INTO material_state VALUES (?, 'C001', '2026-01-20', 'L3', 100.0, 1)",
-                params![format!("MAT{:03}", i)],
+                "INSERT INTO material_state VALUES (?, 'C001', ?, 'L3', 100.0, 1)",
+                params![format!("MAT{:03}", i), &overdue_due_date],
             )
             .unwrap();
         }
@@ -172,8 +178,8 @@ mod tests {
         // C002: L2, 10个材料, 6个已排产 (临期)
         for i in 6..=15 {
             conn.execute(
-                "INSERT INTO material_state VALUES (?, 'C002', '2026-01-26', 'L2', 150.0, 1)",
-                params![format!("MAT{:03}", i)],
+                "INSERT INTO material_state VALUES (?, 'C002', ?, 'L2', 150.0, 1)",
+                params![format!("MAT{:03}", i), &near_due_date],
             )
             .unwrap();
         }
@@ -191,8 +197,8 @@ mod tests {
         // C003: L1, 8个材料, 全部未排产
         for i in 16..=23 {
             conn.execute(
-                "INSERT INTO material_state VALUES (?, 'C003', '2026-02-01', 'L1', 120.0, 1)",
-                params![format!("MAT{:03}", i)],
+                "INSERT INTO material_state VALUES (?, 'C003', ?, 'L1', 120.0, 1)",
+                params![format!("MAT{:03}", i), &future_due_date],
             )
             .unwrap();
         }

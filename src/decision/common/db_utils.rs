@@ -29,7 +29,7 @@ use rusqlite::{Connection, Result as SqlResult};
 ///
 /// # 示例
 /// ```
-/// use hot_rolling_finish_aps::decision::common::db_utils::build_in_clause;
+/// use hot_rolling_aps::decision::common::db_utils::build_in_clause;
 ///
 /// let machines = vec!["H032".to_string(), "H033".to_string()];
 /// let clause = build_in_clause("machine_code", &machines);
@@ -86,7 +86,7 @@ pub fn build_in_clause<T: AsRef<str>>(column_name: &str, values: &[T]) -> String
 /// # 示例
 /// ```
 /// use rusqlite::Connection;
-/// use hot_rolling_finish_aps::decision::common::db_utils::execute_delete_with_in_clause;
+/// use hot_rolling_aps::decision::common::db_utils::execute_delete_with_in_clause;
 ///
 /// let conn = Connection::open_in_memory().unwrap();
 /// conn.execute(
@@ -161,7 +161,7 @@ pub fn execute_delete_with_in_clause(
 /// # 示例
 /// ```
 /// use rusqlite::Connection;
-/// use hot_rolling_finish_aps::decision::common::db_utils::execute_delete_with_in_clause_and_date_range;
+/// use hot_rolling_aps::decision::common::db_utils::execute_delete_with_in_clause_and_date_range;
 ///
 /// let conn = Connection::open_in_memory().unwrap();
 /// conn.execute(

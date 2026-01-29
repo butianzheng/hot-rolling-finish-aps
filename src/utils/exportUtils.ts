@@ -122,6 +122,13 @@ function downloadFile(content: string, filename: string, mimeType: string): void
   URL.revokeObjectURL(url);
 }
 
+function buildTimestampedFilename(filename: string, ext: string): string {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+  const filenameParts = filename.split('.');
+  const baseName = filenameParts.length > 1 ? filenameParts.slice(0, -1).join('.') : filename;
+  return `${baseName}_${timestamp}.${ext}`;
+}
+
 /**
  * 导出数据
  */
@@ -134,10 +141,7 @@ export function exportData(
   }
 
   const format = options.format || 'csv';
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-  const filenameParts = options.filename.split('.');
-  const baseName = filenameParts.length > 1 ? filenameParts.slice(0, -1).join('.') : options.filename;
-  const fullFilename = `${baseName}_${timestamp}.${format}`;
+  const fullFilename = buildTimestampedFilename(options.filename, format);
 
   let content: string;
   let mimeType: string;
@@ -184,6 +188,22 @@ export function exportJSON(data: any[], filename: string): void {
  */
 export function exportTSV(data: any[], filename: string): void {
   exportData(data, { filename, format: 'tsv' });
+}
+
+/**
+ * 导出 Markdown 文本（用于报告导出）
+ */
+export function exportMarkdown(markdown: string, filename: string): void {
+  const fullFilename = buildTimestampedFilename(filename, 'md');
+  downloadFile(markdown, fullFilename, 'text/markdown');
+}
+
+/**
+ * 导出 HTML 文本（用于报告导出，可在浏览器/打印为 PDF）
+ */
+export function exportHTML(html: string, filename: string): void {
+  const fullFilename = buildTimestampedFilename(filename, 'html');
+  downloadFile(html, fullFilename, 'text/html');
 }
 
 /**

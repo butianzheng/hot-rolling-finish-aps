@@ -17,13 +17,16 @@ use crate::domain::types::SchedState;
 use crate::engine::events::{OptionalEventPublisher, ScheduleEvent, ScheduleEventPublisher, ScheduleEventType};
 use crate::engine::orchestrator::ScheduleOrchestrator;
 use crate::engine::{CapacityFiller, EligibilityEngine, PrioritySorter, UrgencyEngine};
+use crate::engine::strategy::ScheduleStrategy;
 use crate::config::ConfigManager;
+use crate::config::strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
 use crate::repository::{
     ActionLogRepository, CapacityPoolRepository, MaterialMasterRepository,
     MaterialStateRepository, PlanItemRepository, PlanVersionRepository,
 };
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
@@ -83,6 +86,40 @@ impl Default for RecalcConfig {
             auto_activate: false,
         }
     }
+}
+
+const CUSTOM_STRATEGY_PREFIX: &str = "custom:";
+
+/// 解析后的“执行策略”（用于把自定义策略参数下沉到引擎层）
+#[derive(Debug, Clone)]
+pub struct ResolvedStrategyProfile {
+    /// 对外展示/审计使用（例如 balanced / custom:my_strategy_1）
+    pub strategy_key: String,
+    /// 实际执行使用的基础策略（预设策略枚举）
+    pub base_strategy: ScheduleStrategy,
+    /// 版本中文命名使用的策略标题
+    pub title_cn: String,
+    /// 可选：策略参数（自定义策略才有）
+    pub parameters: Option<CustomStrategyParameters>,
+}
+
+impl ResolvedStrategyProfile {
+    pub fn parameters_json(&self) -> JsonValue {
+        match &self.parameters {
+            Some(p) => serde_json::to_value(p).unwrap_or(JsonValue::Null),
+            None => JsonValue::Null,
+        }
+    }
+}
+
+fn is_params_empty(params: &CustomStrategyParameters) -> bool {
+    params.urgent_weight.is_none()
+        && params.capacity_weight.is_none()
+        && params.cold_stock_weight.is_none()
+        && params.due_date_weight.is_none()
+        && params.rolling_output_age_weight.is_none()
+        && params.cold_stock_age_threshold_days.is_none()
+        && params.overflow_tolerance_pct.is_none()
 }
 
 // ==========================================
@@ -270,6 +307,65 @@ impl RecalcEngine {
     /// - 不写入plan_item表
     /// - 不写入risk_snapshot表
     /// - 返回内存中的结果供前端预览
+    pub fn resolve_strategy_profile(
+        &self,
+        strategy_key: &str,
+    ) -> Result<ResolvedStrategyProfile, Box<dyn Error>> {
+        let raw = strategy_key.trim();
+        if raw.is_empty() {
+            return Err("策略不能为空".into());
+        }
+
+        if raw.starts_with(CUSTOM_STRATEGY_PREFIX) {
+            let id = raw[CUSTOM_STRATEGY_PREFIX.len()..].trim();
+            if id.is_empty() {
+                return Err("自定义策略ID不能为空".into());
+            }
+
+            let profile: CustomStrategyProfile = self
+                .config_manager
+                .get_custom_strategy_profile(id)?
+                .ok_or_else(|| format!("自定义策略不存在: {}", id))?;
+
+            let base_strategy = profile.base_strategy.parse::<ScheduleStrategy>()?;
+
+            let params = profile.parameters;
+            let params = if is_params_empty(&params) {
+                None
+            } else {
+                Some(params)
+            };
+
+            return Ok(ResolvedStrategyProfile {
+                strategy_key: raw.to_string(),
+                base_strategy,
+                title_cn: profile.title,
+                parameters: params,
+            });
+        }
+
+        let base_strategy = raw.parse::<ScheduleStrategy>()?;
+        Ok(ResolvedStrategyProfile {
+            strategy_key: base_strategy.as_str().to_string(),
+            base_strategy,
+            title_cn: base_strategy.title_cn().to_string(),
+            parameters: None,
+        })
+    }
+
+    pub fn recalc_full_with_strategy_key(
+        &self,
+        plan_id: &str,
+        base_date: NaiveDate,
+        window_days: i32,
+        operator: &str,
+        is_dry_run: bool,
+        strategy_key: &str,
+    ) -> Result<RecalcResult, Box<dyn Error>> {
+        let profile = self.resolve_strategy_profile(strategy_key)?;
+        self.recalc_full_with_profile(plan_id, base_date, window_days, operator, is_dry_run, profile)
+    }
+
     pub fn recalc_full(
         &self,
         plan_id: &str,
@@ -277,6 +373,25 @@ impl RecalcEngine {
         window_days: i32,
         operator: &str,
         is_dry_run: bool,
+        strategy: ScheduleStrategy,
+    ) -> Result<RecalcResult, Box<dyn Error>> {
+        let profile = ResolvedStrategyProfile {
+            strategy_key: strategy.as_str().to_string(),
+            base_strategy: strategy,
+            title_cn: strategy.title_cn().to_string(),
+            parameters: None,
+        };
+        self.recalc_full_with_profile(plan_id, base_date, window_days, operator, is_dry_run, profile)
+    }
+
+    pub(crate) fn recalc_full_with_profile(
+        &self,
+        plan_id: &str,
+        base_date: NaiveDate,
+        window_days: i32,
+        operator: &str,
+        is_dry_run: bool,
+        profile: ResolvedStrategyProfile,
     ) -> Result<RecalcResult, Box<dyn Error>> {
         // 1. 查询激活版本 (如果存在)
         let base_version = self.version_repo.find_active_version(plan_id)?;
@@ -307,6 +422,19 @@ impl RecalcEngine {
             )?
         };
 
+        // 2.1 生产模式：为新版本写入“中文命名”到 config_snapshot_json（不改表结构）
+        if !is_dry_run {
+            let version_name_cn = Self::build_version_name_cn(&profile.title_cn, base_date, new_version.version_no);
+            let snapshot_json = Self::upsert_version_meta_snapshot(
+                new_version.config_snapshot_json.take(),
+                &version_name_cn,
+                &profile.strategy_key,
+                profile.base_strategy,
+                profile.parameters.as_ref(),
+            )?;
+            new_version.config_snapshot_json = Some(snapshot_json);
+        }
+
         // 3. 计算冻结区起始日期
         let frozen_from_date = self.calculate_frozen_from_date(base_date);
         new_version.frozen_from_date = Some(frozen_from_date);
@@ -329,6 +457,9 @@ impl RecalcEngine {
             &new_version.version_id,
             (base_date, end_date),
             &machine_codes,
+            is_dry_run,
+            profile.base_strategy,
+            profile.parameters.clone(),
         )?;
 
         // 6. 提取统计信息
@@ -415,6 +546,7 @@ impl RecalcEngine {
         end_date: NaiveDate,
         _operator: &str,
         is_dry_run: bool,
+        strategy: ScheduleStrategy,
     ) -> Result<RecalcResult, Box<dyn Error>> {
         // 1. 查询版本
         let version = self
@@ -454,6 +586,9 @@ impl RecalcEngine {
             version_id,
             (start_date, end_date),
             &machine_codes,
+            is_dry_run,
+            strategy,
+            None,
         )?;
 
         // 6. 提取统计信息
@@ -521,18 +656,61 @@ impl RecalcEngine {
         cascade_days: i32,
         operator: &str,
         is_dry_run: bool,
+        strategy: ScheduleStrategy,
     ) -> Result<RecalcResult, Box<dyn Error>> {
         // 计算联动范围
         let start_date = trigger_date;
         let end_date = trigger_date + chrono::Duration::days(cascade_days as i64);
 
         // 调用局部重排
-        self.recalc_partial(version_id, start_date, end_date, operator, is_dry_run)
+        self.recalc_partial(version_id, start_date, end_date, operator, is_dry_run, strategy)
     }
 
     // ==========================================
     // 版本管理
     // ==========================================
+
+    fn build_version_name_cn(strategy_title_cn: &str, base_date: NaiveDate, version_no: i32) -> String {
+        let date_part = base_date.format("%m%d").to_string();
+        format!("{}-{}-{:03}", strategy_title_cn, date_part, version_no)
+    }
+
+    fn upsert_version_meta_snapshot(
+        snapshot_json: Option<String>,
+        version_name_cn: &str,
+        strategy_key: &str,
+        base_strategy: ScheduleStrategy,
+        strategy_params: Option<&CustomStrategyParameters>,
+    ) -> Result<String, Box<dyn Error>> {
+        let mut map: HashMap<String, String> = match snapshot_json.as_deref() {
+            Some(raw) => match serde_json::from_str(raw) {
+                Ok(v) => v,
+                Err(_) => {
+                    let mut m = HashMap::new();
+                    m.insert("__meta_config_snapshot_raw".to_string(), raw.to_string());
+                    m
+                }
+            },
+            None => HashMap::new(),
+        };
+
+        map.insert(
+            "__meta_version_name_cn".to_string(),
+            version_name_cn.to_string(),
+        );
+        map.insert("__meta_strategy".to_string(), strategy_key.to_string());
+        map.insert(
+            "__meta_strategy_base".to_string(),
+            base_strategy.as_str().to_string(),
+        );
+
+        if let Some(p) = strategy_params {
+            let raw = serde_json::to_string(p)?;
+            map.insert("__meta_strategy_params_json".to_string(), raw);
+        }
+
+        Ok(serde_json::to_string(&map)?)
+    }
 
     /// 创建派生版本 (基于现有版本)
     ///
@@ -554,17 +732,14 @@ impl RecalcEngine {
         _note: Option<String>,
         operator: &str,
     ) -> Result<PlanVersion, Box<dyn Error>> {
-        // 1. 获取下一个版本号
-        let version_no = self.version_repo.get_next_version_no(plan_id)?;
-
-        // 2. 获取配置快照
+        // 1. 获取配置快照
         let config_snapshot = self.config_manager.get_config_snapshot()?;
 
-        // 3. 创建PlanVersion对象
-        let version = PlanVersion {
+        // 2. 创建PlanVersion对象（version_no 由仓储层在事务内分配，避免并发冲突）
+        let mut version = PlanVersion {
             version_id: Uuid::new_v4().to_string(),
             plan_id: plan_id.to_string(),
-            version_no,
+            version_no: 0,
             status: "DRAFT".to_string(),
             frozen_from_date: None, // 将在recalc_full中设置
             recalc_window_days: Some(window_days),
@@ -574,8 +749,8 @@ impl RecalcEngine {
             revision: 0, // 乐观锁：初始修订号
         };
 
-        // 4. 保存版本
-        self.version_repo.create(&version)?;
+        // 3. 保存版本
+        self.version_repo.create_with_next_version_no(&mut version)?;
 
         Ok(version)
     }
@@ -646,22 +821,39 @@ impl RecalcEngine {
         version_id: &str,
         date_range: (NaiveDate, NaiveDate),
         machine_codes: &[String],
+        is_dry_run: bool,
+        strategy: ScheduleStrategy,
+        strategy_params: Option<CustomStrategyParameters>,
     ) -> Result<RescheduleResult, Box<dyn Error>> {
         // 检查是否已经在 tokio 运行时中
         if let Ok(handle) = tokio::runtime::Handle::try_current() {
             // 已经在运行时中，使用 block_in_place 来运行异步代码
             tokio::task::block_in_place(|| {
-                handle.block_on(async {
-                    self.execute_reschedule_async(version_id, date_range, machine_codes)
-                        .await
+                handle.block_on(async move {
+                    self.execute_reschedule_async(
+                        version_id,
+                        date_range,
+                        machine_codes,
+                        is_dry_run,
+                        strategy,
+                        strategy_params,
+                    )
+                    .await
                 })
             })
         } else {
             // 不在运行时中，创建新的运行时
             let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(async {
-                self.execute_reschedule_async(version_id, date_range, machine_codes)
-                    .await
+            rt.block_on(async move {
+                self.execute_reschedule_async(
+                    version_id,
+                    date_range,
+                    machine_codes,
+                    is_dry_run,
+                    strategy,
+                    strategy_params,
+                )
+                .await
             })
         }
     }
@@ -681,9 +873,21 @@ impl RecalcEngine {
         version_id: &str,
         date_range: (NaiveDate, NaiveDate),
         machine_codes: &[String],
+        is_dry_run: bool,
+        strategy: ScheduleStrategy,
+        strategy_params: Option<CustomStrategyParameters>,
     ) -> Result<RescheduleResult, Box<dyn Error>> {
         // ===== Step 1: 查询冻结区材料（冻结区保护红线） =====
         let frozen_items = self.item_repo.find_frozen_items(version_id)?;
+
+        let orchestrator = match strategy_params {
+            Some(params) => ScheduleOrchestrator::new_with_strategy_parameters(
+                self.config_manager.clone(),
+                strategy,
+                params,
+            ),
+            None => ScheduleOrchestrator::new_with_strategy(self.config_manager.clone(), strategy),
+        };
 
         // ===== Step 2: 初始化统计 =====
         let mut all_plan_items = Vec::new();
@@ -787,8 +991,6 @@ impl RecalcEngine {
                     });
 
                 // ----- 4.7 创建编排器并执行单日排产 -----
-                let orchestrator = ScheduleOrchestrator::new(self.config_manager.clone());
-
                 let schedule_result = orchestrator
                     .execute_single_day_schedule(
                         ready_materials,
@@ -816,8 +1018,10 @@ impl RecalcEngine {
                 }
 
                 // ----- 4.9 更新产能池（写回数据库） -----
-                self.capacity_repo
-                    .upsert_single(&schedule_result.updated_capacity_pool)?;
+                if !is_dry_run {
+                    self.capacity_repo
+                        .upsert_single(&schedule_result.updated_capacity_pool)?;
+                }
 
                 // ----- 4.10 持久化修改的材料状态（urgent_level, rush_level 等） -----
                 // Orchestrator 更新了 eligible_materials 中的状态，必须持久化到数据库
@@ -828,7 +1032,7 @@ impl RecalcEngine {
                     .map(|(_, state)| state)
                     .collect();
 
-                if !updated_states.is_empty() {
+                if !is_dry_run && !updated_states.is_empty() {
                     self.material_state_repo.batch_insert_material_state(updated_states)?;
                     tracing::debug!(
                         machine_code = %capacity_pool.machine_code,

@@ -53,6 +53,7 @@ interface MaterialInspectorProps {
   onLock?: (_materialId: string) => void;
   onUnlock?: (_materialId: string) => void;
   onSetUrgent?: (_materialId: string) => void;
+  onClearUrgent?: (_materialId: string) => void;
 }
 
 export const MaterialInspector: React.FC<MaterialInspectorProps> = ({
@@ -62,6 +63,7 @@ export const MaterialInspector: React.FC<MaterialInspectorProps> = ({
   onLock,
   onUnlock,
   onSetUrgent,
+  onClearUrgent,
 }) => {
   const [actionLogs, setActionLogs] = useState<ActionLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
@@ -81,19 +83,8 @@ export const MaterialInspector: React.FC<MaterialInspectorProps> = ({
       // 获取最近30天的操作日志
       const endTime = formatDateTime(new Date());
       const startTime = formatDateTime(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
-      const logs = await dashboardApi.listActionLogs(startTime, endTime);
-
-      // ActionLog 域模型没有专门的 target_id 字段，这里从 detail/payload/impact 里做包含匹配。
-      const materialLogs = (Array.isArray(logs) ? (logs as ActionLog[]) : []).filter((log) => {
-        const haystacks = [
-          log.detail || '',
-          log.payload_json ? JSON.stringify(log.payload_json) : '',
-          log.impact_summary_json ? JSON.stringify(log.impact_summary_json) : '',
-        ].join(' ');
-        return haystacks.includes(material.material_id);
-      });
-
-      setActionLogs(materialLogs.slice(0, 10)); // 只显示最近10条
+      const logs = await dashboardApi.listActionLogsByMaterial(material.material_id, startTime, endTime, 10);
+      setActionLogs(Array.isArray(logs) ? (logs as ActionLog[]) : []);
     } catch (error) {
       console.error('加载操作历史失败:', error);
       setActionLogs([]);
@@ -145,14 +136,25 @@ export const MaterialInspector: React.FC<MaterialInspectorProps> = ({
               锁定
             </Button>
           )}
-          <Button
-            size="small"
-            type="primary"
-            danger
-            onClick={() => onSetUrgent?.(material.material_id)}
-          >
-            设为紧急
-          </Button>
+          {material.manual_urgent_flag ? (
+            <Button
+              size="small"
+              onClick={() => onClearUrgent?.(material.material_id)}
+              disabled={!onClearUrgent}
+            >
+              取消紧急
+            </Button>
+          ) : (
+            <Button
+              size="small"
+              type="primary"
+              danger
+              onClick={() => onSetUrgent?.(material.material_id)}
+              disabled={!onSetUrgent}
+            >
+              设为紧急
+            </Button>
+          )}
         </Space>
       }
     >

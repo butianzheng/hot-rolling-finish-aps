@@ -14,6 +14,8 @@ use crate::engine::{
     CapacityFiller, EligibilityEngine, PrioritySorter, StructureCorrector,
     StructureViolationReport, UrgencyEngine,
 };
+use crate::config::strategy_profile::CustomStrategyParameters;
+use crate::engine::strategy::ScheduleStrategy;
 use chrono::NaiveDate;
 use std::collections::HashMap;
 use std::error::Error;
@@ -59,6 +61,8 @@ where
     sorter: PrioritySorter,
     filler: CapacityFiller,
     structure: StructureCorrector,
+    strategy: ScheduleStrategy,
+    strategy_params: Option<CustomStrategyParameters>,
 }
 
 impl<C> ScheduleOrchestrator<C>
@@ -70,6 +74,10 @@ where
     /// # 参数
     /// - config: 配置读取器
     pub fn new(config: Arc<C>) -> Self {
+        Self::new_with_strategy(config, ScheduleStrategy::Balanced)
+    }
+
+    pub fn new_with_strategy(config: Arc<C>, strategy: ScheduleStrategy) -> Self {
         Self {
             eligibility: EligibilityEngine::new(config.clone()),
             urgency: UrgencyEngine::new(),
@@ -77,6 +85,25 @@ where
             filler: CapacityFiller::new(),
             structure: StructureCorrector::new(),
             config,
+            strategy,
+            strategy_params: None,
+        }
+    }
+
+    pub fn new_with_strategy_parameters(
+        config: Arc<C>,
+        strategy: ScheduleStrategy,
+        params: CustomStrategyParameters,
+    ) -> Self {
+        Self {
+            eligibility: EligibilityEngine::new(config.clone()),
+            urgency: UrgencyEngine::new(),
+            sorter: PrioritySorter::new(),
+            filler: CapacityFiller::new(),
+            structure: StructureCorrector::new(),
+            config,
+            strategy,
+            strategy_params: Some(params),
         }
     }
 
@@ -192,7 +219,17 @@ where
         // ==========================================
         debug!("步骤3: 执行等级内排序");
 
-        let sorted_materials = self.sorter.sort(eligible_materials.clone());
+        let sorted_materials = match self.strategy_params.as_ref() {
+            Some(params) => self.sorter.sort_with_parameters(
+                eligible_materials.clone(),
+                self.strategy,
+                params,
+                today,
+            ),
+            None => self
+                .sorter
+                .sort_with_strategy(eligible_materials.clone(), self.strategy),
+        };
 
         info!(
             sorted_count = sorted_materials.len(),

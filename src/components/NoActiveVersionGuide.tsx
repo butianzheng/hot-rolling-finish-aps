@@ -1,24 +1,40 @@
 import React from 'react';
-import { Empty, Button, Card, Row, Col, Steps, Space, Alert, Divider } from 'antd';
+import { Empty, Button, Card, Row, Col, Steps, Space, Alert, Divider, Typography, theme } from 'antd';
 import {
   AppstoreOutlined,
   CheckCircleOutlined,
   NumberOutlined,
   ThunderboltOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
+
+const { Title, Text } = Typography;
 
 interface NoActiveVersionGuideProps {
   onNavigateToPlan: () => void; // 导航到排产方案的回调
+  onNavigateToImport?: () => void; // 导航到数据导入的回调（可选）
   title?: string; // 自定义标题
   description?: string; // 自定义描述
 }
 
 const NoActiveVersionGuide: React.FC<NoActiveVersionGuideProps> = ({
   onNavigateToPlan,
+  onNavigateToImport,
   title = '尚无激活的排产版本',
   description = '请先创建并激活一个排产版本，才能进行排产和调度操作',
 }) => {
+  const { token } = theme.useToken();
+
   const steps = [
+    ...(onNavigateToImport
+      ? [
+          {
+            title: '导入数据',
+            description: '先导入材料/订单等基础数据（支持冲突处理与导入历史）',
+            icon: <UploadOutlined />,
+          },
+        ]
+      : []),
     {
       title: '创建排产方案',
       description: '在"排产方案"页面中点击"创建方案"按钮，输入方案名称',
@@ -51,8 +67,12 @@ const NoActiveVersionGuide: React.FC<NoActiveVersionGuideProps> = ({
               style={{ marginBottom: 24 }}
               description={
                 <div>
-                  <h2 style={{ color: '#262626', marginBottom: 8 }}>{title}</h2>
-                  <p style={{ color: '#8c8c8c', fontSize: 14 }}>{description}</p>
+                  <Title level={4} style={{ marginBottom: 8 }}>
+                    {title}
+                  </Title>
+                  <Text type="secondary" style={{ fontSize: 14 }}>
+                    {description}
+                  </Text>
                 </div>
               }
             />
@@ -66,15 +86,28 @@ const NoActiveVersionGuide: React.FC<NoActiveVersionGuideProps> = ({
                 closable={false}
               />
 
-              <Button
-                type="primary"
-                size="large"
-                icon={<AppstoreOutlined />}
-                onClick={onNavigateToPlan}
-                style={{ width: '100%', maxWidth: 300 }}
-              >
-                前往排产方案创建版本
-              </Button>
+              <Space wrap style={{ width: '100%', justifyContent: 'center' }}>
+                {onNavigateToImport && (
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<UploadOutlined />}
+                    onClick={onNavigateToImport}
+                    style={{ width: '100%', maxWidth: 300 }}
+                  >
+                    开始导入数据
+                  </Button>
+                )}
+                <Button
+                  type={onNavigateToImport ? 'default' : 'primary'}
+                  size="large"
+                  icon={<AppstoreOutlined />}
+                  onClick={onNavigateToPlan}
+                  style={{ width: '100%', maxWidth: 300 }}
+                >
+                  前往版本管理/创建版本
+                </Button>
+              </Space>
             </Space>
           </Card>
 
@@ -82,7 +115,7 @@ const NoActiveVersionGuide: React.FC<NoActiveVersionGuideProps> = ({
           <Card
             title={
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>📋 快速开始指南</span>
+                <span>快速开始指南</span>
               </div>
             }
             variant="borderless"
@@ -98,7 +131,7 @@ const NoActiveVersionGuide: React.FC<NoActiveVersionGuideProps> = ({
                   </div>
                 ),
                 description: (
-                  <p style={{ margin: '8px 0 0 28px', color: '#595959', fontSize: 13 }}>
+                  <p style={{ margin: '8px 0 0 28px', color: token.colorTextSecondary, fontSize: 13 }}>
                     {step.description}
                   </p>
                 ),
@@ -108,7 +141,13 @@ const NoActiveVersionGuide: React.FC<NoActiveVersionGuideProps> = ({
             <Divider style={{ margin: '24px 0' }} />
 
             {/* 提示信息 */}
-            <div style={{ background: '#f5f7fa', padding: 12, borderRadius: 4 }}>
+            <div
+              style={{
+                background: token.colorFillAlter,
+                padding: 12,
+                borderRadius: token.borderRadiusLG,
+              }}
+            >
               <div style={{ marginBottom: 8 }}>
                 <strong>✨ 说明：</strong>
               </div>
@@ -132,7 +171,7 @@ const NoActiveVersionGuide: React.FC<NoActiveVersionGuideProps> = ({
                 <p style={{ marginBottom: 4 }}>
                   <strong>Q: 为什么看不到排产数据？</strong>
                 </p>
-                <p style={{ margin: '0 0 8px 16px', color: '#595959' }}>
+                <p style={{ margin: '0 0 8px 16px', color: token.colorTextSecondary }}>
                   A: 系统需要一个激活的排产版本作为基础。没有激活版本时，所有依赖版本的功能都会显示此引导页面。
                 </p>
               </div>
@@ -141,7 +180,7 @@ const NoActiveVersionGuide: React.FC<NoActiveVersionGuideProps> = ({
                 <p style={{ marginBottom: 4 }}>
                   <strong>Q: 如何切换到其他版本？</strong>
                 </p>
-                <p style={{ margin: '0 0 8px 16px', color: '#595959' }}>
+                <p style={{ margin: '0 0 8px 16px', color: token.colorTextSecondary }}>
                   A: 在"排产方案"页面中，选择要激活的版本，点击"激活"按钮即可。系统会自动应用新版本的数据。
                 </p>
               </div>
@@ -150,7 +189,7 @@ const NoActiveVersionGuide: React.FC<NoActiveVersionGuideProps> = ({
                 <p style={{ marginBottom: 4 }}>
                   <strong>Q: 激活版本会影响已有数据吗？</strong>
                 </p>
-                <p style={{ margin: '0 0 8px 16px', color: '#595959' }}>
+                <p style={{ margin: '0 0 8px 16px', color: token.colorTextSecondary }}>
                   A: 不会。激活版本只是改变当前工作版本，不会删除或修改任何已有数据。
                 </p>
               </div>

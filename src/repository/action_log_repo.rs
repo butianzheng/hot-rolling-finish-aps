@@ -189,6 +189,55 @@ impl ActionLogRepository {
         Ok(logs)
     }
 
+    /// 查询指定材料ID的操作日志（按时间范围）
+    ///
+    /// 说明：
+    /// - action_log 目前没有专门的 target_id 字段，因此这里通过 detail/payload_json/impact_summary_json 做“包含匹配”。
+    /// - 对 JSON 字段使用 `"MATERIAL_ID"` 形式的匹配，尽量避免误匹配（例如 MAT001 不应匹配 MAT0010）。
+    pub fn find_by_material_id_in_time_range(
+        &self,
+        material_id: &str,
+        start_time: NaiveDateTime,
+        end_time: NaiveDateTime,
+        limit: i32,
+    ) -> RepositoryResult<Vec<ActionLog>> {
+        let conn = self.get_conn()?;
+        let json_token = format!("\"{}\"", material_id);
+
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT action_id, version_id, action_type, action_ts, actor,
+                   payload_json, impact_summary_json, machine_code,
+                   date_range_start, date_range_end, detail
+            FROM action_log
+            WHERE action_ts BETWEEN ? AND ?
+              AND (
+                instr(COALESCE(detail, ''), ?) > 0
+                OR instr(COALESCE(payload_json, ''), ?) > 0
+                OR instr(COALESCE(impact_summary_json, ''), ?) > 0
+              )
+            ORDER BY action_ts DESC
+            LIMIT ?
+            "#,
+        )?;
+
+        let logs = stmt
+            .query_map(
+                params![
+                    start_time.format("%Y-%m-%d %H:%M:%S").to_string(),
+                    end_time.format("%Y-%m-%d %H:%M:%S").to_string(),
+                    material_id,
+                    &json_token,
+                    &json_token,
+                    limit,
+                ],
+                |row| self.map_row(row),
+            )?
+            .collect::<SqliteResult<Vec<_>>>()?;
+
+        Ok(logs)
+    }
+
     /// 查询指定操作人的日志
     pub fn find_by_actor(&self, actor: &str, limit: i32) -> RepositoryResult<Vec<ActionLog>> {
         let conn = self.get_conn()?;
@@ -256,6 +305,67 @@ impl ActionLogRepository {
 
         let logs = stmt
             .query_map(params![limit], |row| self.map_row(row))?
+            .collect::<SqliteResult<Vec<_>>>()?;
+
+        Ok(logs)
+    }
+
+    /// 查询最近的 N 条日志（分页）
+    pub fn find_recent_paged(&self, limit: i32, offset: i32) -> RepositoryResult<Vec<ActionLog>> {
+        let conn = self.get_conn()?;
+
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT action_id, version_id, action_type, action_ts, actor,
+                   payload_json, impact_summary_json, machine_code,
+                   date_range_start, date_range_end, detail
+            FROM action_log
+            ORDER BY action_ts DESC
+            LIMIT ?
+            OFFSET ?
+            "#,
+        )?;
+
+        let logs = stmt
+            .query_map(params![limit, offset], |row| self.map_row(row))?
+            .collect::<SqliteResult<Vec<_>>>()?;
+
+        Ok(logs)
+    }
+
+    /// 查询指定时间范围的操作日志（分页）
+    pub fn find_by_time_range_paged(
+        &self,
+        start_time: NaiveDateTime,
+        end_time: NaiveDateTime,
+        limit: i32,
+        offset: i32,
+    ) -> RepositoryResult<Vec<ActionLog>> {
+        let conn = self.get_conn()?;
+
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT action_id, version_id, action_type, action_ts, actor,
+                   payload_json, impact_summary_json, machine_code,
+                   date_range_start, date_range_end, detail
+            FROM action_log
+            WHERE action_ts BETWEEN ? AND ?
+            ORDER BY action_ts DESC
+            LIMIT ?
+            OFFSET ?
+            "#,
+        )?;
+
+        let logs = stmt
+            .query_map(
+                params![
+                    start_time.format("%Y-%m-%d %H:%M:%S").to_string(),
+                    end_time.format("%Y-%m-%d %H:%M:%S").to_string(),
+                    limit,
+                    offset,
+                ],
+                |row| self.map_row(row),
+            )?
             .collect::<SqliteResult<Vec<_>>>()?;
 
         Ok(logs)
@@ -409,7 +519,7 @@ impl ActionLogRepository {
 mod tests {
     use super::*;
     use crate::domain::action_log::ImpactSummary;
-    use chrono::{NaiveDate, Utc};
+    use chrono::{NaiveDate, NaiveDateTime, Utc};
 
     fn setup_test_db() -> Arc<Mutex<Connection>> {
         let conn = Connection::open_in_memory().unwrap();
@@ -622,5 +732,60 @@ mod tests {
         // log2 不应该被找到 (20-25 不overlaps 12-18)
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0].action_id, "log1");
+    }
+
+    #[test]
+    fn test_find_by_material_id_in_time_range_matches_detail_and_json_token() {
+        let conn = setup_test_db();
+        let repo = ActionLogRepository::new(conn);
+
+        let t1 = NaiveDateTime::parse_from_str("2026-01-24 10:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let t2 = NaiveDateTime::parse_from_str("2026-01-24 11:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let t3 = NaiveDateTime::parse_from_str("2026-01-24 12:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let t4 = NaiveDateTime::parse_from_str("2026-01-24 13:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+
+        // detail 命中
+        let mut log_detail = make_test_log("log_detail", "v1", "user1");
+        log_detail.action_ts = t1;
+        log_detail.detail = Some("move material MAT001 -> H032/2026-01-24".to_string());
+        repo.insert(&log_detail).unwrap();
+
+        // payload_json 命中（\"MAT001\" token）
+        let mut log_payload = make_test_log("log_payload", "v1", "user1");
+        log_payload.action_ts = t2;
+        log_payload.payload_json = Some(serde_json::json!({"material_id":"MAT001","op":"move"}));
+        log_payload.detail = Some("payload_hit".to_string());
+        repo.insert(&log_payload).unwrap();
+
+        // impact_summary_json 命中（\"MAT001\" token）
+        let mut log_impact = make_test_log("log_impact", "v1", "user1");
+        log_impact.action_ts = t3;
+        log_impact.impact_summary_json = Some(serde_json::json!({"moved":["MAT001"],"added":[]}));
+        log_impact.detail = Some("impact_hit".to_string());
+        repo.insert(&log_impact).unwrap();
+
+        // 相似 material_id（MAT0010）不应被 \"MAT001\" token 误匹配（此处不写 detail，避免 substring 误判）
+        let mut log_similar = make_test_log("log_similar", "v1", "user1");
+        log_similar.action_ts = t4;
+        log_similar.payload_json = Some(serde_json::json!({"material_id":"MAT0010"}));
+        log_similar.detail = None;
+        repo.insert(&log_similar).unwrap();
+
+        let start_time = NaiveDateTime::parse_from_str("2026-01-24 09:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let end_time = NaiveDateTime::parse_from_str("2026-01-24 15:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+
+        let logs = repo
+            .find_by_material_id_in_time_range("MAT001", start_time, end_time, 10)
+            .unwrap();
+
+        assert_eq!(logs.len(), 3);
+        assert_eq!(logs[0].action_id, "log_impact");
+        assert_eq!(logs[1].action_id, "log_payload");
+        assert_eq!(logs[2].action_id, "log_detail");
+
+        let logs_limited = repo
+            .find_by_material_id_in_time_range("MAT001", start_time, end_time, 2)
+            .unwrap();
+        assert_eq!(logs_limited.len(), 2);
     }
 }

@@ -16,6 +16,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useRecentDaysRisk } from '../../hooks/queries/use-decision-queries';
 import { useActiveVersionId } from '../../stores/use-global-store';
 import { RiskCalendarHeatmap } from '../../components/charts/RiskCalendarHeatmap';
+import type { DrilldownSpec } from '../../hooks/useRiskOverviewData';
 import type { DaySummary, ReasonItem } from '../../types/decision';
 import { RISK_LEVEL_COLORS, isHighRiskDay } from '../../types/decision/d1-day-summary';
 
@@ -23,13 +24,19 @@ import { RISK_LEVEL_COLORS, isHighRiskDay } from '../../types/decision/d1-day-su
 // 主组件
 // ==========================================
 
-export const D1RiskHeatmap: React.FC = () => {
+interface D1RiskHeatmapProps {
+  embedded?: boolean;
+  onOpenDrilldown?: (spec: DrilldownSpec) => void;
+}
+
+export const D1RiskHeatmap: React.FC<D1RiskHeatmapProps> = ({ embedded, onOpenDrilldown }) => {
   const versionId = useActiveVersionId();
   const [selectedDays, setSelectedDays] = useState<number>(30);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const effectiveDays = embedded ? 30 : selectedDays;
 
   // 获取风险数据
-  const { data, isLoading, error } = useRecentDaysRisk(versionId, selectedDays);
+  const { data, isLoading, error } = useRecentDaysRisk(versionId, effectiveDays);
 
   // 计算统计数据
   const stats = useMemo(() => {
@@ -70,6 +77,9 @@ export const D1RiskHeatmap: React.FC = () => {
   // 热力图点击处理
   const handleDateClick = (date: string) => {
     setSelectedDate(date);
+    if (embedded && onOpenDrilldown) {
+      onOpenDrilldown({ kind: 'risk', planDate: date });
+    }
   };
 
   // ==========================================
@@ -78,7 +88,7 @@ export const D1RiskHeatmap: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div style={{ textAlign: 'center', padding: '100px 0' }}>
+      <div style={{ textAlign: 'center', padding: embedded ? '40px 0' : '100px 0' }}>
         <Spin size="large" tip="正在加载风险数据...">
           <div style={{ minHeight: 80 }} />
         </Spin>
@@ -97,7 +107,7 @@ export const D1RiskHeatmap: React.FC = () => {
         description={error.message || '未知错误'}
         type="error"
         showIcon
-        style={{ margin: '20px' }}
+        style={{ margin: embedded ? 0 : '20px' }}
       />
     );
   }
@@ -109,7 +119,7 @@ export const D1RiskHeatmap: React.FC = () => {
         description="请先在主界面选择一个排产版本"
         type="warning"
         showIcon
-        style={{ margin: '20px' }}
+        style={{ margin: embedded ? 0 : '20px' }}
       />
     );
   }
@@ -119,38 +129,38 @@ export const D1RiskHeatmap: React.FC = () => {
   // ==========================================
 
   return (
-    <div style={{ padding: '24px' }}>
-      {/* 页面标题 */}
-      <div style={{ marginBottom: '24px' }}>
-        <h2>
-          <CalendarOutlined style={{ marginRight: '8px' }} />
-          D1决策：风险热力图
-        </h2>
-        <p style={{ color: '#8c8c8c', marginBottom: '16px' }}>
-          展示未来{selectedDays}天的排产风险趋势，点击日期查看详细原因
-        </p>
+    <div style={{ padding: embedded ? 0 : 24 }}>
+      {!embedded ? (
+        <div style={{ marginBottom: 24 }}>
+          <h2>
+            <CalendarOutlined style={{ marginRight: 8 }} />
+            D1决策：风险热力图
+          </h2>
+          <p style={{ color: '#8c8c8c', marginBottom: 16 }}>
+            展示未来{selectedDays}天的排产风险趋势，点击日期查看详细原因
+          </p>
 
-        {/* 天数选择器 */}
-        <Space>
-          <span>查看范围：</span>
-          <Select
-            value={selectedDays}
-            onChange={setSelectedDays}
-            style={{ width: 120 }}
-            options={[
-              { label: '7天', value: 7 },
-              { label: '14天', value: 14 },
-              { label: '30天', value: 30 },
-              { label: '60天', value: 60 },
-            ]}
-          />
-        </Space>
-      </div>
+          <Space>
+            <span>查看范围：</span>
+            <Select
+              value={selectedDays}
+              onChange={setSelectedDays}
+              style={{ width: 120 }}
+              options={[
+                { label: '7天', value: 7 },
+                { label: '14天', value: 14 },
+                { label: '30天', value: 30 },
+                { label: '60天', value: 60 },
+              ]}
+            />
+          </Space>
+        </div>
+      ) : null}
 
       {/* 统计卡片 */}
-      <Row gutter={16} style={{ marginBottom: '24px' }}>
+      <Row gutter={embedded ? 12 : 16} style={{ marginBottom: embedded ? 12 : 24 }}>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="平均风险分数"
               value={stats.avgRiskScore}
@@ -163,7 +173,7 @@ export const D1RiskHeatmap: React.FC = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="高风险天数"
               value={stats.highRiskDays}
@@ -176,7 +186,7 @@ export const D1RiskHeatmap: React.FC = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="最高风险日"
               value={stats.maxRiskDay?.planDate || 'N/A'}
@@ -192,7 +202,7 @@ export const D1RiskHeatmap: React.FC = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="紧急订单失败总数"
               value={stats.totalUrgentFailures}
@@ -208,11 +218,12 @@ export const D1RiskHeatmap: React.FC = () => {
       {/* 热力图 */}
       <Card
         title="风险热力图"
-        style={{ marginBottom: '24px' }}
+        size={embedded ? 'small' : undefined}
+        style={{ marginBottom: embedded ? 12 : 24 }}
         extra={
           <Space>
             <InfoCircleOutlined />
-            <span style={{ fontSize: '12px', color: '#8c8c8c' }}>
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>
               点击日期查看详细原因
             </span>
           </Space>
@@ -232,9 +243,10 @@ export const D1RiskHeatmap: React.FC = () => {
       </Card>
 
       {/* 选中日期的详细信息 */}
-      {selectedDayData && (
+      {!embedded && selectedDayData && (
         <Card
           title={`${selectedDayData.planDate} 风险详情`}
+          size={embedded ? 'small' : undefined}
           extra={
             <Tag color={RISK_LEVEL_COLORS[selectedDayData.riskLevel]}>
               {selectedDayData.riskLevel} - {selectedDayData.riskScore.toFixed(1)}

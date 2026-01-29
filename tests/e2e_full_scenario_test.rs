@@ -18,7 +18,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use chrono::Local;
 
-#[tokio::test]
+// 复用统一的测试 DB schema 初始化（包含 material_master/material_state 等必要表）
+#[path = "test_helpers.rs"]
+mod test_helpers;
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_full_scenario_workflow() {
     println!("\n");
     println!("==========================================");
@@ -27,13 +31,8 @@ async fn test_full_scenario_workflow() {
 
     // 1. 初始化测试环境
     println!("\n[步骤1] 初始化测试环境...");
-    let test_db_path = "/tmp/aps_full_scenario_test.db";
-
-    // 删除旧数据库（如果存在）
-    if std::path::Path::new(test_db_path).exists() {
-        std::fs::remove_file(test_db_path).unwrap();
-        println!("已清理旧数据库");
-    }
+    let (_temp, test_db_path) = test_helpers::create_test_db().expect("创建测试数据库失败");
+    println!("测试数据库创建成功: {}", test_db_path);
 
     // 创建AppState
     let app_state = Arc::new(
@@ -47,8 +46,8 @@ async fn test_full_scenario_workflow() {
     let csv_path = PathBuf::from("tests/fixtures/datasets/02_large_dataset.csv");
 
     // 创建导入器 - 使用新的泛型 API
-    let import_config = ConfigManager::new(test_db_path).expect("创建ConfigManager失败");
-    let import_repo = MaterialImportRepositoryImpl::new(test_db_path).expect("创建导入仓储失败");
+    let import_config = ConfigManager::new(&test_db_path).expect("创建ConfigManager失败");
+    let import_repo = MaterialImportRepositoryImpl::new(&test_db_path).expect("创建导入仓储失败");
     let file_parser = Box::new(CsvParser);
     let field_mapper = Box::new(FieldMapperImpl);
     let data_cleaner = Box::new(DataCleanerImpl);

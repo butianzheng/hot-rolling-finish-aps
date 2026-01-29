@@ -427,16 +427,16 @@ fn test_impact_summary_risk_level_change() {
     );
 
     // 验证风险等级变化
-    assert_eq!(impact.risk_level_before, "Green");
-    assert_eq!(impact.risk_level_after, "Yellow");
+    assert_eq!(impact.risk_level_before, "GREEN");
+    assert_eq!(impact.risk_level_after, "YELLOW");
 
     // 验证风险变更详情
     assert_eq!(impact.risk_changes.len(), 1);
     let risk_change = &impact.risk_changes[0];
     assert_eq!(risk_change.machine_code, "H032");
     assert_eq!(risk_change.date, date1);
-    assert_eq!(risk_change.risk_before, "Green");
-    assert_eq!(risk_change.risk_after, "Yellow");
+    assert_eq!(risk_change.risk_before, "GREEN");
+    assert_eq!(risk_change.risk_after, "YELLOW");
 }
 
 // ==========================================
@@ -728,8 +728,8 @@ fn test_impact_summary_comprehensive() {
     );
 
     // 验证风险影响
-    assert_eq!(impact.risk_level_before, "Green");
-    assert_eq!(impact.risk_level_after, "Yellow");
+    assert_eq!(impact.risk_level_before, "GREEN");
+    assert_eq!(impact.risk_level_after, "YELLOW");
     assert_eq!(impact.risk_changes.len(), 1);
 
     // 验证紧急单影响
@@ -803,8 +803,8 @@ fn test_impact_summary_no_changes() {
     assert!(impact.capacity_delta_t.abs() < 0.01);
     assert!(impact.overflow_delta_t.abs() < 0.01);
     assert_eq!(impact.capacity_changes.len(), 0);
-    assert_eq!(impact.risk_level_before, "Green");
-    assert_eq!(impact.risk_level_after, "Green");
+    assert_eq!(impact.risk_level_before, "GREEN");
+    assert_eq!(impact.risk_level_after, "GREEN");
     assert_eq!(impact.risk_changes.len(), 0);
     assert_eq!(impact.urgent_material_affected, 0);
     assert_eq!(impact.l3_critical_count, 0);

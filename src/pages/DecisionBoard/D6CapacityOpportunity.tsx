@@ -5,7 +5,7 @@
 // ==========================================
 
 import React, { useState, useMemo } from 'react';
-import { Card, Row, Col, Statistic, Tag, Spin, Alert, Progress, Space, Select, Table } from 'antd';
+import { Card, Row, Col, Statistic, Tag, Spin, Alert, Progress, Space, Select, Table, theme } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   CalendarOutlined,
@@ -13,6 +13,7 @@ import {
   SwapOutlined,
 } from '@ant-design/icons';
 import { useRecentDaysCapacityOpportunity } from '../../hooks/queries/use-decision-queries';
+import type { DrilldownSpec } from '../../hooks/useRiskOverviewData';
 import { useActiveVersionId } from '../../stores/use-global-store';
 import type { CapacityOpportunity, OpportunityType } from '../../types/decision';
 import {
@@ -35,12 +36,22 @@ function parseOpportunityType(typeStr: string): OpportunityType {
 // 主组件
 // ==========================================
 
-export const D6CapacityOpportunity: React.FC = () => {
+interface D6CapacityOpportunityProps {
+  embedded?: boolean;
+  onOpenDrilldown?: (spec: DrilldownSpec) => void;
+}
+
+export const D6CapacityOpportunity: React.FC<D6CapacityOpportunityProps> = ({ embedded, onOpenDrilldown }) => {
+  const { token } = theme.useToken();
+  const warningBg = (token as any).colorWarningBg ?? token.colorFillTertiary;
+  const warningBgHover = (token as any).colorWarningBgHover ?? token.colorFillSecondary;
   const versionId = useActiveVersionId();
   const [selectedDays, setSelectedDays] = useState<number>(30);
+  const effectiveDays = embedded ? 30 : selectedDays;
+  const openWithDrawer = !!embedded && !!onOpenDrilldown;
 
   // 获取容量优化机会数据
-  const { data, isLoading, error } = useRecentDaysCapacityOpportunity(versionId, selectedDays);
+  const { data, isLoading, error } = useRecentDaysCapacityOpportunity(versionId, effectiveDays);
 
   // 计算统计数据
   const stats = useMemo(() => {
@@ -207,7 +218,7 @@ export const D6CapacityOpportunity: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div style={{ textAlign: 'center', padding: '100px 0' }}>
+      <div style={{ textAlign: 'center', padding: embedded ? '40px 0' : '100px 0' }}>
         <Spin size="large" tip="正在加载容量优化机会数据...">
           <div style={{ minHeight: 80 }} />
         </Spin>
@@ -226,7 +237,7 @@ export const D6CapacityOpportunity: React.FC = () => {
         description={error.message || '未知错误'}
         type="error"
         showIcon
-        style={{ margin: '20px' }}
+        style={{ margin: embedded ? 0 : '20px' }}
       />
     );
   }
@@ -238,7 +249,7 @@ export const D6CapacityOpportunity: React.FC = () => {
         description="请先在主界面选择一个排产版本"
         type="warning"
         showIcon
-        style={{ margin: '20px' }}
+        style={{ margin: embedded ? 0 : '20px' }}
       />
     );
   }
@@ -248,38 +259,38 @@ export const D6CapacityOpportunity: React.FC = () => {
   // ==========================================
 
   return (
-    <div style={{ padding: '24px' }}>
-      {/* 页面标题 */}
-      <div style={{ marginBottom: '24px' }}>
-        <h2>
-          <RiseOutlined style={{ marginRight: '8px' }} />
-          D6决策：容量优化机会
-        </h2>
-        <p style={{ color: '#8c8c8c', marginBottom: '16px' }}>
-          识别未充分利用的产能，提供负载平衡和优化建议，最大化生产效率
-        </p>
+    <div style={{ padding: embedded ? 0 : 24 }}>
+      {!embedded ? (
+        <div style={{ marginBottom: 24 }}>
+          <h2>
+            <RiseOutlined style={{ marginRight: 8 }} />
+            D6决策：容量优化机会
+          </h2>
+          <p style={{ color: '#8c8c8c', marginBottom: 16 }}>
+            识别未充分利用的产能，提供负载平衡和优化建议，最大化生产效率
+          </p>
 
-        {/* 天数选择器 */}
-        <Space>
-          <span>查看范围：</span>
-          <Select
-            value={selectedDays}
-            onChange={setSelectedDays}
-            style={{ width: 120 }}
-            options={[
-              { label: '7天', value: 7 },
-              { label: '14天', value: 14 },
-              { label: '30天', value: 30 },
-              { label: '60天', value: 60 },
-            ]}
-          />
-        </Space>
-      </div>
+          <Space>
+            <span>查看范围：</span>
+            <Select
+              value={selectedDays}
+              onChange={setSelectedDays}
+              style={{ width: 120 }}
+              options={[
+                { label: '7天', value: 7 },
+                { label: '14天', value: 14 },
+                { label: '30天', value: 30 },
+                { label: '60天', value: 60 },
+              ]}
+            />
+          </Space>
+        </div>
+      ) : null}
 
       {/* 统计卡片 */}
-      <Row gutter={16} style={{ marginBottom: '24px' }}>
+      <Row gutter={embedded ? 12 : 16} style={{ marginBottom: embedded ? 12 : 24 }}>
         <Col span={4}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="优化机会总数"
               value={stats.totalOpportunities}
@@ -289,7 +300,7 @@ export const D6CapacityOpportunity: React.FC = () => {
           </Card>
         </Col>
         <Col span={4}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="未充分利用"
               value={stats.underutilizedCount}
@@ -299,7 +310,7 @@ export const D6CapacityOpportunity: React.FC = () => {
           </Card>
         </Col>
         <Col span={4}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="机会空间总计"
               value={stats.totalOpportunitySpace}
@@ -311,7 +322,7 @@ export const D6CapacityOpportunity: React.FC = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="平均当前利用率"
               value={stats.avgCurrentUtilization}
@@ -324,7 +335,7 @@ export const D6CapacityOpportunity: React.FC = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="平均优化后利用率"
               value={stats.avgOptimizedUtilization}
@@ -341,7 +352,8 @@ export const D6CapacityOpportunity: React.FC = () => {
       {/* 完整表格 */}
       <Card
         title={`容量优化机会 (共 ${data?.totalCount ?? 0} 条)`}
-        style={{ marginBottom: '24px' }}
+        size={embedded ? 'small' : undefined}
+        style={{ marginBottom: embedded ? 12 : 24 }}
       >
         <Table<CapacityOpportunity>
           columns={columns}
@@ -359,10 +371,27 @@ export const D6CapacityOpportunity: React.FC = () => {
             }
             return '';
           }}
-          expandable={{
-            expandedRowRender: (record) => <OpportunityDetail opportunity={record} />,
-            rowExpandable: (record) => record.recommendedActions.length > 0,
-          }}
+          expandable={
+            openWithDrawer
+              ? undefined
+              : {
+                  expandedRowRender: (record) => <OpportunityDetail opportunity={record} />,
+                  rowExpandable: (record) => record.recommendedActions.length > 0,
+                }
+          }
+          onRow={
+            openWithDrawer
+              ? (record) => ({
+                  onClick: () =>
+                    onOpenDrilldown?.({
+                      kind: 'capacityOpportunity',
+                      machineCode: record.machineCode,
+                      planDate: record.planDate,
+                    }),
+                  style: { cursor: 'pointer' },
+                })
+              : undefined
+          }
         />
       </Card>
 
@@ -370,10 +399,10 @@ export const D6CapacityOpportunity: React.FC = () => {
       <style>
         {`
           .high-priority-row {
-            background-color: #fff7e6;
+            background-color: ${warningBg};
           }
           .high-priority-row:hover {
-            background-color: #ffe7ba !important;
+            background-color: ${warningBgHover} !important;
           }
         `}
       </style>
@@ -390,10 +419,11 @@ interface OpportunityDetailProps {
 }
 
 const OpportunityDetail: React.FC<OpportunityDetailProps> = ({ opportunity }) => {
+  const { token } = theme.useToken();
   const opportunityType = parseOpportunityType(opportunity.opportunityType);
 
   return (
-    <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>
+    <div style={{ padding: 16, backgroundColor: token.colorFillQuaternary }}>
       <Row gutter={16}>
         {/* 左侧：建议操作 */}
         <Col span={12}>
@@ -428,7 +458,7 @@ const OpportunityDetail: React.FC<OpportunityDetailProps> = ({ opportunity }) =>
               <Tag color={OPPORTUNITY_TYPE_COLORS[opportunityType]}>
                 {OPPORTUNITY_TYPE_LABELS[opportunityType]}
               </Tag>
-              <span style={{ fontSize: '12px', color: '#8c8c8c', marginLeft: '8px' }}>
+              <span style={{ fontSize: 12, color: token.colorTextSecondary, marginLeft: 8 }}>
                 {getOpportunityTypeDescription(opportunityType)}
               </span>
             </div>
@@ -438,7 +468,7 @@ const OpportunityDetail: React.FC<OpportunityDetailProps> = ({ opportunity }) =>
           {opportunity.description && (
             <div style={{ marginTop: '16px' }}>
               <h4>详细描述：</h4>
-              <p style={{ color: '#595959' }}>{opportunity.description}</p>
+              <p style={{ color: token.colorTextSecondary }}>{opportunity.description}</p>
             </div>
           )}
         </Col>

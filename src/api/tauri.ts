@@ -8,6 +8,31 @@
 // ==========================================
 
 import { IpcClient } from './ipcClient';
+import {
+  z,
+  zodValidator,
+  GenerateStrategyDraftsResponseSchema,
+  ListStrategyDraftsResponseSchema,
+  ApplyStrategyDraftResponseSchema,
+  GetStrategyDraftDetailResponseSchema,
+  CleanupStrategyDraftsResponseSchema,
+  VersionComparisonKpiResultSchema,
+  DecisionRefreshStatusResponseSchema,
+  DecisionDaySummaryResponseSchema,
+  OrderFailureSetResponseSchema,
+  ColdStockProfileResponseSchema,
+  MachineBottleneckProfileResponseSchema,
+  RollCampaignAlertsResponseSchema,
+  CapacityOpportunityResponseSchema,
+  MaterialWithStateSchema,
+  MaterialDetailResponseSchema,
+  PlanSchema,
+  PlanVersionSchema,
+  PlanItemSchema,
+  ConfigItemSchema,
+  ActionLogSchema,
+  ImpactSummarySchema,
+} from './ipcSchemas';
 
 // ==========================================
 // 错误响应类型
@@ -78,15 +103,21 @@ export const materialApi = {
       steel_grade: params.steel_grade,
       limit: params.limit,
       offset: params.offset,
+    }, {
+      validate: zodValidator(z.array(MaterialWithStateSchema), 'list_materials'),
     });
   },
 
   async getMaterialDetail(materialId: string): Promise<any> {
-    return IpcClient.call('get_material_detail', { material_id: materialId });
+    return IpcClient.call('get_material_detail', { material_id: materialId }, {
+      validate: zodValidator(MaterialDetailResponseSchema, 'get_material_detail'),
+    });
   },
 
   async listReadyMaterials(machineCode?: string): Promise<any> {
-    return IpcClient.call('list_ready_materials', { machine_code: machineCode });
+    return IpcClient.call('list_ready_materials', { machine_code: machineCode }, {
+      validate: zodValidator(z.array(MaterialWithStateSchema), 'list_ready_materials'),
+    });
   },
 
   async batchLockMaterials(
@@ -102,6 +133,8 @@ export const materialApi = {
       operator,
       reason,
       mode,
+    }, {
+      validate: zodValidator(ImpactSummarySchema, 'batch_lock_materials'),
     });
   },
 
@@ -116,6 +149,8 @@ export const materialApi = {
       operator,
       reason,
       mode,
+    }, {
+      validate: zodValidator(ImpactSummarySchema, 'batch_force_release'),
     });
   },
 
@@ -130,6 +165,8 @@ export const materialApi = {
       manual_urgent_flag: manualUrgentFlag,
       operator,
       reason,
+    }, {
+      validate: zodValidator(ImpactSummarySchema, 'batch_set_urgent'),
     });
   },
 
@@ -140,6 +177,8 @@ export const materialApi = {
     return IpcClient.call('list_materials_by_urgent_level', {
       urgent_level: urgentLevel,
       machine_code: machineCode,
+    }, {
+      validate: zodValidator(z.array(MaterialWithStateSchema), 'list_materials_by_urgent_level'),
     });
   },
 };
@@ -157,11 +196,15 @@ export const planApi = {
   },
 
   async listPlans(): Promise<any> {
-    return IpcClient.call('list_plans');
+    return IpcClient.call('list_plans', {}, {
+      validate: zodValidator(z.array(PlanSchema), 'list_plans'),
+    });
   },
 
   async getPlanDetail(planId: string): Promise<any> {
-    return IpcClient.call('get_plan_detail', { plan_id: planId });
+    return IpcClient.call('get_plan_detail', { plan_id: planId }, {
+      validate: zodValidator(PlanSchema.nullable().optional(), 'get_plan_detail'),
+    });
   },
 
   async getLatestActiveVersionId(): Promise<string | null> {
@@ -199,7 +242,9 @@ export const planApi = {
   },
 
   async listVersions(planId: string): Promise<any> {
-    return IpcClient.call('list_versions', { plan_id: planId });
+    return IpcClient.call('list_versions', { plan_id: planId }, {
+      validate: zodValidator(z.array(PlanVersionSchema), 'list_versions'),
+    });
   },
 
   async activateVersion(versionId: string, operator: string): Promise<void> {
@@ -209,17 +254,35 @@ export const planApi = {
     });
   },
 
+  async rollbackVersion(
+    planId: string,
+    targetVersionId: string,
+    operator: string,
+    reason: string
+  ): Promise<any> {
+    return IpcClient.call('rollback_version', {
+      plan_id: planId,
+      target_version_id: targetVersionId,
+      operator,
+      reason,
+    });
+  },
+
   async simulateRecalc(
     versionId: string,
     baseDate: string,
     frozenDate?: string,
-    operator: string = 'admin'
+    operator: string = 'admin',
+    strategy?: string
   ): Promise<any> {
     return IpcClient.call('simulate_recalc', {
       version_id: versionId,
       base_date: baseDate,
       frozen_date: frozenDate,
       operator,
+      strategy,
+    }, {
+      validate: zodValidator(z.array(PlanItemSchema), 'simulate_recalc'),
     });
   },
 
@@ -227,24 +290,113 @@ export const planApi = {
     versionId: string,
     baseDate: string,
     frozenDate?: string,
-    operator: string = 'admin'
+    operator: string = 'admin',
+    strategy?: string
   ): Promise<any> {
     return IpcClient.call('recalc_full', {
       version_id: versionId,
       base_date: baseDate,
       frozen_date: frozenDate,
       operator,
+      strategy,
+    }, {
+      validate: zodValidator(z.array(PlanItemSchema), 'recalc_full'),
     });
   },
 
-  async listPlanItems(versionId: string): Promise<any> {
-    return IpcClient.call('list_plan_items', { version_id: versionId });
+  async getStrategyPresets(): Promise<any> {
+    return IpcClient.call('get_strategy_presets');
+  },
+
+  async generateStrategyDrafts(params: {
+    base_version_id: string;
+    plan_date_from: string;
+    plan_date_to: string;
+    strategies: string[];
+    operator: string;
+  }): Promise<any> {
+    return IpcClient.call('generate_strategy_drafts', {
+      base_version_id: params.base_version_id,
+      plan_date_from: params.plan_date_from,
+      plan_date_to: params.plan_date_to,
+      strategies: params.strategies,
+      operator: params.operator,
+    }, {
+      validate: zodValidator(GenerateStrategyDraftsResponseSchema, 'generate_strategy_drafts'),
+    });
+  },
+
+  async applyStrategyDraft(draftId: string, operator: string): Promise<any> {
+    return IpcClient.call('apply_strategy_draft', {
+      draft_id: draftId,
+      operator,
+    }, {
+      validate: zodValidator(ApplyStrategyDraftResponseSchema, 'apply_strategy_draft'),
+    });
+  },
+
+  async getStrategyDraftDetail(draftId: string): Promise<any> {
+    return IpcClient.call('get_strategy_draft_detail', {
+      draft_id: draftId,
+    }, {
+      validate: zodValidator(GetStrategyDraftDetailResponseSchema, 'get_strategy_draft_detail'),
+    });
+  },
+
+  async listStrategyDrafts(params: {
+    base_version_id: string;
+    plan_date_from: string;
+    plan_date_to: string;
+    status_filter?: string;
+    limit?: number;
+  }): Promise<any> {
+    return IpcClient.call('list_strategy_drafts', {
+      base_version_id: params.base_version_id,
+      plan_date_from: params.plan_date_from,
+      plan_date_to: params.plan_date_to,
+      status_filter: params.status_filter,
+      limit: params.limit,
+    }, {
+      validate: zodValidator(ListStrategyDraftsResponseSchema, 'list_strategy_drafts'),
+    });
+  },
+
+  async cleanupExpiredStrategyDrafts(keepDays: number): Promise<any> {
+    return IpcClient.call('cleanup_expired_strategy_drafts', {
+      keep_days: keepDays,
+    }, {
+      validate: zodValidator(CleanupStrategyDraftsResponseSchema, 'cleanup_expired_strategy_drafts'),
+    });
+  },
+
+  async listPlanItems(
+    versionId: string,
+    opts?: {
+      plan_date_from?: string;
+      plan_date_to?: string;
+      machine_code?: string;
+      limit?: number;
+      offset?: number;
+    }
+  ): Promise<any> {
+    return IpcClient.call('list_plan_items', {
+      version_id: versionId,
+      plan_date_from: opts?.plan_date_from,
+      plan_date_to: opts?.plan_date_to,
+      machine_code: opts?.machine_code,
+      limit: opts?.limit,
+      offset: opts?.offset,
+    }, {
+      validate: zodValidator(z.array(PlanItemSchema), 'list_plan_items'),
+    });
   },
 
   async listItemsByDate(versionId: string, planDate: string): Promise<any> {
     return IpcClient.call('list_items_by_date', {
       version_id: versionId,
       plan_date: planDate,
+    }, {
+      validate: zodValidator(z.array(PlanItemSchema), 'list_items_by_date'),
     });
   },
 
@@ -252,6 +404,15 @@ export const planApi = {
     return IpcClient.call('compare_versions', {
       version_id_a: versionIdA,
       version_id_b: versionIdB,
+    });
+  },
+
+  async compareVersionsKpi(versionIdA: string, versionIdB: string): Promise<any> {
+    return IpcClient.call('compare_versions_kpi', {
+      version_id_a: versionIdA,
+      version_id_b: versionIdB,
+    }, {
+      validate: zodValidator(VersionComparisonKpiResultSchema, 'compare_versions_kpi'),
     });
   },
 
@@ -263,12 +424,16 @@ export const planApi = {
       to_seq: number;
       to_machine: string;
     }>,
-    mode: 'AUTO_FIX' | 'STRICT' = 'AUTO_FIX'
+    mode: 'AUTO_FIX' | 'STRICT' = 'AUTO_FIX',
+    operator: string = 'system',
+    reason?: string
   ): Promise<any> {
     return IpcClient.call('move_items', {
       version_id: versionId,
       moves: JSON.stringify(moves),
       mode,
+      operator,
+      reason,
     });
   },
 };
@@ -298,7 +463,8 @@ export const capacityApi = {
     targetCapacityT: number,
     limitCapacityT: number,
     reason: string,
-    operator: string = 'system'
+    operator: string = 'system',
+    versionId?: string
   ): Promise<any> {
     return IpcClient.call('update_capacity_pool', {
       machine_code: machineCode,
@@ -307,6 +473,26 @@ export const capacityApi = {
       limit_capacity_t: limitCapacityT,
       reason,
       operator,
+      version_id: versionId,
+    });
+  },
+
+  async batchUpdateCapacityPools(
+    updates: Array<{
+      machine_code: string;
+      plan_date: string;
+      target_capacity_t: number;
+      limit_capacity_t: number;
+    }>,
+    reason: string,
+    operator: string = 'system',
+    versionId?: string
+  ): Promise<any> {
+    return IpcClient.call('batch_update_capacity_pools', {
+      updates: JSON.stringify(updates),
+      reason,
+      operator,
+      version_id: versionId,
     });
   },
 };
@@ -328,12 +514,16 @@ export const dashboardApi = {
   },
 
   async getMostRiskyDate(versionId: string): Promise<any> {
-    return IpcClient.call('get_most_risky_date', { version_id: versionId });
+    return IpcClient.call('get_most_risky_date', { version_id: versionId }, {
+      validate: zodValidator(DecisionDaySummaryResponseSchema, 'get_most_risky_date'),
+    });
   },
 
   async getUnsatisfiedUrgentMaterials(versionId?: string): Promise<any> {
     return IpcClient.call('get_unsatisfied_urgent_materials', {
       version_id: versionId,
+    }, {
+      validate: zodValidator(OrderFailureSetResponseSchema, 'get_unsatisfied_urgent_materials'),
     });
   },
 
@@ -341,12 +531,31 @@ export const dashboardApi = {
     return IpcClient.call('get_cold_stock_materials', {
       version_id: versionId,
       threshold_days: thresholdDays,
+    }, {
+      validate: zodValidator(ColdStockProfileResponseSchema, 'get_cold_stock_materials'),
     });
   },
 
   async getMostCongestedMachine(versionId: string): Promise<any> {
     return IpcClient.call('get_most_congested_machine', {
       version_id: versionId,
+    }, {
+      validate: zodValidator(MachineBottleneckProfileResponseSchema, 'get_most_congested_machine'),
+    });
+  },
+
+  async getRefreshStatus(versionId: string): Promise<any> {
+    return IpcClient.call('get_refresh_status', {
+      version_id: versionId,
+    }, {
+      validate: zodValidator(DecisionRefreshStatusResponseSchema, 'get_refresh_status'),
+    });
+  },
+
+  async manualRefreshDecision(versionId: string, operator: string = 'admin'): Promise<any> {
+    return IpcClient.call('manual_refresh_decision', {
+      version_id: versionId,
+      operator,
     });
   },
 
@@ -354,17 +563,51 @@ export const dashboardApi = {
     return IpcClient.call('list_action_logs', {
       start_time: startTime,
       end_time: endTime,
+    }, {
+      validate: zodValidator(z.array(ActionLogSchema), 'list_action_logs'),
+    });
+  },
+
+  async listActionLogsByMaterial(
+    materialId: string,
+    startTime: string,
+    endTime: string,
+    limit?: number
+  ): Promise<any> {
+    return IpcClient.call('list_action_logs_by_material', {
+      material_id: materialId,
+      start_time: startTime,
+      end_time: endTime,
+      limit,
+    }, {
+      validate: zodValidator(z.array(ActionLogSchema), 'list_action_logs_by_material'),
     });
   },
 
   async listActionLogsByVersion(versionId: string): Promise<any> {
     return IpcClient.call('list_action_logs_by_version', {
       version_id: versionId,
+    }, {
+      validate: zodValidator(z.array(ActionLogSchema), 'list_action_logs_by_version'),
     });
   },
 
-  async getRecentActions(limit: number): Promise<any> {
-    return IpcClient.call('get_recent_actions', { limit });
+  async getRecentActions(
+    limit: number,
+    opts?: {
+      offset?: number;
+      start_time?: string;
+      end_time?: string;
+    }
+  ): Promise<any> {
+    return IpcClient.call('get_recent_actions', {
+      limit,
+      offset: opts?.offset,
+      start_time: opts?.start_time,
+      end_time: opts?.end_time,
+    }, {
+      validate: zodValidator(z.array(ActionLogSchema), 'get_recent_actions'),
+    });
   },
 };
 
@@ -374,13 +617,17 @@ export const dashboardApi = {
 
 export const configApi = {
   async listConfigs(): Promise<any> {
-    return IpcClient.call('list_configs');
+    return IpcClient.call('list_configs', {}, {
+      validate: zodValidator(z.array(ConfigItemSchema), 'list_configs'),
+    });
   },
 
   async getConfig(scopeId: string, key: string): Promise<any> {
     return IpcClient.call('get_config', {
       scope_id: scopeId,
       key,
+    }, {
+      validate: zodValidator(ConfigItemSchema.nullable().optional(), 'get_config'),
     });
   },
 
@@ -410,6 +657,8 @@ export const configApi = {
       configs: JSON.stringify(configs),
       operator,
       reason,
+    }, {
+      validate: zodValidator(z.number(), 'batch_update_configs'),
     });
   },
 
@@ -427,7 +676,29 @@ export const configApi = {
       snapshot_json: snapshotJson,
       operator,
       reason,
+    }, {
+      validate: zodValidator(z.number(), 'restore_config_from_snapshot'),
     });
+  },
+
+  // ==========================================
+  // Custom Strategy (P2)
+  // ==========================================
+
+  async saveCustomStrategy(params: {
+    strategy: any;
+    operator: string;
+    reason: string;
+  }): Promise<any> {
+    return IpcClient.call('save_custom_strategy', {
+      strategy_json: JSON.stringify(params.strategy),
+      operator: params.operator,
+      reason: params.reason,
+    });
+  },
+
+  async listCustomStrategies(): Promise<any> {
+    return IpcClient.call('list_custom_strategies');
   },
 };
 
@@ -457,6 +728,8 @@ export const decisionApi = {
         : undefined,
       limit: params.limit,
       sort_by: params.sortBy,
+    }, {
+      validate: zodValidator(DecisionDaySummaryResponseSchema, 'get_decision_day_summary'),
     });
   },
 
@@ -488,6 +761,8 @@ export const decisionApi = {
       completion_rate_threshold: params.completionRateThreshold,
       limit: params.limit,
       offset: params.offset,
+    }, {
+      validate: zodValidator(OrderFailureSetResponseSchema, 'list_order_failure_set'),
     });
   },
 
@@ -511,6 +786,8 @@ export const decisionApi = {
         ? JSON.stringify(params.ageBinFilter)
         : undefined,
       limit: params.limit,
+    }, {
+      validate: zodValidator(ColdStockProfileResponseSchema, 'get_cold_stock_profile'),
     });
   },
 
@@ -538,6 +815,8 @@ export const decisionApi = {
         ? JSON.stringify(params.bottleneckTypeFilter)
         : undefined,
       limit: params.limit,
+    }, {
+      validate: zodValidator(MachineBottleneckProfileResponseSchema, 'get_machine_bottleneck_profile'),
     });
   },
 
@@ -565,6 +844,8 @@ export const decisionApi = {
       date_from: params.dateFrom,
       date_to: params.dateTo,
       limit: params.limit,
+    }, {
+      validate: zodValidator(RollCampaignAlertsResponseSchema, 'get_roll_campaign_alert'),
     });
   },
 
@@ -590,6 +871,8 @@ export const decisionApi = {
         : undefined,
       min_opportunity_t: params.minOpportunityT,
       limit: params.limit,
+    }, {
+      validate: zodValidator(CapacityOpportunityResponseSchema, 'get_capacity_opportunity'),
     });
   },
 };

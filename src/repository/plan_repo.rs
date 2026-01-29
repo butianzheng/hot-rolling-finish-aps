@@ -9,7 +9,8 @@
 use crate::domain::plan::{Plan, PlanItem, PlanVersion};
 use crate::repository::error::{RepositoryError, RepositoryResult};
 use chrono::{NaiveDate, NaiveDateTime};
-use rusqlite::{params, Connection};
+use rusqlite::{params, params_from_iter, Connection};
+use rusqlite::types::Value;
 use std::sync::{Arc, Mutex};
 
 // ==========================================
@@ -214,6 +215,47 @@ impl PlanVersionRepository {
             ],
         )?;
 
+        Ok(version.version_id.clone())
+    }
+
+    /// 创建版本（自动分配 version_no，避免并发下 version_no 冲突）
+    ///
+    /// 说明：
+    /// - 在同一事务内查询 MAX(version_no) 并写入，保证对同一 plan_id 的 version_no 分配原子性。
+    /// - 该方法会覆盖传入的 `version.version_no`。
+    pub fn create_with_next_version_no(&self, version: &mut PlanVersion) -> RepositoryResult<String> {
+        let mut conn = self.get_conn()?;
+        let tx = conn.transaction()?;
+
+        let max_version_no: Option<i32> = tx.query_row(
+            "SELECT MAX(version_no) FROM plan_version WHERE plan_id = ?",
+            params![&version.plan_id],
+            |row| row.get(0),
+        )?;
+
+        version.version_no = max_version_no.unwrap_or(0) + 1;
+
+        tx.execute(
+            r#"INSERT INTO plan_version (
+                version_id, plan_id, version_no, status,
+                frozen_from_date, recalc_window_days, config_snapshot_json,
+                created_by, created_at, revision
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+            params![
+                &version.version_id,
+                &version.plan_id,
+                &version.version_no,
+                &version.status,
+                &version.frozen_from_date.map(|d| d.format("%Y-%m-%d").to_string()),
+                &version.recalc_window_days,
+                &version.config_snapshot_json,
+                &version.created_by,
+                &version.created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+                &version.revision,
+            ],
+        )?;
+
+        tx.commit()?;
         Ok(version.version_id.clone())
     }
 
@@ -440,6 +482,26 @@ pub struct PlanItemRepository {
     conn: Arc<Mutex<Connection>>,
 }
 
+/// PlanItem 聚合统计（用于版本对比 KPI，避免拉取全量明细）
+#[derive(Debug, Clone)]
+pub struct PlanItemVersionAgg {
+    pub plan_items_count: usize,
+    pub total_weight_t: f64,
+    pub locked_in_plan_count: usize,
+    pub force_release_in_plan_count: usize,
+    pub plan_date_from: Option<NaiveDate>,
+    pub plan_date_to: Option<NaiveDate>,
+}
+
+/// 两版本间的 diff 计数（口径与 `compare_versions` 保持一致：仅比较机组/日期）
+#[derive(Debug, Clone)]
+pub struct PlanItemDiffCounts {
+    pub moved_count: usize,
+    pub added_count: usize,
+    pub removed_count: usize,
+    pub squeezed_out_count: usize,
+}
+
 impl PlanItemRepository {
     /// 创建新的PlanItemRepository实例
     pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
@@ -552,6 +614,180 @@ impl PlanItemRepository {
             .collect::<Result<Vec<PlanItem>, _>>()?;
 
         Ok(items)
+    }
+
+    /// 查询版本明细（可选过滤 + 分页）
+    ///
+    /// 说明：
+    /// - plan_date 字段在库中为 YYYY-MM-DD 文本，ISO 格式支持字符串比较（>= / <= / BETWEEN）；
+    /// - limit/offset 用于“增量加载”，避免一次性拉取全量明细。
+    pub fn find_by_filters_paged(
+        &self,
+        version_id: &str,
+        machine_code: Option<&str>,
+        start_date: Option<NaiveDate>,
+        end_date: Option<NaiveDate>,
+        limit: Option<i64>,
+        offset: Option<i64>,
+    ) -> RepositoryResult<Vec<PlanItem>> {
+        let conn = self.get_conn()?;
+
+        let mut sql = String::from(
+            r#"SELECT version_id, material_id, machine_code, plan_date, seq_no,
+                      weight_t, source_type, locked_in_plan, force_release_in_plan,
+                      violation_flags
+               FROM plan_item
+               WHERE version_id = ?1"#,
+        );
+
+        let mut values: Vec<Value> = vec![Value::from(version_id.to_string())];
+        let mut idx: i32 = 2;
+
+        if let Some(code) = machine_code.map(str::trim).filter(|s| !s.is_empty()) {
+            sql.push_str(&format!(" AND machine_code = ?{}", idx));
+            values.push(Value::from(code.to_string()));
+            idx += 1;
+        }
+
+        match (start_date, end_date) {
+            (Some(from), Some(to)) => {
+                sql.push_str(&format!(" AND plan_date BETWEEN ?{} AND ?{}", idx, idx + 1));
+                values.push(Value::from(from.format("%Y-%m-%d").to_string()));
+                values.push(Value::from(to.format("%Y-%m-%d").to_string()));
+                idx += 2;
+            }
+            (Some(from), None) => {
+                sql.push_str(&format!(" AND plan_date >= ?{}", idx));
+                values.push(Value::from(from.format("%Y-%m-%d").to_string()));
+                idx += 1;
+            }
+            (None, Some(to)) => {
+                sql.push_str(&format!(" AND plan_date <= ?{}", idx));
+                values.push(Value::from(to.format("%Y-%m-%d").to_string()));
+                idx += 1;
+            }
+            (None, None) => {}
+        }
+
+        sql.push_str(" ORDER BY plan_date, machine_code, seq_no");
+
+        if let Some(limit) = limit {
+            sql.push_str(&format!(" LIMIT ?{}", idx));
+            values.push(Value::from(limit));
+            idx += 1;
+        }
+        if let Some(offset) = offset {
+            sql.push_str(&format!(" OFFSET ?{}", idx));
+            values.push(Value::from(offset));
+            idx += 1;
+        }
+
+        let mut stmt = conn.prepare(&sql)?;
+        let items = stmt
+            .query_map(params_from_iter(values), |row| self.map_row(row))?
+            .collect::<Result<Vec<PlanItem>, _>>()?;
+
+        Ok(items)
+    }
+
+    /// 获取版本的排产明细聚合统计（count/sum/min/max）
+    pub fn get_version_agg(&self, version_id: &str) -> RepositoryResult<PlanItemVersionAgg> {
+        let conn = self.get_conn()?;
+
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT
+                COUNT(*) AS plan_items_count,
+                COALESCE(SUM(weight_t), 0.0) AS total_weight_t,
+                COALESCE(SUM(locked_in_plan), 0) AS locked_in_plan_count,
+                COALESCE(SUM(force_release_in_plan), 0) AS force_release_in_plan_count,
+                MIN(plan_date) AS plan_date_from,
+                MAX(plan_date) AS plan_date_to
+            FROM plan_item
+            WHERE version_id = ?1
+            "#,
+        )?;
+
+        let agg = stmt.query_row(params![version_id], |row| {
+            let plan_date_from: Option<String> = row.get(4)?;
+            let plan_date_to: Option<String> = row.get(5)?;
+
+            Ok(PlanItemVersionAgg {
+                plan_items_count: row.get::<_, i64>(0)? as usize,
+                total_weight_t: row.get::<_, f64>(1)?,
+                locked_in_plan_count: row.get::<_, i64>(2)? as usize,
+                force_release_in_plan_count: row.get::<_, i64>(3)? as usize,
+                plan_date_from: plan_date_from
+                    .as_deref()
+                    .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()),
+                plan_date_to: plan_date_to
+                    .as_deref()
+                    .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()),
+            })
+        })?;
+
+        Ok(agg)
+    }
+
+    /// 获取两版本间的 diff 计数（SQL 聚合，避免全量拉取 plan_item）
+    pub fn get_versions_diff_counts(
+        &self,
+        version_id_a: &str,
+        version_id_b: &str,
+    ) -> RepositoryResult<PlanItemDiffCounts> {
+        let conn = self.get_conn()?;
+
+        let moved_count: i64 = conn.query_row(
+            r#"
+            SELECT COUNT(*)
+            FROM plan_item a
+            INNER JOIN plan_item b ON a.material_id = b.material_id
+            WHERE a.version_id = ?1
+              AND b.version_id = ?2
+              AND (a.plan_date <> b.plan_date OR a.machine_code <> b.machine_code)
+            "#,
+            params![version_id_a, version_id_b],
+            |row| row.get(0),
+        )?;
+
+        let added_count: i64 = conn.query_row(
+            r#"
+            SELECT COUNT(*)
+            FROM plan_item b
+            WHERE b.version_id = ?2
+              AND NOT EXISTS (
+                SELECT 1
+                FROM plan_item a
+                WHERE a.version_id = ?1
+                  AND a.material_id = b.material_id
+              )
+            "#,
+            params![version_id_a, version_id_b],
+            |row| row.get(0),
+        )?;
+
+        let removed_count: i64 = conn.query_row(
+            r#"
+            SELECT COUNT(*)
+            FROM plan_item a
+            WHERE a.version_id = ?1
+              AND NOT EXISTS (
+                SELECT 1
+                FROM plan_item b
+                WHERE b.version_id = ?2
+                  AND b.material_id = a.material_id
+              )
+            "#,
+            params![version_id_a, version_id_b],
+            |row| row.get(0),
+        )?;
+
+        Ok(PlanItemDiffCounts {
+            moved_count: moved_count as usize,
+            added_count: added_count as usize,
+            removed_count: removed_count as usize,
+            squeezed_out_count: removed_count as usize,
+        })
     }
 
     /// 查询指定日期的明细

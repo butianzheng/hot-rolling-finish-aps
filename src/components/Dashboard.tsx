@@ -201,7 +201,7 @@ const Dashboard: React.FC = () => {
       <NoActiveVersionGuide
         title="尚无激活的排产版本"
         description="驾驶舱需要一个激活的排产版本作为基础"
-        onNavigateToPlan={() => navigate('/plan')}
+        onNavigateToPlan={() => navigate('/comparison')}
       />
     );
   }
@@ -286,7 +286,7 @@ const Dashboard: React.FC = () => {
           <Card
             hoverable
             style={{ cursor: 'pointer' }}
-            onClick={() => navigate('/decision/d2-order-failure')}
+            onClick={() => navigate('/overview?tab=d2')}
           >
             <Statistic
               title="未满足紧急单"
@@ -300,7 +300,7 @@ const Dashboard: React.FC = () => {
           <Card
             hoverable
             style={{ cursor: 'pointer' }}
-            onClick={() => navigate('/decision/d3-cold-stock')}
+            onClick={() => navigate('/overview?tab=d3')}
           >
             <Statistic
               title="冷料数量"
@@ -333,7 +333,7 @@ const Dashboard: React.FC = () => {
                 machine: mostCongestedPoint.machine_code,
                 date: mostCongestedPoint.plan_date,
               }).toString();
-              navigate(`/decision/d4-bottleneck?${qs}`);
+              navigate(`/overview?tab=d4&${qs}`);
             }}
           >
             <Statistic
@@ -363,7 +363,7 @@ const Dashboard: React.FC = () => {
                     urgency: record.urgency_level,
                     failType: record.fail_type,
                   }).toString();
-                  navigate(`/decision/d2-order-failure?${qs}`);
+                  navigate(`/overview?tab=d2&${qs}`);
                 },
               })}
             />
@@ -385,7 +385,7 @@ const Dashboard: React.FC = () => {
                     ageBin: record.age_bin,
                     pressureLevel: record.pressure_level,
                   }).toString();
-                  navigate(`/decision/d3-cold-stock?${qs}`);
+                  navigate(`/overview?tab=d3&${qs}`);
                 },
               })}
             />

@@ -32,6 +32,8 @@ mod api_integration_e2e_test {
         material_repo::{MaterialMasterRepository, MaterialStateRepository},
         plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository},
         risk_repo::RiskSnapshotRepository,
+        strategy_draft_repo::StrategyDraftRepository,
+        decision_refresh_repo::DecisionRefreshRepository,
     };
     use rusqlite::Connection;
     use std::sync::{Arc, Mutex};
@@ -62,6 +64,7 @@ mod api_integration_e2e_test {
         let plan_version_repo = Arc::new(PlanVersionRepository::new(conn.clone()));
         let plan_item_repo = Arc::new(PlanItemRepository::new(conn.clone()));
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
+        let strategy_draft_repo = Arc::new(StrategyDraftRepository::new(conn.clone()));
         let risk_snapshot_repo =
             Arc::new(RiskSnapshotRepository::new(&db_path).unwrap());
         let capacity_pool_repo =
@@ -123,7 +126,7 @@ mod api_integration_e2e_test {
         // APIs
         let material_api = Arc::new(MaterialApi::new(
             material_master_repo,
-            material_state_repo,
+            material_state_repo.clone(),
             action_log_repo.clone(),
             eligibility_engine,
             urgency_engine,
@@ -134,8 +137,11 @@ mod api_integration_e2e_test {
             plan_repo,
             plan_version_repo,
             plan_item_repo,
+            material_state_repo,
+            strategy_draft_repo,
             action_log_repo.clone(),
             risk_snapshot_repo,
+            config_manager.clone(),
             recalc_engine,
             risk_engine,
             None,
@@ -150,7 +156,12 @@ mod api_integration_e2e_test {
             Arc::new(MachineBottleneckUseCaseImpl::new(bottleneck_repo)),
         ));
 
-        let dashboard_api = Arc::new(DashboardApi::new(decision_api, action_log_repo));
+        let decision_refresh_repo = Arc::new(DecisionRefreshRepository::new(conn.clone()));
+        let dashboard_api = Arc::new(DashboardApi::new(
+            decision_api,
+            action_log_repo,
+            decision_refresh_repo,
+        ));
 
         (
             temp_file,

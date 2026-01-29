@@ -10,14 +10,16 @@ mod test_helpers;
 
 #[cfg(test)]
 mod e2e_p0_p1_features_test {
-    use chrono::NaiveDate;
+    use chrono::{Duration, NaiveDate, Utc};
     use hot_rolling_aps::api::{
         ConfigApi, MaterialApi, PlanApi, ValidationMode,
     };
     use hot_rolling_aps::config::config_manager::ConfigManager;
+    use hot_rolling_aps::domain::material::{MaterialMaster, MaterialState};
+    use hot_rolling_aps::domain::types::{RushLevel, SchedState, UrgentLevel};
     use hot_rolling_aps::engine::{
         CapacityFiller, EligibilityEngine, PrioritySorter, RecalcEngine,
-        RiskEngine, UrgencyEngine,
+        RiskEngine, UrgencyEngine, ScheduleStrategy,
     };
     use hot_rolling_aps::repository::{
         action_log_repo::ActionLogRepository,
@@ -25,6 +27,7 @@ mod e2e_p0_p1_features_test {
         material_repo::{MaterialMasterRepository, MaterialStateRepository},
         plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository},
         risk_repo::RiskSnapshotRepository,
+        strategy_draft_repo::StrategyDraftRepository,
     };
     use rusqlite::Connection;
     use std::sync::{Arc, Mutex};
@@ -57,6 +60,7 @@ mod e2e_p0_p1_features_test {
         let plan_version_repo = Arc::new(PlanVersionRepository::new(conn.clone()));
         let plan_item_repo = Arc::new(PlanItemRepository::new(conn.clone()));
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
+        let strategy_draft_repo = Arc::new(StrategyDraftRepository::new(conn.clone()));
         let risk_snapshot_repo = Arc::new(RiskSnapshotRepository::new(&db_path).unwrap());
         let capacity_pool_repo = Arc::new(CapacityPoolRepository::new(db_path.to_string()).unwrap());
 
@@ -93,7 +97,7 @@ mod e2e_p0_p1_features_test {
         // 创建APIs
         let material_api = Arc::new(MaterialApi::new(
             material_master_repo,
-            material_state_repo,
+            material_state_repo.clone(),
             action_log_repo.clone(),
             eligibility_engine,
             urgency_engine,
@@ -104,8 +108,11 @@ mod e2e_p0_p1_features_test {
             plan_repo,
             plan_version_repo,
             plan_item_repo,
+            material_state_repo,
+            strategy_draft_repo,
             action_log_repo.clone(),
             risk_snapshot_repo,
+            config_manager.clone(),
             recalc_engine,
             risk_engine,
             None, // refresh_queue (not needed in tests)
@@ -126,7 +133,7 @@ mod e2e_p0_p1_features_test {
 
     #[test]
     fn test_e2e_dry_run_mode() {
-        let (_temp_file, _db_path, plan_api, _material_api, _config_api, _config_manager) = setup_test_env();
+        let (_temp_file, db_path, plan_api, _material_api, _config_api, _config_manager) = setup_test_env();
 
         // 1. 创建方案
         let plan_id = plan_api
@@ -144,8 +151,74 @@ mod e2e_p0_p1_features_test {
             )
             .unwrap();
 
-        // 3. 执行dry-run重算
+        // 2.1 准备一条可排材料（用于验证 dry-run 不落库）
         let base_date = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
+        let material_id = "MAT_DRY_001";
+
+        let master_repo = MaterialMasterRepository::new(&db_path).unwrap();
+        let state_repo = MaterialStateRepository::new(&db_path).unwrap();
+
+        master_repo
+            .batch_insert_material_master(vec![MaterialMaster {
+                material_id: material_id.to_string(),
+                manufacturing_order_id: None,
+                material_status_code_src: None,
+                steel_mark: Some("Q235".to_string()),
+                slab_id: None,
+                next_machine_code: Some("H032".to_string()),
+                rework_machine_code: None,
+                current_machine_code: Some("H032".to_string()),
+                width_mm: Some(1250.0),
+                thickness_mm: Some(2.5),
+                length_m: Some(100.0),
+                weight_t: Some(500.0),
+                available_width_mm: None,
+                // 交期在 N1(默认3天)内，若参与计算会被 UrgencyEngine 抬升到 L2
+                due_date: Some(base_date + Duration::days(1)),
+                stock_age_days: Some(10),
+                output_age_days_raw: Some(5),
+                status_updated_at: None,
+                contract_no: Some("C001".to_string()),
+                contract_nature: None,
+                weekly_delivery_flag: None,
+                export_flag: None,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            }])
+            .unwrap();
+
+        state_repo
+            .batch_insert_material_state(vec![MaterialState {
+                material_id: material_id.to_string(),
+                sched_state: SchedState::Ready,
+                lock_flag: false,
+                force_release_flag: false,
+                urgent_level: UrgentLevel::L0,
+                urgent_reason: None,
+                rush_level: RushLevel::L0,
+                rolling_output_age_days: 5,
+                ready_in_days: 0,
+                earliest_sched_date: Some(base_date),
+                stock_age_days: 10,
+                scheduled_date: None,
+                scheduled_machine_code: None,
+                seq_no: None,
+                manual_urgent_flag: false,
+                in_frozen_zone: false,
+                last_calc_version_id: None,
+                updated_at: Utc::now(),
+                updated_by: Some("seed".to_string()),
+            }])
+            .unwrap();
+
+        // 2.2 记录 dry-run 前的数据库状态
+        let conn = Connection::open(&db_path).unwrap();
+        let cap_before: i64 = conn
+            .query_row("SELECT COUNT(*) FROM capacity_pool", [], |row| row.get(0))
+            .unwrap();
+        let state_before = state_repo.find_by_id(material_id).unwrap().unwrap();
+
+        // 3. 执行dry-run重算
         let result = plan_api
             .simulate_recalc(
                 &version_id,
@@ -159,9 +232,21 @@ mod e2e_p0_p1_features_test {
         let recalc_result = result.unwrap();
         assert!(recalc_result.success, "Dry-run应该返回成功状态");
 
-        // 5. 验证没有写入数据库
-        // 注意：这里需要验证plan_item表没有新增记录
-        // 由于是dry-run，不应该有实际的排产明细写入
+        // 5. 验证没有写入数据库（关键：capacity_pool/material_state 不应被模拟改写）
+        let cap_after: i64 = conn
+            .query_row("SELECT COUNT(*) FROM capacity_pool", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(cap_after, cap_before, "Dry-run 不应写入/更新 capacity_pool");
+
+        let state_after = state_repo.find_by_id(material_id).unwrap().unwrap();
+        assert_eq!(
+            state_after.urgent_level, state_before.urgent_level,
+            "Dry-run 不应改写 material_state.urgent_level"
+        );
+        assert_eq!(
+            state_after.urgent_reason, state_before.urgent_reason,
+            "Dry-run 不应改写 material_state.urgent_reason"
+        );
 
         println!("✅ Dry-run模式测试通过");
     }
@@ -417,5 +502,136 @@ mod e2e_p0_p1_features_test {
         println!("版本2 ID: {}", version2_id);
 
         println!("✅ 配置快照与版本绑定测试通过");
+    }
+
+    // ==========================================
+    // 测试7: 多策略草案生成/发布（P0: strategy drafts）
+    // ==========================================
+
+    #[test]
+    fn test_e2e_strategy_drafts_generate_and_apply() {
+        let (_temp_file, db_path, plan_api, _material_api, _config_api, _config_manager) =
+            setup_test_env();
+
+        // 1. 创建方案与版本，并激活为基准
+        let plan_id = plan_api
+            .create_plan("策略草案测试方案".to_string(), "test_user".to_string())
+            .unwrap();
+
+        let base_date = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
+        let version_id = plan_api
+            .create_version(
+                plan_id.clone(),
+                30,
+                Some(base_date),
+                Some("基准版本".to_string()),
+                "test_user".to_string(),
+            )
+            .unwrap();
+
+        plan_api
+            .activate_version(&version_id, "test_user")
+            .unwrap();
+
+        // 2. 生成草案（dry-run，不落库）
+        let from = base_date;
+        let to = base_date + Duration::days(6);
+
+        let versions_before = plan_api.list_versions(&plan_id).unwrap();
+        let resp = plan_api
+            .generate_strategy_drafts(
+                &version_id,
+                from,
+                to,
+                vec![ScheduleStrategy::Balanced.as_str().to_string()],
+                "test_user",
+            )
+            .unwrap();
+
+        assert_eq!(resp.base_version_id, version_id);
+        assert_eq!(resp.drafts.len(), 1);
+        assert_eq!(resp.drafts[0].strategy, ScheduleStrategy::Balanced.as_str());
+        assert!(!resp.drafts[0].draft_id.trim().is_empty());
+        assert_eq!(
+            resp.drafts[0].plan_items_count,
+            resp.drafts[0].frozen_items_count + resp.drafts[0].calc_items_count,
+            "草案排产项数量应等于 冻结项 + 新排项"
+        );
+        assert!(
+            resp.drafts[0].total_capacity_used_t >= 0.0,
+            "预计产量不应为负"
+        );
+
+        // 2.1 可查询草案变更明细（用于前端解释对比）
+        let detail = plan_api
+            .get_strategy_draft_detail(&resp.drafts[0].draft_id)
+            .unwrap();
+        assert_eq!(detail.draft_id, resp.drafts[0].draft_id);
+        assert_eq!(detail.base_version_id, version_id);
+        assert_eq!(detail.strategy, ScheduleStrategy::Balanced.as_str());
+        assert!(detail.diff_items_total >= detail.diff_items.len());
+
+        // 草案生成不应创建新版本（仅存内存）
+        let versions_after_generate = plan_api.list_versions(&plan_id).unwrap();
+        assert_eq!(
+            versions_after_generate.len(),
+            versions_before.len(),
+            "生成草案不应创建新版本（不落库）"
+        );
+
+        // 3. 发布草案：生成正式版本（落库）
+        let apply_resp = plan_api
+            .apply_strategy_draft(&resp.drafts[0].draft_id, "test_user")
+            .unwrap();
+        assert!(apply_resp.success);
+        assert!(!apply_resp.version_id.trim().is_empty());
+
+        // 4. 新版本应出现在版本列表中
+        let versions_after_apply = plan_api.list_versions(&plan_id).unwrap();
+        let new_version = versions_after_apply
+            .iter()
+            .find(|v| v.version_id == apply_resp.version_id)
+            .expect("发布草案后应生成新的正式版本");
+
+        // 4.1 新版本应写入“中文命名”到 config_snapshot_json（不改表结构）
+        let snapshot_json = new_version
+            .config_snapshot_json
+            .as_deref()
+            .unwrap_or("{}");
+        let snapshot_map: std::collections::HashMap<String, String> =
+            serde_json::from_str(snapshot_json).unwrap_or_default();
+        let expected_name = format!(
+            "均衡方案-{}-{:03}",
+            base_date.format("%m%d"),
+            new_version.version_no
+        );
+        assert_eq!(
+            snapshot_map
+                .get("__meta_version_name_cn")
+                .map(|s| s.as_str()),
+            Some(expected_name.as_str()),
+            "新版本应带有中文命名元信息"
+        );
+        assert_eq!(
+            snapshot_map.get("__meta_strategy").map(|s| s.as_str()),
+            Some("balanced"),
+            "新版本应带有策略元信息"
+        );
+
+        // 5. ActionLog 应记录发布草案行为
+        let conn = Connection::open(&db_path).unwrap();
+        let apply_log_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM action_log WHERE action_type = 'APPLY_STRATEGY_DRAFT'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(
+            apply_log_count >= 1,
+            "发布草案应记录 ActionLog (APPLY_STRATEGY_DRAFT)"
+        );
+
+        println!("✅ 策略草案生成/发布测试通过");
     }
 }

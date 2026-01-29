@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Card,
   Table,
@@ -105,9 +105,21 @@ const DraggableRow: React.FC<DraggableRowProps> = (props) => {
 
 interface PlanItemVisualizationProps {
   onNavigateToPlan?: () => void; // 导航到排产方案的回调
+  machineCode?: string | null; // 外部控制机组筛选（'all' | 'H031'...）
+  urgentLevel?: string | null; // 外部控制紧急度筛选（'all' | 'L0'...）
+  refreshSignal?: number; // 变化时触发重新加载
+  selectedMaterialIds?: string[]; // 外部控制选中项
+  onSelectedMaterialIdsChange?: (ids: string[]) => void; // 选中项变化回调
 }
 
-const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = ({ onNavigateToPlan }) => {
+const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = ({
+  onNavigateToPlan,
+  machineCode,
+  urgentLevel,
+  refreshSignal,
+  selectedMaterialIds: controlledSelectedMaterialIds,
+  onSelectedMaterialIdsChange,
+}) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [planItems, setPlanItems] = useState<PlanItem[]>([]);
@@ -120,12 +132,21 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = ({ onNavigat
   const [selectedUrgentLevel, setSelectedUrgentLevel] = useState<string>('all');
   const [selectedItem, setSelectedItem] = useState<PlanItem | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
+  const [internalSelectedMaterialIds, setInternalSelectedMaterialIds] = useState<string[]>([]);
+  const selectedMaterialIds = controlledSelectedMaterialIds ?? internalSelectedMaterialIds;
+  const setSelectedMaterialIds = (ids: string[]) => {
+    if (onSelectedMaterialIdsChange) {
+      onSelectedMaterialIdsChange(ids);
+      return;
+    }
+    setInternalSelectedMaterialIds(ids);
+  };
   const [forceReleaseModalVisible, setForceReleaseModalVisible] = useState(false);
   const [forceReleaseReason, setForceReleaseReason] = useState('');
+  const [forceReleaseMode, setForceReleaseMode] = useState<'AutoFix' | 'Strict'>('AutoFix');
   const activeVersionId = useActiveVersionId();
   const currentUser = useCurrentUser();
-  const navigateToPlan = onNavigateToPlan || (() => navigate('/plan'));
+  const navigateToPlan = onNavigateToPlan || (() => navigate('/comparison'));
 
   // 拖拽传感器
   const sensors = useSensors(
@@ -142,6 +163,15 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = ({ onNavigat
       loadPlanItems(activeVersionId);
     }
   });
+
+  // 外部筛选控制
+  useEffect(() => {
+    setSelectedMachine(machineCode ?? 'all');
+  }, [machineCode]);
+
+  useEffect(() => {
+    setSelectedUrgentLevel(urgentLevel ?? 'all');
+  }, [urgentLevel]);
 
   // 紧急等级颜色映射
   const urgentLevelColors: Record<string, string> = {
@@ -276,14 +306,31 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = ({ onNavigat
 
     setLoading(true);
     try {
-      await materialApi.batchForceRelease(
+      const res: any = await materialApi.batchForceRelease(
         selectedMaterialIds,
         currentUser,
-        forceReleaseReason
+        forceReleaseReason,
+        forceReleaseMode
       );
-      message.success(`成功强制放行 ${selectedMaterialIds.length} 个材料`);
+      message.success(String(res?.message || `成功强制放行 ${selectedMaterialIds.length} 个材料`));
+
+      const violations = Array.isArray(res?.details?.violations) ? res.details.violations : [];
+      if (violations.length > 0) {
+        Modal.info({
+          title: '强制放行警告（未适温材料）',
+          width: 720,
+          content: (
+            <div style={{ maxHeight: 420, overflow: 'auto' }}>
+              <pre style={{ fontSize: 12, whiteSpace: 'pre-wrap' }}>
+                {JSON.stringify(violations, null, 2)}
+              </pre>
+            </div>
+          ),
+        });
+      }
       setForceReleaseModalVisible(false);
       setForceReleaseReason('');
+      setForceReleaseMode('AutoFix');
       setSelectedMaterialIds([]);
       // 重新加载数据
       if (activeVersionId) {
@@ -345,7 +392,9 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = ({ onNavigat
             to_machine: targetItem.machine_code,
           },
         ],
-        'AUTO_FIX'
+        'AUTO_FIX',
+        currentUser || 'admin',
+        '拖拽调整顺序'
       );
       message.success('顺序调整成功');
       // 重新加载数据
@@ -358,6 +407,15 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = ({ onNavigat
       setFilteredItems(filteredItems);
     }
   };
+
+  const machineOptions = useMemo(() => {
+    const codes = new Set<string>();
+    planItems.forEach((it) => {
+      const code = String(it.machine_code ?? '').trim();
+      if (code) codes.add(code);
+    });
+    return Array.from(codes).sort();
+  }, [planItems]);
 
   // 表格列定义
   const columns: ColumnsType<PlanItem> = [
@@ -417,12 +475,7 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = ({ onNavigat
       dataIndex: 'machine_code',
       key: 'machine_code',
       width: 100,
-      filters: [
-        { text: 'H031', value: 'H031' },
-        { text: 'H032', value: 'H032' },
-        { text: 'H033', value: 'H033' },
-        { text: 'H034', value: 'H034' },
-      ],
+      filters: machineOptions.map((code) => ({ text: code, value: code })),
       onFilter: (value, record) => record.machine_code === value,
     },
     {
@@ -497,7 +550,7 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = ({ onNavigat
     if (activeVersionId) {
       loadPlanItems(activeVersionId);
     }
-  }, [activeVersionId]);
+  }, [activeVersionId, refreshSignal]);
 
   // 筛选条件变化时重新筛选
   useEffect(() => {
@@ -634,10 +687,11 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = ({ onNavigat
             onChange={setSelectedMachine}
           >
             <Option value="all">全部机组</Option>
-            <Option value="H031">H031</Option>
-            <Option value="H032">H032</Option>
-            <Option value="H033">H033</Option>
-            <Option value="H034">H034</Option>
+            {machineOptions.map((code) => (
+              <Option key={code} value={code}>
+                {code}
+              </Option>
+            ))}
           </Select>
 
           <Select
@@ -833,11 +887,26 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = ({ onNavigat
         onCancel={() => {
           setForceReleaseModalVisible(false);
           setForceReleaseReason('');
+          setForceReleaseMode('AutoFix');
         }}
         confirmLoading={loading}
       >
         <Space direction="vertical" style={{ width: '100%' }}>
           <p>即将强制放行 {selectedMaterialIds.length} 个材料</p>
+          <Space wrap>
+            <span>校验模式</span>
+            <Select
+              value={forceReleaseMode}
+              onChange={(v) => setForceReleaseMode(v as 'AutoFix' | 'Strict')}
+              style={{ width: 220 }}
+            >
+              <Option value="AutoFix">AUTO_FIX（允许未适温）</Option>
+              <Option value="Strict">STRICT（未适温则失败）</Option>
+            </Select>
+          </Space>
+          <p style={{ margin: 0, fontSize: 12, color: '#8c8c8c' }}>
+            提示：STRICT 遇到未适温材料会失败；AUTO_FIX 允许放行并记录警告（可审计）。
+          </p>
           <Input.TextArea
             placeholder="请输入强制放行原因(必填)"
             value={forceReleaseReason}

@@ -227,3 +227,121 @@ fn test_batch_update_configs_空列表() {
 
     assert!(result.is_err(), "空配置列表应该返回错误");
 }
+
+// ==========================================
+// 自定义策略（P2）测试
+// ==========================================
+
+#[test]
+fn test_save_custom_strategy_成功_并写入_action_log() {
+    use hot_rolling_aps::config::strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
+
+    let env = ApiTestEnv::new().expect("无法创建测试环境");
+
+    let profile = CustomStrategyProfile {
+        strategy_id: "my_strategy_1".to_string(),
+        title: "我的策略".to_string(),
+        description: Some("用于测试".to_string()),
+        base_strategy: "balanced".to_string(),
+        parameters: CustomStrategyParameters {
+            urgent_weight: Some(10.0),
+            capacity_weight: Some(3.0),
+            cold_stock_weight: Some(2.0),
+            due_date_weight: Some(8.0),
+            rolling_output_age_weight: None,
+            cold_stock_age_threshold_days: Some(30),
+            overflow_tolerance_pct: Some(0.05),
+        },
+    };
+
+    let resp = env
+        .config_api
+        .save_custom_strategy(profile, "admin", "测试保存自定义策略")
+        .expect("保存失败");
+
+    assert_eq!(resp.strategy_id, "my_strategy_1");
+    assert!(!resp.existed);
+
+    // 验证：可被查询到
+    let list = env
+        .config_api
+        .list_custom_strategies()
+        .expect("查询失败");
+    assert_eq!(list.len(), 1);
+    assert_eq!(list[0].strategy_id, "my_strategy_1");
+    assert_eq!(list[0].base_strategy, "balanced");
+
+    // 验证：ActionLog 记录
+    let logs = env
+        .action_log_repo
+        .find_by_action_type("SAVE_CUSTOM_STRATEGY", 10)
+        .expect("查询ActionLog失败");
+    assert!(!logs.is_empty(), "应写入 SAVE_CUSTOM_STRATEGY 的操作日志");
+    assert_eq!(logs[0].actor, "admin");
+}
+
+#[test]
+fn test_save_custom_strategy_非法_id() {
+    use hot_rolling_aps::config::strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
+
+    let env = ApiTestEnv::new().expect("无法创建测试环境");
+
+    let profile = CustomStrategyProfile {
+        strategy_id: "bad id".to_string(), // 包含空格
+        title: "策略".to_string(),
+        description: None,
+        base_strategy: "balanced".to_string(),
+        parameters: CustomStrategyParameters::default(),
+    };
+
+    let result = env
+        .config_api
+        .save_custom_strategy(profile, "admin", "测试");
+
+    assert!(result.is_err(), "非法 strategy_id 应返回错误");
+}
+
+#[test]
+fn test_save_custom_strategy_非法_base_strategy() {
+    use hot_rolling_aps::config::strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
+
+    let env = ApiTestEnv::new().expect("无法创建测试环境");
+
+    let profile = CustomStrategyProfile {
+        strategy_id: "ok_1".to_string(),
+        title: "策略".to_string(),
+        description: None,
+        base_strategy: "not_exist".to_string(),
+        parameters: CustomStrategyParameters::default(),
+    };
+
+    let result = env
+        .config_api
+        .save_custom_strategy(profile, "admin", "测试");
+
+    assert!(result.is_err(), "非法 base_strategy 应返回错误");
+}
+
+#[test]
+fn test_save_custom_strategy_非法_weight() {
+    use hot_rolling_aps::config::strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
+
+    let env = ApiTestEnv::new().expect("无法创建测试环境");
+
+    let profile = CustomStrategyProfile {
+        strategy_id: "ok_2".to_string(),
+        title: "策略".to_string(),
+        description: None,
+        base_strategy: "balanced".to_string(),
+        parameters: CustomStrategyParameters {
+            urgent_weight: Some(-1.0), // 越界
+            ..Default::default()
+        },
+    };
+
+    let result = env
+        .config_api
+        .save_custom_strategy(profile, "admin", "测试");
+
+    assert!(result.is_err(), "非法 weight 应返回错误");
+}

@@ -5,7 +5,7 @@
 // ==========================================
 
 import React, { useMemo } from 'react';
-import { Card, Row, Col, Statistic, Tag, Spin, Alert, Progress, Descriptions, Space, Table } from 'antd';
+import { Button, Card, Row, Col, Statistic, Tag, Spin, Alert, Progress, Descriptions, Space, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   WarningOutlined,
@@ -15,6 +15,7 @@ import {
   ToolOutlined,
 } from '@ant-design/icons';
 import { useAllRollCampaignAlerts } from '../../hooks/queries/use-decision-queries';
+import type { DrilldownSpec } from '../../hooks/useRiskOverviewData';
 import { useActiveVersionId } from '../../stores/use-global-store';
 import type { RollCampaignAlert } from '../../types/decision';
 import {
@@ -29,8 +30,14 @@ import {
 // 主组件
 // ==========================================
 
-export const D5RollCampaign: React.FC = () => {
+interface D5RollCampaignProps {
+  embedded?: boolean;
+  onOpenDrilldown?: (spec: DrilldownSpec) => void;
+}
+
+export const D5RollCampaign: React.FC<D5RollCampaignProps> = ({ embedded, onOpenDrilldown }) => {
   const versionId = useActiveVersionId();
+  const openWithDrawer = !!embedded && !!onOpenDrilldown;
 
   // 获取换辊警报数据
   const { data, isLoading, error } = useAllRollCampaignAlerts(versionId);
@@ -222,7 +229,7 @@ export const D5RollCampaign: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div style={{ textAlign: 'center', padding: '100px 0' }}>
+      <div style={{ textAlign: 'center', padding: embedded ? '40px 0' : '100px 0' }}>
         <Spin size="large" tip="正在加载换辊警报数据...">
           <div style={{ minHeight: 80 }} />
         </Spin>
@@ -241,7 +248,7 @@ export const D5RollCampaign: React.FC = () => {
         description={error.message || '未知错误'}
         type="error"
         showIcon
-        style={{ margin: '20px' }}
+        style={{ margin: embedded ? 0 : '20px' }}
       />
     );
   }
@@ -253,7 +260,7 @@ export const D5RollCampaign: React.FC = () => {
         description="请先在主界面选择一个排产版本"
         type="warning"
         showIcon
-        style={{ margin: '20px' }}
+        style={{ margin: embedded ? 0 : '20px' }}
       />
     );
   }
@@ -263,17 +270,18 @@ export const D5RollCampaign: React.FC = () => {
   // ==========================================
 
   return (
-    <div style={{ padding: '24px' }}>
-      {/* 页面标题 */}
-      <div style={{ marginBottom: '24px' }}>
-        <h2>
-          <ToolOutlined style={{ marginRight: '8px' }} />
-          D5决策：轧制活动警报
-        </h2>
-        <p style={{ color: '#8c8c8c', marginBottom: '16px' }}>
-          监控各机组轧辊累积吨位，及时发现换辊需求，避免生产中断
-        </p>
-      </div>
+    <div style={{ padding: embedded ? 0 : 24 }}>
+      {!embedded ? (
+        <div style={{ marginBottom: 24 }}>
+          <h2>
+            <ToolOutlined style={{ marginRight: 8 }} />
+            D5决策：轧制活动警报
+          </h2>
+          <p style={{ color: '#8c8c8c', marginBottom: 16 }}>
+            监控各机组轧辊累积吨位，及时发现换辊需求，避免生产中断
+          </p>
+        </div>
+      ) : null}
 
       {/* 警报总览 */}
       {stats.hardStopCount > 0 && (
@@ -287,9 +295,9 @@ export const D5RollCampaign: React.FC = () => {
       )}
 
       {/* 统计卡片 */}
-      <Row gutter={16} style={{ marginBottom: '24px' }}>
+      <Row gutter={embedded ? 12 : 16} style={{ marginBottom: embedded ? 12 : 24 }}>
         <Col span={4}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="机组总数"
               value={stats.totalMachines}
@@ -298,7 +306,7 @@ export const D5RollCampaign: React.FC = () => {
           </Card>
         </Col>
         <Col span={4}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="正常"
               value={stats.normalCount}
@@ -308,7 +316,7 @@ export const D5RollCampaign: React.FC = () => {
           </Card>
         </Col>
         <Col span={4}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="建议换辊"
               value={stats.suggestCount}
@@ -318,7 +326,7 @@ export const D5RollCampaign: React.FC = () => {
           </Card>
         </Col>
         <Col span={4}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="警告"
               value={stats.warningCount}
@@ -328,7 +336,7 @@ export const D5RollCampaign: React.FC = () => {
           </Card>
         </Col>
         <Col span={4}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="硬停止"
               value={stats.hardStopCount}
@@ -338,7 +346,7 @@ export const D5RollCampaign: React.FC = () => {
           </Card>
         </Col>
         <Col span={4}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="平均利用率"
               value={stats.avgUtilization}
@@ -379,7 +387,17 @@ export const D5RollCampaign: React.FC = () => {
       )}
 
       {/* 完整表格 */}
-      <Card title="机组换辊状态" style={{ marginBottom: '24px' }}>
+      <Card
+        title="机组换辊状态"
+        style={{ marginBottom: '24px' }}
+        extra={
+          openWithDrawer ? (
+            <Button size="small" onClick={() => onOpenDrilldown({ kind: 'roll' })}>
+              打开下钻
+            </Button>
+          ) : undefined
+        }
+      >
         <Table<RollCampaignAlert>
           columns={columns}
           dataSource={data?.items || []}
@@ -390,6 +408,14 @@ export const D5RollCampaign: React.FC = () => {
             showQuickJumper: true,
           }}
           scroll={{ x: 1400 }}
+          onRow={
+            openWithDrawer
+              ? (record) => ({
+                  onClick: () => onOpenDrilldown?.({ kind: 'roll', machineCode: record.machineCode }),
+                  style: { cursor: 'pointer' },
+                })
+              : undefined
+          }
         />
       </Card>
     </div>

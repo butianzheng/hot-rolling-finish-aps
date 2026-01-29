@@ -14,6 +14,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useSearchParams } from 'react-router-dom';
 import { useRecentDaysBottleneck } from '../../hooks/queries/use-decision-queries';
+import type { DrilldownSpec } from '../../hooks/useRiskOverviewData';
 import { useActiveVersionId } from '../../stores/use-global-store';
 import { BottleneckHeatmap } from '../../components/charts/BottleneckHeatmap';
 import type { ReasonItem, BottleneckType } from '../../types/decision';
@@ -41,26 +42,33 @@ const BOTTLENECK_LEVEL_COLORS = {
 // 主组件
 // ==========================================
 
-export const D4Bottleneck: React.FC = () => {
+interface D4BottleneckProps {
+  embedded?: boolean;
+  onOpenDrilldown?: (spec: DrilldownSpec) => void;
+}
+
+export const D4Bottleneck: React.FC<D4BottleneckProps> = ({ embedded, onOpenDrilldown }) => {
   const versionId = useActiveVersionId();
   const [searchParams] = useSearchParams();
   const [selectedDays, setSelectedDays] = useState<number>(30);
+  const effectiveDays = embedded ? 30 : selectedDays;
   const [selectedPoint, setSelectedPoint] = useState<{
     machine: string;
     date: string;
   } | null>(null);
 
   // 获取堵塞数据
-  const { data, isLoading, error } = useRecentDaysBottleneck(versionId, selectedDays);
+  const { data, isLoading, error } = useRecentDaysBottleneck(versionId, effectiveDays);
 
   // 支持 Dashboard drill-down：/decision/d4-bottleneck?machine=H031&date=YYYY-MM-DD
   useEffect(() => {
+    if (embedded) return;
     const machine = searchParams.get('machine');
     const date = searchParams.get('date');
     if (machine && date) {
       setSelectedPoint({ machine, date });
     }
-  }, [searchParams]);
+  }, [embedded, searchParams]);
 
   // 计算统计数据
   const stats = useMemo(() => {
@@ -108,6 +116,9 @@ export const D4Bottleneck: React.FC = () => {
   // 热力图点击处理
   const handlePointClick = (machine: string, date: string) => {
     setSelectedPoint({ machine, date });
+    if (embedded && onOpenDrilldown) {
+      onOpenDrilldown({ kind: 'bottleneck', machineCode: machine, planDate: date });
+    }
   };
 
   // ==========================================
@@ -116,7 +127,7 @@ export const D4Bottleneck: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div style={{ textAlign: 'center', padding: '100px 0' }}>
+      <div style={{ textAlign: 'center', padding: embedded ? '40px 0' : '100px 0' }}>
         <Spin size="large" tip="正在加载堵塞数据...">
           <div style={{ minHeight: 80 }} />
         </Spin>
@@ -135,7 +146,7 @@ export const D4Bottleneck: React.FC = () => {
         description={error.message || '未知错误'}
         type="error"
         showIcon
-        style={{ margin: '20px' }}
+        style={{ margin: embedded ? 0 : '20px' }}
       />
     );
   }
@@ -147,7 +158,7 @@ export const D4Bottleneck: React.FC = () => {
         description="请先在主界面选择一个排产版本"
         type="warning"
         showIcon
-        style={{ margin: '20px' }}
+        style={{ margin: embedded ? 0 : '20px' }}
       />
     );
   }
@@ -157,38 +168,38 @@ export const D4Bottleneck: React.FC = () => {
   // ==========================================
 
   return (
-    <div style={{ padding: '24px' }}>
-      {/* 页面标题 */}
-      <div style={{ marginBottom: '24px' }}>
-        <h2>
-          <BuildOutlined style={{ marginRight: '8px' }} />
-          D4决策：机组堵塞矩阵
-        </h2>
-        <p style={{ color: '#8c8c8c', marginBottom: '16px' }}>
-          展示未来{selectedDays}天各机组的堵塞情况，点击单元格查看详细原因
-        </p>
+    <div style={{ padding: embedded ? 0 : 24 }}>
+      {!embedded ? (
+        <div style={{ marginBottom: 24 }}>
+          <h2>
+            <BuildOutlined style={{ marginRight: 8 }} />
+            D4决策：机组堵塞矩阵
+          </h2>
+          <p style={{ color: '#8c8c8c', marginBottom: 16 }}>
+            展示未来{selectedDays}天各机组的堵塞情况，点击单元格查看详细原因
+          </p>
 
-        {/* 天数选择器 */}
-        <Space>
-          <span>查看范围：</span>
-          <Select
-            value={selectedDays}
-            onChange={setSelectedDays}
-            style={{ width: 120 }}
-            options={[
-              { label: '7天', value: 7 },
-              { label: '14天', value: 14 },
-              { label: '30天', value: 30 },
-              { label: '60天', value: 60 },
-            ]}
-          />
-        </Space>
-      </div>
+          <Space>
+            <span>查看范围：</span>
+            <Select
+              value={selectedDays}
+              onChange={setSelectedDays}
+              style={{ width: 120 }}
+              options={[
+                { label: '7天', value: 7 },
+                { label: '14天', value: 14 },
+                { label: '30天', value: 30 },
+                { label: '60天', value: 60 },
+              ]}
+            />
+          </Space>
+        </div>
+      ) : null}
 
       {/* 统计卡片 */}
-      <Row gutter={16} style={{ marginBottom: '24px' }}>
+      <Row gutter={embedded ? 12 : 16} style={{ marginBottom: embedded ? 12 : 24 }}>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="平均堵塞分数"
               value={stats.avgBottleneckScore}
@@ -201,7 +212,7 @@ export const D4Bottleneck: React.FC = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="高堵塞点位"
               value={stats.highBottleneckCount}
@@ -214,7 +225,7 @@ export const D4Bottleneck: React.FC = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="严重堵塞点位"
               value={stats.criticalBottleneckCount}
@@ -226,7 +237,7 @@ export const D4Bottleneck: React.FC = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="涉及机组数"
               value={stats.affectedMachineCount}
@@ -240,11 +251,12 @@ export const D4Bottleneck: React.FC = () => {
       {/* 堵塞矩阵热力图 */}
       <Card
         title="机组堵塞矩阵（机组×日期）"
-        style={{ marginBottom: '24px' }}
+        size={embedded ? 'small' : undefined}
+        style={{ marginBottom: embedded ? 12 : 24 }}
         extra={
           <Space>
             <InfoCircleOutlined />
-            <span style={{ fontSize: '12px', color: '#8c8c8c' }}>
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>
               点击单元格查看详细原因
             </span>
           </Space>
@@ -264,9 +276,10 @@ export const D4Bottleneck: React.FC = () => {
       </Card>
 
       {/* 选中点位的详细信息 */}
-      {selectedPointData && (
+      {!embedded && selectedPointData && (
         <Card
           title={`${selectedPointData.machineCode} - ${selectedPointData.planDate} 堵塞详情`}
+          size={embedded ? 'small' : undefined}
           extra={
             <Tag color={BOTTLENECK_LEVEL_COLORS[selectedPointData.bottleneckLevel]}>
               {selectedPointData.bottleneckLevel} - {selectedPointData.bottleneckScore.toFixed(1)}

@@ -79,7 +79,7 @@ const RiskSnapshotCharts: React.FC<RiskSnapshotChartsProps> = ({ onNavigateToPla
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [activeTab, setActiveTab] = useState<string>('trend');
   const activeVersionId = useActiveVersionId();
-  const navigateToPlan = onNavigateToPlan || (() => navigate('/plan'));
+  const navigateToPlan = onNavigateToPlan || (() => navigate('/comparison'));
   const prevActiveVersionIdRef = useRef<string | null>(null);
 
   // 订阅risk_snapshot_updated事件,自动刷新

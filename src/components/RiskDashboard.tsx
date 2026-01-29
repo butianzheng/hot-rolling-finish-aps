@@ -188,7 +188,7 @@ const RiskDashboard: React.FC = () => {
         <NoActiveVersionGuide
           title="尚无激活的排产版本"
           description="风险仪表盘需要一个激活的排产版本作为基础"
-          onNavigateToPlan={() => navigate('/plan')}
+          onNavigateToPlan={() => navigate('/comparison')}
         />
       )}
 

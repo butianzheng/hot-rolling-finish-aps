@@ -69,6 +69,7 @@ impl CapacityFiller {
         }
 
         // 2. 填充计算区材料
+        let plan_date = capacity_pool.plan_date;
         for (master, state) in candidates {
             let weight = master.weight_t.unwrap_or(0.0);
 
@@ -79,6 +80,7 @@ impl CapacityFiller {
                     &master,
                     &state,
                     version_id,
+                    plan_date,
                     sequence_no,
                     false,
                     "LOCKED_MATERIAL",
@@ -123,6 +125,7 @@ impl CapacityFiller {
                 &master,
                 &state,
                 version_id,
+                plan_date,
                 sequence_no,
                 false,
                 assign_reason,
@@ -153,6 +156,7 @@ impl CapacityFiller {
         master: &MaterialMaster,
         state: &MaterialState,
         version_id: &str,
+        plan_date: NaiveDate,
         sequence_no: i32,
         is_frozen: bool,
         assign_reason: &str,
@@ -164,9 +168,8 @@ impl CapacityFiller {
                 .current_machine_code
                 .clone()
                 .unwrap_or_else(|| "UNKNOWN".to_string()),
-            plan_date: state
-                .scheduled_date
-                .unwrap_or_else(|| NaiveDate::from_ymd_opt(2026, 1, 1).unwrap()),
+            // 排程落位的日期应由当前产能池/排程窗口决定，而不是依赖 material_state.scheduled_date（可能为空/历史值）。
+            plan_date,
             seq_no: sequence_no,
             weight_t: master.weight_t.unwrap_or(0.0),
             source_type: if is_frozen { "FROZEN".to_string() } else { "CALC".to_string() },
@@ -583,4 +586,3 @@ mod tests {
         assert_eq!(pool.overflow_ratio(), 0.0); // 未超限
     }
 }
-

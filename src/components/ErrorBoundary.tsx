@@ -1,5 +1,6 @@
 import React, { Component, ReactNode } from 'react';
 import { Result, Button } from 'antd';
+import { reportFrontendError } from '../utils/telemetry';
 
 interface Props {
   children: ReactNode;
@@ -26,6 +27,10 @@ class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('ErrorBoundary caught error:', error, errorInfo);
+    void reportFrontendError(error, {
+      source: 'ErrorBoundary',
+      componentStack: errorInfo?.componentStack || null,
+    });
   }
 
   handleReset = () => {

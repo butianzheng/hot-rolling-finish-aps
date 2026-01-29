@@ -52,6 +52,12 @@ export const GlobalKPIDisplay: React.FC<GlobalKPIDisplayProps> = ({ kpi }) => {
   }, [kpi.riskLevel]);
 
   const textColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.85)';
+  const urgentL3Total = kpi.urgentBreakdown?.L3?.total ?? null;
+  const urgentL3Blocked = kpi.urgentBreakdown?.L3?.blocked ?? null;
+  const urgentL2Total = kpi.urgentBreakdown?.L2?.total ?? null;
+  const urgentL2Blocked = kpi.urgentBreakdown?.L2?.blocked ?? null;
+  const showUrgentGroups =
+    urgentL3Total != null && urgentL2Total != null && (urgentL3Total > 0 || urgentL2Total > 0);
 
   return (
     <Space size={24} style={{ fontSize: 13 }}>
@@ -66,15 +72,37 @@ export const GlobalKPIDisplay: React.FC<GlobalKPIDisplayProps> = ({ kpi }) => {
       )}
 
       {/* 紧急订单 */}
-      <Tooltip title={`紧急订单: ${kpi.urgentOrdersCount} | 阻塞: ${kpi.blockedUrgentCount}`}>
+      <Tooltip
+        title={
+          showUrgentGroups
+            ? `紧急物料: ${kpi.urgentOrdersCount} | 阻塞: ${kpi.blockedUrgentCount} | L3: ${urgentL3Total} (阻${urgentL3Blocked || 0}) | L2: ${urgentL2Total} (阻${urgentL2Blocked || 0})`
+            : `紧急物料: ${kpi.urgentOrdersCount} | 阻塞: ${kpi.blockedUrgentCount}`
+        }
+      >
         <Space size={6}>
           <FireOutlined style={{ color: '#ff4d4f', fontSize: 16 }} />
-          <Text style={{ color: textColor }}>
-            {kpi.urgentOrdersCount}
-            {kpi.blockedUrgentCount > 0 && (
-              <span style={{ color: '#ff4d4f' }}> ({kpi.blockedUrgentCount})</span>
-            )}
-          </Text>
+          {showUrgentGroups ? (
+            <Text style={{ color: textColor }}>
+              <span style={{ color: '#ff4d4f', fontFamily: 'monospace', fontWeight: 700 }}>L3</span>{' '}
+              <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{urgentL3Total}</span>
+              {urgentL3Blocked ? (
+                <span style={{ color: '#ff4d4f', fontFamily: 'monospace' }}>({urgentL3Blocked})</span>
+              ) : null}
+              <span style={{ opacity: 0.6, margin: '0 6px' }}>·</span>
+              <span style={{ color: '#faad14', fontFamily: 'monospace', fontWeight: 700 }}>L2</span>{' '}
+              <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{urgentL2Total}</span>
+              {urgentL2Blocked ? (
+                <span style={{ color: '#ff4d4f', fontFamily: 'monospace' }}>({urgentL2Blocked})</span>
+              ) : null}
+            </Text>
+          ) : (
+            <Text style={{ color: textColor }}>
+              {kpi.urgentOrdersCount}
+              {kpi.blockedUrgentCount > 0 && (
+                <span style={{ color: '#ff4d4f' }}> ({kpi.blockedUrgentCount})</span>
+              )}
+            </Text>
+          )}
         </Space>
       </Tooltip>
 

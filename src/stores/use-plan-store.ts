@@ -6,6 +6,7 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import type { StrategyDraft } from '../types/comparison';
 
 // ==========================================
 // 类型定义（与后端保持一致）
@@ -51,6 +52,9 @@ export interface PlanState {
   // 加载状态
   isLoadingPlans: boolean;
   isLoadingVersions: boolean;
+
+  // 策略草案（Phase 3：多策略对比）
+  draftVersions: StrategyDraft[];
 }
 
 // ==========================================
@@ -91,6 +95,14 @@ export interface PlanActions {
 
   // 重置状态
   reset: () => void;
+
+  // 策略草案（Phase 3：多策略对比）
+  setDraftVersions: (drafts: StrategyDraft[]) => void;
+  clearDraftVersions: () => void;
+
+  // 预留：多策略草案 API（后端实现后接入）
+  createDraftVersion: (sourceVersionId: string, note?: string) => Promise<string>;
+  publishDraft: (draftId: string) => Promise<string>;
 }
 
 // ==========================================
@@ -104,6 +116,7 @@ const initialState: PlanState = {
   selectedVersionId: null,
   isLoadingPlans: false,
   isLoadingVersions: false,
+  draftVersions: [],
 };
 
 // ==========================================
@@ -123,9 +136,10 @@ export const usePlanStore = create<PlanState & PlanActions>()(
 
     setSelectedPlanId: (planId) =>
       set((state) => {
+        const prev = state.selectedPlanId;
         state.selectedPlanId = planId;
         // 切换方案时清空版本列表
-        if (planId !== state.selectedPlanId) {
+        if (planId !== prev) {
           state.versions = [];
           state.selectedVersionId = null;
         }
@@ -188,6 +202,24 @@ export const usePlanStore = create<PlanState & PlanActions>()(
       }),
 
     reset: () => set(initialState),
+
+    setDraftVersions: (drafts) =>
+      set((state) => {
+        state.draftVersions = drafts;
+      }),
+
+    clearDraftVersions: () =>
+      set((state) => {
+        state.draftVersions = [];
+      }),
+
+    createDraftVersion: async () => {
+      throw new Error('createDraftVersion is not implemented yet');
+    },
+
+    publishDraft: async () => {
+      throw new Error('publishDraft is not implemented yet');
+    },
   }))
 );
 
@@ -240,4 +272,8 @@ export const usePlanActions = () =>
     updateVersion: state.updateVersion,
     activateVersion: state.activateVersion,
     reset: state.reset,
+    setDraftVersions: state.setDraftVersions,
+    clearDraftVersions: state.clearDraftVersions,
+    createDraftVersion: state.createDraftVersion,
+    publishDraft: state.publishDraft,
   }));

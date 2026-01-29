@@ -63,6 +63,19 @@ type ImportMaterialsResponse = {
   elapsed_ms?: number;
 };
 
+type ImportHistoryItem = {
+  id: string;
+  created_at: string;
+  operator: string;
+  file_path: string;
+  source_batch_id: string;
+  import_batch_id: string | null;
+  imported: number;
+  updated: number;
+  conflicts: number;
+  elapsed_ms: number | null;
+};
+
 type ImportConflict = {
   conflict_id: string;
   batch_id: string;
@@ -85,6 +98,8 @@ type ImportConflictListResponse = {
 type PreviewRow = Record<string, string>;
 
 const REQUIRED_HEADERS = ['材料号', '材料实际重量', '下道机组代码'];
+const IMPORT_HISTORY_KEY = 'aps_import_history';
+const IMPORT_HISTORY_MAX = 30;
 
 function splitCsvLine(line: string): string[] {
   // Minimal CSV splitter with basic quote handling; good enough for our fixture data.
@@ -143,6 +158,41 @@ function formatMs(ms?: number): string {
   return `${(ms / 1000).toFixed(2)}s`;
 }
 
+function safeReadImportHistory(): ImportHistoryItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(IMPORT_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((it: any) => ({
+        id: String(it?.id ?? ''),
+        created_at: String(it?.created_at ?? ''),
+        operator: String(it?.operator ?? ''),
+        file_path: String(it?.file_path ?? ''),
+        source_batch_id: String(it?.source_batch_id ?? ''),
+        import_batch_id: it?.import_batch_id == null ? null : String(it.import_batch_id),
+        imported: Number(it?.imported ?? 0),
+        updated: Number(it?.updated ?? 0),
+        conflicts: Number(it?.conflicts ?? 0),
+        elapsed_ms: it?.elapsed_ms == null ? null : Number(it.elapsed_ms),
+      }))
+      .filter((it) => it.id);
+  } catch {
+    return [];
+  }
+}
+
+function safeWriteImportHistory(items: ImportHistoryItem[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(IMPORT_HISTORY_KEY, JSON.stringify(items));
+  } catch {
+    // ignore
+  }
+}
+
 function conflictTypeLabel(t: string): string {
   const map: Record<string, string> = {
     PrimaryKeyMissing: '主键缺失',
@@ -160,7 +210,7 @@ const MaterialImport: React.FC = () => {
 
   const isTauriRuntime = typeof window !== 'undefined' && !!(window as any).__TAURI__;
 
-  const [activeTab, setActiveTab] = useState<'import' | 'conflicts'>('import');
+  const [activeTab, setActiveTab] = useState<'import' | 'conflicts' | 'history'>('import');
   const [selectedFilePath, setSelectedFilePath] = useState<string>('');
   const [previewHeaders, setPreviewHeaders] = useState<string[]>([]);
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
@@ -183,6 +233,7 @@ const MaterialImport: React.FC = () => {
     total: 0,
     showSizeChanger: true,
   });
+  const [importHistory, setImportHistory] = useState<ImportHistoryItem[]>(() => safeReadImportHistory());
   const [rawModal, setRawModal] = useState<{ open: boolean; title: string; content: string }>({
     open: false,
     title: '',
@@ -213,6 +264,34 @@ const MaterialImport: React.FC = () => {
 
     return { summary, byLevel, topFields, violations };
   }, [importResult]);
+
+  const appendHistory = useCallback(
+    (result: ImportMaterialsResponse) => {
+      const now = new Date().toISOString();
+      const internalBatch = String(result?.import_batch_id || '').trim() || null;
+      const fallbackId = internalBatch || String(result?.batch_id || '').trim() || `IMPORT_${Date.now()}`;
+
+      const item: ImportHistoryItem = {
+        id: fallbackId,
+        created_at: now,
+        operator: currentUser || 'admin',
+        file_path: selectedFilePath || '-',
+        source_batch_id: batchId.trim() || '-',
+        import_batch_id: internalBatch,
+        imported: Number(result?.imported ?? 0),
+        updated: Number(result?.updated ?? 0),
+        conflicts: Number(result?.conflicts ?? 0),
+        elapsed_ms: typeof result?.elapsed_ms === 'number' ? result.elapsed_ms : null,
+      };
+
+      setImportHistory((prev) => {
+        const next = [item, ...prev.filter((x) => x.id !== item.id)].slice(0, IMPORT_HISTORY_MAX);
+        safeWriteImportHistory(next);
+        return next;
+      });
+    },
+    [batchId, currentUser, selectedFilePath]
+  );
 
   const previewColumns: ColumnsType<PreviewRow> = useMemo(() => {
     const cols = previewHeaders.map((h) => ({
@@ -273,7 +352,12 @@ const MaterialImport: React.FC = () => {
   }, [isTauriRuntime, loadPreview]);
 
   const loadConflicts = useCallback(
-    async (opts?: { status?: 'OPEN' | 'RESOLVED' | 'ALL'; batchId?: string; page?: number; pageSize?: number }) => {
+    async (opts?: {
+      status?: 'OPEN' | 'RESOLVED' | 'ALL';
+      batchId?: string;
+      page?: number;
+      pageSize?: number;
+    }): Promise<{ list: ImportConflict[]; total: number }> => {
       const status = opts?.status ?? conflictStatus;
       const batch = (opts?.batchId ?? conflictBatchId).trim();
       const page = opts?.page ?? (conflictPagination.current as number) ?? 1;
@@ -298,11 +382,13 @@ const MaterialImport: React.FC = () => {
           pageSize,
           total,
         }));
+        return { list, total };
       } catch (e: any) {
         console.error('[MaterialImport] load conflicts failed:', e);
         setConflicts([]);
         setConflictPagination((prev) => ({ ...prev, total: 0 }));
         message.error(e?.message || '加载冲突列表失败');
+        return { list: [], total: 0 };
       } finally {
         setConflictsLoading(false);
       }
@@ -315,6 +401,8 @@ const MaterialImport: React.FC = () => {
     setImporting(true);
     setImportResult(null);
 
+    let shouldNavigateToWorkbench = false;
+
     try {
       const result = (await importApi.importMaterials(
         selectedFilePath,
@@ -323,6 +411,7 @@ const MaterialImport: React.FC = () => {
       )) as ImportMaterialsResponse;
 
       setImportResult(result);
+      appendHistory(result);
 
       const internalBatch = String(result?.import_batch_id || '').trim();
       if (internalBatch) {
@@ -336,6 +425,9 @@ const MaterialImport: React.FC = () => {
         setActiveTab('conflicts');
         setConflictStatus('OPEN');
         await loadConflicts({ status: 'OPEN', batchId: internalBatch, page: 1 });
+      } else {
+        // 无冲突：按重构方案，导入成功后自动跳转到计划工作台
+        shouldNavigateToWorkbench = true;
       }
     } catch (e: any) {
       console.error('[MaterialImport] import failed:', e);
@@ -344,7 +436,11 @@ const MaterialImport: React.FC = () => {
       setImportLoading(false);
       setImporting(false);
     }
-  }, [batchId, loadConflicts, mappingProfileId, selectedFilePath, setImporting]);
+
+    if (shouldNavigateToWorkbench) {
+      navigate('/workbench', { replace: true });
+    }
+  }, [batchId, loadConflicts, mappingProfileId, navigate, selectedFilePath, setImporting]);
 
   const handleImport = useCallback(async () => {
     if (!selectedFilePath) {
@@ -380,13 +476,21 @@ const MaterialImport: React.FC = () => {
       try {
         await importApi.resolveImportConflict(conflictId, action, `由${currentUser}处理`, currentUser);
         message.success('冲突已处理');
-        await loadConflicts();
+        const res = await loadConflicts();
+        if (conflictStatus === 'OPEN' && res.total === 0 && conflictBatchId.trim()) {
+          Modal.success({
+            title: '本批次冲突已全部处理',
+            content: '可以进入计划工作台继续排产操作。',
+            okText: '去计划工作台',
+            onOk: () => navigate('/workbench'),
+          });
+        }
       } catch (e: any) {
         console.error('[MaterialImport] resolve conflict failed:', e);
         message.error(e?.message || '处理冲突失败');
       }
     },
-    [currentUser, loadConflicts]
+    [conflictBatchId, conflictStatus, currentUser, loadConflicts, navigate]
   );
 
   const conflictColumns: ColumnsType<ImportConflict> = useMemo(
@@ -515,7 +619,7 @@ const MaterialImport: React.FC = () => {
       <Tabs
         activeKey={activeTab}
         onChange={(k) => {
-          const key = k as 'import' | 'conflicts';
+          const key = k as 'import' | 'conflicts' | 'history';
           setActiveTab(key);
           if (key === 'conflicts') {
             // 进入冲突页时，如果已有批次ID则自动加载
@@ -673,7 +777,7 @@ const MaterialImport: React.FC = () => {
                         )}
 
                         <Space>
-                          <Button onClick={() => navigate('/material')}>去材料管理查看</Button>
+                          <Button onClick={() => navigate('/workbench')}>去计划工作台查看</Button>
                           <Button
                             icon={<ReloadOutlined />}
                             onClick={() => {
@@ -745,15 +849,138 @@ const MaterialImport: React.FC = () => {
                     dataSource={conflicts}
                     rowKey="conflict_id"
                     pagination={conflictPagination}
+                    virtual
                     onChange={(pagination) => {
                       const current = pagination.current ?? 1;
                       const pageSize = pagination.pageSize ?? 20;
                       loadConflicts({ page: current, pageSize }).catch(() => void 0);
                     }}
-                    scroll={{ x: 1200 }}
+                    scroll={{ x: 1200, y: 520 }}
                     size="middle"
                   />
                 </Space>
+              </Card>
+            ),
+          },
+          {
+            key: 'history',
+            label: '导入历史',
+            children: (
+              <Card
+                title="最近导入记录（本机）"
+                extra={
+                  <Space>
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={() => setImportHistory(safeReadImportHistory())}
+                    >
+                      刷新
+                    </Button>
+                    <Button
+                      danger
+                      onClick={() => {
+                        Modal.confirm({
+                          title: '清空导入历史？',
+                          content: '仅清除本机 localStorage 记录，不影响后端数据。',
+                          okText: '清空',
+                          okButtonProps: { danger: true },
+                          cancelText: '取消',
+                          onOk: () => {
+                            safeWriteImportHistory([]);
+                            setImportHistory([]);
+                          },
+                        });
+                      }}
+                      disabled={importHistory.length === 0}
+                    >
+                      清空
+                    </Button>
+                  </Space>
+                }
+              >
+                <Alert
+                  type="info"
+                  showIcon
+                  message="说明"
+                  description="导入历史暂存于本机 localStorage，用于快速定位批次与冲突；如需全局导入审计/查询，需要后端提供 import_batch 列表接口。"
+                  style={{ marginBottom: 12 }}
+                />
+
+                <Table<ImportHistoryItem>
+                  rowKey={(r) => r.id}
+                  pagination={{ pageSize: 10 }}
+                  dataSource={importHistory}
+                  virtual
+                  columns={[
+                    {
+                      title: '时间',
+                      dataIndex: 'created_at',
+                      width: 180,
+                      render: (v) => <span style={{ fontFamily: 'monospace' }}>{String(v).replace('T', ' ').slice(0, 19)}</span>,
+                    },
+                    { title: '导入人', dataIndex: 'operator', width: 100 },
+                    {
+                      title: '批次ID',
+                      dataIndex: 'id',
+                      width: 200,
+                      ellipsis: true,
+                      render: (v) => <span style={{ fontFamily: 'monospace' }}>{String(v)}</span>,
+                    },
+                    {
+                      title: '文件',
+                      dataIndex: 'file_path',
+                      ellipsis: true,
+                      render: (v) => <span style={{ fontFamily: 'monospace' }}>{String(v || '-')}</span>,
+                    },
+                    {
+                      title: '结果',
+                      key: 'result',
+                      width: 200,
+                      render: (_, r) => (
+                        <Space size={8}>
+                          <Tag color="green">导入 {r.imported}</Tag>
+                          <Tag color="blue">更新 {r.updated}</Tag>
+                          <Tag color={r.conflicts > 0 ? 'red' : 'default'}>冲突 {r.conflicts}</Tag>
+                        </Space>
+                      ),
+                    },
+                    {
+                      title: '耗时',
+                      dataIndex: 'elapsed_ms',
+                      width: 100,
+                      render: (v) => <span style={{ fontFamily: 'monospace' }}>{formatMs(v == null ? undefined : Number(v))}</span>,
+                    },
+                    {
+                      title: '操作',
+                      key: 'actions',
+                      width: 160,
+                      render: (_, r) => (
+                        <Space>
+                          <Button
+                            size="small"
+                            disabled={!r.import_batch_id}
+                            onClick={async () => {
+                              if (!r.import_batch_id) return;
+                              setConflictBatchId(r.import_batch_id);
+                              setConflictStatus('OPEN');
+                              setActiveTab('conflicts');
+                              await loadConflicts({ status: 'OPEN', batchId: r.import_batch_id, page: 1 });
+                            }}
+                          >
+                            查看冲突
+                          </Button>
+                          <Button
+                            size="small"
+                            onClick={() => navigator.clipboard.writeText(r.id)}
+                          >
+                            复制ID
+                          </Button>
+                        </Space>
+                      ),
+                    },
+                  ]}
+                  scroll={{ x: 980, y: 520 }}
+                />
               </Card>
             ),
           },

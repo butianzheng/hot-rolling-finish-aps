@@ -108,12 +108,16 @@ mod tests {
         conn.execute(
             r#"
             CREATE TABLE IF NOT EXISTS roller_campaign (
+                version_id TEXT NOT NULL,
                 machine_code TEXT NOT NULL,
                 campaign_no INTEGER NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT,
+                cum_weight_t REAL NOT NULL DEFAULT 0,
                 status TEXT NOT NULL,
                 suggest_threshold_t REAL NOT NULL,
                 hard_limit_t REAL NOT NULL,
-                PRIMARY KEY (machine_code, campaign_no)
+                PRIMARY KEY (version_id, machine_code, campaign_no)
             )
             "#,
             [],
@@ -154,7 +158,7 @@ mod tests {
 
         // H032: 正常 (5000t / 10000t = 50%)
         conn.execute(
-            "INSERT INTO roller_campaign VALUES ('H032', 1, 'ACTIVE', 10000.0, 12000.0)",
+            "INSERT INTO roller_campaign (version_id, machine_code, campaign_no, start_date, end_date, cum_weight_t, status, suggest_threshold_t, hard_limit_t) VALUES ('V001', 'H032', 1, '2026-01-01', NULL, 0.0, 'ACTIVE', 10000.0, 12000.0)",
             [],
         )
         .unwrap();
@@ -174,7 +178,7 @@ mod tests {
 
         // H033: 警告 (9000t / 10000t = 90%)
         conn.execute(
-            "INSERT INTO roller_campaign VALUES ('H033', 1, 'ACTIVE', 10000.0, 12000.0)",
+            "INSERT INTO roller_campaign (version_id, machine_code, campaign_no, start_date, end_date, cum_weight_t, status, suggest_threshold_t, hard_limit_t) VALUES ('V001', 'H033', 1, '2026-01-01', NULL, 0.0, 'ACTIVE', 10000.0, 12000.0)",
             [],
         )
         .unwrap();
@@ -194,7 +198,7 @@ mod tests {
 
         // H034: 严重 (10500t / 10000t = 105%)
         conn.execute(
-            "INSERT INTO roller_campaign VALUES ('H034', 1, 'ACTIVE', 10000.0, 12000.0)",
+            "INSERT INTO roller_campaign (version_id, machine_code, campaign_no, start_date, end_date, cum_weight_t, status, suggest_threshold_t, hard_limit_t) VALUES ('V001', 'H034', 1, '2026-01-01', NULL, 0.0, 'ACTIVE', 10000.0, 12000.0)",
             [],
         )
         .unwrap();
@@ -214,7 +218,7 @@ mod tests {
 
         // H035: 紧急 (12000t / 10000t = 120%)
         conn.execute(
-            "INSERT INTO roller_campaign VALUES ('H035', 1, 'ACTIVE', 10000.0, 12000.0)",
+            "INSERT INTO roller_campaign (version_id, machine_code, campaign_no, start_date, end_date, cum_weight_t, status, suggest_threshold_t, hard_limit_t) VALUES ('V001', 'H035', 1, '2026-01-01', NULL, 0.0, 'ACTIVE', 10000.0, 12000.0)",
             [],
         )
         .unwrap();

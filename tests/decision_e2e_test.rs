@@ -551,8 +551,8 @@ mod decision_e2e_test {
             let material_id = format!("MAT_COLD_{:03}", i);
             let age_days = 15 + i; // 15-24 天
             conn.execute(
-                "INSERT INTO material_state (material_id, contract_no, urgency_level, age_days, weight_t, due_date, eligible_machine_code, sched_state, lock_flag, force_release_flag, urgent_level, rush_level, manual_urgent_flag, in_frozen_zone, updated_at)
-                 VALUES (?1, 'C_COLD_001', 'L1', ?2, 50.0, ?3, 'M01', 'UNSCHEDULED', 0, 0, 'L1', 'Normal', 0, 0, CURRENT_TIMESTAMP)",
+                "INSERT INTO material_state (material_id, contract_no, urgency_level, age_days, stock_age_days, weight_t, due_date, eligible_machine_code, machine_code, is_mature, sched_state, lock_flag, force_release_flag, urgent_level, rush_level, manual_urgent_flag, in_frozen_zone, updated_at)
+                 VALUES (?1, 'C_COLD_001', 'L1', ?2, ?2, 50.0, ?3, 'M01', 'M01', 0, 'UNSCHEDULED', 0, 0, 'L1', 'Normal', 0, 0, CURRENT_TIMESTAMP)",
                 rusqlite::params![material_id, age_days, due_date],
             )
             .unwrap();
@@ -585,8 +585,8 @@ mod decision_e2e_test {
         assert!(response.summary.avg_age_days >= 15.0, "平均库龄应该 >= 15 天");
 
         // 验证年龄分桶
-        let has_15_29_bin = response.items.iter().any(|item| item.age_bin == "15-29");
-        assert!(has_15_29_bin, "应该包含 15-29 天的年龄分桶");
+        let has_15_30_bin = response.items.iter().any(|item| item.age_bin == "15-30");
+        assert!(has_15_30_bin, "应该包含 15-30 天的年龄分桶");
     }
 
     // ==========================================
@@ -613,20 +613,58 @@ mod decision_e2e_test {
         )
         .unwrap();
 
-        // 2. 创建换辊活动数据
-        // 活动 1: 累计重量接近建议阈值 (90%)
+        // 2. 创建换辊活动数据 (roller_campaign) + 计划项 (plan_item 用于累计重量)
+        //
+        // 活动 1: 累计重量接近建议阈值 (90%) -> WARNING
+        // 活动 2: 累计重量超过硬限制 -> EMERGENCY
         conn.execute(
-            "INSERT INTO roll_campaign (campaign_id, machine_code, status, cum_weight_t, suggest_threshold_t, hard_limit_t, start_date)
-             VALUES ('CAMP_001', 'M01', 'ACTIVE', 9000.0, 10000.0, 12000.0, '2026-01-15')",
+            r#"
+            INSERT OR IGNORE INTO machine_master (machine_code, machine_name, machine_type) VALUES
+            ('M01', '测试机组01', 'FINISHING'),
+            ('M02', '测试机组02', 'FINISHING')
+            "#,
             rusqlite::params![],
         )
         .unwrap();
 
-        // 活动 2: 累计重量超过硬限制
         conn.execute(
-            "INSERT INTO roll_campaign (campaign_id, machine_code, status, cum_weight_t, suggest_threshold_t, hard_limit_t, start_date)
-             VALUES ('CAMP_002', 'M02', 'ACTIVE', 12500.0, 10000.0, 12000.0, '2026-01-10')",
+            "INSERT INTO roller_campaign (version_id, machine_code, campaign_no, start_date, end_date, cum_weight_t, suggest_threshold_t, hard_limit_t, status)
+             VALUES (?1, 'M01', 1, '2026-01-15', NULL, 0.0, 10000.0, 12000.0, 'ACTIVE')",
+            rusqlite::params![version_id],
+        )
+        .unwrap();
+
+        conn.execute(
+            "INSERT INTO roller_campaign (version_id, machine_code, campaign_no, start_date, end_date, cum_weight_t, suggest_threshold_t, hard_limit_t, status)
+             VALUES (?1, 'M02', 2, '2026-01-10', NULL, 0.0, 10000.0, 12000.0, 'ACTIVE')",
+            rusqlite::params![version_id],
+        )
+        .unwrap();
+
+        // plan_item 累计重量口径来自 plan_item 聚合，而不是 roller_campaign.cum_weight_t
+        conn.execute(
+            "INSERT INTO material_master (material_id, contract_no, width_mm, thickness_mm, weight_t, due_date, created_at, updated_at)
+             VALUES ('MAT_ROLL_M01_001', 'C_ROLL_001', 1500.0, 5.0, 9000.0, '2026-02-15', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
             rusqlite::params![],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO material_master (material_id, contract_no, width_mm, thickness_mm, weight_t, due_date, created_at, updated_at)
+             VALUES ('MAT_ROLL_M02_001', 'C_ROLL_002', 1500.0, 5.0, 12500.0, '2026-02-15', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            rusqlite::params![],
+        )
+        .unwrap();
+
+        conn.execute(
+            "INSERT INTO plan_item (version_id, material_id, machine_code, plan_date, seq_no, weight_t, source_type)
+             VALUES (?1, 'MAT_ROLL_M01_001', 'M01', '2026-01-25', 1, 9000.0, 'scheduled')",
+            rusqlite::params![version_id],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO plan_item (version_id, material_id, machine_code, plan_date, seq_no, weight_t, source_type)
+             VALUES (?1, 'MAT_ROLL_M02_001', 'M02', '2026-01-25', 1, 12500.0, 'scheduled')",
+            rusqlite::params![version_id],
         )
         .unwrap();
 
@@ -657,15 +695,20 @@ mod decision_e2e_test {
         assert!(!response.items.is_empty(), "应该检测到换辊预警");
         assert!(response.summary.total_alerts > 0, "总预警数应该大于 0");
 
-        // 验证 CRITICAL 级别预警
-        let has_critical = response.items.iter().any(|item| item.alert_level == "CRITICAL" || item.alert_level == "HIGH");
-        assert!(has_critical, "应该包含 CRITICAL 或 HIGH 级别预警");
+        // 验证 EMERGENCY 级别预警（超过硬限制）
+        let has_emergency = response.items.iter().any(|item| item.alert_level == "EMERGENCY");
+        assert!(has_emergency, "应该包含 EMERGENCY 级别预警");
 
-        // 验证超过硬限制的活动
-        let over_hard_limit = response.items.iter().find(|item| item.campaign_id == "CAMP_002");
-        if let Some(alert) = over_hard_limit {
-            assert!(alert.current_tonnage_t >= alert.hard_limit_t, "CAMP_002 应该超过硬限制");
-        }
+        // 验证超过硬限制的活动（campaign_no=2 -> campaign_id=C002）
+        let alert = response
+            .items
+            .iter()
+            .find(|item| item.campaign_id == "C002")
+            .expect("应该存在 campaign_no=2 的换辊预警记录");
+        assert!(
+            alert.current_tonnage_t >= alert.hard_limit_t,
+            "C002 应该超过硬限制"
+        );
     }
 
     // ==========================================

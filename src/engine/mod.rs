@@ -22,6 +22,7 @@ pub mod repositories;
 pub mod risk;
 pub mod roll_campaign;
 pub mod structure;
+pub mod strategy;
 pub mod urgency;
 
 // 重导出核心引擎
@@ -42,4 +43,5 @@ pub use repositories::ScheduleRepositories;
 pub use risk::RiskEngine;
 pub use roll_campaign::RollCampaignEngine;
 pub use structure::{StructureCorrector, StructureViolationReport};
+pub use strategy::ScheduleStrategy;
 pub use urgency::UrgencyEngine;

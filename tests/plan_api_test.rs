@@ -15,7 +15,7 @@ mod test_helpers;
 
 use chrono::NaiveDate;
 use helpers::api_test_helper::*;
-use helpers::test_data_builder::{MaterialBuilder, MaterialStateBuilder, CapacityPoolBuilder};
+use helpers::test_data_builder::{CapacityPoolBuilder, MaterialBuilder, MaterialStateBuilder, PlanItemBuilder};
 use hot_rolling_aps::api::ApiError;
 use hot_rolling_aps::domain::types::SchedState;
 
@@ -383,6 +383,183 @@ fn test_compare_versions_空版本对比() {
     assert_eq!(result.added_count, 0);
     assert_eq!(result.removed_count, 0);
     assert_eq!(result.moved_count, 0);
+}
+
+#[test]
+fn test_compare_versions_kpi_聚合统计() {
+    let env = ApiTestEnv::new().expect("无法创建测试环境");
+
+    // 创建方案和2个版本
+    let plan_id = env
+        .plan_api
+        .create_plan("KPI对比测试方案".to_string(), "admin".to_string())
+        .expect("创建失败");
+
+    let version_a = env
+        .plan_api
+        .create_version(
+            plan_id.clone(),
+            30,
+            None,
+            Some("版本A".to_string()),
+            "admin".to_string(),
+        )
+        .expect("创建失败");
+
+    let version_b = env
+        .plan_api
+        .create_version(
+            plan_id,
+            30,
+            None,
+            Some("版本B".to_string()),
+            "admin".to_string(),
+        )
+        .expect("创建失败");
+
+    // 准备 material_master（满足 plan_item 外键）
+    env.material_master_repo
+        .batch_insert_material_master(vec![
+            MaterialBuilder::new("MAT_KPI_001").weight(10.0).machine("H032").build(),
+            MaterialBuilder::new("MAT_KPI_002").weight(7.0).machine("H032").build(),
+            MaterialBuilder::new("MAT_KPI_003").weight(5.0).machine("H032").build(),
+        ])
+        .expect("插入material_master失败");
+
+    let date = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
+
+    // 版本A：2项（其中 1 项将在版本B移动，1项将在版本B被移除）
+    env.plan_item_repo
+        .batch_insert(&[
+            PlanItemBuilder::new(&version_a, "MAT_KPI_001", "H032", date)
+                .seq_no(1)
+                .weight(10.0)
+                .build(),
+            PlanItemBuilder::new(&version_a, "MAT_KPI_003", "H032", date)
+                .seq_no(2)
+                .weight(5.0)
+                .build(),
+        ])
+        .expect("插入plan_item(A)失败");
+
+    // 版本B：2项（移动 MAT_KPI_001，新增 MAT_KPI_002）
+    env.plan_item_repo
+        .batch_insert(&[
+            PlanItemBuilder::new(&version_b, "MAT_KPI_001", "H033", date)
+                .seq_no(1)
+                .weight(10.0)
+                .build(),
+            PlanItemBuilder::new(&version_b, "MAT_KPI_002", "H032", date)
+                .seq_no(2)
+                .weight(7.0)
+                .build(),
+        ])
+        .expect("插入plan_item(B)失败");
+
+    let result = env
+        .plan_api
+        .compare_versions_kpi(&version_a, &version_b)
+        .expect("KPI对比失败");
+
+    // diff counts（口径：仅比较机组/日期）
+    assert_eq!(result.diff_counts.moved_count, 1);
+    assert_eq!(result.diff_counts.added_count, 1);
+    assert_eq!(result.diff_counts.removed_count, 1);
+    assert_eq!(result.diff_counts.squeezed_out_count, 1);
+
+    // plan_item 聚合
+    assert_eq!(result.kpi_a.plan_items_count, 2);
+    assert_eq!(result.kpi_b.plan_items_count, 2);
+    assert!((result.kpi_a.total_weight_t - 15.0).abs() < 1e-9);
+    assert!((result.kpi_b.total_weight_t - 17.0).abs() < 1e-9);
+
+    // risk_snapshot 在该测试中未写入，相关指标应返回 None
+    assert!(result.kpi_a.overflow_days.is_none());
+    assert!(result.kpi_b.overflow_days.is_none());
+}
+
+#[test]
+fn test_rollback_version_切换激活版本并恢复配置快照() {
+    let env = ApiTestEnv::new().expect("无法创建测试环境");
+
+    // 1) 准备配置与方案
+    env.config_api
+        .update_config("global", "maturity_days_winter", "3", "admin", "init")
+        .expect("写入配置失败");
+
+    let plan_id = env
+        .plan_api
+        .create_plan("回滚测试方案".to_string(), "admin".to_string())
+        .expect("创建方案失败");
+
+    // 2) 创建版本A（快照应包含 maturity_days_winter=3）
+    let version_a = env
+        .plan_api
+        .create_version(
+            plan_id.clone(),
+            30,
+            None,
+            Some("版本A".to_string()),
+            "admin".to_string(),
+        )
+        .expect("创建版本A失败");
+
+    // 3) 修改配置并创建版本B（快照应包含 maturity_days_winter=5）
+    env.config_api
+        .update_config("global", "maturity_days_winter", "5", "admin", "update")
+        .expect("写入配置失败");
+
+    let version_b = env
+        .plan_api
+        .create_version(
+            plan_id.clone(),
+            30,
+            None,
+            Some("版本B".to_string()),
+            "admin".to_string(),
+        )
+        .expect("创建版本B失败");
+
+    // 4) 先激活版本B（模拟“当前运行版本”）
+    env.plan_api
+        .activate_version(&version_b, "admin")
+        .expect("激活版本B失败");
+
+    // 5) 模拟运行中配置被改动（与版本B快照产生漂移）
+    env.config_api
+        .update_config("global", "maturity_days_winter", "7", "admin", "drift")
+        .expect("写入配置失败");
+
+    // 6) 回滚到版本A：应恢复 maturity_days_winter=3 + 激活版本A
+    let resp = env
+        .plan_api
+        .rollback_version(&plan_id, &version_a, "admin", "回滚到A做基准")
+        .expect("回滚失败");
+
+    assert_eq!(resp.plan_id, plan_id);
+    assert_eq!(resp.to_version_id, version_a);
+    assert!(resp.message.contains("回滚"));
+
+    let active = env
+        .plan_version_repo
+        .find_active_version(&plan_id)
+        .expect("查询激活版本失败")
+        .expect("应存在激活版本");
+    assert_eq!(active.version_id, version_a);
+
+    let cfg = env
+        .config_api
+        .get_config("global", "maturity_days_winter")
+        .expect("读取配置失败")
+        .expect("配置应存在");
+    assert_eq!(cfg.value, "3");
+
+    // 7) 审计日志应写入
+    let logs = env
+        .action_log_repo
+        .find_by_action_type("ROLLBACK_VERSION", 10)
+        .expect("查询 action_log 失败");
+    assert!(!logs.is_empty(), "应写入 ROLLBACK_VERSION 审计日志");
 }
 
 // ==========================================

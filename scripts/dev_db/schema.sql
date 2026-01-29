@@ -254,6 +254,52 @@ CREATE TABLE action_log (
 );
 
 CREATE INDEX idx_action_version_ts ON action_log(version_id, action_ts);
+CREATE INDEX idx_action_ts ON action_log(action_ts);
+CREATE INDEX idx_action_type_ts ON action_log(action_type, action_ts);
+CREATE INDEX idx_action_actor_ts ON action_log(actor, action_ts);
+CREATE INDEX idx_action_machine_ts ON action_log(machine_code, action_ts);
+CREATE INDEX idx_action_date_range ON action_log(date_range_start, date_range_end);
+
+-- ==========================================
+-- Decision: Strategy drafts (persistent)
+-- ==========================================
+
+CREATE TABLE decision_strategy_draft (
+  draft_id TEXT PRIMARY KEY,
+  base_version_id TEXT NOT NULL REFERENCES plan_version(version_id),
+  plan_date_from TEXT NOT NULL,
+  plan_date_to TEXT NOT NULL,
+
+  -- strategy profile (supports preset + custom:xxx)
+  strategy_key TEXT NOT NULL,
+  strategy_base TEXT NOT NULL,
+  strategy_title_cn TEXT NOT NULL,
+  strategy_params_json TEXT,
+
+  -- lifecycle
+  status TEXT NOT NULL CHECK(status IN ('DRAFT', 'PUBLISHED', 'EXPIRED')),
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+  expires_at TEXT NOT NULL,
+  published_as_version_id TEXT REFERENCES plan_version(version_id),
+  published_by TEXT,
+  published_at TEXT,
+
+  -- soft lock for concurrency (best-effort)
+  locked_by TEXT,
+  locked_at TEXT,
+
+  -- payload
+  summary_json TEXT NOT NULL,
+  diff_items_json TEXT NOT NULL,
+  diff_items_total INTEGER NOT NULL DEFAULT 0,
+  diff_items_truncated INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX idx_strategy_draft_base_version ON decision_strategy_draft(base_version_id);
+CREATE INDEX idx_strategy_draft_status ON decision_strategy_draft(status);
+CREATE INDEX idx_strategy_draft_expires_at ON decision_strategy_draft(expires_at);
+CREATE INDEX idx_strategy_draft_created_at ON decision_strategy_draft(created_at DESC);
 
 -- ==========================================
 -- Importer

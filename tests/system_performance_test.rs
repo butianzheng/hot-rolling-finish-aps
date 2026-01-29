@@ -22,6 +22,7 @@ mod system_performance_test {
         material_repo::{MaterialMasterRepository, MaterialStateRepository},
         plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository},
         risk_repo::RiskSnapshotRepository,
+        strategy_draft_repo::StrategyDraftRepository,
     };
     use rusqlite::Connection;
     use std::sync::{Arc, Mutex};
@@ -132,6 +133,7 @@ mod system_performance_test {
         let plan_version_repo = Arc::new(PlanVersionRepository::new(conn.clone()));
         let plan_item_repo = Arc::new(PlanItemRepository::new(conn.clone()));
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
+        let strategy_draft_repo = Arc::new(StrategyDraftRepository::new(conn.clone()));
         let risk_snapshot_repo = Arc::new(RiskSnapshotRepository::new(&db_path).unwrap());
         let capacity_pool_repo = Arc::new(CapacityPoolRepository::new(db_path.to_string()).unwrap());
 
@@ -161,8 +163,11 @@ mod system_performance_test {
             plan_repo,
             plan_version_repo,
             plan_item_repo,
+            material_state_repo.clone(),
+            strategy_draft_repo,
             action_log_repo,
             risk_snapshot_repo,
+            config_manager.clone(),
             recalc_engine,
             risk_engine,
             None, // 测试环境不需要事件发布

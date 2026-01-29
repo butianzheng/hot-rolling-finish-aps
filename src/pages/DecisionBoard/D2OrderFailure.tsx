@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons';
 import { useSearchParams } from 'react-router-dom';
 import { useAllFailedOrders } from '../../hooks/queries/use-decision-queries';
+import type { DrilldownSpec } from '../../hooks/useRiskOverviewData';
 import { useActiveVersionId } from '../../stores/use-global-store';
 import type { OrderFailure, UrgencyLevel, FailType } from '../../types/decision';
 
@@ -64,7 +65,12 @@ const getFailTypeLabel = (type: string) =>
 // 主组件
 // ==========================================
 
-export const D2OrderFailure: React.FC = () => {
+interface D2OrderFailureProps {
+  embedded?: boolean;
+  onOpenDrilldown?: (spec: DrilldownSpec) => void;
+}
+
+export const D2OrderFailure: React.FC<D2OrderFailureProps> = ({ embedded, onOpenDrilldown }) => {
   const versionId = useActiveVersionId();
   const [searchParams] = useSearchParams();
   const [selectedUrgency, setSelectedUrgency] = useState<UrgencyLevel | 'ALL'>(() => {
@@ -92,6 +98,15 @@ export const D2OrderFailure: React.FC = () => {
     return 'ALL';
   });
   const [selectedOrder, setSelectedOrder] = useState<OrderFailure | null>(null);
+
+  const handleOrderClick = (order: OrderFailure) => {
+    if (embedded && onOpenDrilldown) {
+      setSelectedOrder(order);
+      onOpenDrilldown({ kind: 'orders', urgency: order.urgencyLevel });
+      return;
+    }
+    setSelectedOrder(order);
+  };
 
   // 获取失败订单数据
   const { data, isLoading, error } = useAllFailedOrders(versionId);
@@ -193,7 +208,7 @@ export const D2OrderFailure: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div style={{ textAlign: 'center', padding: '100px 0' }}>
+      <div style={{ textAlign: 'center', padding: embedded ? '40px 0' : '100px 0' }}>
         <Spin size="large" tip="正在加载订单失败数据...">
           <div style={{ minHeight: 80 }} />
         </Spin>
@@ -212,7 +227,7 @@ export const D2OrderFailure: React.FC = () => {
         description={error.message || '未知错误'}
         type="error"
         showIcon
-        style={{ margin: '20px' }}
+        style={{ margin: embedded ? 0 : '20px' }}
       />
     );
   }
@@ -224,7 +239,7 @@ export const D2OrderFailure: React.FC = () => {
         description="请先在主界面选择一个排产版本"
         type="warning"
         showIcon
-        style={{ margin: '20px' }}
+        style={{ margin: embedded ? 0 : '20px' }}
       />
     );
   }
@@ -234,59 +249,99 @@ export const D2OrderFailure: React.FC = () => {
   // ==========================================
 
   return (
-    <div style={{ padding: '24px' }}>
-      {/* 页面标题 */}
-      <div style={{ marginBottom: '24px' }}>
-        <h2>
-          <ThunderboltOutlined style={{ marginRight: '8px' }} />
-          D2决策：订单失败看板
-        </h2>
-        <p style={{ color: '#8c8c8c', marginBottom: '16px' }}>
-          展示紧急订单失败情况，按紧急度分组查看阻塞因素和推荐行动
-        </p>
+    <div style={{ padding: embedded ? 0 : 24 }}>
+      {!embedded ? (
+        <div style={{ marginBottom: 24 }}>
+          <h2>
+            <ThunderboltOutlined style={{ marginRight: 8 }} />
+            D2决策：订单失败看板
+          </h2>
+          <p style={{ color: '#8c8c8c', marginBottom: 16 }}>
+            展示紧急订单失败情况，按紧急度分组查看阻塞因素和推荐行动
+          </p>
 
-        {/* 紧急度过滤器 */}
-        <Space wrap>
-          <Space>
-            <span>紧急度筛选：</span>
-            <Select
-              value={selectedUrgency}
-              onChange={setSelectedUrgency}
-              style={{ width: 150 }}
-              options={[
-                { label: '全部', value: 'ALL' },
-                { label: `${URGENCY_LEVEL_LABELS.L3} (${groupedOrders.L3.length})`, value: 'L3' },
-                { label: `${URGENCY_LEVEL_LABELS.L2} (${groupedOrders.L2.length})`, value: 'L2' },
-                { label: `${URGENCY_LEVEL_LABELS.L1} (${groupedOrders.L1.length})`, value: 'L1' },
-                { label: `${URGENCY_LEVEL_LABELS.L0} (${groupedOrders.L0.length})`, value: 'L0' },
-              ]}
-            />
-          </Space>
+          <Space wrap>
+            <Space>
+              <span>紧急度筛选：</span>
+              <Select
+                value={selectedUrgency}
+                onChange={setSelectedUrgency}
+                style={{ width: 150 }}
+                options={[
+                  { label: '全部', value: 'ALL' },
+                  { label: `${URGENCY_LEVEL_LABELS.L3} (${groupedOrders.L3.length})`, value: 'L3' },
+                  { label: `${URGENCY_LEVEL_LABELS.L2} (${groupedOrders.L2.length})`, value: 'L2' },
+                  { label: `${URGENCY_LEVEL_LABELS.L1} (${groupedOrders.L1.length})`, value: 'L1' },
+                  { label: `${URGENCY_LEVEL_LABELS.L0} (${groupedOrders.L0.length})`, value: 'L0' },
+                ]}
+              />
+            </Space>
 
-          <Space>
-            <span>失败类型筛选：</span>
-            <Select
-              value={selectedFailType}
-              onChange={setSelectedFailType}
-              style={{ width: 200 }}
-              options={[
-                { label: '全部', value: 'ALL' },
-                { label: FAIL_TYPE_LABELS.Overdue, value: 'Overdue' },
-                { label: FAIL_TYPE_LABELS.NearDueImpossible, value: 'NearDueImpossible' },
-                { label: FAIL_TYPE_LABELS.CapacityShortage, value: 'CapacityShortage' },
-                { label: FAIL_TYPE_LABELS.StructureConflict, value: 'StructureConflict' },
-                { label: FAIL_TYPE_LABELS.ColdStockNotReady, value: 'ColdStockNotReady' },
-                { label: FAIL_TYPE_LABELS.Other, value: 'Other' },
-              ]}
-            />
+            <Space>
+              <span>失败类型筛选：</span>
+              <Select
+                value={selectedFailType}
+                onChange={setSelectedFailType}
+                style={{ width: 200 }}
+                options={[
+                  { label: '全部', value: 'ALL' },
+                  { label: FAIL_TYPE_LABELS.Overdue, value: 'Overdue' },
+                  { label: FAIL_TYPE_LABELS.NearDueImpossible, value: 'NearDueImpossible' },
+                  { label: FAIL_TYPE_LABELS.CapacityShortage, value: 'CapacityShortage' },
+                  { label: FAIL_TYPE_LABELS.StructureConflict, value: 'StructureConflict' },
+                  { label: FAIL_TYPE_LABELS.ColdStockNotReady, value: 'ColdStockNotReady' },
+                  { label: FAIL_TYPE_LABELS.Other, value: 'Other' },
+                ]}
+              />
+            </Space>
           </Space>
-        </Space>
-      </div>
+        </div>
+      ) : (
+        <div style={{ marginBottom: 12 }}>
+          <Space wrap>
+            <Space>
+              <span>紧急度：</span>
+              <Select
+                size="small"
+                value={selectedUrgency}
+                onChange={setSelectedUrgency}
+                style={{ width: 150 }}
+                options={[
+                  { label: '全部', value: 'ALL' },
+                  { label: `${URGENCY_LEVEL_LABELS.L3} (${groupedOrders.L3.length})`, value: 'L3' },
+                  { label: `${URGENCY_LEVEL_LABELS.L2} (${groupedOrders.L2.length})`, value: 'L2' },
+                  { label: `${URGENCY_LEVEL_LABELS.L1} (${groupedOrders.L1.length})`, value: 'L1' },
+                  { label: `${URGENCY_LEVEL_LABELS.L0} (${groupedOrders.L0.length})`, value: 'L0' },
+                ]}
+              />
+            </Space>
+
+            <Space>
+              <span>失败类型：</span>
+              <Select
+                size="small"
+                value={selectedFailType}
+                onChange={setSelectedFailType}
+                style={{ width: 200 }}
+                options={[
+                  { label: '全部', value: 'ALL' },
+                  { label: FAIL_TYPE_LABELS.Overdue, value: 'Overdue' },
+                  { label: FAIL_TYPE_LABELS.NearDueImpossible, value: 'NearDueImpossible' },
+                  { label: FAIL_TYPE_LABELS.CapacityShortage, value: 'CapacityShortage' },
+                  { label: FAIL_TYPE_LABELS.StructureConflict, value: 'StructureConflict' },
+                  { label: FAIL_TYPE_LABELS.ColdStockNotReady, value: 'ColdStockNotReady' },
+                  { label: FAIL_TYPE_LABELS.Other, value: 'Other' },
+                ]}
+              />
+            </Space>
+          </Space>
+        </div>
+      )}
 
       {/* 统计卡片 */}
-      <Row gutter={16} style={{ marginBottom: '24px' }}>
+      <Row gutter={embedded ? 12 : 16} style={{ marginBottom: embedded ? 12 : 24 }}>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="失败订单总数"
               value={stats.totalFailures}
@@ -296,7 +351,7 @@ export const D2OrderFailure: React.FC = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="超期未完成"
               value={stats.overdueCount}
@@ -306,7 +361,7 @@ export const D2OrderFailure: React.FC = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="临期无法完成"
               value={stats.nearDueImpossibleCount}
@@ -316,7 +371,7 @@ export const D2OrderFailure: React.FC = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
+          <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="平均完成率"
               value={stats.avgCompletionRate}
@@ -347,7 +402,7 @@ export const D2OrderFailure: React.FC = () => {
                   <OrderCard
                     key={order.contractNo}
                     order={order}
-                    onClick={() => setSelectedOrder(order)}
+                    onClick={() => handleOrderClick(order)}
                     isSelected={selectedOrder?.contractNo === order.contractNo}
                   />
                 ))}
@@ -376,7 +431,7 @@ export const D2OrderFailure: React.FC = () => {
               <Col key={order.contractNo} span={6} style={{ marginBottom: '16px' }}>
                 <OrderCard
                   order={order}
-                  onClick={() => setSelectedOrder(order)}
+                  onClick={() => handleOrderClick(order)}
                   isSelected={selectedOrder?.contractNo === order.contractNo}
                 />
               </Col>
@@ -391,7 +446,7 @@ export const D2OrderFailure: React.FC = () => {
       )}
 
       {/* 选中订单的详细信息 */}
-      {selectedOrder && (
+      {!embedded && selectedOrder && (
         <Card
           title={`订单详情: ${selectedOrder.contractNo}`}
           style={{ marginTop: '24px' }}

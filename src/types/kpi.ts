@@ -10,6 +10,10 @@ export interface GlobalKPI {
   // 紧急订单统计
   urgentOrdersCount: number;
   blockedUrgentCount: number;
+  urgentBreakdown?: {
+    L2: { total: number; blocked: number };
+    L3: { total: number; blocked: number };
+  };
 
   // 产能利用率
   capacityUtilization: number; // 百分比

@@ -8,10 +8,21 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
+import type { UserPreferences } from '../types/preferences';
 
 // ==========================================
 // 全局状态接口
 // ==========================================
+
+export type VersionComparisonMode = 'DRAFT_COMPARISON' | 'HISTORICAL';
+export type WorkbenchViewMode = 'MATRIX' | 'GANTT' | 'CARD';
+export type WorkbenchLockStatusFilter = 'ALL' | 'LOCKED' | 'UNLOCKED';
+
+export interface WorkbenchFilters {
+  machineCode: string | null;
+  urgencyLevel: string | null;
+  lockStatus: WorkbenchLockStatusFilter;
+}
 
 export interface GlobalState {
   // 当前激活的排产版本ID
@@ -26,6 +37,18 @@ export interface GlobalState {
 
   // 管理员覆盖模式
   adminOverrideMode: boolean;
+
+  // 版本对比
+  versionComparisonMode: VersionComparisonMode | null;
+  selectedVersionA: string | null;
+  selectedVersionB: string | null;
+
+  // 工作台
+  workbenchViewMode: WorkbenchViewMode;
+  workbenchFilters: WorkbenchFilters;
+
+  // 用户偏好
+  userPreferences: UserPreferences;
 }
 
 // ==========================================
@@ -48,6 +71,20 @@ export interface GlobalActions {
   // 设置管理员覆盖模式
   setAdminOverrideMode: (flag: boolean) => void;
 
+  // 设置版本对比模式
+  setVersionComparisonMode: (mode: VersionComparisonMode | null) => void;
+
+  // 设置对比版本
+  setSelectedVersionA: (versionId: string | null) => void;
+  setSelectedVersionB: (versionId: string | null) => void;
+
+  // 工作台视图/筛选
+  setWorkbenchViewMode: (mode: WorkbenchViewMode) => void;
+  setWorkbenchFilters: (filters: Partial<WorkbenchFilters>) => void;
+
+  // 用户偏好
+  updateUserPreferences: (updates: Partial<UserPreferences>) => void;
+
   // 重置所有状态
   reset: () => void;
 }
@@ -68,6 +105,27 @@ const initialState: GlobalState = {
       ? localStorage.getItem(LEGACY_CURRENT_USER_KEY) || 'admin'
       : 'admin',
   adminOverrideMode: false,
+
+  versionComparisonMode: null,
+  selectedVersionA: null,
+  selectedVersionB: null,
+
+  workbenchViewMode: 'MATRIX',
+  workbenchFilters: {
+    machineCode: null,
+    urgencyLevel: null,
+    lockStatus: 'ALL',
+  },
+
+  userPreferences: {
+    defaultTheme:
+      typeof window !== 'undefined'
+        ? ((localStorage.getItem('theme') as UserPreferences['defaultTheme'] | null) || 'dark')
+        : 'dark',
+    autoRefreshInterval: 30_000,
+    sidebarCollapsed: false,
+    defaultStrategy: 'balanced',
+  },
 };
 
 // ==========================================
@@ -109,6 +167,36 @@ export const useGlobalStore = create<GlobalState & GlobalActions>()(
             state.adminOverrideMode = flag;
           }),
 
+        setVersionComparisonMode: (mode) =>
+          set((state) => {
+            state.versionComparisonMode = mode;
+          }),
+
+        setSelectedVersionA: (versionId) =>
+          set((state) => {
+            state.selectedVersionA = versionId;
+          }),
+
+        setSelectedVersionB: (versionId) =>
+          set((state) => {
+            state.selectedVersionB = versionId;
+          }),
+
+        setWorkbenchViewMode: (mode) =>
+          set((state) => {
+            state.workbenchViewMode = mode;
+          }),
+
+        setWorkbenchFilters: (filters) =>
+          set((state) => {
+            state.workbenchFilters = { ...state.workbenchFilters, ...filters };
+          }),
+
+        updateUserPreferences: (updates) =>
+          set((state) => {
+            state.userPreferences = { ...state.userPreferences, ...updates };
+          }),
+
         reset: () => set(initialState),
       }),
       {
@@ -116,8 +204,12 @@ export const useGlobalStore = create<GlobalState & GlobalActions>()(
         storage: createJSONStorage(() => localStorage),
         // 只持久化部分字段（临时状态不持久化）
         partialize: (state) => ({
+          activeVersionId: state.activeVersionId,
           currentUser: state.currentUser,
           adminOverrideMode: state.adminOverrideMode,
+          workbenchViewMode: state.workbenchViewMode,
+          workbenchFilters: state.workbenchFilters,
+          userPreferences: state.userPreferences,
         }),
       }
     )
@@ -143,6 +235,9 @@ export const useIsImporting = () => useGlobalStore((state) => state.isImporting)
 // 获取管理员覆盖模式
 export const useAdminOverrideMode = () => useGlobalStore((state) => state.adminOverrideMode);
 
+// 获取用户偏好
+export const useUserPreferences = () => useGlobalStore((state) => state.userPreferences);
+
 // 获取所有 Actions（不会触发重新渲染）
 export const useGlobalActions = () =>
   useGlobalStore((state) => ({
@@ -151,5 +246,11 @@ export const useGlobalActions = () =>
     setImporting: state.setImporting,
     setCurrentUser: state.setCurrentUser,
     setAdminOverrideMode: state.setAdminOverrideMode,
+    setVersionComparisonMode: state.setVersionComparisonMode,
+    setSelectedVersionA: state.setSelectedVersionA,
+    setSelectedVersionB: state.setSelectedVersionB,
+    setWorkbenchViewMode: state.setWorkbenchViewMode,
+    setWorkbenchFilters: state.setWorkbenchFilters,
+    updateUserPreferences: state.updateUserPreferences,
     reset: state.reset,
   }));

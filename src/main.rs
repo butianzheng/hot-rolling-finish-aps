@@ -58,7 +58,7 @@ fn main() {
             list_materials_by_urgent_level,
 
             // ==========================================
-            // 排产方案相关命令 (15个)
+            // 排产方案相关命令 (18个)
             // ==========================================
             create_plan,
             list_plans,
@@ -69,11 +69,19 @@ fn main() {
             create_version,
             list_versions,
             activate_version,
+            rollback_version,
             simulate_recalc,
             recalc_full,
+            get_strategy_presets,
+            generate_strategy_drafts,
+            apply_strategy_draft,
+            get_strategy_draft_detail,
+            list_strategy_drafts,
+            cleanup_expired_strategy_drafts,
             list_plan_items,
             list_items_by_date,
             compare_versions,
+            compare_versions_kpi,
             move_items,
 
             // ==========================================
@@ -85,12 +93,15 @@ fn main() {
             get_unsatisfied_urgent_materials,
             get_cold_stock_materials,
             get_most_congested_machine,
+            get_refresh_status,
+            manual_refresh_decision,
             list_action_logs,
+            list_action_logs_by_material,
             list_action_logs_by_version,
             get_recent_actions,
 
             // ==========================================
-            // 配置管理相关命令 (6个)
+            // 配置管理相关命令 (8个)
             // ==========================================
             list_configs,
             get_config,
@@ -98,6 +109,8 @@ fn main() {
             batch_update_configs,
             get_config_snapshot,
             restore_config_from_snapshot,
+            save_custom_strategy,
+            list_custom_strategies,
 
             // ==========================================
             // 换辊管理相关命令 (5个)
@@ -119,10 +132,16 @@ fn main() {
             get_capacity_opportunity,           // D6: 是否存在产能优化空间
 
             // ==========================================
-            // 产能池管理相关命令 (2个)
+            // 产能池管理相关命令 (3个)
             // ==========================================
             get_capacity_pools,
             update_capacity_pool,
+            batch_update_capacity_pools,
+
+            // ==========================================
+            // 前端遥测/错误上报 (1个)
+            // ==========================================
+            report_frontend_event,
         ])
         .run(tauri::generate_context!())
         .expect("启动Tauri应用失败");

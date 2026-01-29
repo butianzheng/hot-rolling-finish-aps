@@ -9,10 +9,12 @@
 
 pub mod config_manager;
 pub mod import_config_trait;
+pub mod strategy_profile;
 
 // 重导出核心配置管理器
 pub use config_manager::{config_keys, ConfigManager, ConfigScope};
 pub use import_config_trait::ImportConfigReader;
+pub use strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
 
 // TODO: 添加配置验证器
 // TODO: 添加配置变更监听器

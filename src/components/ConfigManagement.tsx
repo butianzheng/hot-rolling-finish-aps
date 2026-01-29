@@ -8,6 +8,7 @@ import {
   Select,
   Modal,
   Input,
+  Alert,
   message,
   Row,
   Col,
@@ -45,6 +46,7 @@ const ConfigManagement: React.FC = () => {
   const [filteredConfigs, setFilteredConfigs] = useState<ConfigItem[]>([]);
   const [selectedScopeType, setSelectedScopeType] = useState<string>('all');
   const [searchText, setSearchText] = useState<string>('');
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingConfig, setEditingConfig] = useState<ConfigItem | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -56,6 +58,7 @@ const ConfigManagement: React.FC = () => {
 
   const loadConfigs = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const result = await configApi.listConfigs();
       setConfigs(result);
@@ -63,6 +66,9 @@ const ConfigManagement: React.FC = () => {
       message.success(`成功加载 ${result.length} 条配置`);
     } catch (error: any) {
       console.error('加载配置失败:', error);
+      const msg = String(error?.message || error || '加载失败');
+      setLoadError(msg);
+      message.error(`加载失败: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -293,6 +299,21 @@ const ConfigManagement: React.FC = () => {
         </Col>
       </Row>
 
+      {loadError && (
+        <Alert
+          type="error"
+          showIcon
+          message="配置加载失败"
+          description={loadError}
+          action={
+            <Button size="small" onClick={loadConfigs}>
+              重试
+            </Button>
+          }
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
       {/* 统计卡片 */}
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={6}>
@@ -362,12 +383,13 @@ const ConfigManagement: React.FC = () => {
           loading={loading}
           rowKey={(record) => `${record.scope_id}-${record.key}`}
           locale={tableEmptyConfig}
+          virtual
           pagination={{
             pageSize: 20,
             showSizeChanger: true,
             showTotal: (total) => `共 ${total} 条配置`,
           }}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 1000, y: 520 }}
           size="small"
         />
       </Card>
