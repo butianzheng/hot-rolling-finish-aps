@@ -12,7 +12,7 @@ import { StrategyDraftControls } from './StrategyDraftControls';
 import { KpiOverviewCard } from './KpiOverviewCard';
 import { StrategyDraftCard } from './StrategyDraftCard';
 import { StrategyDraftDetailDrawer } from './StrategyDraftDetailDrawer';
-import { MaterialDetailModal } from './MaterialDetailModal';
+import MaterialDetailModal from './MaterialDetailModal';
 import { PostPublishModal } from './PostPublishModal';
 
 const StrategyDraftComparison: React.FC = () => {
