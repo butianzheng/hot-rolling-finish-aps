@@ -40,11 +40,12 @@ fn main() {
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             // ==========================================
-            // 材料导入相关命令 (3个)
+            // 材料导入相关命令 (4个)
             // ==========================================
             import_materials,
             list_import_conflicts,
             resolve_import_conflict,
+            batch_resolve_import_conflicts,
 
             // ==========================================
             // 材料相关命令 (7个)

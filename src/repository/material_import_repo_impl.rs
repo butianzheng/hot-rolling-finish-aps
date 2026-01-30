@@ -481,6 +481,30 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
         Ok(count)
     }
 
+    /// 按批次统计冲突数量（支持状态过滤）
+    async fn count_conflicts_by_batch(
+        &self,
+        batch_id: &str,
+        status: Option<&str>,
+    ) -> Result<i64, Box<dyn Error>> {
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
+
+        let count: i64 = match status {
+            Some(s) => conn.query_row(
+                "SELECT COUNT(*) FROM import_conflict WHERE source_batch_id = ?1 AND resolution_status = ?2",
+                params![batch_id, s],
+                |row| row.get(0),
+            )?,
+            None => conn.query_row(
+                "SELECT COUNT(*) FROM import_conflict WHERE source_batch_id = ?1",
+                params![batch_id],
+                |row| row.get(0),
+            )?,
+        };
+
+        Ok(count)
+    }
+
     /// 根据ID获取单个冲突记录
     async fn get_conflict_by_id(
         &self,

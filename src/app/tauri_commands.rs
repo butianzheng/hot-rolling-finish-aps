@@ -1828,6 +1828,74 @@ pub async fn resolve_import_conflict(
     Ok("{}".to_string())
 }
 
+/// 批量处理导入冲突
+///
+/// # 参数
+/// - conflict_ids: 冲突ID列表
+/// - action: 处理动作 (KEEP_EXISTING, OVERWRITE, MERGE)
+/// - note: 处理备注（可选）
+/// - operator: 操作人（可选，默认为 "system"）
+///
+/// # 返回
+/// - 成功: BatchResolveConflictsResponse JSON
+/// - 失败: 错误消息
+#[tauri::command(rename_all = "snake_case")]
+pub async fn batch_resolve_import_conflicts(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    conflict_ids: Vec<String>,
+    action: String,
+    note: Option<String>,
+    operator: Option<String>,
+) -> Result<String, String> {
+    use crate::domain::action_log::ActionLog;
+
+    let operator = operator.unwrap_or_else(|| "system".to_string());
+
+    // 批量处理冲突
+    let result = state
+        .import_api
+        .batch_resolve_import_conflicts(&conflict_ids, &action, note.as_deref(), &operator)
+        .await
+        .map_err(map_api_error)?;
+
+    // 记录 ActionLog（红线5：可解释性/审计追踪）
+    let action_log = ActionLog {
+        action_id: uuid::Uuid::new_v4().to_string(),
+        version_id: "N/A".to_string(),
+        action_type: "BATCH_RESOLVE_IMPORT_CONFLICT".to_string(),
+        action_ts: chrono::Local::now().naive_local(),
+        actor: operator.clone(),
+        payload_json: Some(serde_json::json!({
+            "conflict_count": conflict_ids.len(),
+            "action": action,
+            "conflict_ids": conflict_ids,
+        })),
+        impact_summary_json: Some(serde_json::json!({
+            "success_count": result.success_count,
+            "fail_count": result.fail_count,
+            "all_resolved": result.all_resolved,
+        })),
+        machine_code: None,
+        date_range_start: None,
+        date_range_end: None,
+        detail: note,
+    };
+
+    // 尝试记录 ActionLog，失败时只记录警告
+    if let Err(e) = state.action_log_repo.insert(&action_log) {
+        tracing::warn!(error = %e, "记录批量冲突解决操作日志失败");
+    }
+
+    emit_frontend_event(&app, "material_state_changed", serde_json::json!({}));
+
+    // 返回结果JSON
+    let response_json = serde_json::to_string(&result)
+        .map_err(|e| format!("序列化批量处理结果失败: {}", e))?;
+
+    Ok(response_json)
+}
+
 // ==========================================
 // 产能池管理相关命令
 // ==========================================

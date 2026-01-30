@@ -710,3 +710,20 @@ export const ActionLogSchema = z
   })
   .passthrough();
 
+// ==========================================================
+// 批量处理导入冲突 响应 Schema
+// ==========================================================
+
+export const BatchResolveConflictsResponseSchema = z
+  .object({
+    success_count: z.number(),
+    fail_count: z.number(),
+    message: z.string(),
+    all_resolved: z.boolean(),
+    failed_ids: z.array(z.string()).optional(),
+    details: z.record(z.unknown()).nullable().optional(),
+  })
+  .passthrough();
+
+export type BatchResolveConflictsResponse = z.infer<typeof BatchResolveConflictsResponseSchema>;
+

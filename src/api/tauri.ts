@@ -33,6 +33,8 @@ import {
   ActionLogSchema,
   ImpactSummarySchema,
   RecalcResponseSchema,
+  BatchResolveConflictsResponseSchema,
+  type BatchResolveConflictsResponse,
 } from './ipcSchemas';
 
 // ==========================================
@@ -83,6 +85,29 @@ export const importApi = {
       action,
       note,
       operator,
+    });
+  },
+
+  /**
+   * 批量处理导入冲突
+   * @param conflictIds 冲突ID列表
+   * @param action 处理动作 (KEEP_EXISTING | OVERWRITE | MERGE)
+   * @param note 处理备注（可选）
+   * @param operator 操作人（可选，默认为 'system'）
+   */
+  async batchResolveImportConflicts(
+    conflictIds: string[],
+    action: 'KEEP_EXISTING' | 'OVERWRITE' | 'MERGE',
+    note?: string,
+    operator: string = 'system'
+  ): Promise<BatchResolveConflictsResponse> {
+    return IpcClient.call('batch_resolve_import_conflicts', {
+      conflict_ids: conflictIds,
+      action,
+      note,
+      operator,
+    }, {
+      validate: zodValidator(BatchResolveConflictsResponseSchema, 'batch_resolve_import_conflicts'),
     });
   },
 };

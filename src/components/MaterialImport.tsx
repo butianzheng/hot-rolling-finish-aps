@@ -36,6 +36,19 @@ const MaterialImport: React.FC = () => {
     await workflow.handleResolveConflict(conflictId, action, { currentUser: currentUser || 'admin' });
   };
 
+  // 批量处理冲突解决
+  const handleBatchResolveConflict = async (
+    conflictIds: string[],
+    action: 'KEEP_EXISTING' | 'OVERWRITE' | 'MERGE',
+  ) => {
+    // 批量调用handleResolveConflict
+    for (const conflictId of conflictIds) {
+      await workflow.handleResolveConflict(conflictId, action, { currentUser: currentUser || 'admin' });
+    }
+    // 刷新冲突列表
+    await workflow.loadConflicts();
+  };
+
   // 处理查看冲突（从历史记录跳转）
   const handleViewConflicts = async (batchId: string) => {
     workflow.setConflictBatchId(batchId);
@@ -136,6 +149,7 @@ const MaterialImport: React.FC = () => {
                 conflictsLoading={workflow.conflictsLoading}
                 onLoadConflicts={workflow.loadConflicts}
                 onResolveConflict={handleResolveConflict}
+                onBatchResolveConflicts={handleBatchResolveConflict}
                 onViewRawData={(title, content) =>
                   workflow.setRawModal({ open: true, title, content })
                 }

@@ -116,6 +116,20 @@ pub trait MaterialImportRepository: Send + Sync {
         status: Option<&str>,
     ) -> Result<i64, Box<dyn Error>>;
 
+    /// 按批次统计冲突数量（支持状态过滤）
+    ///
+    /// # 参数
+    /// - batch_id: 批次ID
+    /// - status: 冲突状态过滤 (OPEN/RESOLVED/IGNORED/None表示全部)
+    ///
+    /// # 返回
+    /// - Ok(i64): 冲突数量
+    async fn count_conflicts_by_batch(
+        &self,
+        batch_id: &str,
+        status: Option<&str>,
+    ) -> Result<i64, Box<dyn Error>>;
+
     /// 根据ID获取单个冲突记录
     ///
     /// # 参数
