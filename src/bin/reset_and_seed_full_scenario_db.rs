@@ -128,6 +128,52 @@ fn seed_full_scenario(conn: &Connection) -> Result<(), Box<dyn Error>> {
         params![now_sql_dt],
     )?;
 
+    // 紧急等级阈值配置
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','urgent_n1_days','2',?1)",
+        params![now_sql_dt],
+    )?;
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','urgent_n2_days','7',?1)",
+        params![now_sql_dt],
+    )?;
+
+    // 换辊配置
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','roll_suggest_threshold_t','1500',?1)",
+        params![now_sql_dt],
+    )?;
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','roll_hard_limit_t','2500',?1)",
+        params![now_sql_dt],
+    )?;
+
+    // 产能配置
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','overflow_pct','0.05',?1)",
+        params![now_sql_dt],
+    )?;
+
+    // 重算配置
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','recalc_window_days','7',?1)",
+        params![now_sql_dt],
+    )?;
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','cascade_window_days','14',?1)",
+        params![now_sql_dt],
+    )?;
+
+    // 结构校正配置
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','target_ratio','{}',?1)",
+        params![now_sql_dt],
+    )?;
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','deviation_threshold','0.1',?1)",
+        params![now_sql_dt],
+    )?;
+
     // Machines (frontend defaults include H031-H034)
     let machines = [
         ("H031", "Finishing Line 31", 60.0, 1400.0, 1.15),

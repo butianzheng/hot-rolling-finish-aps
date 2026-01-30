@@ -632,5 +632,54 @@ pub fn insert_test_config(conn: &Connection) -> Result<(), Box<dyn Error>> {
         [],
     )?;
 
+    // 紧急等级阈值配置
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO config_kv (scope_id, key, value, updated_at) VALUES
+        ('global', 'urgent_n1_days', '2', datetime('now')),
+        ('global', 'urgent_n2_days', '7', datetime('now'))
+        "#,
+        [],
+    )?;
+
+    // 换辊配置
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO config_kv (scope_id, key, value, updated_at) VALUES
+        ('global', 'roll_suggest_threshold_t', '1500', datetime('now')),
+        ('global', 'roll_hard_limit_t', '2500', datetime('now'))
+        "#,
+        [],
+    )?;
+
+    // 产能配置
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO config_kv (scope_id, key, value, updated_at) VALUES
+        ('global', 'overflow_pct', '0.05', datetime('now'))
+        "#,
+        [],
+    )?;
+
+    // 重算配置
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO config_kv (scope_id, key, value, updated_at) VALUES
+        ('global', 'recalc_window_days', '7', datetime('now')),
+        ('global', 'cascade_window_days', '14', datetime('now'))
+        "#,
+        [],
+    )?;
+
+    // 结构校正配置
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO config_kv (scope_id, key, value, updated_at) VALUES
+        ('global', 'target_ratio', '{}', datetime('now')),
+        ('global', 'deviation_threshold', '0.1', datetime('now'))
+        "#,
+        [],
+    )?;
+
     Ok(())
 }
