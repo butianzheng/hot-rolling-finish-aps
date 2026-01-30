@@ -128,15 +128,34 @@ hot-rolling-finish-aps/
 
 ## 文档索引
 
+📚 **[完整文档导航](docs/INDEX.md)** - 按角色和用途查找文档
+
+### 核心规范
+
 | 文档 | 说明 |
 |-----|------|
 | [spec/Claude_Dev_Master_Spec.md](spec/Claude_Dev_Master_Spec.md) | 最高权威规范 |
 | [spec/Engine_Specs_v0.3_Integrated.md](spec/Engine_Specs_v0.3_Integrated.md) | 引擎规格 |
 | [spec/Tauri_API_Contract_v0.3_Integrated.md](spec/Tauri_API_Contract_v0.3_Integrated.md) | API 契约 |
 | [spec/DecisionApi_Contract_v1.0.md](spec/DecisionApi_Contract_v1.0.md) | 决策 API 规范 |
-| [PROJECT_AUDIT_REPORT.md](PROJECT_AUDIT_REPORT.md) | 项目审核报告 |
-| [FRONTEND_README.md](FRONTEND_README.md) | 前端开发指南 |
-| [CLAUDE.md](CLAUDE.md) | 项目宪法 |
+
+### 项目文档
+
+| 文档 | 说明 |
+|-----|------|
+| [CLAUDE.md](CLAUDE.md) | 项目宪法（开发规范与约束） |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 贡献指南 |
+| [docs/core/ARCHITECTURE.md](docs/core/ARCHITECTURE.md) | 系统架构 |
+| [docs/core/DEVELOPMENT_GUIDE.md](docs/core/DEVELOPMENT_GUIDE.md) | 开发指南 |
+| [docs/reports/FINAL_WORK_SUMMARY.md](docs/reports/FINAL_WORK_SUMMARY.md) | 最终工作总结 |
+| [docs/reports/TEST_REPORT.md](docs/reports/TEST_REPORT.md) | 单元测试报告 |
+
+### 历史文档
+
+| 文档 | 说明 |
+|-----|------|
+| [docs/archived/audit_reports/PROJECT_AUDIT_REPORT.md](docs/archived/audit_reports/PROJECT_AUDIT_REPORT.md) | 项目审核报告 |
+| [docs/frontend/README.md](docs/frontend/README.md) | 前端开发指南 |
 
 ---
 
