@@ -6,7 +6,7 @@ import { Button, Tag, Tooltip } from 'antd';
 import { EditOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { ConfigItem } from './types';
-import { scopeTypeColors, configDescriptions } from './types';
+import { scopeTypeColors, scopeTypeLabels, scopeIdLabels, configKeyLabels, configDescriptions } from './types';
 
 export interface ConfigColumnsOptions {
   onEdit: (record: ConfigItem) => void;
@@ -24,31 +24,40 @@ export function createConfigColumns(
       key: 'scope_type',
       width: 120,
       render: (type: string) => (
-        <Tag color={scopeTypeColors[type] || 'default'}>{type}</Tag>
+        <Tag color={scopeTypeColors[type] || 'default'}>
+          {scopeTypeLabels[type] || type}
+        </Tag>
       ),
     },
     {
       title: '作用域ID',
       dataIndex: 'scope_id',
       key: 'scope_id',
-      width: 150,
+      width: 120,
+      render: (id: string) => (
+        <span>{scopeIdLabels[id] || id}</span>
+      ),
     },
     {
       title: '配置键',
       dataIndex: 'key',
       key: 'key',
-      width: 200,
-      render: (key: string) => (
-        <Tooltip title={configDescriptions[key] || '无描述'}>
-          <span style={{ cursor: 'help' }}>{key}</span>
-        </Tooltip>
-      ),
+      width: 180,
+      render: (key: string) => {
+        const label = configKeyLabels[key] || key;
+        const desc = configDescriptions[key];
+        return (
+          <Tooltip title={desc || '无描述'}>
+            <span style={{ cursor: 'help' }}>{label}</span>
+          </Tooltip>
+        );
+      },
     },
     {
       title: '配置值',
       dataIndex: 'value',
       key: 'value',
-      width: 150,
+      width: 180,
       render: (value: string) => (
         <span style={{ fontWeight: 'bold', color: '#1890ff' }}>{value}</span>
       ),

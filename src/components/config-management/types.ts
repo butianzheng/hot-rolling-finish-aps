@@ -18,6 +18,58 @@ export const scopeTypeColors: Record<string, string> = {
   VERSION: 'purple',
 };
 
+// 作用域类型中文名称
+export const scopeTypeLabels: Record<string, string> = {
+  GLOBAL: '全局',
+  MACHINE: '机组',
+  STEEL_GRADE: '钢种',
+  VERSION: '版本',
+};
+
+// 作用域ID中文名称（常见值映射）
+export const scopeIdLabels: Record<string, string> = {
+  global: '全局',
+  // 机组作用域ID会动态显示，如 H031, H032 等
+  // 可根据需要扩展
+};
+
+// 配置键中文名称
+export const configKeyLabels: Record<string, string> = {
+  // 季节与适温配置
+  season_mode: '季节模式',
+  winter_months: '冬季月份',
+  manual_season: '手动季节',
+  min_temp_days_winter: '冬季适温天数',
+  min_temp_days_summer: '夏季适温天数',
+
+  // 机组代码配置
+  standard_finishing_machines: '标准精整机组',
+  machine_offset_days: '机组偏移天数',
+
+  // 紧急等级阈值配置
+  urgent_n1_days: 'N1紧急阈值',
+  urgent_n2_days: 'N2紧急阈值',
+
+  // 换辊配置
+  roll_suggest_threshold_t: '换辊建议阈值',
+  roll_hard_limit_t: '换辊强制限制',
+
+  // 产能配置
+  overflow_pct: '产能溢出比例',
+
+  // 重算配置
+  recalc_window_days: '重算窗口天数',
+  cascade_window_days: '级联窗口天数',
+
+  // 结构校正配置
+  target_ratio: '目标钢种配比',
+  deviation_threshold: '结构偏差阈值',
+
+  // 数据质量配置
+  weight_anomaly_threshold: '重量异常阈值',
+  batch_retention_days: '批次保留天数',
+};
+
 // 配置键说明（完整汉化版）
 export const configDescriptions: Record<string, string> = {
   // 季节与适温配置
