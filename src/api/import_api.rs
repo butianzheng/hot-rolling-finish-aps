@@ -71,6 +71,17 @@ pub struct BatchResolveConflictsResponse {
     pub details: Option<serde_json::Value>,
 }
 
+/// 取消导入批次响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CancelImportBatchResponse {
+    /// 删除的材料数量
+    pub deleted_materials: usize,
+    /// 删除的冲突记录数
+    pub deleted_conflicts: usize,
+    /// 操作结果说明
+    pub message: String,
+}
+
 /// 导入API
 pub struct ImportApi {
     db_path: String,
@@ -392,6 +403,61 @@ impl ImportApi {
             all_resolved,
             failed_ids,
             details: None,
+        })
+    }
+
+    /// 取消导入批次
+    ///
+    /// # 参数
+    /// - batch_id: 批次ID
+    ///
+    /// # 返回
+    /// - Ok(CancelImportBatchResponse): 取消导入结果
+    /// - Err(ApiError): 错误信息
+    ///
+    /// # 说明
+    /// - 删除该批次的所有冲突记录
+    /// - 删除批次记录
+    /// - 不删除已导入的材料（MaterialMaster/MaterialState）
+    /// - 调用方应记录 ActionLog 用于审计追踪（红线5）
+    pub async fn cancel_import_batch(
+        &self,
+        batch_id: &str,
+    ) -> Result<CancelImportBatchResponse, ApiError> {
+        let repo = MaterialImportRepositoryImpl::new(&self.db_path)
+            .map_err(|e| ApiError::DatabaseError(format!("创建仓储失败: {}", e)))?;
+
+        // 1. 删除该批次的所有冲突记录
+        let deleted_conflicts = repo
+            .delete_conflicts_by_batch(batch_id)
+            .await
+            .map_err(|e| ApiError::DatabaseError(format!("删除冲突记录失败: {}", e)))?;
+
+        // 2. 删除该批次的材料（方案1：暂不实现）
+        let deleted_materials = repo
+            .delete_materials_by_batch(batch_id)
+            .await
+            .map_err(|e| ApiError::DatabaseError(format!("删除材料失败: {}", e)))?;
+
+        // 3. 删除批次记录
+        repo.delete_batch(batch_id)
+            .await
+            .map_err(|e| ApiError::DatabaseError(format!("删除批次记录失败: {}", e)))?;
+
+        tracing::info!(
+            batch_id = %batch_id,
+            deleted_conflicts = deleted_conflicts,
+            deleted_materials = deleted_materials,
+            "成功取消导入批次"
+        );
+
+        Ok(CancelImportBatchResponse {
+            deleted_materials,
+            deleted_conflicts,
+            message: format!(
+                "成功取消导入批次：删除 {} 条冲突记录",
+                deleted_conflicts
+            ),
         })
     }
 

@@ -6,11 +6,12 @@
  */
 
 import React from 'react';
-import { Alert, Tabs, Typography } from 'antd';
+import { Alert, message, Tabs, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useCurrentUser, useGlobalActions } from '../stores/use-global-store';
 import { useImportWorkflow } from '../hooks/useImportWorkflow';
-import { safeWriteImportHistory } from '../utils/importHistoryStorage';
+import { safeReadImportHistory, safeWriteImportHistory } from '../utils/importHistoryStorage';
+import { importApi } from '../api/tauri';
 import { ImportTabContent } from './material-import/ImportTabContent';
 import { ConflictsTabContent } from './material-import/ConflictsTabContent';
 import { HistoryTabContent } from './material-import/HistoryTabContent';
@@ -71,6 +72,24 @@ const MaterialImport: React.FC = () => {
   // 复制 ID 到剪贴板
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
+  };
+
+  // 取消导入批次
+  const handleCancelImport = async (id: string, importBatchId: string) => {
+    try {
+      const result = await importApi.cancelImportBatch(importBatchId, currentUser || 'admin');
+      message.success(result.message);
+
+      // 从本地历史记录中移除该记录
+      const history = safeReadImportHistory();
+      const filteredHistory = history.filter((h) => h.id !== id);
+      safeWriteImportHistory(filteredHistory);
+
+      // 刷新页面以更新历史记录
+      window.location.reload();
+    } catch (err: any) {
+      message.error(err.message || '取消导入失败');
+    }
   };
 
   return (
@@ -166,6 +185,7 @@ const MaterialImport: React.FC = () => {
                 onClearHistory={handleClearHistory}
                 onViewConflicts={handleViewConflicts}
                 onCopyId={handleCopyId}
+                onCancelImport={handleCancelImport}
               />
             ),
           },

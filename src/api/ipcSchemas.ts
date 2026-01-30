@@ -727,3 +727,17 @@ export const BatchResolveConflictsResponseSchema = z
 
 export type BatchResolveConflictsResponse = z.infer<typeof BatchResolveConflictsResponseSchema>;
 
+// ==========================================================
+// 取消导入批次 响应 Schema
+// ==========================================================
+
+export const CancelImportBatchResponseSchema = z
+  .object({
+    deleted_materials: z.number(),
+    deleted_conflicts: z.number(),
+    message: z.string(),
+  })
+  .passthrough();
+
+export type CancelImportBatchResponse = z.infer<typeof CancelImportBatchResponseSchema>;
+

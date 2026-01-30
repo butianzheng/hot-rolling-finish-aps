@@ -1896,6 +1896,67 @@ pub async fn batch_resolve_import_conflicts(
     Ok(response_json)
 }
 
+/// 取消导入批次
+///
+/// # 参数
+/// - batch_id: 批次ID
+/// - operator: 操作人（可选，默认为 "system"）
+///
+/// # 返回
+/// - 成功: CancelImportBatchResponse JSON
+/// - 失败: 错误消息
+#[tauri::command(rename_all = "snake_case")]
+pub async fn cancel_import_batch(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    batch_id: String,
+    operator: Option<String>,
+) -> Result<String, String> {
+    use crate::domain::action_log::ActionLog;
+
+    let operator = operator.unwrap_or_else(|| "system".to_string());
+
+    // 取消导入批次
+    let result = state
+        .import_api
+        .cancel_import_batch(&batch_id)
+        .await
+        .map_err(map_api_error)?;
+
+    // 记录 ActionLog（红线5：可解释性/审计追踪）
+    let action_log = ActionLog {
+        action_id: uuid::Uuid::new_v4().to_string(),
+        version_id: "N/A".to_string(),
+        action_type: "CANCEL_IMPORT_BATCH".to_string(),
+        action_ts: chrono::Local::now().naive_local(),
+        actor: operator.clone(),
+        payload_json: Some(serde_json::json!({
+            "batch_id": batch_id,
+        })),
+        impact_summary_json: Some(serde_json::json!({
+            "deleted_conflicts": result.deleted_conflicts,
+            "deleted_materials": result.deleted_materials,
+        })),
+        machine_code: None,
+        date_range_start: None,
+        date_range_end: None,
+        detail: Some(format!("取消导入批次: {}", batch_id)),
+    };
+
+    // 尝试记录 ActionLog，失败时只记录警告
+    if let Err(e) = state.action_log_repo.insert(&action_log) {
+        tracing::warn!(error = %e, "记录取消导入批次操作日志失败");
+    }
+
+    emit_frontend_event(&app, "material_state_changed", serde_json::json!({}));
+
+    // 返回结果JSON
+    let response_json = serde_json::to_string(&result)
+        .map_err(|e| format!("序列化取消导入结果失败: {}", e))?;
+
+    Ok(response_json)
+}
+
 // ==========================================
 // 产能池管理相关命令
 // ==========================================

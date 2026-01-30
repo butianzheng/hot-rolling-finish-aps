@@ -208,4 +208,39 @@ pub trait MaterialImportRepository: Send + Sync {
 
     /// 统计 material_state 表记录数
     async fn count_states(&self) -> Result<usize, Box<dyn Error>>;
+
+    // ===== 删除操作（用于撤销导入） =====
+
+    /// 按批次ID删除所有关联的材料（material_master 和 material_state）
+    ///
+    /// # 参数
+    /// - batch_id: 批次ID
+    ///
+    /// # 返回
+    /// - Ok(usize): 删除的材料数量
+    async fn delete_materials_by_batch(
+        &self,
+        batch_id: &str,
+    ) -> Result<usize, Box<dyn Error>>;
+
+    /// 按批次ID删除所有关联的冲突记录
+    ///
+    /// # 参数
+    /// - batch_id: 批次ID
+    ///
+    /// # 返回
+    /// - Ok(usize): 删除的冲突记录数
+    async fn delete_conflicts_by_batch(
+        &self,
+        batch_id: &str,
+    ) -> Result<usize, Box<dyn Error>>;
+
+    /// 删除导入批次记录
+    ///
+    /// # 参数
+    /// - batch_id: 批次ID
+    async fn delete_batch(
+        &self,
+        batch_id: &str,
+    ) -> Result<(), Box<dyn Error>>;
 }

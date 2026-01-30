@@ -35,6 +35,8 @@ import {
   RecalcResponseSchema,
   BatchResolveConflictsResponseSchema,
   type BatchResolveConflictsResponse,
+  CancelImportBatchResponseSchema,
+  type CancelImportBatchResponse,
 } from './ipcSchemas';
 
 // ==========================================
@@ -108,6 +110,23 @@ export const importApi = {
       operator,
     }, {
       validate: zodValidator(BatchResolveConflictsResponseSchema, 'batch_resolve_import_conflicts'),
+    });
+  },
+
+  /**
+   * 取消导入批次
+   * @param batchId 批次ID
+   * @param operator 操作人（可选，默认为 'system'）
+   */
+  async cancelImportBatch(
+    batchId: string,
+    operator: string = 'system'
+  ): Promise<CancelImportBatchResponse> {
+    return IpcClient.call('cancel_import_batch', {
+      batch_id: batchId,
+      operator,
+    }, {
+      validate: zodValidator(CancelImportBatchResponseSchema, 'cancel_import_batch'),
     });
   },
 };

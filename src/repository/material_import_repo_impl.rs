@@ -719,4 +719,60 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
 
         Ok(count as usize)
     }
+
+    // ===== 删除操作（用于撤销导入） =====
+
+    /// 按批次ID删除所有关联的材料（方案1：暂不实现，保留接口占位）
+    ///
+    /// # 说明
+    /// MaterialMaster 表中无 batch_id 字段，无法直接按批次删除材料
+    /// 已导入的材料需要用户手动删除
+    async fn delete_materials_by_batch(
+        &self,
+        _batch_id: &str,
+    ) -> Result<usize, Box<dyn Error>> {
+        // 方案1：不删除材料，返回0
+        Ok(0)
+    }
+
+    /// 按批次ID删除所有关联的冲突记录
+    async fn delete_conflicts_by_batch(
+        &self,
+        batch_id: &str,
+    ) -> Result<usize, Box<dyn Error>> {
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
+
+        let affected = conn.execute(
+            "DELETE FROM import_conflict WHERE source_batch_id = ?1",
+            params![batch_id],
+        )?;
+
+        tracing::info!(
+            batch_id = %batch_id,
+            deleted_conflicts = affected,
+            "已删除批次的所有冲突记录"
+        );
+
+        Ok(affected)
+    }
+
+    /// 删除导入批次记录
+    async fn delete_batch(
+        &self,
+        batch_id: &str,
+    ) -> Result<(), Box<dyn Error>> {
+        let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
+
+        conn.execute(
+            "DELETE FROM import_batch WHERE batch_id = ?1",
+            params![batch_id],
+        )?;
+
+        tracing::info!(
+            batch_id = %batch_id,
+            "已删除导入批次记录"
+        );
+
+        Ok(())
+    }
 }

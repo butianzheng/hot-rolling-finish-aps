@@ -4,9 +4,9 @@
  */
 
 import React from 'react';
-import { Alert, Button, Card, Modal, Space, Table, Tag } from 'antd';
+import { Alert, Button, Card, Modal, Popconfirm, Space, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { ReloadOutlined } from '@ant-design/icons';
+import { DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
 import { formatMs } from '../../utils/importFormatters';
 import type { ImportHistoryItem } from '../../types/import';
 
@@ -19,6 +19,7 @@ export interface HistoryTabContentProps {
   onClearHistory: () => void;
   onViewConflicts: (batchId: string) => Promise<void>;
   onCopyId: (id: string) => void;
+  onCancelImport?: (batchId: string, importBatchId: string) => Promise<void>;
 }
 
 export const HistoryTabContent: React.FC<HistoryTabContentProps> = ({
@@ -27,6 +28,7 @@ export const HistoryTabContent: React.FC<HistoryTabContentProps> = ({
   onClearHistory,
   onViewConflicts,
   onCopyId,
+  onCancelImport,
 }) => {
   // 历史表格列定义
   const historyColumns: ColumnsType<ImportHistoryItem> = [
@@ -77,7 +79,7 @@ export const HistoryTabContent: React.FC<HistoryTabContentProps> = ({
     {
       title: '操作',
       key: 'actions',
-      width: 160,
+      width: 220,
       render: (_, r) => (
         <Space>
           <Button
@@ -94,6 +96,24 @@ export const HistoryTabContent: React.FC<HistoryTabContentProps> = ({
           <Button size="small" onClick={() => onCopyId(r.id)}>
             复制ID
           </Button>
+          {onCancelImport && r.import_batch_id && (
+            <Popconfirm
+              title="确认取消导入？"
+              description="将删除该批次的所有冲突记录，但已导入的材料数据不会被删除。"
+              okText="确认取消"
+              cancelText="返回"
+              okType="danger"
+              onConfirm={async () => {
+                if (r.import_batch_id) {
+                  await onCancelImport(r.id, r.import_batch_id);
+                }
+              }}
+            >
+              <Button size="small" danger icon={<DeleteOutlined />}>
+                取消
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
