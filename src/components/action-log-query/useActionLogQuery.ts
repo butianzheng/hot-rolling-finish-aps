@@ -161,7 +161,7 @@ export function useActionLogQuery(): UseActionLogQueryReturn {
 
   // 获取唯一的版本列表
   const uniqueVersions = useMemo(() => {
-    const versions = new Set(actionLogs.map((log) => log.version_id));
+    const versions = new Set(actionLogs.map((log) => log.version_id).filter((v): v is string => v !== null));
     return Array.from(versions);
   }, [actionLogs]);
 

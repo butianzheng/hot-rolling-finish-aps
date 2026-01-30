@@ -106,7 +106,7 @@ export type MaterialDetailPayload = {
 
 export type ActionLogRow = {
   action_id: string;
-  version_id: string;
+  version_id: string | null;
   action_type: string;
   action_ts: string;
   actor: string;

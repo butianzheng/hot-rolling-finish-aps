@@ -697,7 +697,7 @@ export const RecalcResponseSchema = z
 export const ActionLogSchema = z
   .object({
     action_id: z.string(),
-    version_id: z.string(),
+    version_id: z.string().nullable(),
     action_type: z.string(),
     action_ts: z.string(),
     actor: z.string(),

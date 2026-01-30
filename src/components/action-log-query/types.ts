@@ -4,7 +4,7 @@
 
 export interface ActionLog {
   action_id: string;
-  version_id: string;
+  version_id: string | null;
   action_type: string;
   action_ts: string;
   actor: string;
