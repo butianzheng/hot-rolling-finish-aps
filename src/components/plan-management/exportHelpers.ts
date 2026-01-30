@@ -5,15 +5,9 @@
 import dayjs from 'dayjs';
 import { message } from 'antd';
 import { exportCSV, exportJSON, exportHTML, exportMarkdown } from '../../utils/exportUtils';
-import type { BackendVersionComparisonResult } from '../../types/comparison';
+import type { ExportContext, ConfigChange } from './types';
 
-export interface ExportContext {
-  compareResult: BackendVersionComparisonResult;
-  currentUser: string;
-  localDiffResult: any;
-  localCapacityRows: any;
-  retrospectiveNote: string;
-}
+export type { ExportContext } from './types';
 
 export const exportCapacityDelta = async (
   format: 'csv' | 'json',
@@ -22,7 +16,7 @@ export const exportCapacityDelta = async (
   const { compareResult, localCapacityRows } = context;
   if (!compareResult || !localCapacityRows) return;
 
-  const rows = localCapacityRows.rows.map((r: any) => ({
+  const rows = localCapacityRows.rows.map((r) => ({
     date: r.date,
     machine_code: r.machine_code,
     used_a: r.used_a,
@@ -46,7 +40,7 @@ export const exportDiffs = async (
   const { compareResult, localDiffResult } = context;
   if (!compareResult || !localDiffResult) return;
 
-  const rows = localDiffResult.diffs.map((d: any) => ({
+  const rows = localDiffResult.diffs.map((d) => ({
     change_type: d.changeType,
     material_id: d.materialId,
     from_machine: d.previousState?.machine_code ?? null,
@@ -84,8 +78,9 @@ export const exportRetrospectiveReport = async (context: ExportContext): Promise
     );
     exportJSON(JSON.parse(json), '复盘总结');
     message.success('已导出复盘总结（JSON）');
-  } catch (e: any) {
-    message.error(e?.message || '导出失败');
+  } catch (e) {
+    const errorMessage = e instanceof Error ? e.message : '导出失败';
+    message.error(errorMessage);
   }
 };
 
@@ -100,11 +95,11 @@ export const exportReportMarkdown = async (context: ExportContext): Promise<void
     ? `## 本地差异摘要（由排产明细计算）\n\n- totalChanges: ${localDiffResult.summary.totalChanges}\n- movedCount: ${localDiffResult.summary.movedCount}\n- modifiedCount: ${localDiffResult.summary.modifiedCount}\n- addedCount: ${localDiffResult.summary.addedCount}\n- removedCount: ${localDiffResult.summary.removedCount}\n\n`
     : `## 本地差异摘要（由排产明细计算）\n\n> 本地差异明细未加载完成或加载失败。\n\n`;
 
-  const configChanges = Array.isArray(compareResult.config_changes) ? compareResult.config_changes : [];
+  const configChanges = (Array.isArray(compareResult.config_changes) ? compareResult.config_changes : []) as ConfigChange[];
   const configSection =
     configChanges.length > 0
       ? `## 配置变化\n\n| Key | 版本A | 版本B |\n| --- | --- | --- |\n${configChanges
-          .map((c: any) => `| ${String(c.key)} | ${c.value_a == null ? '-' : String(c.value_a)} | ${c.value_b == null ? '-' : String(c.value_b)} |`)
+          .map((c) => `| ${String(c.key)} | ${c.value_a == null ? '-' : String(c.value_a)} | ${c.value_b == null ? '-' : String(c.value_b)} |`)
           .join('\n')}\n\n`
       : `## 配置变化\n\n- 无配置变化\n\n`;
 
@@ -112,7 +107,7 @@ export const exportReportMarkdown = async (context: ExportContext): Promise<void
   const diffsSection =
     diffSample.length > 0
       ? `## 物料变更明细（示例前200条）\n\n| 类型 | 物料 | From | To |\n| --- | --- | --- | --- |\n${diffSample
-          .map((d: any) => {
+          .map((d) => {
             const from = d.previousState ? `${d.previousState.machine_code}/${d.previousState.plan_date}/序${d.previousState.seq_no}` : '-';
             const to = d.currentState ? `${d.currentState.machine_code}/${d.currentState.plan_date}/序${d.currentState.seq_no}` : '-';
             return `| ${d.changeType} | ${d.materialId} | ${from} | ${to} |`;
@@ -129,8 +124,9 @@ export const exportReportMarkdown = async (context: ExportContext): Promise<void
   try {
     exportMarkdown(header + backendSummary + localSummary + configSection + diffsSection + capacitySection + retrospectiveSection, '版本对比报告');
     message.success('已导出（Markdown）');
-  } catch (e: any) {
-    message.error(e?.message || '导出失败');
+  } catch (e) {
+    const errorMessage = e instanceof Error ? e.message : '导出失败';
+    message.error(errorMessage);
   }
 };
 
@@ -138,7 +134,7 @@ export const exportReportHTML = async (context: ExportContext): Promise<void> =>
   const { compareResult, currentUser, localDiffResult, localCapacityRows, retrospectiveNote } = context;
   if (!compareResult) return;
 
-  const configChanges = Array.isArray(compareResult.config_changes) ? compareResult.config_changes : [];
+  const configChanges = (Array.isArray(compareResult.config_changes) ? compareResult.config_changes : []) as ConfigChange[];
   const diffSample = localDiffResult ? localDiffResult.diffs.slice(0, 200) : [];
 
   const escape = (v: unknown) =>
@@ -197,7 +193,7 @@ export const exportReportHTML = async (context: ExportContext): Promise<void> =>
       <thead><tr><th>Key</th><th>版本A</th><th>版本B</th></tr></thead>
       <tbody>
         ${configChanges
-          .map((c: any) => `<tr><td>${escape(c.key)}</td><td>${escape(c.value_a ?? '-')}</td><td>${escape(c.value_b ?? '-')}</td></tr>`)
+          .map((c) => `<tr><td>${escape(c.key)}</td><td>${escape(c.value_a ?? '-')}</td><td>${escape(c.value_b ?? '-')}</td></tr>`)
           .join('')}
       </tbody>
     </table>`
@@ -211,7 +207,7 @@ export const exportReportHTML = async (context: ExportContext): Promise<void> =>
       <thead><tr><th>类型</th><th>物料</th><th>From</th><th>To</th></tr></thead>
       <tbody>
         ${diffSample
-          .map((d: any) => {
+          .map((d) => {
             const from = d.previousState ? `${d.previousState.machine_code}/${d.previousState.plan_date}/序${d.previousState.seq_no}` : '-';
             const to = d.currentState ? `${d.currentState.machine_code}/${d.currentState.plan_date}/序${d.currentState.seq_no}` : '-';
             return `<tr>
@@ -247,7 +243,8 @@ export const exportReportHTML = async (context: ExportContext): Promise<void> =>
   try {
     exportHTML(html, '版本对比报告');
     message.success('已导出（HTML）');
-  } catch (e: any) {
-    message.error(e?.message || '导出失败');
+  } catch (e) {
+    const errorMessage = e instanceof Error ? e.message : '导出失败';
+    message.error(errorMessage);
   }
 };
