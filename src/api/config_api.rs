@@ -157,13 +157,30 @@ impl ConfigApi {
         let conn = self.conn.lock()
             .map_err(|e| ApiError::DatabaseError(format!("锁获取失败: {}", e)))?;
 
-        // 使用UPSERT语法
-        conn.execute(
-            "INSERT INTO config_kv (scope_id, key, value) VALUES (?1, ?2, ?3)
-             ON CONFLICT(scope_id, key) DO UPDATE SET value = ?3",
-            params![scope_id, key, value],
+        // 检查 scope_id 是否存在于 config_scope 表
+        let scope_exists: bool = conn.query_row(
+            "SELECT COUNT(*) FROM config_scope WHERE scope_id = ?1",
+            params![scope_id],
+            |row| row.get::<_, i64>(0).map(|count| count > 0),
         )
-        .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+        .unwrap_or(false);
+
+        if !scope_exists {
+            return Err(ApiError::InvalidInput(format!(
+                "作用域ID '{}' 在 config_scope 表中不存在",
+                scope_id
+            )));
+        }
+
+        let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+        // 使用UPSERT语法，正确处理 updated_at 字段
+        conn.execute(
+            "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(scope_id, key) DO UPDATE SET value = ?3, updated_at = ?4",
+            params![scope_id, key, value, now],
+        )
+        .map_err(|e| ApiError::DatabaseError(format!("更新配置失败: {}", e)))?;
 
         drop(conn);
 
