@@ -32,6 +32,7 @@ import {
   ConfigItemSchema,
   ActionLogSchema,
   ImpactSummarySchema,
+  RecalcResponseSchema,
 } from './ipcSchemas';
 
 // ==========================================
@@ -282,7 +283,7 @@ export const planApi = {
       operator,
       strategy,
     }, {
-      validate: zodValidator(z.array(PlanItemSchema), 'simulate_recalc'),
+      validate: zodValidator(RecalcResponseSchema, 'simulate_recalc'),
     });
   },
 
@@ -300,7 +301,7 @@ export const planApi = {
       operator,
       strategy,
     }, {
-      validate: zodValidator(z.array(PlanItemSchema), 'recalc_full'),
+      validate: zodValidator(RecalcResponseSchema, 'recalc_full'),
     });
   },
 

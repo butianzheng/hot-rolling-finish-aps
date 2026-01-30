@@ -677,6 +677,20 @@ export const ImpactSummarySchema = z
   .passthrough();
 
 // ==========================================================
+// 一键重算/试算 响应 Schema
+// ==========================================================
+
+export const RecalcResponseSchema = z
+  .object({
+    version_id: z.string(),
+    plan_items_count: z.number(),
+    frozen_items_count: z.number(),
+    success: z.boolean(),
+    message: z.string(),
+  })
+  .passthrough();
+
+// ==========================================================
 // Action Log 响应 Schema
 // ==========================================================
 
