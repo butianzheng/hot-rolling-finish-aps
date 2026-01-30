@@ -55,7 +55,7 @@ const KPIBand: React.FC<KPIBandProps> = ({ loading, kpi, onOpenDrilldown, onGoWo
           onMouseEnter={onEnter}
           onMouseLeave={onLeave}
         >
-          <Space direction="vertical" size={2}>
+          <Space direction="vertical" size={4} style={{ width: '100%' }}>
             <Space size={8}>
               <Badge color={riskMeta.color} />
               <Text type="secondary">整体风险</Text>
@@ -86,7 +86,7 @@ const KPIBand: React.FC<KPIBandProps> = ({ loading, kpi, onOpenDrilldown, onGoWo
           onMouseEnter={onEnter}
           onMouseLeave={onLeave}
         >
-          <Space direction="vertical" size={2}>
+          <Space direction="vertical" size={4} style={{ width: '100%' }}>
             <Text type="secondary">紧急物料</Text>
             <Statistic value={safe.urgentOrdersCount} suffix="个" valueStyle={{ fontWeight: 600 }} />
             {safe.blockedUrgentCount > 0 && (
@@ -138,7 +138,7 @@ const KPIBand: React.FC<KPIBandProps> = ({ loading, kpi, onOpenDrilldown, onGoWo
           onMouseEnter={onEnter}
           onMouseLeave={onLeave}
         >
-          <Space direction="vertical" size={2}>
+          <Space direction="vertical" size={4} style={{ width: '100%' }}>
             <Text type="secondary">利用率</Text>
             <Statistic
               value={Number.isFinite(safe.capacityUtilization) ? safe.capacityUtilization : 0}
@@ -162,7 +162,7 @@ const KPIBand: React.FC<KPIBandProps> = ({ loading, kpi, onOpenDrilldown, onGoWo
           onMouseEnter={onEnter}
           onMouseLeave={onLeave}
         >
-          <Space direction="vertical" size={2}>
+          <Space direction="vertical" size={4} style={{ width: '100%' }}>
             <Text type="secondary">冷坨压力</Text>
             <Statistic value={safe.coldStockCount} suffix="件" valueStyle={{ fontWeight: 600 }} />
             {onOpenDrilldown && (
@@ -181,7 +181,7 @@ const KPIBand: React.FC<KPIBandProps> = ({ loading, kpi, onOpenDrilldown, onGoWo
           onMouseEnter={onEnter}
           onMouseLeave={onLeave}
         >
-          <Space direction="vertical" size={2}>
+          <Space direction="vertical" size={4} style={{ width: '100%' }}>
             <Space size={8}>
               <Badge color={rollMeta.color} />
               <Text type="secondary">换辊</Text>
