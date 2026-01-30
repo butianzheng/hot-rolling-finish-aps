@@ -60,15 +60,22 @@ impl ConfigApi {
             .map_err(|e| ApiError::DatabaseError(format!("锁获取失败: {}", e)))?;
 
         let mut stmt = conn
-            .prepare("SELECT scope_id, key, value FROM config_kv ORDER BY scope_id, key")
+            .prepare(
+                "SELECT kv.scope_id, sc.scope_type, kv.key, kv.value, kv.updated_at
+                 FROM config_kv kv
+                 JOIN config_scope sc ON kv.scope_id = sc.scope_id
+                 ORDER BY sc.scope_type, kv.scope_id, kv.key"
+            )
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         let configs = stmt
             .query_map([], |row| {
                 Ok(ConfigItem {
                     scope_id: row.get(0)?,
-                    key: row.get(1)?,
-                    value: row.get(2)?,
+                    scope_type: row.get(1)?,
+                    key: row.get(2)?,
+                    value: row.get(3)?,
+                    updated_at: row.get(4).ok(),
                 })
             })
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?
@@ -93,13 +100,18 @@ impl ConfigApi {
             .map_err(|e| ApiError::DatabaseError(format!("锁获取失败: {}", e)))?;
 
         let result = conn.query_row(
-            "SELECT scope_id, key, value FROM config_kv WHERE scope_id = ?1 AND key = ?2",
+            "SELECT kv.scope_id, sc.scope_type, kv.key, kv.value, kv.updated_at
+             FROM config_kv kv
+             JOIN config_scope sc ON kv.scope_id = sc.scope_id
+             WHERE kv.scope_id = ?1 AND kv.key = ?2",
             params![scope_id, key],
             |row| {
                 Ok(ConfigItem {
                     scope_id: row.get(0)?,
-                    key: row.get(1)?,
-                    value: row.get(2)?,
+                    scope_type: row.get(1)?,
+                    key: row.get(2)?,
+                    value: row.get(3)?,
+                    updated_at: row.get(4).ok(),
                 })
             },
         );
@@ -476,11 +488,18 @@ pub struct ConfigItem {
     /// 作用域ID
     pub scope_id: String,
 
+    /// 作用域类型（GLOBAL, MACHINE, STEEL_GRADE, VERSION）
+    pub scope_type: String,
+
     /// 配置键
     pub key: String,
 
     /// 配置值
     pub value: String,
+
+    /// 最后更新时间（可选）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
 }
 
 /// 保存自定义策略响应
