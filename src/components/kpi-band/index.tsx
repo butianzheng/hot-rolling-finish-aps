@@ -32,10 +32,10 @@ const KPIBand: React.FC<KPIBandProps> = ({ loading, kpi, onOpenDrilldown, onGoWo
 
   if (loading) {
     return (
-      <Row gutter={12} style={{ marginBottom: 12 }}>
+      <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
         {Array.from({ length: 5 }).map((_, idx) => (
-          <Col key={idx} span={24} md={12} xl={4}>
-            <Card size="small">
+          <Col key={idx} xs={24} sm={12} md={12} lg={8} xl={24 / 5} style={{ display: 'flex' }}>
+            <Card size="small" style={{ width: '100%' }}>
               <Skeleton active paragraph={{ rows: 1 }} />
             </Card>
           </Col>
@@ -45,9 +45,9 @@ const KPIBand: React.FC<KPIBandProps> = ({ loading, kpi, onOpenDrilldown, onGoWo
   }
 
   return (
-    <Row gutter={12} style={{ marginBottom: 12 }}>
+    <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
       {/* 整体风险 */}
-      <Col span={24} md={12} xl={4}>
+      <Col xs={24} sm={12} md={12} lg={8} xl={24 / 5} style={{ display: 'flex' }}>
         <KPICardWrapper
           id="risk"
           hovered={hovered}
@@ -72,7 +72,7 @@ const KPIBand: React.FC<KPIBandProps> = ({ loading, kpi, onOpenDrilldown, onGoWo
       </Col>
 
       {/* 紧急物料 */}
-      <Col span={24} md={12} xl={5}>
+      <Col xs={24} sm={12} md={12} lg={8} xl={24 / 5} style={{ display: 'flex' }}>
         <KPICardWrapper
           id="urgent"
           hovered={hovered}
@@ -130,7 +130,7 @@ const KPIBand: React.FC<KPIBandProps> = ({ loading, kpi, onOpenDrilldown, onGoWo
       </Col>
 
       {/* 利用率 */}
-      <Col span={24} md={12} xl={5}>
+      <Col xs={24} sm={12} md={12} lg={8} xl={24 / 5} style={{ display: 'flex' }}>
         <KPICardWrapper
           id="util"
           hovered={hovered}
@@ -154,7 +154,7 @@ const KPIBand: React.FC<KPIBandProps> = ({ loading, kpi, onOpenDrilldown, onGoWo
       </Col>
 
       {/* 冷坨压力 */}
-      <Col span={24} md={12} xl={5}>
+      <Col xs={24} sm={12} md={12} lg={8} xl={24 / 5} style={{ display: 'flex' }}>
         <KPICardWrapper
           id="cold"
           hovered={hovered}
@@ -173,7 +173,7 @@ const KPIBand: React.FC<KPIBandProps> = ({ loading, kpi, onOpenDrilldown, onGoWo
       </Col>
 
       {/* 换辊 */}
-      <Col span={24} md={12} xl={5}>
+      <Col xs={24} sm={12} md={12} lg={8} xl={24 / 5} style={{ display: 'flex' }}>
         <KPICardWrapper
           id="roll"
           hovered={hovered}

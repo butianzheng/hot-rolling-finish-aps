@@ -39,6 +39,7 @@ export const KPICardWrapper: React.FC<KPICardWrapperProps> = ({
       onMouseEnter={onClick ? () => onMouseEnter(id) : undefined}
       onMouseLeave={onClick ? () => onMouseLeave(id) : undefined}
       style={{
+        height: '100%',
         cursor: onClick ? 'pointer' : 'default',
         transition: 'transform 160ms ease, box-shadow 160ms ease',
         transform: hovered === id ? 'translateY(-2px)' : 'translateY(0)',
@@ -47,7 +48,11 @@ export const KPICardWrapper: React.FC<KPICardWrapperProps> = ({
         outline: 'none',
       }}
     >
-      <Card size="small">{children}</Card>
+      <Card size="small" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          {children}
+        </div>
+      </Card>
     </div>
   );
 };
