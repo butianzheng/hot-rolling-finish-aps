@@ -19,7 +19,7 @@ use serde_json::Value as JsonValue;
 pub struct ActionLog {
     // ===== 主键 (对齐schema) =====
     pub action_id: String,         // 日志ID (对齐schema字段名)
-    pub version_id: String,        // 关联版本 (必填)
+    pub version_id: Option<String>, // 关联版本 (可选，配置更新等系统操作可为None)
     pub action_type: String,       // 操作类型 (存储为字符串)
     pub action_ts: NaiveDateTime,  // 操作时间戳 (对齐schema)
     pub actor: String,             // 操作人 (对齐schema字段名)
@@ -166,7 +166,7 @@ impl ActionLog {
     ///
     /// # 参数
     /// - `action_id`: 日志ID (通常使用UUID)
-    /// - `version_id`: 关联版本ID
+    /// - `version_id`: 关联版本ID (可选)
     /// - `action_type`: 操作类型
     /// - `actor`: 操作人
     ///
@@ -174,7 +174,7 @@ impl ActionLog {
     /// 新的 ActionLog 实例
     pub fn new(
         action_id: String,
-        version_id: String,
+        version_id: Option<String>,
         action_type: &str,
         actor: String,
     ) -> Self {
@@ -224,7 +224,8 @@ impl ActionLog {
 
     /// 生成唯一ID (用于显示)
     pub fn get_display_id(&self) -> String {
-        format!("{}_{}", self.version_id, &self.action_id[..8])
+        let version_part = self.version_id.as_deref().unwrap_or("SYSTEM");
+        format!("{}_{}", version_part, &self.action_id[..8])
     }
 }
 

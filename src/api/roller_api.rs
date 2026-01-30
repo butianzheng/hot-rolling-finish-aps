@@ -169,7 +169,7 @@ impl RollerApi {
         // 记录ActionLog
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: version_id.to_string(),
+            version_id: Some(version_id.to_string()),
             action_type: "CREATE_ROLL_CAMPAIGN".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: operator.to_string(),
@@ -235,7 +235,7 @@ impl RollerApi {
         // 记录ActionLog
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: version_id.to_string(),
+            version_id: Some(version_id.to_string()),
             action_type: "CLOSE_ROLL_CAMPAIGN".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: operator.to_string(),

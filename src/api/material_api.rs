@@ -316,7 +316,7 @@ impl MaterialApi {
         // 记录ActionLog（红线5: 可解释性）
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: "N/A".to_string(), // 材料锁定操作不关联版本
+            version_id: None, // 材料锁定操作不关联版本
             action_type: if lock_flag {
                 "LOCK_MATERIALS".to_string()
             } else {
@@ -412,7 +412,7 @@ impl MaterialApi {
         // 记录ActionLog（红线5: 可解释性）
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: "N/A".to_string(), // 材料强制放行操作不关联版本
+            version_id: None, // 材料强制放行操作不关联版本
             action_type: "FORCE_RELEASE".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: operator.to_string(),
@@ -506,7 +506,7 @@ impl MaterialApi {
         // 记录ActionLog（红线5: 可解释性）
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: "N/A".to_string(), // 设置紧急标志操作不关联版本
+            version_id: None, // 设置紧急标志操作不关联版本
             action_type: "SET_URGENT".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: operator.to_string(),

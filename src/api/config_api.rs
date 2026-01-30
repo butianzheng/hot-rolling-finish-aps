@@ -187,7 +187,7 @@ impl ConfigApi {
         // 记录ActionLog
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: "N/A".to_string(),
+            version_id: None,
             action_type: "UPDATE_CONFIG".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: operator.to_string(),
@@ -263,7 +263,7 @@ impl ConfigApi {
         // 记录ActionLog
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: "N/A".to_string(),
+            version_id: None,
             action_type: "BATCH_UPDATE_CONFIG".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: operator.to_string(),
@@ -329,7 +329,7 @@ impl ConfigApi {
         // 记录ActionLog
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: "N/A".to_string(),
+            version_id: None,
             action_type: "RESTORE_CONFIG".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: operator.to_string(),
@@ -417,7 +417,7 @@ impl ConfigApi {
         // 记录ActionLog（可解释性红线：所有写操作必须有审计）
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: "N/A".to_string(),
+            version_id: None,
             action_type: "SAVE_CUSTOM_STRATEGY".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: operator.to_string(),

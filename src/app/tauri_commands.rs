@@ -147,7 +147,7 @@ pub async fn report_frontend_event(
 
     let log = ActionLog {
         action_id: Uuid::new_v4().to_string(),
-        version_id,
+        version_id: Some(version_id),
         action_type: action_type.to_string(),
         action_ts: chrono::Local::now().naive_local(),
         actor,
@@ -1797,7 +1797,7 @@ pub async fn resolve_import_conflict(
     // 记录 ActionLog（红线5：可解释性/审计追踪）
     let action_log = ActionLog {
         action_id: uuid::Uuid::new_v4().to_string(),
-        version_id: "N/A".to_string(),
+        version_id: None,
         action_type: "RESOLVE_IMPORT_CONFLICT".to_string(),
         action_ts: chrono::Local::now().naive_local(),
         actor: operator,
@@ -1862,7 +1862,7 @@ pub async fn batch_resolve_import_conflicts(
     // 记录 ActionLog（红线5：可解释性/审计追踪）
     let action_log = ActionLog {
         action_id: uuid::Uuid::new_v4().to_string(),
-        version_id: "N/A".to_string(),
+        version_id: None,
         action_type: "BATCH_RESOLVE_IMPORT_CONFLICT".to_string(),
         action_ts: chrono::Local::now().naive_local(),
         actor: operator.clone(),
@@ -1926,7 +1926,7 @@ pub async fn cancel_import_batch(
     // 记录 ActionLog（红线5：可解释性/审计追踪）
     let action_log = ActionLog {
         action_id: uuid::Uuid::new_v4().to_string(),
-        version_id: "N/A".to_string(),
+        version_id: None,
         action_type: "CANCEL_IMPORT_BATCH".to_string(),
         action_ts: chrono::Local::now().naive_local(),
         actor: operator.clone(),
@@ -2105,7 +2105,7 @@ pub async fn update_capacity_pool(
     // 记录 ActionLog（红线5：可解释性/审计追踪）
     let action_log = ActionLog {
         action_id: uuid::Uuid::new_v4().to_string(),
-        version_id: version_id_for_log,
+        version_id: Some(version_id_for_log),
         action_type: "UPDATE_CAPACITY_POOL".to_string(),
         action_ts: chrono::Local::now().naive_local(),
         actor: operator.clone(),
@@ -2313,7 +2313,7 @@ pub async fn batch_update_capacity_pools(
 
     let action_log = ActionLog {
         action_id: uuid::Uuid::new_v4().to_string(),
-        version_id: version_id_for_log,
+        version_id: Some(version_id_for_log),
         action_type: "BATCH_UPDATE_CAPACITY_POOL".to_string(),
         action_ts: chrono::Local::now().naive_local(),
         actor: operator.clone(),

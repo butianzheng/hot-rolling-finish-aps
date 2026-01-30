@@ -129,7 +129,7 @@ impl PlanApi {
         // 记录ActionLog
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: "N/A".to_string(),
+            version_id: None,
             action_type: "CREATE_PLAN".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: created_by,
@@ -239,7 +239,7 @@ impl PlanApi {
         // 记录ActionLog
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: "N/A".to_string(),
+            version_id: None,
             action_type: "DELETE_PLAN".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: operator.to_string(),
@@ -362,7 +362,7 @@ impl PlanApi {
         // 记录ActionLog
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: version.version_id.clone(),
+            version_id: Some(version.version_id.clone()),
             action_type: "CREATE_VERSION".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: created_by,
@@ -443,7 +443,7 @@ impl PlanApi {
         // 记录ActionLog
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: version_id.to_string(),
+            version_id: Some(version_id.to_string()),
             action_type: "DELETE_VERSION".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: operator.to_string(),
@@ -497,7 +497,7 @@ impl PlanApi {
         // 记录ActionLog
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: version_id.to_string(),
+            version_id: Some(version_id.to_string()),
             action_type: "ACTIVATE_VERSION".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: operator.to_string(),
@@ -656,7 +656,7 @@ impl PlanApi {
         // 3) 写入审计日志
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: target_version_id.to_string(),
+            version_id: Some(target_version_id.to_string()),
             action_type: "ROLLBACK_VERSION".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: operator.to_string(),
@@ -761,7 +761,7 @@ impl PlanApi {
         // 记录 ActionLog（best-effort）
         let log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: version_id.to_string(),
+            version_id: Some(version_id.to_string()),
             action_type: "MANUAL_REFRESH_DECISION".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: operator.to_string(),
@@ -968,7 +968,7 @@ impl PlanApi {
         // 记录ActionLog（红线5: 可解释性）
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: recalc_result.version_id.clone(),
+            version_id: Some(recalc_result.version_id.clone()),
             action_type: "RECALC_FULL".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: operator.to_string(),
@@ -1365,7 +1365,7 @@ impl PlanApi {
         // 审计记录：发布草案属于“决策行为”，需要落 ActionLog
         let log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: result.version_id.clone(),
+            version_id: Some(result.version_id.clone()),
             action_type: "APPLY_STRATEGY_DRAFT".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: operator.to_string(),
@@ -2348,7 +2348,7 @@ impl PlanApi {
 
             let log = ActionLog {
                 action_id: uuid::Uuid::new_v4().to_string(),
-                version_id: version_id.to_string(),
+                version_id: Some(version_id.to_string()),
                 action_type: "MOVE_ITEMS".to_string(),
                 action_ts: chrono::Local::now().naive_local(),
                 actor: actor.to_string(),

@@ -466,7 +466,7 @@ impl ActionLogRepository {
     /// 将数据库行映射为 ActionLog 实体
     fn map_row(&self, row: &Row) -> SqliteResult<ActionLog> {
         let action_id: String = row.get(0)?;
-        let version_id: String = row.get(1)?;
+        let version_id: Option<String> = row.get(1)?;
         let action_type: String = row.get(2)?;
         let action_ts_str: String = row.get(3)?;
         let actor: String = row.get(4)?;
@@ -550,7 +550,7 @@ mod tests {
     fn make_test_log(action_id: &str, version_id: &str, actor: &str) -> ActionLog {
         ActionLog {
             action_id: action_id.to_string(),
-            version_id: version_id.to_string(),
+            version_id: Some(version_id.to_string()),
             action_type: "Import".to_string(),
             action_ts: Utc::now().naive_utc(),
             actor: actor.to_string(),
