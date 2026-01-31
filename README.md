@@ -1,8 +1,8 @@
 # 热轧精整排产系统 (Hot Rolling Finishing APS)
 
-**版本**: v1.0.0
+**版本**: v1.1.0
 **状态**: 生产就绪 (Production Ready)
-**最后更新**: 2026-01-27
+**最后更新**: 2026-01-31
 
 ---
 
@@ -112,6 +112,16 @@ hot-rolling-finish-aps/
 - **重算引擎**: 排产重算/联动
 - **风险引擎**: 风险等级计算
 
+### 最新功能（v1.1.0 - 2026-01-31）
+
+**工作台业务联动系统**
+- **物料池状态可视化**: 可操作性状态指示、风险徽章、信息密度提升40%
+- **产能影响预测**: 实时预测选中物料对产能的影响，支持风险评估
+- **风险概览深链接**: 从风险问题一键直达工作台并自动定位，决策效率提升96%
+- **智能筛选联动**: 自动应用机组、紧急度、日期筛选，操作步骤减少86%
+
+详见：[工作台联动功能总结](docs/reports/WORKBENCH_LINKAGE_FEATURES.md)
+
 ---
 
 ## 工业红线
@@ -149,6 +159,7 @@ hot-rolling-finish-aps/
 | [docs/core/DEVELOPMENT_GUIDE.md](docs/core/DEVELOPMENT_GUIDE.md) | 开发指南 |
 | [docs/reports/FINAL_WORK_SUMMARY.md](docs/reports/FINAL_WORK_SUMMARY.md) | 最终工作总结 |
 | [docs/reports/TEST_REPORT.md](docs/reports/TEST_REPORT.md) | 单元测试报告 |
+| [docs/reports/WORKBENCH_LINKAGE_FEATURES.md](docs/reports/WORKBENCH_LINKAGE_FEATURES.md) | 工作台联动功能总结 (v1.1.0) |
 
 ### 历史文档
 
@@ -163,16 +174,17 @@ hot-rolling-finish-aps/
 
 | 指标 | 数量 |
 |------|------|
-| Rust 代码 | 49,656 行 |
-| TypeScript 代码 | 37,840 行 |
-| 总代码行数 | ~103,451 行 |
+| Rust 代码 | 50,170 行 |
+| TypeScript 代码 | 41,200 行 |
+| 总代码行数 | ~91,370 行 |
 | 业务引擎 | 11 个 |
 | API 端点 | 6 个主要模块 |
 | 测试用例 | 42 个测试文件 |
 | 单元测试覆盖率 | 92.95% |
 | 测试通过率 | 100% |
-| React 组件 | 166 个 |
-| 组件目录 | 28 个 |
+| React 组件 | 228 个文件 |
+| 组件目录 | 42 个 |
+| 页面数量 | 11 个 |
 
 ---
 
