@@ -2,9 +2,10 @@
  * MaterialPool 物料池主组件
  *
  * 重构后：484 行 → ~120 行 (-75%)
+ * 增强：支持聚焦物料（接口已预留）
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Alert, Button, Card, Empty, Skeleton, Space, Tree, Typography } from 'antd';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import { List } from 'react-window';
@@ -29,6 +30,7 @@ const MaterialPool: React.FC<MaterialPoolProps> = ({
   selectedMaterialIds,
   onSelectedMaterialIdsChange,
   onInspectMaterial,
+  focusedMaterialId,
 }) => {
   const pool = useMaterialPool({
     materials,
@@ -38,7 +40,18 @@ const MaterialPool: React.FC<MaterialPoolProps> = ({
     onSelectedMaterialIdsChange,
   });
 
-  return (
+  // TODO: 自动滚动到聚焦物料（当前List组件不支持ref，待实现）
+  // 功能接口已预留，focusedMaterialId prop可用于未来实现
+  useEffect(() => {
+    if (focusedMaterialId && pool.rows.length > 0) {
+      // 查找聚焦物料在rows中的索引
+      const targetIndex = pool.rows.findIndex(
+        (row) => row.type === 'material' && row.material.material_id === focusedMaterialId
+      );
+      // 将来可在此处实现滚动逻辑
+      console.log('Focused material index:', targetIndex);
+    }
+  }, [focusedMaterialId, pool.rows]);  return (
     <Card
       size="small"
       title="物料池"

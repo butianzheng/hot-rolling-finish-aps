@@ -152,6 +152,14 @@ const PlanningWorkbench: React.FC = () => {
         });
       }
 
+      // 应用紧急度筛选（扩展功能）
+      if (urgency) {
+        setWorkbenchFilters({
+          ...workbenchFilters,
+          urgencyLevel: urgency,
+        });
+      }
+
       // 显示来源提示
       const contextLabel =
         context === 'risk'
@@ -169,10 +177,16 @@ const PlanningWorkbench: React.FC = () => {
           : '';
 
       if (contextLabel) {
-        message.info(`已从「${contextLabel}」跳转，自动应用相关筛选条件`);
+        const filterHints = [];
+        if (machine) filterHints.push(`机组: ${machine}`);
+        if (urgency) filterHints.push(`紧急度: ${urgency}`);
+        if (date) filterHints.push(`日期: ${date}`);
+
+        const filterInfo = filterHints.length > 0 ? `（${filterHints.join('、')}）` : '';
+        message.info(`已从「${contextLabel}」跳转，自动应用相关筛选条件${filterInfo}`);
       }
     }
-  }, [searchParams]);
+  }, [searchParams, setWorkbenchFilters]);
 
   const materialsQuery = useQuery({
     queryKey: ['materials'],

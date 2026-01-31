@@ -43,6 +43,9 @@ export interface MaterialPoolProps {
   selectedMaterialIds: string[];
   onSelectedMaterialIdsChange: (ids: string[]) => void;
   onInspectMaterial?: (material: MaterialPoolMaterial) => void;
+
+  // 扩展功能：自动滚动到聚焦物料
+  focusedMaterialId?: string | null;
 }
 
 export type UrgencyBucket = 'L3' | 'L2' | 'L1' | 'L0';
