@@ -11,6 +11,8 @@ import { planApi, materialApi } from '../../api/tauri';
 import { useEvent } from '../../api/eventBus';
 import { useActiveVersionId, useCurrentUser } from '../../stores/use-global-store';
 import { formatDate } from '../../utils/formatters';
+import type { PlanItemStatusSummary } from '../../utils/planItemStatus';
+import { matchPlanItemStatusFilter, summarizePlanItemStatus } from '../../utils/planItemStatus';
 import type { PlanItem, Statistics, PlanItemVisualizationProps } from './types';
 
 export interface UsePlanItemVisualizationReturn {
@@ -66,6 +68,9 @@ export interface UsePlanItemVisualizationReturn {
 
   // 版本
   activeVersionId: string | null;
+
+  // 状态快速筛选统计（不受状态筛选影响）
+  statusSummary: PlanItemStatusSummary;
 }
 
 export function usePlanItemVisualization(
@@ -74,6 +79,8 @@ export function usePlanItemVisualization(
   const {
     machineCode,
     urgentLevel,
+    statusFilter = 'ALL',
+    focusRequest,
     refreshSignal,
     selectedMaterialIds: controlledSelectedMaterialIds,
     onSelectedMaterialIdsChange,
@@ -89,6 +96,9 @@ export function usePlanItemVisualization(
   const [planItems, setPlanItems] = useState<PlanItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<PlanItem[]>([]);
   const [statistics, setStatistics] = useState<Statistics | null>(null);
+  const [statusSummary, setStatusSummary] = useState<PlanItemStatusSummary>(() =>
+    summarizePlanItemStatus([])
+  );
 
   // 筛选状态
   const [selectedMachine, setSelectedMachine] = useState<string>('all');
@@ -228,9 +238,26 @@ export function usePlanItemVisualization(
       filtered = filtered.filter((item) => item.urgent_level === selectedUrgentLevel);
     }
 
+    // 状态统计：基于状态筛选前的数据，确保快筛标签数量稳定可见
+    setStatusSummary(summarizePlanItemStatus(filtered));
+
+    // 状态筛选：由工作台统一控制（已排/冻结/强放/可调）
+    if (statusFilter && statusFilter !== 'ALL') {
+      filtered = filtered.filter((item) => matchPlanItemStatusFilter(item, statusFilter));
+    }
+
     setFilteredItems(filtered);
     calculateStatistics(filtered);
-  }, [planItems, selectedMachine, selectedDate, dateRange, searchText, selectedUrgentLevel, calculateStatistics]);
+  }, [
+    planItems,
+    selectedMachine,
+    selectedDate,
+    dateRange,
+    searchText,
+    selectedUrgentLevel,
+    statusFilter,
+    calculateStatistics,
+  ]);
 
   // 查看详情
   const handleViewDetail = useCallback((item: PlanItem) => {
@@ -389,6 +416,21 @@ export function usePlanItemVisualization(
     setSelectedUrgentLevel(urgentLevel ?? 'all');
   }, [urgentLevel]);
 
+  // 外部聚焦（从产能概览/甘特同日明细跳转到矩阵时）
+  useEffect(() => {
+    if (!focusRequest) return;
+    const machine = String(focusRequest.machine || '').trim();
+    const date = String(focusRequest.date || '').trim();
+    if (machine) setSelectedMachine(machine);
+    if (date) {
+      const d = dayjs(date);
+      if (d.isValid()) {
+        setSelectedDate(d);
+        setDateRange(null);
+      }
+    }
+  }, [focusRequest?.nonce]);
+
   // 初始加载
   useEffect(() => {
     if (activeVersionId) {
@@ -399,7 +441,7 @@ export function usePlanItemVisualization(
   // 筛选条件变化时重新筛选
   useEffect(() => {
     filterData();
-  }, [selectedMachine, selectedDate, dateRange, searchText, selectedUrgentLevel, filterData]);
+  }, [selectedMachine, selectedDate, dateRange, searchText, selectedUrgentLevel, statusFilter, filterData]);
 
   return {
     loading,
@@ -437,5 +479,6 @@ export function usePlanItemVisualization(
     loadPlanItems,
     clearFilters,
     activeVersionId,
+    statusSummary,
   };
 }

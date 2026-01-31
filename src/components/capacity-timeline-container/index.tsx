@@ -14,6 +14,10 @@ import { ToolBar } from './ToolBar';
 export const CapacityTimelineContainer: React.FC<CapacityTimelineContainerProps> = ({
   machineCode,
   dateRange: externalDateRange,
+  onMachineCodeChange,
+  onDateRangeChange,
+  onResetDateRange,
+  onOpenScheduleCell,
   selectedMaterialIds = [],
   focusedMaterialId,
   materials = [],
@@ -35,9 +39,16 @@ export const CapacityTimelineContainer: React.FC<CapacityTimelineContainerProps>
       {/* 工具栏 */}
       <ToolBar
         dateRange={effectiveDateRange}
-        onDateRangeChange={state.setDateRange}
+        onDateRangeChange={(range) => {
+          state.setDateRange(range);
+          onDateRangeChange?.(range);
+        }}
+        onResetDateRange={onResetDateRange}
         selectedMachine={state.selectedMachine}
-        onMachineChange={state.setSelectedMachine}
+        onMachineChange={(machine) => {
+          state.setSelectedMachine(machine);
+          onMachineCodeChange?.(machine === 'all' ? null : machine);
+        }}
         machineOptions={state.machineOptions}
         onRefresh={state.loadTimelineData}
         loading={state.loading}
@@ -66,6 +77,7 @@ export const CapacityTimelineContainer: React.FC<CapacityTimelineContainerProps>
                 selectedMaterialIds={selectedMaterialIds}
                 focusedMaterialId={focusedMaterialId}
                 materials={materials}
+                onOpenScheduleCell={onOpenScheduleCell}
               />
             ))}
           </Space>

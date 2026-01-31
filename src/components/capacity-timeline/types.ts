@@ -4,6 +4,11 @@
 
 import { URGENCY_COLORS } from '../../theme';
 import type { MaterialPoolMaterial } from '../material-pool/types';
+import type { PlanItemStatusFilter } from '../../utils/planItemStatus';
+
+export interface OpenScheduleCellOptions {
+  statusFilter?: PlanItemStatusFilter;
+}
 
 export interface CapacityTimelineProps {
   data: import('../../types/capacity').CapacityTimelineData;
@@ -11,6 +16,13 @@ export interface CapacityTimelineProps {
   selectedMaterialIds?: string[]; // 选中的物料ID列表
   focusedMaterialId?: string | null; // 聚焦的物料ID
   materials?: MaterialPoolMaterial[]; // 所有物料数据（用于产能影响预测）
+  // 联动：打开甘特图同日明细
+  onOpenScheduleCell?: (
+    machineCode: string,
+    date: string,
+    materialIds: string[],
+    options?: OpenScheduleCellOptions
+  ) => void;
 }
 
 export type RollStatus = 'critical' | 'warning' | 'healthy';

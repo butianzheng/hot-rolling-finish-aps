@@ -18,4 +18,13 @@ export interface CapacityTimelineData {
   rollCampaignProgress: number; // 轧辊吨位进度
   rollChangeThreshold: number; // 轧辊更换阈值 (1500 或 2500)
   materialIds?: string[]; // 该日期包含的所有物料ID（用于高亮）
+  // 排程状态结构（用于产能概览决策与联动）
+  statusSummary?: {
+    totalCount: number;
+    totalWeightT: number;
+    lockedInPlanCount: number;
+    lockedInPlanWeightT: number;
+    forceReleaseCount: number;
+    forceReleaseWeightT: number;
+  };
 }

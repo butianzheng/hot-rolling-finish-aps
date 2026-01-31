@@ -7,6 +7,8 @@ import { Button, DatePicker, Space, Tag, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { URGENCY_COLORS } from '../../theme/tokens';
 import { formatWeight } from '../../utils/formatters';
+import type { PlanItemStatusFilter, PlanItemStatusSummary } from '../../utils/planItemStatus';
+import { PLAN_ITEM_STATUS_FILTER_META } from '../../utils/planItemStatus';
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
@@ -22,6 +24,9 @@ interface GanttToolbarProps {
   filteredTotalWeight: number;
   dateRangeStart: string;
   dateRangeEnd: string;
+  statusSummary: PlanItemStatusSummary;
+  statusFilter: PlanItemStatusFilter;
+  onStatusFilterChange?: (next: PlanItemStatusFilter) => void;
 }
 
 export const GanttToolbar: React.FC<GanttToolbarProps> = ({
@@ -35,7 +40,20 @@ export const GanttToolbar: React.FC<GanttToolbarProps> = ({
   filteredTotalWeight,
   dateRangeStart,
   dateRangeEnd,
+  statusSummary,
+  statusFilter,
+  onStatusFilterChange,
 }) => {
+  const canChangeStatus = !!onStatusFilterChange;
+  const toggleStatus = (next: PlanItemStatusFilter) => {
+    if (!onStatusFilterChange) return;
+    if (next === 'ALL') {
+      onStatusFilterChange('ALL');
+      return;
+    }
+    onStatusFilterChange(statusFilter === next ? 'ALL' : next);
+  };
+
   const legend = (
     <Space size={8} wrap>
       <Tag color={URGENCY_COLORS.L3_EMERGENCY}>L3</Tag>
@@ -67,6 +85,86 @@ export const GanttToolbar: React.FC<GanttToolbarProps> = ({
         <Button size="small" onClick={onScrollToToday} disabled={dateKeysLength === 0}>
           定位今天
         </Button>
+
+        <Space size={6} wrap>
+          <Tag
+            color={PLAN_ITEM_STATUS_FILTER_META.ALL.color}
+            style={{
+              cursor: canChangeStatus ? 'pointer' : undefined,
+              boxShadow: statusFilter === 'ALL' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+              userSelect: 'none',
+            }}
+            onClick={() => canChangeStatus && toggleStatus('ALL')}
+            title={`已排 ${statusSummary.totalCount} 件 / ${statusSummary.totalWeightT.toFixed(1)}t`}
+          >
+            已排 {statusSummary.totalCount}
+          </Tag>
+          <Tag
+            color={PLAN_ITEM_STATUS_FILTER_META.LOCKED.color}
+            style={{
+              cursor:
+                canChangeStatus && (statusSummary.lockedInPlanCount > 0 || statusFilter === 'LOCKED')
+                  ? 'pointer'
+                  : 'not-allowed',
+              opacity:
+                canChangeStatus && statusSummary.lockedInPlanCount === 0 && statusFilter !== 'LOCKED' ? 0.35 : 1,
+              boxShadow: statusFilter === 'LOCKED' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+              userSelect: 'none',
+            }}
+            onClick={() => {
+              if (!canChangeStatus) return;
+              if (statusSummary.lockedInPlanCount === 0 && statusFilter !== 'LOCKED') return;
+              toggleStatus('LOCKED');
+            }}
+            title={`冻结 ${statusSummary.lockedInPlanCount} 件 / ${statusSummary.lockedInPlanWeightT.toFixed(1)}t`}
+          >
+            冻结 {statusSummary.lockedInPlanCount}
+          </Tag>
+          <Tag
+            color={PLAN_ITEM_STATUS_FILTER_META.FORCE_RELEASE.color}
+            style={{
+              cursor:
+                canChangeStatus && (statusSummary.forceReleaseCount > 0 || statusFilter === 'FORCE_RELEASE')
+                  ? 'pointer'
+                  : 'not-allowed',
+              opacity:
+                canChangeStatus && statusSummary.forceReleaseCount === 0 && statusFilter !== 'FORCE_RELEASE' ? 0.35 : 1,
+              boxShadow:
+                statusFilter === 'FORCE_RELEASE' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+              userSelect: 'none',
+            }}
+            onClick={() => {
+              if (!canChangeStatus) return;
+              if (statusSummary.forceReleaseCount === 0 && statusFilter !== 'FORCE_RELEASE') return;
+              toggleStatus('FORCE_RELEASE');
+            }}
+            title={`强制放行 ${statusSummary.forceReleaseCount} 件 / ${statusSummary.forceReleaseWeightT.toFixed(1)}t`}
+          >
+            强放 {statusSummary.forceReleaseCount}
+          </Tag>
+          <Tag
+            color={PLAN_ITEM_STATUS_FILTER_META.ADJUSTABLE.color}
+            style={{
+              cursor:
+                canChangeStatus && (statusSummary.adjustableCount > 0 || statusFilter === 'ADJUSTABLE')
+                  ? 'pointer'
+                  : 'not-allowed',
+              opacity:
+                canChangeStatus && statusSummary.adjustableCount === 0 && statusFilter !== 'ADJUSTABLE' ? 0.35 : 1,
+              boxShadow:
+                statusFilter === 'ADJUSTABLE' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+              userSelect: 'none',
+            }}
+            onClick={() => {
+              if (!canChangeStatus) return;
+              if (statusSummary.adjustableCount === 0 && statusFilter !== 'ADJUSTABLE') return;
+              toggleStatus('ADJUSTABLE');
+            }}
+            title={`可调（非冻结）${statusSummary.adjustableCount} 件 / ${statusSummary.adjustableWeightT.toFixed(1)}t`}
+          >
+            可调 {statusSummary.adjustableCount}
+          </Tag>
+        </Space>
       </Space>
       {legend}
       <Text type="secondary" style={{ fontSize: 12 }}>

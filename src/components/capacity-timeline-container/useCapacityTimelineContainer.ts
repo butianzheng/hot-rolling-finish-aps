@@ -42,8 +42,11 @@ export function useCapacityTimelineContainer(
   const activeVersionId = useActiveVersionId();
 
   useEffect(() => {
-    if (!machineCode) return;
-    setSelectedMachine(machineCode);
+    // 当外部受控 machineCode 变化时，同步内部状态
+    // - null: 表示“全部机组”
+    // - undefined: 表示不受控（保持内部选择）
+    if (machineCode === undefined) return;
+    setSelectedMachine(machineCode == null ? 'all' : machineCode);
   }, [machineCode]);
 
   // 预加载机组选项
@@ -102,6 +105,18 @@ export function useCapacityTimelineContainer(
       const bucketMap = new Map<string, UrgencyBucketMap>();
       // (machine_code, plan_date) -> material IDs
       const materialIdsMap = new Map<string, string[]>();
+      // (machine_code, plan_date) -> status summary
+      const statusSummaryMap = new Map<
+        string,
+        {
+          totalCount: number;
+          totalWeightT: number;
+          lockedInPlanCount: number;
+          lockedInPlanWeightT: number;
+          forceReleaseCount: number;
+          forceReleaseWeightT: number;
+        }
+      >();
 
       const inRange = (d: string) => {
         const day = dayjs(d);
@@ -129,6 +144,14 @@ export function useCapacityTimelineContainer(
             L3: { tonnage: 0, count: 0 },
           });
           materialIdsMap.set(key, []);
+          statusSummaryMap.set(key, {
+            totalCount: 0,
+            totalWeightT: 0,
+            lockedInPlanCount: 0,
+            lockedInPlanWeightT: 0,
+            forceReleaseCount: 0,
+            forceReleaseWeightT: 0,
+          });
         }
 
         const bucket = bucketMap.get(key)!;
@@ -139,6 +162,19 @@ export function useCapacityTimelineContainer(
         const materialId = String(it?.material_id ?? '').trim();
         if (materialId) {
           materialIdsMap.get(key)!.push(materialId);
+        }
+
+        // 状态结构：冻结/强制放行等（用于产能概览辅助决策）
+        const summary = statusSummaryMap.get(key)!;
+        summary.totalCount += 1;
+        summary.totalWeightT += weight;
+        if (it?.locked_in_plan === true) {
+          summary.lockedInPlanCount += 1;
+          summary.lockedInPlanWeightT += weight;
+        }
+        if (it?.force_release_in_plan === true) {
+          summary.forceReleaseCount += 1;
+          summary.forceReleaseWeightT += weight;
         }
       });
 
@@ -195,6 +231,14 @@ export function useCapacityTimelineContainer(
             rollCampaignProgress: Number.isFinite(accumulated) ? accumulated : 0,
             rollChangeThreshold: 2500,
             materialIds: materialIdsMap.get(key) || [],
+            statusSummary: statusSummaryMap.get(key) || {
+              totalCount: 0,
+              totalWeightT: 0,
+              lockedInPlanCount: 0,
+              lockedInPlanWeightT: 0,
+              forceReleaseCount: 0,
+              forceReleaseWeightT: 0,
+            },
           } satisfies CapacityTimelineData;
         })
         .sort((a, b) => {

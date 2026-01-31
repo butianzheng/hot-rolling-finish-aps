@@ -8,7 +8,7 @@
 import React, { useEffect } from 'react';
 import { Alert, Button, Card, Empty, Skeleton, Space, Tree, Typography } from 'antd';
 import AutoSizer from 'react-virtualized-auto-sizer';
-import { List } from 'react-window';
+import { List, useListCallbackRef } from 'react-window';
 import type { MaterialPoolProps } from './types';
 import { ROW_HEIGHT } from './types';
 import { parseTreeKey } from './utils';
@@ -40,18 +40,24 @@ const MaterialPool: React.FC<MaterialPoolProps> = ({
     onSelectedMaterialIdsChange,
   });
 
-  // TODO: 自动滚动到聚焦物料（当前List组件不支持ref，待实现）
-  // 功能接口已预留，focusedMaterialId prop可用于未来实现
+  const [listApi, listRef] = useListCallbackRef(null);
+
+  // 自动滚动到聚焦物料
   useEffect(() => {
     if (focusedMaterialId && pool.rows.length > 0) {
       // 查找聚焦物料在rows中的索引
       const targetIndex = pool.rows.findIndex(
         (row) => row.type === 'material' && row.material.material_id === focusedMaterialId
       );
-      // 将来可在此处实现滚动逻辑
-      console.log('Focused material index:', targetIndex);
+      if (targetIndex < 0) return;
+      const el = listApi?.element;
+      if (!el) return;
+      const targetTop = Math.max(0, targetIndex * ROW_HEIGHT - ROW_HEIGHT);
+      el.scrollTo({ top: targetTop, behavior: 'smooth' });
     }
-  }, [focusedMaterialId, pool.rows]);  return (
+  }, [focusedMaterialId, listApi, pool.rows]);
+
+  return (
     <Card
       size="small"
       title="物料池"
@@ -135,6 +141,7 @@ const MaterialPool: React.FC<MaterialPoolProps> = ({
             <AutoSizer>
               {({ height, width }) => (
                 <List
+                  listRef={listRef}
                   rowCount={pool.rows.length}
                   rowHeight={ROW_HEIGHT}
                   rowComponent={MaterialPoolRow}

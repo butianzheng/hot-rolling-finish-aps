@@ -13,6 +13,7 @@ const { RangePicker } = DatePicker;
 export interface ToolBarProps {
   dateRange: DateRangeValue;
   onDateRangeChange: (range: DateRangeValue) => void;
+  onResetDateRange?: () => void;
   selectedMachine: string;
   onMachineChange: (machine: string) => void;
   machineOptions: MachineOption[];
@@ -23,6 +24,7 @@ export interface ToolBarProps {
 export const ToolBar: React.FC<ToolBarProps> = ({
   dateRange,
   onDateRangeChange,
+  onResetDateRange,
   selectedMachine,
   onMachineChange,
   machineOptions,
@@ -33,9 +35,21 @@ export const ToolBar: React.FC<ToolBarProps> = ({
     <Space style={{ marginBottom: 16 }} size={16}>
       <RangePicker
         value={dateRange}
-        onChange={(dates) => dates && onDateRangeChange(dates as [dayjs.Dayjs, dayjs.Dayjs])}
+        allowClear={!!onResetDateRange}
+        onChange={(dates) => {
+          if (!dates || !dates[0] || !dates[1]) {
+            onResetDateRange?.();
+            return;
+          }
+          onDateRangeChange(dates as [dayjs.Dayjs, dayjs.Dayjs]);
+        }}
         format="YYYY-MM-DD"
       />
+      {onResetDateRange ? (
+        <Button onClick={onResetDateRange}>
+          重置范围
+        </Button>
+      ) : null}
       <Select
         style={{ width: 150 }}
         value={selectedMachine}

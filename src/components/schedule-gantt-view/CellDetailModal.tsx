@@ -8,6 +8,8 @@ import { FONT_FAMILIES } from '../../theme';
 import { formatCapacity, formatPercent, formatWeight } from '../../utils/formatters';
 import type { PlanItemRow, CapacityData, CellDetail } from './types';
 import { getUrgentTagColor } from './utils';
+import type { PlanItemStatusFilter } from '../../utils/planItemStatus';
+import { PLAN_ITEM_STATUS_FILTER_META, matchPlanItemStatusFilter } from '../../utils/planItemStatus';
 
 const { Text } = Typography;
 
@@ -21,6 +23,9 @@ interface CellDetailModalProps {
   onToggleSelection: (id: string, checked: boolean) => void;
   onInspectMaterialId?: (id: string) => void;
   onRequestMoveToCell?: (machine: string, date: string) => void;
+  viewUrgentFilter?: string | null;
+  viewStatusFilter?: PlanItemStatusFilter;
+  onNavigateToMatrix?: (machine: string, date: string) => void;
 }
 
 export const CellDetailModal: React.FC<CellDetailModalProps> = ({
@@ -33,13 +38,20 @@ export const CellDetailModal: React.FC<CellDetailModalProps> = ({
   onToggleSelection,
   onInspectMaterialId,
   onRequestMoveToCell,
+  viewUrgentFilter,
+  viewStatusFilter,
+  onNavigateToMatrix,
 }) => {
   const cellDetailItems = useMemo(() => {
     if (!cellDetail) return [];
     const byDate = itemsByMachineDate.get(cellDetail.machine);
     const list = byDate?.get(cellDetail.date) ?? [];
-    return [...list].sort((a, b) => a.seq_no - b.seq_no);
-  }, [cellDetail, itemsByMachineDate]);
+    let sorted = [...list].sort((a, b) => a.seq_no - b.seq_no);
+    if (viewStatusFilter && viewStatusFilter !== 'ALL') {
+      sorted = sorted.filter((it) => matchPlanItemStatusFilter(it, viewStatusFilter));
+    }
+    return sorted;
+  }, [cellDetail, itemsByMachineDate, viewStatusFilter]);
 
   const cellCapacity = useMemo(() => {
     if (!cellDetail) return null;
@@ -54,6 +66,17 @@ export const CellDetailModal: React.FC<CellDetailModalProps> = ({
       footer={
         cellDetail
           ? [
+              onNavigateToMatrix ? (
+                <Button
+                  key="matrix"
+                  onClick={() => {
+                    onNavigateToMatrix(cellDetail.machine, cellDetail.date);
+                    onClose();
+                  }}
+                >
+                  在矩阵查看
+                </Button>
+              ) : null,
               onRequestMoveToCell && selectedMaterialIds.length > 0 ? (
                 <Button
                   key="move"
@@ -72,6 +95,17 @@ export const CellDetailModal: React.FC<CellDetailModalProps> = ({
       width={900}
       destroyOnClose
     >
+      {((viewUrgentFilter && viewUrgentFilter !== 'all') ||
+        (viewStatusFilter && viewStatusFilter !== 'ALL')) ? (
+        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
+          甘特图当前筛选：
+          {viewUrgentFilter && viewUrgentFilter !== 'all' ? ` ${String(viewUrgentFilter).toUpperCase()}` : ' 全部紧急度'}
+          {viewStatusFilter && viewStatusFilter !== 'ALL'
+            ? ` · ${PLAN_ITEM_STATUS_FILTER_META[viewStatusFilter].label}`
+            : ''}
+          （同日明细不受紧急度筛选影响；状态筛选在明细中生效）
+        </Text>
+      ) : null}
       {cellCapacity ? (
         <Alert
           type={

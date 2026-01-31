@@ -5,13 +5,15 @@
  */
 
 import React, { useMemo } from 'react';
-import { Button, Card, Col, Dropdown, Row, Space, Table, message } from 'antd';
+import { Button, Card, Col, Dropdown, Row, Space, Table, Tag, Typography, message } from 'antd';
 import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
 import { DndContext, closestCenter } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useNavigate } from 'react-router-dom';
 import { exportCSV, exportJSON } from '../../utils/exportUtils';
 import { formatWeight } from '../../utils/formatters';
+import type { PlanItemStatusFilter } from '../../utils/planItemStatus';
+import { PLAN_ITEM_STATUS_FILTER_META } from '../../utils/planItemStatus';
 import { tableFilterEmptyConfig } from '../CustomEmpty';
 import NoActiveVersionGuide from '../NoActiveVersionGuide';
 
@@ -25,12 +27,16 @@ import { PlanItemDetailModal } from './PlanItemDetailModal';
 import { ForceReleaseModal } from './ForceReleaseModal';
 import type { PlanItemVisualizationProps } from './types';
 
+const { Text } = Typography;
+
 const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = (props) => {
   const { onNavigateToPlan } = props;
   const navigate = useNavigate();
   const navigateToPlan = onNavigateToPlan || (() => navigate('/comparison'));
 
   const state = usePlanItemVisualization(props);
+  const statusFilter = props.statusFilter || 'ALL';
+  const onStatusFilterChange = props.onStatusFilterChange;
 
   // 表格列配置
   const columns = useMemo(
@@ -114,6 +120,102 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = (props) => {
 
       {/* 统计卡片 */}
       <StatisticsCards statistics={state.statistics} />
+
+      {/* 状态快速筛选（与工作台其他视图一致） */}
+      <Card size="small" style={{ marginBottom: 16 }}>
+        <Space wrap size={6} style={{ justifyContent: 'space-between', width: '100%' }}>
+          <Space wrap size={6}>
+            <Tag
+              color={PLAN_ITEM_STATUS_FILTER_META.ALL.color}
+              style={{
+                cursor: onStatusFilterChange ? 'pointer' : undefined,
+                boxShadow: statusFilter === 'ALL' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+                userSelect: 'none',
+              }}
+              onClick={() => onStatusFilterChange?.('ALL')}
+              title={`已排 ${state.statusSummary.totalCount} 件 / ${state.statusSummary.totalWeightT.toFixed(1)}t`}
+            >
+              已排 {state.statusSummary.totalCount}
+            </Tag>
+            <Tag
+              color={PLAN_ITEM_STATUS_FILTER_META.LOCKED.color}
+              style={{
+                cursor:
+                  onStatusFilterChange &&
+                  (state.statusSummary.lockedInPlanCount > 0 || statusFilter === 'LOCKED')
+                    ? 'pointer'
+                    : 'not-allowed',
+                opacity:
+                  onStatusFilterChange && state.statusSummary.lockedInPlanCount === 0 && statusFilter !== 'LOCKED'
+                    ? 0.35
+                    : 1,
+                boxShadow: statusFilter === 'LOCKED' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+                userSelect: 'none',
+              }}
+              onClick={() => {
+                if (!onStatusFilterChange) return;
+                if (state.statusSummary.lockedInPlanCount === 0 && statusFilter !== 'LOCKED') return;
+                onStatusFilterChange(statusFilter === 'LOCKED' ? 'ALL' : ('LOCKED' as PlanItemStatusFilter));
+              }}
+              title={`冻结 ${state.statusSummary.lockedInPlanCount} 件 / ${state.statusSummary.lockedInPlanWeightT.toFixed(1)}t`}
+            >
+              冻结 {state.statusSummary.lockedInPlanCount}
+            </Tag>
+            <Tag
+              color={PLAN_ITEM_STATUS_FILTER_META.FORCE_RELEASE.color}
+              style={{
+                cursor:
+                  onStatusFilterChange &&
+                  (state.statusSummary.forceReleaseCount > 0 || statusFilter === 'FORCE_RELEASE')
+                    ? 'pointer'
+                    : 'not-allowed',
+                opacity:
+                  onStatusFilterChange && state.statusSummary.forceReleaseCount === 0 && statusFilter !== 'FORCE_RELEASE'
+                    ? 0.35
+                    : 1,
+                boxShadow: statusFilter === 'FORCE_RELEASE' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+                userSelect: 'none',
+              }}
+              onClick={() => {
+                if (!onStatusFilterChange) return;
+                if (state.statusSummary.forceReleaseCount === 0 && statusFilter !== 'FORCE_RELEASE') return;
+                onStatusFilterChange(statusFilter === 'FORCE_RELEASE' ? 'ALL' : ('FORCE_RELEASE' as PlanItemStatusFilter));
+              }}
+              title={`强制放行 ${state.statusSummary.forceReleaseCount} 件 / ${state.statusSummary.forceReleaseWeightT.toFixed(1)}t`}
+            >
+              强放 {state.statusSummary.forceReleaseCount}
+            </Tag>
+            <Tag
+              color={PLAN_ITEM_STATUS_FILTER_META.ADJUSTABLE.color}
+              style={{
+                cursor:
+                  onStatusFilterChange &&
+                  (state.statusSummary.adjustableCount > 0 || statusFilter === 'ADJUSTABLE')
+                    ? 'pointer'
+                    : 'not-allowed',
+                opacity:
+                  onStatusFilterChange && state.statusSummary.adjustableCount === 0 && statusFilter !== 'ADJUSTABLE'
+                    ? 0.35
+                    : 1,
+                boxShadow: statusFilter === 'ADJUSTABLE' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+                userSelect: 'none',
+              }}
+              onClick={() => {
+                if (!onStatusFilterChange) return;
+                if (state.statusSummary.adjustableCount === 0 && statusFilter !== 'ADJUSTABLE') return;
+                onStatusFilterChange(statusFilter === 'ADJUSTABLE' ? 'ALL' : ('ADJUSTABLE' as PlanItemStatusFilter));
+              }}
+              title={`可调（非冻结）${state.statusSummary.adjustableCount} 件 / ${state.statusSummary.adjustableWeightT.toFixed(1)}t`}
+            >
+              可调 {state.statusSummary.adjustableCount}
+            </Tag>
+          </Space>
+
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            当前状态筛选：{PLAN_ITEM_STATUS_FILTER_META[statusFilter]?.label || '已排'}
+          </Text>
+        </Space>
+      </Card>
 
       {/* 筛选栏 */}
       <FilterBar

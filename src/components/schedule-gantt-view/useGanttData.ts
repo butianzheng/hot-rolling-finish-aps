@@ -9,11 +9,19 @@ import { message } from 'antd';
 import type { PlanItemRow, CellDetail } from './types';
 import { MAX_DAYS } from './types';
 import { normalizeDateKey, computeSuggestedRange } from './utils';
+import type { PlanItemStatusFilter, PlanItemStatusSummary } from '../../utils/planItemStatus';
+import { matchPlanItemStatusFilter } from '../../utils/planItemStatus';
 
 interface UseGanttDataOptions {
   machineCode?: string | null;
   urgentLevel?: string | null;
+  statusFilter?: PlanItemStatusFilter;
   planItems?: unknown;
+  // 受控日期范围（工作台联动）；提供时，Hook 不再自行维护范围
+  externalRange?: [Dayjs, Dayjs] | null;
+  onExternalRangeChange?: (range: [Dayjs, Dayjs]) => void;
+  // 受控模式下“重置范围”回到该值（通常由工作台提供）
+  externalSuggestedRange?: [Dayjs, Dayjs];
   selectedMaterialIds: string[];
   onSelectedMaterialIdsChange: (ids: string[]) => void;
 }
@@ -21,7 +29,11 @@ interface UseGanttDataOptions {
 export function useGanttData({
   machineCode,
   urgentLevel,
+  statusFilter = 'ALL',
   planItems,
+  externalRange,
+  onExternalRangeChange,
+  externalSuggestedRange,
   selectedMaterialIds,
   onSelectedMaterialIdsChange,
 }: UseGanttDataOptions) {
@@ -51,12 +63,15 @@ export function useGanttData({
         const want = String(urgentLevel).toUpperCase();
         if (String(it.urgent_level || 'L0').toUpperCase() !== want) return;
       }
+      if (statusFilter && statusFilter !== 'ALL') {
+        if (!matchPlanItemStatusFilter(it, statusFilter)) return;
+      }
       const key = normalizeDateKey(it.plan_date);
       if (!key) return;
       set.add(key);
     });
     return Array.from(set);
-  }, [machineCode, normalized, urgentLevel]);
+  }, [machineCode, normalized, statusFilter, urgentLevel]);
 
   // 建议范围
   const suggestedRange = useMemo(() => computeSuggestedRange(availableDateKeys), [availableDateKeys]);
@@ -64,20 +79,23 @@ export function useGanttData({
   const lastMachineRef = useRef<string | null | undefined>(undefined);
 
   // 状态
-  const [range, setRange] = useState<[Dayjs, Dayjs]>(() => suggestedRange);
+  const [internalRange, setInternalRange] = useState<[Dayjs, Dayjs]>(() => suggestedRange);
   const [cellDetail, setCellDetail] = useState<CellDetail>(null);
 
   // 机组变化时重置范围
   useEffect(() => {
+    if (externalRange) return;
     const machineKey = machineCode ?? null;
     if (lastMachineRef.current !== machineKey) {
       lastMachineRef.current = machineKey;
       didUserAdjustRangeRef.current = false;
     }
     if (!didUserAdjustRangeRef.current) {
-      setRange(suggestedRange);
+      setInternalRange(suggestedRange);
     }
-  }, [machineCode, suggestedRange]);
+  }, [externalRange, machineCode, suggestedRange]);
+
+  const range = externalRange || internalRange;
 
   // 日期键数组
   const dateKeys = useMemo(() => {
@@ -102,11 +120,27 @@ export function useGanttData({
   const todayIndex = dateIndexByKey.get(todayKey) ?? -1;
 
   // 机组和数据
-  const { machines, itemsByMachineDate, filteredCount, filteredTotalWeight } = useMemo(() => {
+  const { machines, itemsByMachineDate, filteredCount, filteredTotalWeight, statusSummary } = useMemo(() => {
     const byMachine = new Map<string, Map<string, PlanItemRow[]>>();
     const machineSet = new Set<string>();
+    const summary: PlanItemStatusSummary = {
+      totalCount: 0,
+      totalWeightT: 0,
+      lockedInPlanCount: 0,
+      lockedInPlanWeightT: 0,
+      forceReleaseCount: 0,
+      forceReleaseWeightT: 0,
+      adjustableCount: 0,
+      adjustableWeightT: 0,
+    };
     if (dateKeys.length === 0) {
-      return { machines: [] as string[], itemsByMachineDate: byMachine, filteredCount: 0, filteredTotalWeight: 0 };
+      return {
+        machines: [] as string[],
+        itemsByMachineDate: byMachine,
+        filteredCount: 0,
+        filteredTotalWeight: 0,
+        statusSummary: summary,
+      };
     }
 
     if (machineCode && machineCode !== 'all') {
@@ -130,6 +164,25 @@ export function useGanttData({
       if (!dateKey) return;
       if (dateKey < startKey || dateKey > endKey) return;
 
+      const weight = Number(it.weight_t || 0);
+      summary.totalCount += 1;
+      summary.totalWeightT += weight;
+      if (it.locked_in_plan) {
+        summary.lockedInPlanCount += 1;
+        summary.lockedInPlanWeightT += weight;
+      } else {
+        summary.adjustableCount += 1;
+        summary.adjustableWeightT += weight;
+      }
+      if (it.force_release_in_plan) {
+        summary.forceReleaseCount += 1;
+        summary.forceReleaseWeightT += weight;
+      }
+
+      if (statusFilter && statusFilter !== 'ALL') {
+        if (!matchPlanItemStatusFilter(it, statusFilter)) return;
+      }
+
       machineSet.add(machine);
       let byDate = byMachine.get(machine);
       if (!byDate) {
@@ -140,7 +193,7 @@ export function useGanttData({
       if (list) list.push(it);
       else byDate.set(dateKey, [it]);
       count += 1;
-      totalWeight += Number(it.weight_t || 0);
+      totalWeight += weight;
     });
 
     byMachine.forEach((byDate) => {
@@ -154,8 +207,9 @@ export function useGanttData({
       itemsByMachineDate: byMachine,
       filteredCount: count,
       filteredTotalWeight: totalWeight,
+      statusSummary: summary,
     };
-  }, [dateKeys, machineCode, normalized, urgentLevel]);
+  }, [dateKeys, machineCode, normalized, statusFilter, urgentLevel]);
 
   // 选中集合
   const selectedSet = useMemo(() => new Set(selectedMaterialIds), [selectedMaterialIds]);
@@ -175,8 +229,12 @@ export function useGanttData({
   const onRangeChange = useCallback(
     (values: null | [Dayjs | null, Dayjs | null]) => {
       if (!values || !values[0] || !values[1]) {
+        if (externalRange) {
+          onExternalRangeChange?.(externalSuggestedRange || suggestedRange);
+          return;
+        }
         didUserAdjustRangeRef.current = false;
-        setRange(suggestedRange);
+        setInternalRange(suggestedRange);
         return;
       }
       let start = values[0].startOf('day');
@@ -191,17 +249,25 @@ export function useGanttData({
         message.warning(`时间跨度过大，已限制为${MAX_DAYS}天`);
         end = start.add(MAX_DAYS - 1, 'day');
       }
+      if (externalRange) {
+        onExternalRangeChange?.([start, end]);
+        return;
+      }
       didUserAdjustRangeRef.current = true;
-      setRange([start, end]);
+      setInternalRange([start, end]);
     },
-    [suggestedRange]
+    [externalRange, externalSuggestedRange, onExternalRangeChange, suggestedRange]
   );
 
   // 重置范围
   const resetRange = useCallback(() => {
+    if (externalRange) {
+      onExternalRangeChange?.(externalSuggestedRange || suggestedRange);
+      return;
+    }
     didUserAdjustRangeRef.current = false;
-    setRange(suggestedRange);
-  }, [suggestedRange]);
+    setInternalRange(suggestedRange);
+  }, [externalRange, externalSuggestedRange, onExternalRangeChange, suggestedRange]);
 
   return {
     normalized,
@@ -213,6 +279,7 @@ export function useGanttData({
     itemsByMachineDate,
     filteredCount,
     filteredTotalWeight,
+    statusSummary,
     selectedSet,
     toggleSelection,
     range,

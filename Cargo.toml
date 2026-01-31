@@ -66,6 +66,7 @@ tauri = { version = "1.5", optional = true , features = [ "fs-read-file", "dialo
 [features]
 default = ["tauri-app"]
 tauri-app = ["tauri"]
+custom-protocol = ["tauri-app", "tauri/custom-protocol"]
 
 [dev-dependencies]
 tempfile = "3.0"       # 测试临时文件

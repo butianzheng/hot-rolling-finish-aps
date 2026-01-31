@@ -2,6 +2,8 @@
  * 排产明细可视化 - 类型定义和常量
  */
 
+import type { PlanItemStatusFilter } from '../../utils/planItemStatus';
+
 // 排产明细类型
 export interface PlanItem {
   key: string;
@@ -34,6 +36,9 @@ export interface PlanItemVisualizationProps {
   onNavigateToPlan?: () => void;
   machineCode?: string | null;
   urgentLevel?: string | null;
+  statusFilter?: PlanItemStatusFilter;
+  onStatusFilterChange?: (next: PlanItemStatusFilter) => void;
+  focusRequest?: { machine?: string; date: string; nonce: string | number } | null;
   refreshSignal?: number;
   selectedMaterialIds?: string[];
   onSelectedMaterialIdsChange?: (ids: string[]) => void;

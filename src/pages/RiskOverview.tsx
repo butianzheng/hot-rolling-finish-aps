@@ -200,17 +200,15 @@ const RiskOverview: React.FC = () => {
     });
 
     // 轻量联动：从不同问题入口进入工作台时，默认切到更匹配的视图。
+    // - risk/bottleneck/capacityOpportunity：默认甘特图（便于定位到日期列并打开同日明细）
     // - visualization/roll：倾向甘特图
     // - materials：倾向卡片
+    const context = String(opts.context || '').trim();
+    const isCellContext = context === 'risk' || context === 'bottleneck' || context === 'capacityOpportunity';
     if (opts.workbenchTab === 'materials') {
       setWorkbenchViewMode('CARD');
-    } else if (opts.workbenchTab === 'capacity' || opts.workbenchTab === 'visualization') {
+    } else if (opts.workbenchTab === 'capacity' || opts.workbenchTab === 'visualization' || isCellContext) {
       setWorkbenchViewMode('GANTT');
-    }
-
-    if (opts.workbenchTab === 'capacity') {
-      navigate('/settings?tab=machine');
-      return;
     }
 
     // 构建深链接URL参数（第三阶段：风险概览深链接）
@@ -219,6 +217,14 @@ const RiskOverview: React.FC = () => {
     if (opts.urgencyLevel) params.set('urgency', opts.urgencyLevel);
     if (opts.planDate) params.set('date', opts.planDate);
     if (opts.context) params.set('context', opts.context);
+
+    // 风险日/瓶颈点/机会点：定位到日期列并自动打开该单元格明细（提升问题直达效率）
+    if (isCellContext) {
+      params.set('focus', 'gantt');
+      if (opts.machineCode && opts.planDate) {
+        params.set('openCell', '1');
+      }
+    }
 
     const url = params.toString() ? `/workbench?${params.toString()}` : '/workbench';
     navigate(url);

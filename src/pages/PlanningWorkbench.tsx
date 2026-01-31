@@ -31,10 +31,12 @@ import {
   useCurrentUser,
   useGlobalActions,
   useGlobalStore,
+  useUserPreferences,
   type WorkbenchViewMode,
 } from '../stores/use-global-store';
 import { formatDate } from '../utils/formatters';
 import { normalizeSchedState } from '../utils/schedState';
+import type { PlanItemStatusFilter } from '../utils/planItemStatus';
 import MaterialPool, { type MaterialPoolMaterial, type MaterialPoolSelection } from '../components/workbench/MaterialPool';
 import ScheduleCardView from '../components/workbench/ScheduleCardView';
 import ScheduleGanttView from '../components/workbench/ScheduleGanttView';
@@ -70,6 +72,15 @@ type MoveImpactRow = {
 };
 type ConditionLockFilter = 'ALL' | 'LOCKED' | 'UNLOCKED';
 
+const DEFAULT_MOVE_REASON = '手工微调';
+const QUICK_MOVE_REASONS: Array<{ label: string; value: string }> = [
+  { label: '手工微调', value: '手工微调' },
+  { label: '处理产能超限', value: '处理产能超限' },
+  { label: '满足紧急订单', value: '满足紧急订单' },
+  { label: '轧辊/工艺约束调整', value: '轧辊/工艺约束调整' },
+  { label: '冷坯消化', value: '冷坯消化' },
+];
+
 const PlanningWorkbench: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -78,6 +89,7 @@ const PlanningWorkbench: React.FC = () => {
   const adminOverrideMode = useAdminOverrideMode();
   const workbenchViewMode = useGlobalStore((state) => state.workbenchViewMode);
   const workbenchFilters = useGlobalStore((state) => state.workbenchFilters);
+  const preferences = useUserPreferences();
   const { setRecalculating } = useGlobalActions();
   const [refreshSignal, setRefreshSignal] = useState(0);
 
@@ -88,6 +100,32 @@ const PlanningWorkbench: React.FC = () => {
     schedState: null,
   }));
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
+  const [scheduleStatusFilter, setScheduleStatusFilter] = useState<PlanItemStatusFilter>('ALL');
+  const [scheduleFocus, setScheduleFocus] = useState<{
+    machine?: string;
+    date: string;
+    source?: string;
+  } | null>(null);
+  const [matrixFocusRequest, setMatrixFocusRequest] = useState<{
+    machine?: string;
+    date: string;
+    nonce: number;
+  } | null>(null);
+
+  type WorkbenchDateRangeMode = 'AUTO' | 'PINNED' | 'MANUAL';
+  const [dateRangeMode, setDateRangeMode] = useState<WorkbenchDateRangeMode>(() => {
+    const d = searchParams.get('date');
+    const focusDate = d ? dayjs(d) : null;
+    return focusDate && focusDate.isValid() ? 'PINNED' : 'AUTO';
+  });
+  const [workbenchDateRange, setWorkbenchDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>(() => {
+    const d = searchParams.get('date');
+    const focusDate = d ? dayjs(d) : null;
+    if (focusDate && focusDate.isValid()) {
+      return [focusDate.subtract(3, 'day'), focusDate.add(3, 'day')];
+    }
+    return [dayjs().subtract(3, 'day'), dayjs().add(10, 'day')];
+  });
 
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [inspectedMaterialId, setInspectedMaterialId] = useState<string | null>(null);
@@ -107,6 +145,16 @@ const PlanningWorkbench: React.FC = () => {
   const [moveValidationMode, setMoveValidationMode] = useState<MoveValidationMode>('AUTO_FIX');
   const [moveSubmitting, setMoveSubmitting] = useState(false);
   const [moveReason, setMoveReason] = useState<string>('');
+  const [moveRecommendLoading, setMoveRecommendLoading] = useState(false);
+  const [moveRecommendSummary, setMoveRecommendSummary] = useState<{
+    machine: string;
+    date: string;
+    overLimitCount: number;
+    unknownCount: number;
+    totalOverT: number;
+    maxUtilPct: number;
+  } | null>(null);
+  const [autoRecommendOnOpen, setAutoRecommendOnOpen] = useState(false);
 
   // 深链接：从“策略对比/变更明细”等页面跳转到工作台时，可携带 material_id 自动打开详情侧栏
   React.useEffect(() => {
@@ -132,6 +180,8 @@ const PlanningWorkbench: React.FC = () => {
     date?: string;
     urgency?: string;
     context?: string;
+    focus?: string;
+    openCell?: boolean;
   } | null>(null);
 
   React.useEffect(() => {
@@ -139,10 +189,20 @@ const PlanningWorkbench: React.FC = () => {
     const date = searchParams.get('date');
     const urgency = searchParams.get('urgency');
     const context = searchParams.get('context');
+    const focus = searchParams.get('focus');
+    const openCell = searchParams.get('openCell');
 
     // 如果有深链接参数，保存到状态并应用
-    if (machine || date || urgency || context) {
-      setDeepLinkContext({ machine: machine || undefined, date: date || undefined, urgency: urgency || undefined, context: context || undefined });
+    if (machine || date || urgency || context || focus || openCell) {
+      const openCellFlag = openCell === '1' || openCell === 'true';
+      setDeepLinkContext({
+        machine: machine || undefined,
+        date: date || undefined,
+        urgency: urgency || undefined,
+        context: context || undefined,
+        focus: focus || undefined,
+        openCell: openCellFlag,
+      });
 
       // 应用机组筛选
       if (machine) {
@@ -150,14 +210,26 @@ const PlanningWorkbench: React.FC = () => {
           if (prev.machineCode === machine) return prev;
           return { machineCode: machine, schedState: null };
         });
+        setWorkbenchFilters({ machineCode: machine });
       }
 
       // 应用紧急度筛选（扩展功能）
       if (urgency) {
-        setWorkbenchFilters({
-          ...workbenchFilters,
-          urgencyLevel: urgency,
-        });
+        setWorkbenchFilters({ urgencyLevel: urgency });
+      }
+
+      // 深链接日期：默认聚焦前后各 3 天，并锁定范围，避免被自动范围覆盖
+      if (date) {
+        const focusDate = dayjs(date);
+        if (focusDate.isValid()) {
+          setWorkbenchDateRange([focusDate.subtract(3, 'day'), focusDate.add(3, 'day')]);
+          setDateRangeMode('PINNED');
+        }
+      }
+
+      // 深链接指定甘特图定位（风险日/瓶颈点等）
+      if (focus === 'gantt' || openCellFlag) {
+        setWorkbenchViewMode('GANTT');
       }
 
       // 显示来源提示
@@ -186,7 +258,18 @@ const PlanningWorkbench: React.FC = () => {
         message.info(`已从「${contextLabel}」跳转，自动应用相关筛选条件${filterInfo}`);
       }
     }
-  }, [searchParams, setWorkbenchFilters]);
+  }, [searchParams, setWorkbenchFilters, setWorkbenchViewMode]);
+
+  const deepLinkContextLabel = useMemo(() => {
+    const ctx = String(deepLinkContext?.context || '').trim();
+    if (ctx === 'risk') return '风险日';
+    if (ctx === 'bottleneck') return '瓶颈点';
+    if (ctx === 'capacityOpportunity') return '容量优化机会';
+    if (ctx === 'orders') return '订单失败';
+    if (ctx === 'coldStock') return '冷坨高压力';
+    if (ctx === 'roll') return '换辊警报';
+    return '';
+  }, [deepLinkContext?.context]);
 
   const materialsQuery = useQuery({
     queryKey: ['materials'],
@@ -266,16 +349,8 @@ const PlanningWorkbench: React.FC = () => {
     planItemsQuery.refetch();
   }, [activeVersionId, refreshSignal, planItemsQuery.refetch]);
 
-  // 计算全局日期范围（基于当前机组的排程数据）
-  const globalDateRange = useMemo<[dayjs.Dayjs, dayjs.Dayjs]>(() => {
-    // 深链接：如果URL中有date参数，聚焦到该日期（前后各3天）
-    if (deepLinkContext?.date) {
-      const focusDate = dayjs(deepLinkContext.date);
-      if (focusDate.isValid()) {
-        return [focusDate.subtract(3, 'day'), focusDate.add(3, 'day')];
-      }
-    }
-
+  // AUTO 日期范围（基于当前机组的排程数据）
+  const autoDateRange = useMemo<[dayjs.Dayjs, dayjs.Dayjs]>(() => {
     const filteredItems = (planItemsQuery.data || []).filter(
       (item: any) => !poolSelection.machineCode ||
                     poolSelection.machineCode === 'all' ||
@@ -302,11 +377,71 @@ const PlanningWorkbench: React.FC = () => {
     const maxDate = sortedDates[sortedDates.length - 1].add(3, 'day'); // 后面留 3 天余量
 
     return [minDate, maxDate];
-  }, [planItemsQuery.data, poolSelection.machineCode, deepLinkContext?.date]);
+  }, [planItemsQuery.data, poolSelection.machineCode]);
+
+  React.useEffect(() => {
+    if (dateRangeMode !== 'AUTO') return;
+    setWorkbenchDateRange(autoDateRange);
+  }, [autoDateRange, dateRangeMode]);
+
+  const applyWorkbenchDateRange = (next: [dayjs.Dayjs, dayjs.Dayjs]) => {
+    if (!next || !next[0] || !next[1]) return;
+    let start = next[0].startOf('day');
+    let end = next[1].startOf('day');
+    if (end.isBefore(start)) {
+      const tmp = start;
+      start = end;
+      end = tmp;
+    }
+    setWorkbenchDateRange([start, end]);
+    const isAuto =
+      formatDate(start) === formatDate(autoDateRange[0]) &&
+      formatDate(end) === formatDate(autoDateRange[1]);
+    setDateRangeMode(isAuto ? 'AUTO' : 'MANUAL');
+  };
+
+  const resetWorkbenchDateRangeToAuto = () => {
+    setDateRangeMode('AUTO');
+    setWorkbenchDateRange(autoDateRange);
+  };
 
   const openInspector = (materialId: string) => {
     setInspectedMaterialId(materialId);
     setInspectorOpen(true);
+  };
+
+  const applyWorkbenchMachineCode = (machineCode: string | null) => {
+    setPoolSelection((prev) => {
+      if (prev.machineCode === machineCode) return prev;
+      return { machineCode, schedState: null };
+    });
+    setWorkbenchFilters({ machineCode });
+  };
+
+  const ganttFocusedDate = deepLinkContext?.date || null;
+  const ganttAutoOpenCell = useMemo(() => {
+    if (!deepLinkContext?.openCell) return null;
+    const machine = String(deepLinkContext.machine || poolSelection.machineCode || '').trim();
+    const date = String(deepLinkContext.date || '').trim();
+    if (!machine || !date) return null;
+    return { machine, date };
+  }, [deepLinkContext?.date, deepLinkContext?.machine, deepLinkContext?.openCell, poolSelection.machineCode]);
+
+  const [ganttOpenCellRequest, setGanttOpenCellRequest] = useState<{
+    machine: string;
+    date: string;
+    nonce: number;
+    source?: string;
+  } | null>(null);
+
+  const openGanttCellDetail = (machine: string, date: string, source: string) => {
+    const machineCode = String(machine || '').trim();
+    const d = dayjs(date);
+    if (!machineCode || !d.isValid()) return;
+    const dateKey = formatDate(d);
+    setWorkbenchViewMode('GANTT');
+    setGanttOpenCellRequest({ machine: machineCode, date: dateKey, nonce: Date.now(), source });
+    setScheduleFocus({ machine: machineCode, date: dateKey, source });
   };
 
   const selectedMaterials = useMemo(() => {
@@ -527,6 +662,237 @@ const PlanningWorkbench: React.FC = () => {
 
     return { rows, overflowRows, loading: moveImpactCapacityQuery.isLoading };
   }, [moveImpactBase, moveImpactCapacityQuery.data, moveImpactCapacityQuery.isLoading]);
+
+  const strategyLabel = useMemo(() => {
+    const v = String(preferences.defaultStrategy || 'balanced');
+    if (v === 'urgent_first') return '紧急优先';
+    if (v === 'capacity_first') return '产能优先';
+    if (v === 'cold_stock_first') return '冷坯消化';
+    if (v === 'manual') return '手动调整';
+    return '均衡方案';
+  }, [preferences.defaultStrategy]);
+
+  const recommendMoveTarget = React.useCallback(async () => {
+    if (!activeVersionId) {
+      message.warning('请先激活一个版本');
+      return;
+    }
+    const targetMachine = String(moveTargetMachine || '').trim();
+    if (!targetMachine) {
+      message.warning('请先选择目标机组');
+      return;
+    }
+
+    // 仅基于“可移动”的已选物料做推荐（AUTO_FIX 模式下，冻结项会被跳过）
+    let planItemsRaw = Array.isArray(planItemsQuery.data) ? planItemsQuery.data : [];
+    if (planItemsRaw.length === 0) {
+      const fetched = await planApi.listPlanItems(activeVersionId);
+      planItemsRaw = Array.isArray(fetched) ? fetched : [];
+    }
+
+    const byId = new Map<string, any>();
+    const tonnageMap = new Map<string, number>();
+    planItemsRaw.forEach((it: any) => {
+      const id = String(it?.material_id ?? '').trim();
+      if (id) byId.set(id, it);
+      const machine = String(it?.machine_code ?? '').trim();
+      const date = String(it?.plan_date ?? '').trim();
+      if (!machine || !date) return;
+      const weight = Number(it?.weight_t ?? 0);
+      if (!Number.isFinite(weight) || weight <= 0) return;
+      const key = `${machine}__${date}`;
+      tonnageMap.set(key, (tonnageMap.get(key) ?? 0) + weight);
+    });
+
+    const movable = selectedMaterialIds
+      .map((id) => byId.get(id))
+      .filter(Boolean)
+      .filter((it: any) => !(moveValidationMode === 'AUTO_FIX' && it?.locked_in_plan === true))
+      .map((it: any) => ({
+        material_id: String(it?.material_id ?? '').trim(),
+        from_machine: String(it?.machine_code ?? '').trim(),
+        from_date: String(it?.plan_date ?? '').trim(),
+        weight_t: Number(it?.weight_t ?? 0),
+      }))
+      .filter((it) => it.material_id && it.from_machine && it.from_date && Number.isFinite(it.weight_t) && it.weight_t > 0);
+
+    if (movable.length === 0) {
+      message.warning('所选物料在当前版本中不可移动（可能均为冻结或不在排程）');
+      return;
+    }
+
+    const totalWeight = movable.reduce((sum, it) => sum + it.weight_t, 0);
+    const deltaBase = new Map<string, number>();
+    movable.forEach((it) => {
+      const fromKey = `${it.from_machine}__${it.from_date}`;
+      deltaBase.set(fromKey, (deltaBase.get(fromKey) ?? 0) - it.weight_t);
+    });
+
+    const focus = moveTargetDate && moveTargetDate.isValid() ? moveTargetDate.startOf('day') : dayjs().startOf('day');
+    const rangeStart = workbenchDateRange[0].startOf('day');
+    const rangeEnd = workbenchDateRange[1].startOf('day');
+    const spanDays = rangeEnd.diff(rangeStart, 'day');
+    const candidates: string[] = [];
+
+    // 默认最多评估 31 天（围绕焦点日期）
+    const radius = 15;
+    if (spanDays <= radius * 2) {
+      for (let i = 0; i <= spanDays; i += 1) {
+        candidates.push(rangeStart.add(i, 'day').format('YYYY-MM-DD'));
+      }
+    } else {
+      for (let offset = -radius; offset <= radius; offset += 1) {
+        const d = focus.add(offset, 'day');
+        if (d.isBefore(rangeStart) || d.isAfter(rangeEnd)) continue;
+        candidates.push(d.format('YYYY-MM-DD'));
+      }
+    }
+
+    if (candidates.length === 0) {
+      message.warning('当前日期范围过窄，无法推荐（可先调整范围）');
+      return;
+    }
+
+    const affectedMachines = Array.from(
+      new Set<string>([targetMachine, ...movable.map((it) => it.from_machine)])
+    ).sort();
+
+    const originDates = movable.map((it) => it.from_date).filter(Boolean).sort();
+    const candidateDates = [...candidates].sort();
+    const dateFrom = [originDates[0], candidateDates[0]].filter(Boolean).sort()[0] || candidateDates[0];
+    const dateTo =
+      [originDates[originDates.length - 1], candidateDates[candidateDates.length - 1]].filter(Boolean).sort().slice(-1)[0] ||
+      candidateDates[candidateDates.length - 1];
+
+    setMoveRecommendLoading(true);
+    try {
+      const pools = await capacityApi.getCapacityPools(affectedMachines, dateFrom, dateTo, activeVersionId);
+      const poolMap = new Map<string, { target: number | null; limit: number | null }>();
+      (Array.isArray(pools) ? pools : []).forEach((p: any) => {
+        const machine = String(p?.machine_code ?? '').trim();
+        const date = String(p?.plan_date ?? '').trim();
+        if (!machine || !date) return;
+        const target = Number(p?.target_capacity_t ?? 0);
+        const limit = Number(p?.limit_capacity_t ?? 0);
+        poolMap.set(`${machine}__${date}`, {
+          target: Number.isFinite(target) && target > 0 ? target : null,
+          limit: Number.isFinite(limit) && limit > 0 ? limit : null,
+        });
+      });
+
+      const scored = candidates
+        .map((date) => {
+          const deltaMap = new Map<string, number>(deltaBase);
+          const toKey = `${targetMachine}__${date}`;
+          deltaMap.set(toKey, (deltaMap.get(toKey) ?? 0) + totalWeight);
+
+          // 过滤掉无变化的 key
+          const keys = Array.from(deltaMap.entries()).filter(([, d]) => Number.isFinite(d) && Math.abs(d) > 1e-9);
+          if (keys.length === 0) return null;
+
+          let overLimitCount = 0;
+          let unknownCount = 0;
+          let totalOverT = 0;
+          let maxUtilPct = 0;
+
+          keys.forEach(([key, delta]) => {
+            const before = tonnageMap.get(key) ?? 0;
+            const after = before + delta;
+            const cap = poolMap.get(key);
+            const limit = cap?.limit ?? cap?.target ?? null;
+            if (limit == null || limit <= 0) {
+              unknownCount += 1;
+              return;
+            }
+            const pct = (after / limit) * 100;
+            if (pct > maxUtilPct) maxUtilPct = pct;
+            if (after > limit + 1e-9) {
+              overLimitCount += 1;
+              totalOverT += after - limit;
+            }
+          });
+
+          const distance = Math.abs(dayjs(date).diff(focus, 'day'));
+          return {
+            date,
+            overLimitCount,
+            unknownCount,
+            totalOverT,
+            maxUtilPct,
+            distance,
+          };
+        })
+        .filter(Boolean) as Array<{
+        date: string;
+        overLimitCount: number;
+        unknownCount: number;
+        totalOverT: number;
+        maxUtilPct: number;
+        distance: number;
+      }>;
+
+      if (scored.length === 0) {
+        message.warning('暂无可推荐的位置（可能全为无变化/未知容量）');
+        return;
+      }
+
+      const strategy = String(preferences.defaultStrategy || 'balanced');
+      scored.sort((a, b) => {
+        if (a.overLimitCount !== b.overLimitCount) return a.overLimitCount - b.overLimitCount;
+        if (a.unknownCount !== b.unknownCount) return a.unknownCount - b.unknownCount;
+
+        // 策略差异（尽量贴合“当前方案策略”的偏好）
+        if (strategy === 'capacity_first') {
+          if (a.maxUtilPct !== b.maxUtilPct) return a.maxUtilPct - b.maxUtilPct;
+          if (a.totalOverT !== b.totalOverT) return a.totalOverT - b.totalOverT;
+          if (a.distance !== b.distance) return a.distance - b.distance;
+        } else {
+          if (a.totalOverT !== b.totalOverT) return a.totalOverT - b.totalOverT;
+          if (a.distance !== b.distance) return a.distance - b.distance;
+          if (a.maxUtilPct !== b.maxUtilPct) return a.maxUtilPct - b.maxUtilPct;
+        }
+
+        if (strategy === 'urgent_first') return a.date.localeCompare(b.date); // 越早越好
+        if (strategy === 'cold_stock_first') return b.date.localeCompare(a.date); // 越晚越好
+        return a.date.localeCompare(b.date);
+      });
+
+      const best = scored[0];
+      setMoveTargetDate(dayjs(best.date));
+      setMoveRecommendSummary({
+        machine: targetMachine,
+        date: best.date,
+        overLimitCount: best.overLimitCount,
+        unknownCount: best.unknownCount,
+        totalOverT: best.totalOverT,
+        maxUtilPct: best.maxUtilPct,
+      });
+
+      message.success(`推荐位置：${targetMachine} / ${best.date}（策略：${strategyLabel}）`);
+    } catch (error: any) {
+      console.error('推荐位置失败:', error);
+      message.error(`推荐位置失败: ${error?.message || error}`);
+    } finally {
+      setMoveRecommendLoading(false);
+    }
+  }, [
+    activeVersionId,
+    moveTargetMachine,
+    moveTargetDate,
+    moveValidationMode,
+    planItemsQuery.data,
+    preferences.defaultStrategy,
+    strategyLabel,
+    selectedMaterialIds,
+    workbenchDateRange,
+  ]);
+
+  React.useEffect(() => {
+    if (!moveModalOpen) return;
+    if (!autoRecommendOnOpen) return;
+    setAutoRecommendOnOpen(false);
+    recommendMoveTarget();
+  }, [autoRecommendOnOpen, moveModalOpen, recommendMoveTarget]);
 
   const checkRedLineViolations = (
     material: MaterialPoolMaterial,
@@ -784,12 +1150,14 @@ const PlanningWorkbench: React.FC = () => {
     }
 
     const fallbackMachine = poolSelection.machineCode || machineOptions[0] || null;
+    const focusDate = deepLinkContext?.date ? dayjs(deepLinkContext.date) : dayjs();
     setMoveTargetMachine(fallbackMachine);
-    setMoveTargetDate(dayjs());
+    setMoveTargetDate(focusDate.isValid() ? focusDate : dayjs());
     setMoveSeqMode('APPEND');
     setMoveStartSeq(1);
     setMoveValidationMode('AUTO_FIX');
-    setMoveReason('');
+    setMoveReason(DEFAULT_MOVE_REASON);
+    setMoveRecommendSummary(null);
     setMoveModalOpen(true);
   };
 
@@ -807,8 +1175,18 @@ const PlanningWorkbench: React.FC = () => {
     setMoveSeqMode('APPEND');
     setMoveStartSeq(1);
     setMoveValidationMode('AUTO_FIX');
-    setMoveReason('');
+    setMoveReason(DEFAULT_MOVE_REASON);
+    setMoveRecommendSummary(null);
     setMoveModalOpen(true);
+  };
+
+  const openMoveModalWithRecommend = () => {
+    if (selectedMaterialIds.length === 0) {
+      message.warning('请先选择物料');
+      return;
+    }
+    openMoveModal();
+    setAutoRecommendOnOpen(true);
   };
 
   const submitMove = async () => {
@@ -1111,6 +1489,21 @@ const PlanningWorkbench: React.FC = () => {
         {/* 主体：左物料池 + 右视图 */}
         <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 12 }}>
           <div style={{ flex: '0 0 380px', minWidth: 320, minHeight: 0 }}>
+            {deepLinkContext?.date ? (
+              <div style={{ marginBottom: 8 }}>
+                <Space wrap size={6}>
+                  <Tag color="blue">
+                    定位：{deepLinkContext.machine || poolSelection.machineCode || '全部机组'} / {deepLinkContext.date}
+                  </Tag>
+                  {deepLinkContextLabel ? <Tag>来源：{deepLinkContextLabel}</Tag> : null}
+                  {dateRangeMode !== 'AUTO' ? (
+                    <Button size="small" onClick={resetWorkbenchDateRangeToAuto}>
+                      恢复自动范围
+                    </Button>
+                  ) : null}
+                </Space>
+              </div>
+            ) : null}
             <MaterialPool
               materials={materials}
               loading={materialsQuery.isLoading}
@@ -1120,9 +1513,6 @@ const PlanningWorkbench: React.FC = () => {
               onSelectionChange={(next) => {
                 setPoolSelection(next);
                 setWorkbenchFilters({ machineCode: next.machineCode });
-                if (next.machineCode !== poolSelection.machineCode) {
-                  setSelectedMaterialIds([]);
-                }
               }}
               filters={{
                 urgencyLevel: workbenchFilters.urgencyLevel,
@@ -1149,7 +1539,16 @@ const PlanningWorkbench: React.FC = () => {
               <div style={{ maxHeight: 260, overflow: 'auto' }}>
                 <CapacityTimelineContainer
                   machineCode={poolSelection.machineCode}
-                  dateRange={globalDateRange}
+                  dateRange={workbenchDateRange}
+                  onMachineCodeChange={applyWorkbenchMachineCode}
+                  onDateRangeChange={applyWorkbenchDateRange}
+                  onResetDateRange={resetWorkbenchDateRangeToAuto}
+                  onOpenScheduleCell={(machine, date, _materialIds, options) => {
+                    if (options?.statusFilter) {
+                      setScheduleStatusFilter(options.statusFilter);
+                    }
+                    openGanttCellDetail(machine, date, 'capacity');
+                  }}
                   selectedMaterialIds={selectedMaterialIds}
                   materials={materials}
                 />
@@ -1160,15 +1559,37 @@ const PlanningWorkbench: React.FC = () => {
               size="small"
               title="排程视图"
               extra={
-                <Segmented
-                  value={workbenchViewMode}
-                  options={[
-                    { label: '矩阵', value: 'MATRIX' },
-                    { label: '甘特图', value: 'GANTT' },
-                    { label: '卡片', value: 'CARD' },
-                  ]}
-                  onChange={(value) => setWorkbenchViewMode(value as WorkbenchViewMode)}
-                />
+                <Space wrap size={8}>
+                  <Select
+                    size="small"
+                    style={{ width: 148 }}
+                    value={poolSelection.machineCode ?? 'all'}
+                    onChange={(value) => applyWorkbenchMachineCode(value === 'all' ? null : (value as string))}
+                    options={[
+                      { label: '全部机组', value: 'all' },
+                      ...machineOptions.map((code) => ({ label: code, value: code })),
+                    ]}
+                  />
+                  {scheduleFocus?.date ? (
+                    <Tag color="blue">
+                      聚焦：
+                      {String(scheduleFocus.machine || '').trim()
+                        ? `${scheduleFocus.machine} / ${formatDate(scheduleFocus.date)}`
+                        : poolSelection.machineCode && poolSelection.machineCode !== 'all'
+                        ? `${poolSelection.machineCode} / ${formatDate(scheduleFocus.date)}`
+                        : formatDate(scheduleFocus.date)}
+                    </Tag>
+                  ) : null}
+                  <Segmented
+                    value={workbenchViewMode}
+                    options={[
+                      { label: '矩阵', value: 'MATRIX' },
+                      { label: '甘特图', value: 'GANTT' },
+                      { label: '卡片', value: 'CARD' },
+                    ]}
+                    onChange={(value) => setWorkbenchViewMode(value as WorkbenchViewMode)}
+                  />
+                </Space>
               }
               style={{ flex: 1, minHeight: 0 }}
               bodyStyle={{
@@ -1178,11 +1599,14 @@ const PlanningWorkbench: React.FC = () => {
                 flexDirection: 'column',
               }}
             >
-              <div style={{ flex: 1, minHeight: 0 }}>
+              <div style={{ flex: 1, minHeight: 0, height: '100%' }}>
                 {workbenchViewMode === 'CARD' ? (
                   <ScheduleCardView
                     machineCode={poolSelection.machineCode}
                     urgentLevel={workbenchFilters.urgencyLevel}
+                    dateRange={workbenchDateRange}
+                    statusFilter={scheduleStatusFilter}
+                    onStatusFilterChange={setScheduleStatusFilter}
                     refreshSignal={refreshSignal}
                     selectedMaterialIds={selectedMaterialIds}
                     onSelectedMaterialIdsChange={setSelectedMaterialIds}
@@ -1192,6 +1616,20 @@ const PlanningWorkbench: React.FC = () => {
                   <ScheduleGanttView
                     machineCode={poolSelection.machineCode}
                     urgentLevel={workbenchFilters.urgencyLevel}
+                    dateRange={workbenchDateRange}
+                    suggestedDateRange={autoDateRange}
+                    onDateRangeChange={applyWorkbenchDateRange}
+                    focusedDate={ganttFocusedDate}
+                    autoOpenCell={ganttOpenCellRequest || ganttAutoOpenCell}
+                    statusFilter={scheduleStatusFilter}
+                    onStatusFilterChange={setScheduleStatusFilter}
+                    onFocusChange={setScheduleFocus}
+                    focus={scheduleFocus}
+                    onNavigateToMatrix={(machine, date) => {
+                      setWorkbenchViewMode('MATRIX');
+                      setMatrixFocusRequest({ machine, date, nonce: Date.now() });
+                      setScheduleFocus({ machine, date, source: 'matrixJump' });
+                    }}
                     planItems={planItemsQuery.data}
                     loading={planItemsQuery.isLoading}
                     error={planItemsQuery.error}
@@ -1202,15 +1640,18 @@ const PlanningWorkbench: React.FC = () => {
                     onRequestMoveToCell={(machine, date) => openMoveModalAt(machine, date)}
                   />
                 ) : (
-                  <React.Suspense fallback={<PageSkeleton />}>
-                    <PlanItemVisualization
-                      machineCode={poolSelection.machineCode}
-                      urgentLevel={workbenchFilters.urgencyLevel}
-                      refreshSignal={refreshSignal}
-                      selectedMaterialIds={selectedMaterialIds}
-                      onSelectedMaterialIdsChange={setSelectedMaterialIds}
-                    />
-                  </React.Suspense>
+                    <React.Suspense fallback={<PageSkeleton />}>
+                      <PlanItemVisualization
+                        machineCode={poolSelection.machineCode}
+                        urgentLevel={workbenchFilters.urgencyLevel}
+                        statusFilter={scheduleStatusFilter}
+                        onStatusFilterChange={setScheduleStatusFilter}
+                        focusRequest={matrixFocusRequest}
+                        refreshSignal={refreshSignal}
+                        selectedMaterialIds={selectedMaterialIds}
+                        onSelectedMaterialIdsChange={setSelectedMaterialIds}
+                      />
+                    </React.Suspense>
                 )}
               </div>
             </Card>
@@ -1262,6 +1703,9 @@ const PlanningWorkbench: React.FC = () => {
                 onClick={() => runForceReleaseOperation(selectedMaterialIds)}
               >
                 强制放行
+              </Button>
+              <Button disabled={selectedMaterialIds.length === 0} onClick={openMoveModalWithRecommend}>
+                最近可行
               </Button>
               <Button disabled={selectedMaterialIds.length === 0} onClick={openMoveModal}>
                 移动到...
@@ -1457,6 +1901,28 @@ const PlanningWorkbench: React.FC = () => {
               />
             ) : null}
 
+            <Space wrap align="center">
+              <Button
+                size="small"
+                onClick={() => recommendMoveTarget()}
+                loading={moveRecommendLoading}
+                disabled={selectedMaterialIds.length === 0 || !moveTargetMachine}
+              >
+                推荐位置（最近可行）
+              </Button>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                策略：{strategyLabel}
+              </Typography.Text>
+              {moveRecommendSummary ? (
+                <Tag color={moveRecommendSummary.overLimitCount === 0 ? 'green' : 'orange'}>
+                  推荐：{moveRecommendSummary.machine} {moveRecommendSummary.date}{' '}
+                  {moveRecommendSummary.unknownCount > 0
+                    ? `· 未知容量 ${moveRecommendSummary.unknownCount}`
+                    : `· 超限 ${moveRecommendSummary.overLimitCount}`}
+                </Tag>
+              ) : null}
+            </Space>
+
             <Space wrap>
               <span>目标机组</span>
               <Select
@@ -1517,6 +1983,23 @@ const PlanningWorkbench: React.FC = () => {
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               请输入移动原因（必填，将写入操作日志）
             </Typography.Text>
+            <Space wrap align="center">
+              <span>快捷原因</span>
+              <Select
+                style={{ minWidth: 220 }}
+                value={
+                  QUICK_MOVE_REASONS.some((opt) => opt.value === moveReason.trim())
+                    ? moveReason.trim()
+                    : undefined
+                }
+                onChange={(v) => setMoveReason(String(v || DEFAULT_MOVE_REASON))}
+                options={QUICK_MOVE_REASONS}
+                placeholder="选择一个常用原因"
+              />
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                可在下方补充说明
+              </Typography.Text>
+            </Space>
             <Input.TextArea
               value={moveReason}
               onChange={(e) => setMoveReason(e.target.value)}

@@ -1,8 +1,11 @@
 import React, { useMemo } from 'react';
-import { Alert, Empty, Skeleton } from 'antd';
+import { Alert, Empty, Skeleton, Space, Tag } from 'antd';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import { List } from 'react-window';
 import { useActiveVersionId } from '../../stores/use-global-store';
+import type { PlanItemStatusFilter } from '../../utils/planItemStatus';
+import { PLAN_ITEM_STATUS_FILTER_META, matchPlanItemStatusFilter, summarizePlanItemStatus } from '../../utils/planItemStatus';
+import { formatWeight } from '../../utils/formatters';
 import type { ScheduleCardViewProps } from './types';
 import { ROW_HEIGHT } from './types';
 import { usePlanItems, normalizePlanItems } from './usePlanItems';
@@ -13,6 +16,9 @@ import { CountInfo } from './CountInfo';
 const ScheduleCardView: React.FC<ScheduleCardViewProps> = ({
   machineCode,
   urgentLevel,
+  dateRange,
+  statusFilter = 'ALL',
+  onStatusFilterChange,
   refreshSignal,
   selectedMaterialIds,
   onSelectedMaterialIdsChange,
@@ -25,7 +31,14 @@ const ScheduleCardView: React.FC<ScheduleCardViewProps> = ({
     return normalizePlanItems(query.data);
   }, [query.data]);
 
-  const filtered = useFilteredPlanItems(items, machineCode, urgentLevel);
+  const inRange = useFilteredPlanItems(items, machineCode, urgentLevel, dateRange);
+  const statusSummary = useMemo(() => summarizePlanItemStatus(inRange), [inRange]);
+  const filtered = useMemo(() => {
+    return statusFilter ? inRange.filter((it) => matchPlanItemStatusFilter(it, statusFilter)) : inRange;
+  }, [inRange, statusFilter]);
+  const filteredTotalWeight = useMemo(() => {
+    return filtered.reduce((acc, it) => acc + Number(it.weight_t || 0), 0);
+  }, [filtered]);
 
   const selectedSet = useMemo(() => new Set(selectedMaterialIds), [selectedMaterialIds]);
 
@@ -67,37 +80,131 @@ const ScheduleCardView: React.FC<ScheduleCardViewProps> = ({
     return <Skeleton active paragraph={{ rows: 10 }} />;
   }
 
-  if (filtered.length === 0) {
-    return (
-      <div style={{ padding: 24 }}>
-        <Empty description='暂无排程数据（可先执行"一键优化/重算"生成排程）' />
-      </div>
-    );
-  }
+  const showEmpty = filtered.length === 0;
 
   return (
-    <div style={{ height: '100%' }}>
-      <div style={{ marginBottom: 8 }}>
-        <CountInfo count={filtered.length} />
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <Space size={6} wrap>
+          <Tag
+            color={PLAN_ITEM_STATUS_FILTER_META.ALL.color}
+            style={{
+              cursor: onStatusFilterChange ? 'pointer' : undefined,
+              boxShadow: statusFilter === 'ALL' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+              userSelect: 'none',
+            }}
+            onClick={() => onStatusFilterChange?.('ALL')}
+            title={`已排 ${statusSummary.totalCount} 件 / ${statusSummary.totalWeightT.toFixed(1)}t`}
+          >
+            已排 {statusSummary.totalCount}
+          </Tag>
+          <Tag
+            color={PLAN_ITEM_STATUS_FILTER_META.LOCKED.color}
+            style={{
+              cursor:
+                onStatusFilterChange &&
+                (statusSummary.lockedInPlanCount > 0 || statusFilter === 'LOCKED')
+                  ? 'pointer'
+                  : 'not-allowed',
+              opacity:
+                onStatusFilterChange && statusSummary.lockedInPlanCount === 0 && statusFilter !== 'LOCKED' ? 0.35 : 1,
+              boxShadow: statusFilter === 'LOCKED' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+              userSelect: 'none',
+            }}
+            onClick={() => {
+              if (!onStatusFilterChange) return;
+              if (statusSummary.lockedInPlanCount === 0 && statusFilter !== 'LOCKED') return;
+              onStatusFilterChange(statusFilter === 'LOCKED' ? 'ALL' : ('LOCKED' as PlanItemStatusFilter));
+            }}
+            title={`冻结 ${statusSummary.lockedInPlanCount} 件 / ${statusSummary.lockedInPlanWeightT.toFixed(1)}t`}
+          >
+            冻结 {statusSummary.lockedInPlanCount}
+          </Tag>
+          <Tag
+            color={PLAN_ITEM_STATUS_FILTER_META.FORCE_RELEASE.color}
+            style={{
+              cursor:
+                onStatusFilterChange &&
+                (statusSummary.forceReleaseCount > 0 || statusFilter === 'FORCE_RELEASE')
+                  ? 'pointer'
+                  : 'not-allowed',
+              opacity:
+                onStatusFilterChange && statusSummary.forceReleaseCount === 0 && statusFilter !== 'FORCE_RELEASE' ? 0.35 : 1,
+              boxShadow: statusFilter === 'FORCE_RELEASE' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+              userSelect: 'none',
+            }}
+            onClick={() => {
+              if (!onStatusFilterChange) return;
+              if (statusSummary.forceReleaseCount === 0 && statusFilter !== 'FORCE_RELEASE') return;
+              onStatusFilterChange(statusFilter === 'FORCE_RELEASE' ? 'ALL' : ('FORCE_RELEASE' as PlanItemStatusFilter));
+            }}
+            title={`强制放行 ${statusSummary.forceReleaseCount} 件 / ${statusSummary.forceReleaseWeightT.toFixed(1)}t`}
+          >
+            强放 {statusSummary.forceReleaseCount}
+          </Tag>
+          <Tag
+            color={PLAN_ITEM_STATUS_FILTER_META.ADJUSTABLE.color}
+            style={{
+              cursor:
+                onStatusFilterChange &&
+                (statusSummary.adjustableCount > 0 || statusFilter === 'ADJUSTABLE')
+                  ? 'pointer'
+                  : 'not-allowed',
+              opacity:
+                onStatusFilterChange && statusSummary.adjustableCount === 0 && statusFilter !== 'ADJUSTABLE' ? 0.35 : 1,
+              boxShadow: statusFilter === 'ADJUSTABLE' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+              userSelect: 'none',
+            }}
+            onClick={() => {
+              if (!onStatusFilterChange) return;
+              if (statusSummary.adjustableCount === 0 && statusFilter !== 'ADJUSTABLE') return;
+              onStatusFilterChange(statusFilter === 'ADJUSTABLE' ? 'ALL' : ('ADJUSTABLE' as PlanItemStatusFilter));
+            }}
+            title={`可调（非冻结）${statusSummary.adjustableCount} 件 / ${statusSummary.adjustableWeightT.toFixed(1)}t`}
+          >
+            可调 {statusSummary.adjustableCount}
+          </Tag>
+        </Space>
+        <Space size={10} wrap>
+          <CountInfo count={filtered.length} />
+          <span style={{ color: '#8c8c8c', fontSize: 12 }}>
+            总重 {formatWeight(filteredTotalWeight)}
+          </span>
+        </Space>
       </div>
 
-      <div style={{ height: 'calc(100% - 24px)' }}>
-        <AutoSizer>
-          {({ height, width }) => (
-            <List
-              rowCount={filtered.length}
-              rowHeight={ROW_HEIGHT}
-              rowComponent={ScheduleCardRow}
-              rowProps={{
-                items: filtered,
-                selected: selectedSet,
-                onToggle: toggleSelection,
-                onInspect: onInspectMaterialId,
-              }}
-              style={{ height, width }}
+      <div style={{ flex: 1, minHeight: 240 }}>
+        {showEmpty ? (
+          <div style={{ padding: 24 }}>
+            <Empty
+              description={
+                inRange.length === 0
+                  ? '暂无排程数据（可先执行"一键优化/重算"生成排程）'
+                  : '当前筛选下暂无排程数据（可切换状态标签）'
+              }
             />
-          )}
-        </AutoSizer>
+          </div>
+        ) : (
+          <AutoSizer disableWidth defaultHeight={360} doNotBailOutOnEmptyChildren>
+            {({ height }) => (
+              <List
+                rowCount={filtered.length}
+                rowHeight={ROW_HEIGHT}
+                rowComponent={ScheduleCardRow}
+                rowProps={{
+                  items: filtered,
+                  selected: selectedSet,
+                  onToggle: toggleSelection,
+                  onInspect: onInspectMaterialId,
+                }}
+                style={{
+                  height: Number.isFinite(height) ? Math.max(height, 240) : 240,
+                  width: '100%',
+                }}
+              />
+            )}
+          </AutoSizer>
+        )}
       </div>
     </div>
   );

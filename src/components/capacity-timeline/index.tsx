@@ -6,8 +6,8 @@
  */
 
 import React, { useMemo } from 'react';
-import { Card, Space, Typography, Tooltip, Progress } from 'antd';
-import { ToolOutlined, WarningOutlined } from '@ant-design/icons';
+import { Card, Space, Typography, Tooltip, Progress, Tag } from 'antd';
+import { ToolOutlined, WarningOutlined, RightOutlined } from '@ant-design/icons';
 import { FONT_FAMILIES } from '../../theme';
 import type { CapacityTimelineProps } from './types';
 import { useCapacityTimeline } from './useCapacityTimeline';
@@ -15,6 +15,7 @@ import { StackedBarChart } from './StackedBarChart';
 import { Legend } from './Legend';
 import { CapacityImpactPanel } from '../CapacityImpactPanel';
 import { predictRemovalImpact } from '../../services/capacityImpactService';
+import type { PlanItemStatusFilter } from '../../utils/planItemStatus';
 
 const { Text, Title } = Typography;
 
@@ -24,6 +25,7 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
   selectedMaterialIds = [],
   focusedMaterialId,
   materials = [],
+  onOpenScheduleCell,
 }) => {
   const {
     utilizationPercent,
@@ -57,6 +59,18 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
     return predictRemovalImpact(data, selectedInThisTimeline);
   }, [hasSelectedMaterial, selectedMaterialIds, materials, materialIds, data]);
 
+  const statusSummary = data.statusSummary;
+  const adjustableCount = useMemo(() => {
+    if (!statusSummary) return 0;
+    return Math.max(0, statusSummary.totalCount - statusSummary.lockedInPlanCount);
+  }, [statusSummary]);
+
+  const openScheduleCell = (options?: { statusFilter?: PlanItemStatusFilter }) => {
+    onOpenScheduleCell?.(data.machineCode, data.date, materialIds, options);
+  };
+
+  const clickable = !!onOpenScheduleCell;
+
   return (
     <Card
       size="small"
@@ -80,7 +94,10 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
         {/* 标题行 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Space size={16}>
-            <Title level={5} style={{ margin: 0 }}>
+            <Title
+              level={5}
+              style={{ margin: 0 }}
+            >
               {data.date} - {data.machineCode}
             </Title>
             <Text type="secondary" style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>
@@ -91,31 +108,85 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
                 <WarningOutlined style={{ color: '#ff4d4f', fontSize: 16 }} />
               </Tooltip>
             )}
+            {statusSummary ? (
+              <Space size={6}>
+                <Tag
+                  color="blue"
+                  style={{ cursor: clickable ? 'pointer' : undefined }}
+                  onClick={() => clickable && openScheduleCell({ statusFilter: 'ALL' })}
+                  title={`已排 ${statusSummary.totalCount} 件 / ${statusSummary.totalWeightT.toFixed(1)}t${clickable ? '（点击快筛并打开明细）' : ''}`}
+                >
+                  已排 {statusSummary.totalCount}
+                </Tag>
+                {statusSummary.lockedInPlanCount > 0 ? (
+                  <Tag
+                    color="purple"
+                    style={{ cursor: clickable ? 'pointer' : undefined }}
+                    onClick={() => clickable && openScheduleCell({ statusFilter: 'LOCKED' })}
+                    title={`冻结 ${statusSummary.lockedInPlanCount} 件 / ${statusSummary.lockedInPlanWeightT.toFixed(1)}t${clickable ? '（点击快筛并打开明细）' : ''}`}
+                  >
+                    冻结 {statusSummary.lockedInPlanCount}
+                  </Tag>
+                ) : null}
+                {statusSummary.forceReleaseCount > 0 ? (
+                  <Tag
+                    color="red"
+                    style={{ cursor: clickable ? 'pointer' : undefined }}
+                    onClick={() => clickable && openScheduleCell({ statusFilter: 'FORCE_RELEASE' })}
+                    title={`强制放行 ${statusSummary.forceReleaseCount} 件 / ${statusSummary.forceReleaseWeightT.toFixed(1)}t${clickable ? '（点击快筛并打开明细）' : ''}`}
+                  >
+                    强放 {statusSummary.forceReleaseCount}
+                  </Tag>
+                ) : null}
+                {adjustableCount > 0 ? (
+                  <Tag
+                    color="green"
+                    style={{ cursor: clickable ? 'pointer' : undefined }}
+                    onClick={() => clickable && openScheduleCell({ statusFilter: 'ADJUSTABLE' })}
+                    title={`可调（非冻结）${adjustableCount} 件${clickable ? '（点击快筛并打开明细）' : ''}`}
+                  >
+                    可调 {adjustableCount}
+                  </Tag>
+                ) : null}
+              </Space>
+            ) : null}
           </Space>
 
-          {/* 轧辊状态 */}
-          <Tooltip
-            title={`轧辊吨位: ${data.rollCampaignProgress}t / ${data.rollChangeThreshold}t`}
-          >
-            <Space size={8}>
-              <ToolOutlined style={{ color: rollStatusColor, fontSize: 16 }} />
-              <Text style={{ fontFamily: FONT_FAMILIES.MONOSPACE, color: rollStatusColor }}>
-                {data.rollCampaignProgress}t
+          <Space size={12} align="center">
+            {clickable ? (
+              <Text type="secondary" style={{ fontSize: 12, cursor: 'pointer' }} onClick={() => openScheduleCell()}>
+                同日明细 <RightOutlined />
               </Text>
-            </Space>
-          </Tooltip>
+            ) : null}
+
+            {/* 轧辊状态 */}
+            <Tooltip title={`轧辊吨位: ${data.rollCampaignProgress}t / ${data.rollChangeThreshold}t`}>
+              <Space size={8}>
+                <ToolOutlined style={{ color: rollStatusColor, fontSize: 16 }} />
+                <Text style={{ fontFamily: FONT_FAMILIES.MONOSPACE, color: rollStatusColor }}>
+                  {data.rollCampaignProgress}t
+                </Text>
+              </Space>
+            </Tooltip>
+          </Space>
         </div>
 
         {/* 产能影响预测面板（选中物料时显示） */}
         {capacityImpact && <CapacityImpactPanel prediction={capacityImpact} compact />}
 
-        {/* 堆叠条形图 */}
-        <StackedBarChart
-          data={data}
-          segments={segments}
-          utilizationPercent={utilizationPercent}
-          height={height}
-        />
+        {/* 堆叠条形图（点击联动甘特同日明细） */}
+        <div
+          onClick={() => clickable && openScheduleCell()}
+          style={{ cursor: clickable ? 'pointer' : undefined }}
+          title={clickable ? '点击查看该机组/日期的排程明细（甘特图）' : undefined}
+        >
+          <StackedBarChart
+            data={data}
+            segments={segments}
+            utilizationPercent={utilizationPercent}
+            height={height}
+          />
+        </div>
 
         {/* 图例 */}
         <Legend />

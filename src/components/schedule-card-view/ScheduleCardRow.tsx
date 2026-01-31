@@ -58,7 +58,7 @@ export const ScheduleCardRow = ({
           <Space direction="vertical" size={4} align="end">
             <Tag color={urgentColor}>{urgent}</Tag>
             {it.locked_in_plan && <Tag color="purple">冻结</Tag>}
-            {it.force_release_in_plan && <Tag color="orange">强制放行</Tag>}
+            {it.force_release_in_plan && <Tag color="red">强放</Tag>}
           </Space>
         </Space>
       </Card>
