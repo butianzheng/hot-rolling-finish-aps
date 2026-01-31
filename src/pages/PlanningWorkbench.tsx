@@ -1081,6 +1081,7 @@ const PlanningWorkbench: React.FC = () => {
                   machineCode={poolSelection.machineCode}
                   dateRange={globalDateRange}
                   selectedMaterialIds={selectedMaterialIds}
+                  materials={materials}
                 />
               </div>
             </Card>
