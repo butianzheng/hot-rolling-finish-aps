@@ -2,9 +2,10 @@
  * CapacityTimeline - 主组件
  *
  * 重构后：357 行 → ~85 行 (-76%)
+ * 增强：产能影响预测功能
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, Space, Typography, Tooltip, Progress } from 'antd';
 import { ToolOutlined, WarningOutlined } from '@ant-design/icons';
 import { FONT_FAMILIES } from '../../theme';
@@ -12,6 +13,8 @@ import type { CapacityTimelineProps } from './types';
 import { useCapacityTimeline } from './useCapacityTimeline';
 import { StackedBarChart } from './StackedBarChart';
 import { Legend } from './Legend';
+import { CapacityImpactPanel } from '../CapacityImpactPanel';
+import { predictRemovalImpact } from '../../services/capacityImpactService';
 
 const { Text, Title } = Typography;
 
@@ -20,6 +23,7 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
   height = 120,
   selectedMaterialIds = [],
   focusedMaterialId,
+  materials = [],
 }) => {
   const {
     utilizationPercent,
@@ -32,6 +36,26 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
   const materialIds = data.materialIds || [];
   const hasSelectedMaterial = selectedMaterialIds.some(id => materialIds.includes(id));
   const hasFocusedMaterial = focusedMaterialId && materialIds.includes(focusedMaterialId);
+
+  // 计算产能影响预测（仅在有选中物料且存在于该时间线时计算）
+  const capacityImpact = useMemo(() => {
+    if (!hasSelectedMaterial || selectedMaterialIds.length === 0) {
+      return null;
+    }
+
+    // 过滤出在该时间线中的选中物料
+    const selectedInThisTimeline = materials.filter(
+      m =>
+        selectedMaterialIds.includes(m.material_id) &&
+        materialIds.includes(m.material_id)
+    );
+
+    if (selectedInThisTimeline.length === 0) {
+      return null;
+    }
+
+    return predictRemovalImpact(data, selectedInThisTimeline);
+  }, [hasSelectedMaterial, selectedMaterialIds, materials, materialIds, data]);
 
   return (
     <Card
@@ -81,6 +105,9 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
             </Space>
           </Tooltip>
         </div>
+
+        {/* 产能影响预测面板（选中物料时显示） */}
+        {capacityImpact && <CapacityImpactPanel prediction={capacityImpact} compact />}
 
         {/* 堆叠条形图 */}
         <StackedBarChart

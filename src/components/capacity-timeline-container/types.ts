@@ -3,6 +3,7 @@
  */
 
 import type dayjs from 'dayjs';
+import type { MaterialPoolMaterial } from '../material-pool/types';
 
 export interface CapacityTimelineContainerProps {
   machineCode?: string | null;
@@ -11,6 +12,8 @@ export interface CapacityTimelineContainerProps {
   // 新增：选中物料
   selectedMaterialIds?: string[];
   focusedMaterialId?: string | null;
+  // 新增：所有物料数据（用于产能影响预测）
+  materials?: MaterialPoolMaterial[];
 }
 
 export interface MachineOption {

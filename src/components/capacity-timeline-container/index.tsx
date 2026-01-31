@@ -16,6 +16,7 @@ export const CapacityTimelineContainer: React.FC<CapacityTimelineContainerProps>
   dateRange: externalDateRange,
   selectedMaterialIds = [],
   focusedMaterialId,
+  materials = [],
 }) => {
   const state = useCapacityTimelineContainer(machineCode);
 
@@ -64,6 +65,7 @@ export const CapacityTimelineContainer: React.FC<CapacityTimelineContainerProps>
                 data={data}
                 selectedMaterialIds={selectedMaterialIds}
                 focusedMaterialId={focusedMaterialId}
+                materials={materials}
               />
             ))}
           </Space>
