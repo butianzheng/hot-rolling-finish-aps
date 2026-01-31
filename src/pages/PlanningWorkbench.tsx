@@ -126,6 +126,54 @@ const PlanningWorkbench: React.FC = () => {
     });
   }, [workbenchFilters.machineCode]);
 
+  // 深链接：从风险概览跳转时，处理上下文参数（第三阶段）
+  const [deepLinkContext, setDeepLinkContext] = React.useState<{
+    machine?: string;
+    date?: string;
+    urgency?: string;
+    context?: string;
+  } | null>(null);
+
+  React.useEffect(() => {
+    const machine = searchParams.get('machine');
+    const date = searchParams.get('date');
+    const urgency = searchParams.get('urgency');
+    const context = searchParams.get('context');
+
+    // 如果有深链接参数，保存到状态并应用
+    if (machine || date || urgency || context) {
+      setDeepLinkContext({ machine: machine || undefined, date: date || undefined, urgency: urgency || undefined, context: context || undefined });
+
+      // 应用机组筛选
+      if (machine) {
+        setPoolSelection((prev) => {
+          if (prev.machineCode === machine) return prev;
+          return { machineCode: machine, schedState: null };
+        });
+      }
+
+      // 显示来源提示
+      const contextLabel =
+        context === 'risk'
+          ? '风险日'
+          : context === 'bottleneck'
+          ? '瓶颈点'
+          : context === 'capacityOpportunity'
+          ? '容量优化机会'
+          : context === 'orders'
+          ? '订单失败'
+          : context === 'coldStock'
+          ? '冷坨高压力'
+          : context === 'roll'
+          ? '换辊警报'
+          : '';
+
+      if (contextLabel) {
+        message.info(`已从「${contextLabel}」跳转，自动应用相关筛选条件`);
+      }
+    }
+  }, [searchParams]);
+
   const materialsQuery = useQuery({
     queryKey: ['materials'],
     queryFn: async () => {
@@ -206,6 +254,14 @@ const PlanningWorkbench: React.FC = () => {
 
   // 计算全局日期范围（基于当前机组的排程数据）
   const globalDateRange = useMemo<[dayjs.Dayjs, dayjs.Dayjs]>(() => {
+    // 深链接：如果URL中有date参数，聚焦到该日期（前后各3天）
+    if (deepLinkContext?.date) {
+      const focusDate = dayjs(deepLinkContext.date);
+      if (focusDate.isValid()) {
+        return [focusDate.subtract(3, 'day'), focusDate.add(3, 'day')];
+      }
+    }
+
     const filteredItems = (planItemsQuery.data || []).filter(
       (item: any) => !poolSelection.machineCode ||
                     poolSelection.machineCode === 'all' ||
@@ -232,7 +288,7 @@ const PlanningWorkbench: React.FC = () => {
     const maxDate = sortedDates[sortedDates.length - 1].add(3, 'day'); // 后面留 3 天余量
 
     return [minDate, maxDate];
-  }, [planItemsQuery.data, poolSelection.machineCode]);
+  }, [planItemsQuery.data, poolSelection.machineCode, deepLinkContext?.date]);
 
   const openInspector = (materialId: string) => {
     setInspectedMaterialId(materialId);

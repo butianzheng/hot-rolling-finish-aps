@@ -189,8 +189,10 @@ const RiskOverview: React.FC = () => {
     workbenchTab?: WorkbenchTabKey;
     machineCode?: string | null;
     urgencyLevel?: string | null;
+    planDate?: string | null;
+    context?: string;
   }) => {
-    // 从风险概览进入工作台，默认回到“全局视角”，并带上当前问题的关键信息（如机组、紧急度）。
+    // 从风险概览进入工作台，默认回到"全局视角"，并带上当前问题的关键信息（如机组、紧急度）。
     setWorkbenchFilters({
       machineCode: opts.machineCode ?? null,
       urgencyLevel: opts.urgencyLevel ?? null,
@@ -211,7 +213,15 @@ const RiskOverview: React.FC = () => {
       return;
     }
 
-    navigate('/workbench');
+    // 构建深链接URL参数（第三阶段：风险概览深链接）
+    const params = new URLSearchParams();
+    if (opts.machineCode) params.set('machine', opts.machineCode);
+    if (opts.urgencyLevel) params.set('urgency', opts.urgencyLevel);
+    if (opts.planDate) params.set('date', opts.planDate);
+    if (opts.context) params.set('context', opts.context);
+
+    const url = params.toString() ? `/workbench?${params.toString()}` : '/workbench';
+    navigate(url);
   }, [navigate, setWorkbenchFilters, setWorkbenchViewMode]);
 
   const goWorkbench = (problem: RiskProblem) => {
@@ -220,10 +230,25 @@ const RiskOverview: React.FC = () => {
         ? problem.drilldown.urgency
         : null;
 
+    // 提取planDate（日期信息）从不同类型的drilldown
+    const planDate =
+      problem.drilldown.kind === 'risk' && problem.drilldown.planDate
+        ? problem.drilldown.planDate
+        : problem.drilldown.kind === 'bottleneck' && problem.drilldown.planDate
+        ? problem.drilldown.planDate
+        : problem.drilldown.kind === 'capacityOpportunity' && problem.drilldown.planDate
+        ? problem.drilldown.planDate
+        : null;
+
+    // 构建上下文字符串（用于显示来源提示）
+    const context = problem.drilldown.kind;
+
     goWorkbenchWith({
       workbenchTab: problem.workbenchTab,
       machineCode: problem.workbenchMachineCode ?? null,
       urgencyLevel: urgency,
+      planDate,
+      context,
     });
   };
 
