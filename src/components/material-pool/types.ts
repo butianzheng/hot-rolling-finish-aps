@@ -49,7 +49,7 @@ export type UrgencyBucket = 'L3' | 'L2' | 'L1' | 'L0';
 
 export const URGENCY_ORDER: UrgencyBucket[] = ['L3', 'L2', 'L1', 'L0'];
 
-export const ROW_HEIGHT = 56;
+export const ROW_HEIGHT = 76;  // 增加行高以容纳状态徽章和风险标记
 
 export type PoolRow =
   | { type: 'header'; level: UrgencyBucket; count: number; weight: number; collapsed: boolean }
