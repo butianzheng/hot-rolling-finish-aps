@@ -114,6 +114,68 @@ mod tests {
         )
         .unwrap();
 
+        // 创建 material_master 表（用于待排材料查询）
+        conn.execute(
+            r#"
+            CREATE TABLE IF NOT EXISTS material_master (
+                material_id TEXT PRIMARY KEY,
+                manufacturing_order_id TEXT,
+                contract_no TEXT,
+                due_date TEXT,
+                next_machine_code TEXT,
+                rework_machine_code TEXT,
+                current_machine_code TEXT,
+                width_mm REAL,
+                thickness_mm REAL,
+                length_m REAL,
+                weight_t REAL,
+                available_width_mm REAL,
+                steel_mark TEXT,
+                slab_id TEXT,
+                material_status_code_src TEXT,
+                status_updated_at TEXT,
+                output_age_days_raw INTEGER,
+                stock_age_days INTEGER,
+                contract_nature TEXT,
+                weekly_delivery_flag TEXT,
+                export_flag TEXT,
+                created_at TEXT NOT NULL DEFAULT '2026-01-01T00:00:00Z',
+                updated_at TEXT NOT NULL DEFAULT '2026-01-01T00:00:00Z'
+            )
+            "#,
+            [],
+        )
+        .unwrap();
+
+        // 创建 material_state 表（用于待排材料查询）
+        conn.execute(
+            r#"
+            CREATE TABLE IF NOT EXISTS material_state (
+                material_id TEXT PRIMARY KEY,
+                sched_state TEXT NOT NULL DEFAULT 'READY',
+                lock_flag INTEGER NOT NULL DEFAULT 0,
+                force_release_flag INTEGER NOT NULL DEFAULT 0,
+                urgent_level TEXT NOT NULL DEFAULT 'L0',
+                urgent_reason TEXT,
+                rush_level TEXT DEFAULT 'L0',
+                rolling_output_age_days INTEGER DEFAULT 0,
+                ready_in_days INTEGER DEFAULT 0,
+                earliest_sched_date TEXT,
+                stock_age_days INTEGER DEFAULT 0,
+                scheduled_date TEXT,
+                scheduled_machine_code TEXT,
+                seq_no INTEGER,
+                manual_urgent_flag INTEGER NOT NULL DEFAULT 0,
+                in_frozen_zone INTEGER NOT NULL DEFAULT 0,
+                last_calc_version_id TEXT,
+                updated_at TEXT NOT NULL DEFAULT '2026-01-01T00:00:00Z',
+                updated_by TEXT
+            )
+            "#,
+            [],
+        )
+        .unwrap();
+
         // 插入产能数据 - H032: 高利用率，H033: 产能超载，H034: 正常
         conn.execute(
             r#"
@@ -278,7 +340,10 @@ mod tests {
         // H033 应该是最堵的（产能超载）
         assert_eq!(profiles[0].machine_code, "H033");
         assert!(profiles[0].is_severe());
-        assert_eq!(profiles[0].pending_materials, 25);
+        // pending_materials 应该为 0（测试中没有插入待排材料数据）
+        assert_eq!(profiles[0].pending_materials, 0);
+        // scheduled_materials 来自 plan_item，应该是 25
+        assert_eq!(profiles[0].scheduled_materials, 25);
     }
 
     #[test]
@@ -290,7 +355,10 @@ mod tests {
 
         assert_eq!(profiles.len(), 1);
         assert_eq!(profiles[0].machine_code, "H032");
-        assert_eq!(profiles[0].pending_materials, 10);
+        // pending_materials 应该为 0（测试中没有插入待排材料数据）
+        assert_eq!(profiles[0].pending_materials, 0);
+        // scheduled_materials 来自 plan_item，应该是 10
+        assert_eq!(profiles[0].scheduled_materials, 10);
     }
 
     #[test]
@@ -348,8 +416,8 @@ mod tests {
         // 应该包含结构冲突原因（5 个违规）
         assert!(h033.reasons.iter().any(|r| r.code == "STRUCTURE_CONFLICT"));
 
-        // 应该包含待排材料过多原因（25 个材料）
-        assert!(h033.reasons.iter().any(|r| r.code == "HIGH_PENDING_COUNT"));
+        // 注意：HIGH_PENDING_COUNT 原因需要从 material_state 查询待排材料
+        // 测试中未插入待排材料数据，因此不会产生此原因
     }
 
     #[test]

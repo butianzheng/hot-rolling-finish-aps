@@ -742,6 +742,7 @@ mod tests {
             urgent_level: Some("L0".to_string()),
             sched_state: Some("READY".to_string()),
             assign_reason: Some("TEST".to_string()),
+            steel_grade: None,
         }
     }
 

@@ -652,6 +652,7 @@ export const PlanItemSchema = z
     urgent_level: z.string().nullable().optional(),
     sched_state: z.string().nullable().optional(),
     assign_reason: z.string().nullable().optional(),
+    steel_grade: z.string().nullable().optional(),
   })
   .passthrough();
 

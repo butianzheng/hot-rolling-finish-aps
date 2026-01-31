@@ -32,6 +32,7 @@ import {
 import { useEvent } from './api/eventBus';
 import { useGlobalKPI } from './hooks/useGlobalKPI';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
+import { useVersionSwitchInvalidation } from './hooks/useVersionSwitchInvalidation';
 import { reportFrontendError } from './utils/telemetry';
 
 const { Header, Content, Sider } = Layout;
@@ -81,6 +82,9 @@ const App: React.FC = () => {
 
   const { data: globalKPIData, refetch: refetchGlobalKPI } = useGlobalKPI(activeVersionId);
   const globalKPI = globalKPIData ?? defaultKPI;
+
+  // 监听版本切换，自动失效决策数据缓存
+  useVersionSwitchInvalidation();
 
   const activeVersionLabel = React.useMemo(() => {
     if (!activeVersionId) return '未激活版本';

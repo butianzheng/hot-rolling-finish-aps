@@ -82,6 +82,7 @@ mod concurrent_control_test {
             plan_version_repo.clone(),
             plan_item_repo,
             material_state_repo,
+            material_master_repo,
             strategy_draft_repo,
             action_log_repo,
             risk_snapshot_repo,

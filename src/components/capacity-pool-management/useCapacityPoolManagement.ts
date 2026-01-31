@@ -8,6 +8,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import { capacityApi, materialApi } from '../../api/tauri';
 import { useActiveVersionId, useCurrentUser, useGlobalStore } from '../../stores/use-global-store';
 import { formatDate } from '../../utils/formatters';
+import { getErrorMessage } from '../../utils/errorUtils';
 import type { CapacityPool, TotalStats } from './types';
 
 export interface UseCapacityPoolManagementReturn {
@@ -311,13 +312,17 @@ export function useCapacityPoolManagement(): UseCapacityPoolManagementReturn {
 
   // 初始化加载
   useEffect(() => {
-    loadMachineOptions().catch(() => void 0);
+    loadMachineOptions().catch((e: unknown) => {
+      console.error('加载机组选项失败:', getErrorMessage(e));
+    });
   }, [activeVersionId, loadMachineOptions]);
 
   useEffect(() => {
     if (!activeVersionId) return;
     if (selectedMachines.length === 0) return;
-    loadCapacityPools().catch(() => void 0);
+    loadCapacityPools().catch((e: unknown) => {
+      console.error('加载产能池失败:', getErrorMessage(e));
+    });
   }, [activeVersionId, selectedMachines, loadCapacityPools]);
 
   return {

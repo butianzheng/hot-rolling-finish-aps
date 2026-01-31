@@ -207,7 +207,17 @@ pub async fn get_material_detail(
         .get_material_detail(&material_id)
         .map_err(map_api_error)?;
 
-    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
+    // 将 Option<(master, state)> 元组转换为 {master, state} 对象，
+    // 以匹配前端 MaterialDetailResponseSchema 期望的对象结构
+    let response = match result {
+        Some((master, mat_state)) => serde_json::json!({
+            "master": master,
+            "state": mat_state,
+        }),
+        None => serde_json::json!(null),
+    };
+
+    serde_json::to_string(&response).map_err(|e| format!("序列化失败: {}", e))
 }
 
 /// 查询适温待排材料

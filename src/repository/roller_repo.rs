@@ -106,10 +106,10 @@ impl RollerCampaignRepository {
                 machine_code: row.get(1)?,
                 campaign_no: row.get(2)?,
                 start_date: NaiveDate::parse_from_str(&row.get::<_, String>(3)?, "%Y-%m-%d")
-                    .unwrap(),
+                    .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
                 end_date: row
                     .get::<_, Option<String>>(4)?
-                    .map(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").unwrap()),
+                    .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
                 cum_weight_t: row.get(5)?,
                 suggest_threshold_t: row.get(6)?,
                 hard_limit_t: row.get(7)?,
@@ -157,10 +157,10 @@ impl RollerCampaignRepository {
                     machine_code: row.get(1)?,
                     campaign_no: row.get(2)?,
                     start_date: NaiveDate::parse_from_str(&row.get::<_, String>(3)?, "%Y-%m-%d")
-                        .unwrap(),
+                        .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
                     end_date: row
                         .get::<_, Option<String>>(4)?
-                        .map(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").unwrap()),
+                        .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
                     cum_weight_t: row.get(5)?,
                     suggest_threshold_t: row.get(6)?,
                     hard_limit_t: row.get(7)?,
@@ -208,10 +208,10 @@ impl RollerCampaignRepository {
                 machine_code: row.get(1)?,
                 campaign_no: row.get(2)?,
                 start_date: NaiveDate::parse_from_str(&row.get::<_, String>(3)?, "%Y-%m-%d")
-                    .unwrap(),
+                    .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
                 end_date: row
                     .get::<_, Option<String>>(4)?
-                    .map(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").unwrap()),
+                    .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
                 cum_weight_t: row.get(5)?,
                 suggest_threshold_t: row.get(6)?,
                 hard_limit_t: row.get(7)?,
@@ -264,10 +264,10 @@ impl RollerCampaignRepository {
                     machine_code: row.get(1)?,
                     campaign_no: row.get(2)?,
                     start_date: NaiveDate::parse_from_str(&row.get::<_, String>(3)?, "%Y-%m-%d")
-                        .unwrap(),
+                        .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
                     end_date: row
                         .get::<_, Option<String>>(4)?
-                        .map(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").unwrap()),
+                        .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
                     cum_weight_t: row.get(5)?,
                     suggest_threshold_t: row.get(6)?,
                     hard_limit_t: row.get(7)?,
@@ -320,10 +320,10 @@ impl RollerCampaignRepository {
                     machine_code: row.get(1)?,
                     campaign_no: row.get(2)?,
                     start_date: NaiveDate::parse_from_str(&row.get::<_, String>(3)?, "%Y-%m-%d")
-                        .unwrap(),
+                        .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
                     end_date: row
                         .get::<_, Option<String>>(4)?
-                        .map(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").unwrap()),
+                        .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
                     cum_weight_t: row.get(5)?,
                     suggest_threshold_t: row.get(6)?,
                     hard_limit_t: row.get(7)?,

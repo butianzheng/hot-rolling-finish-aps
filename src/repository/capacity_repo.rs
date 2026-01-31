@@ -83,7 +83,7 @@ impl CapacityPoolRepository {
                 Ok(CapacityPool {
                     machine_code: row.get(0)?,
                     plan_date: NaiveDate::parse_from_str(&row.get::<_, String>(1)?, "%Y-%m-%d")
-                        .unwrap(),
+                        .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
                     target_capacity_t: row.get(2)?,
                     limit_capacity_t: row.get(3)?,
                     used_capacity_t: row.get(4)?,
@@ -141,7 +141,7 @@ impl CapacityPoolRepository {
                             &row.get::<_, String>(1)?,
                             "%Y-%m-%d",
                         )
-                        .unwrap(),
+                        .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
                         target_capacity_t: row.get(2)?,
                         limit_capacity_t: row.get(3)?,
                         used_capacity_t: row.get(4)?,
@@ -277,7 +277,7 @@ impl CapacityPoolRepository {
                 Ok(CapacityPool {
                     machine_code: row.get(0)?,
                     plan_date: NaiveDate::parse_from_str(&row.get::<_, String>(1)?, "%Y-%m-%d")
-                        .unwrap(),
+                        .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
                     target_capacity_t: row.get(2)?,
                     limit_capacity_t: row.get(3)?,
                     used_capacity_t: row.get(4)?,
@@ -324,7 +324,7 @@ impl CapacityPoolRepository {
                 Ok(CapacityPool {
                     machine_code: row.get(0)?,
                     plan_date: NaiveDate::parse_from_str(&row.get::<_, String>(1)?, "%Y-%m-%d")
-                        .unwrap(),
+                        .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
                     target_capacity_t: row.get(2)?,
                     limit_capacity_t: row.get(3)?,
                     used_capacity_t: row.get(4)?,

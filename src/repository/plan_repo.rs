@@ -7,6 +7,7 @@
 // ==========================================
 
 use crate::domain::plan::{Plan, PlanItem, PlanVersion};
+use crate::domain::types::PlanVersionStatus;
 use crate::repository::error::{RepositoryError, RepositoryResult};
 use chrono::{NaiveDate, NaiveDateTime};
 use rusqlite::{params, params_from_iter, Connection};
@@ -205,7 +206,7 @@ impl PlanVersionRepository {
                 &version.version_id,
                 &version.plan_id,
                 &version.version_no,
-                &version.status,
+                version.status.to_db_str(),
                 &version.frozen_from_date.map(|d| d.format("%Y-%m-%d").to_string()),
                 &version.recalc_window_days,
                 &version.config_snapshot_json,
@@ -245,7 +246,7 @@ impl PlanVersionRepository {
                 &version.version_id,
                 &version.plan_id,
                 &version.version_no,
-                &version.status,
+                version.status.to_db_str(),
                 &version.frozen_from_date.map(|d| d.format("%Y-%m-%d").to_string()),
                 &version.recalc_window_days,
                 &version.config_snapshot_json,
@@ -317,7 +318,7 @@ impl PlanVersionRepository {
                    config_snapshot_json = ?, revision = revision + 1
                WHERE version_id = ? AND revision = ?"#,
             params![
-                &version.status,
+                version.status.to_db_str(),
                 &version.frozen_from_date.map(|d| d.format("%Y-%m-%d").to_string()),
                 &version.recalc_window_days,
                 &version.config_snapshot_json,
@@ -456,11 +457,12 @@ impl PlanVersionRepository {
 
     /// 映射数据库行到PlanVersion对象
     fn map_row(&self, row: &rusqlite::Row) -> rusqlite::Result<PlanVersion> {
+        let status_str: String = row.get(3)?;
         Ok(PlanVersion {
             version_id: row.get(0)?,
             plan_id: row.get(1)?,
             version_no: row.get(2)?,
-            status: row.get(3)?,
+            status: PlanVersionStatus::from_str(&status_str),
             frozen_from_date: row
                 .get::<_, Option<String>>(4)?
                 .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
@@ -974,10 +976,11 @@ impl PlanItemRepository {
             locked_in_plan: row.get::<_, i32>(7)? == 1,
             force_release_in_plan: row.get::<_, i32>(8)? == 1,
             violation_flags: row.get(9)?,
-            // 快照字段 (不存储在schema中，从material_state动态获取)
+            // 快照字段 (不存储在schema中，由API层从material_state/material_master动态补充)
             urgent_level: None,
             sched_state: None,
             assign_reason: None,
+            steel_grade: None,
         })
     }
 }

@@ -14,6 +14,7 @@ use crate::domain::material::{MaterialMaster, MaterialState};
 use crate::domain::plan::PlanItem;
 use crate::domain::types::SchedState;
 use chrono::NaiveDate;
+use tracing::instrument;
 
 // ==========================================
 // CapacityFiller - 产能池填充引擎
@@ -51,6 +52,12 @@ impl CapacityFiller {
     ///
     /// # 返回
     /// (填充的 plan_item 列表, 被跳过的材料列表)
+    #[instrument(skip(self, candidates, frozen_items), fields(
+        machine_code = %capacity_pool.machine_code,
+        plan_date = %capacity_pool.plan_date,
+        candidates_count = candidates.len(),
+        frozen_count = frozen_items.len()
+    ))]
     pub fn fill_single_day(
         &self,
         capacity_pool: &mut CapacityPool,
@@ -179,6 +186,7 @@ impl CapacityFiller {
             urgent_level: Some(state.urgent_level.to_string()),
             sched_state: Some(state.sched_state.to_string()),
             assign_reason: Some(assign_reason.to_string()),
+            steel_grade: None,
         }
     }
 
@@ -470,6 +478,7 @@ mod tests {
                 urgent_level: Some("L0".to_string()),
                 sched_state: Some("Ready".to_string()),
                 assign_reason: Some("FROZEN".to_string()),
+                steel_grade: None,
             },
         ];
 

@@ -16,6 +16,23 @@ import type {
   OrderFailure,
   RollCampaignAlert,
 } from '../../../types/decision';
+import {
+  // 堵塞等级/类型
+  BOTTLENECK_LEVEL_LABELS,
+  BOTTLENECK_TYPE_LABELS,
+  // 风险等级
+  RISK_LEVEL_LABELS,
+  // 紧急等级/失败类型
+  URGENCY_LEVEL_LABELS,
+  FAIL_TYPE_LABELS,
+  // 压库等级/年龄分桶
+  PRESSURE_LEVEL_LABELS,
+  AGE_BIN_LABELS,
+  // 机会类型
+  OPPORTUNITY_TYPE_LABELS,
+  // 换辊状态
+  getAlertLevelLabel,
+} from '../../../types/decision';
 
 import { OrdersContent } from './OrdersContent';
 import { ColdStockContent } from './ColdStockContent';
@@ -25,6 +42,149 @@ import { RiskDayContent } from './RiskDayContent';
 import { CapacityOpportunityContent } from './CapacityOpportunityContent';
 
 const { Text } = Typography;
+
+/**
+ * 字段名汉化映射表
+ * 覆盖所有决策层数据类型的字段
+ */
+const FIELD_LABEL_MAP: Record<string, string> = {
+  // 通用字段
+  machineCode: '机组代码',
+  planDate: '计划日期',
+  reasons: '原因',
+  recommendedActions: '推荐行动',
+
+  // BottleneckPoint - 堵塞点
+  bottleneckScore: '堵塞分数',
+  bottleneckLevel: '堵塞等级',
+  bottleneckTypes: '堵塞类型',
+  capacityUtilPct: '容量利用率',
+  pendingMaterialCount: '待排材料数',
+  pendingWeightT: '待排重量(吨)',
+  scheduledMaterialCount: '已排材料数',
+  // scheduledWeightT 在 OrderFailure 部分已定义
+
+  // DaySummary - 日期风险摘要
+  riskScore: '风险分数',
+  riskLevel: '风险等级',
+  overloadWeightT: '超载重量(吨)',
+  urgentFailureCount: '紧急失败数',
+  topReasons: '主要原因',
+  involvedMachines: '涉及机组',
+
+  // OrderFailure - 订单失败
+  contractNo: '合同号',
+  dueDate: '交货日期',
+  daysToDue: '到期天数',
+  urgencyLevel: '紧急等级',
+  failType: '失败类型',
+  completionRate: '完成率',
+  totalWeightT: '总重量(吨)',
+  scheduledWeightT: '已排重量(吨)',
+  unscheduledWeightT: '未排重量(吨)',
+  blockingFactors: '阻塞因素',
+  failureReasons: '失败原因',
+
+  // ColdStockBucket - 冷料分桶
+  ageBin: '库龄分桶',
+  count: '数量',
+  weightT: '重量(吨)',
+  pressureScore: '压库分数',
+  pressureLevel: '压库等级',
+  avgAgeDays: '平均库龄(天)',
+  maxAgeDays: '最大库龄(天)',
+  structureGap: '结构性缺口',
+  trend: '趋势',
+
+  // RollCampaignAlert - 换辊警报
+  campaignId: '轧制活动ID',
+  campaignStartDate: '轧制活动开始日期',
+  currentTonnageT: '当前吨位(吨)',
+  softLimitT: '软限制(吨)',
+  hardLimitT: '硬限制(吨)',
+  remainingTonnageT: '剩余吨位(吨)',
+  alertLevel: '警报等级',
+  alertType: '警报类型',
+  estimatedHardStopDate: '预计硬停日期',
+  alertMessage: '警报消息',
+  impactDescription: '影响描述',
+
+  // CapacityOpportunity - 容量优化机会
+  opportunityType: '机会类型',
+  currentUtilPct: '当前利用率',
+  targetCapacityT: '目标容量(吨)',
+  usedCapacityT: '已用容量(吨)',
+  opportunitySpaceT: '机会空间(吨)',
+  optimizedUtilPct: '优化后利用率',
+  sensitivity: '敏感性分析',
+  description: '描述',
+  potentialBenefits: '潜在收益',
+};
+
+/**
+ * 获取字段的汉化标签
+ */
+function getFieldLabel(fieldName: string): string {
+  return FIELD_LABEL_MAP[fieldName] || fieldName;
+}
+
+/**
+ * 枚举值汉化映射表
+ * 根据字段名对特定枚举值进行汉化
+ */
+const ENUM_VALUE_LABELS: Record<string, Record<string, string>> = {
+  bottleneckLevel: BOTTLENECK_LEVEL_LABELS,
+  bottleneckTypes: BOTTLENECK_TYPE_LABELS,
+  riskLevel: RISK_LEVEL_LABELS,
+  urgencyLevel: URGENCY_LEVEL_LABELS,
+  failType: FAIL_TYPE_LABELS,
+  pressureLevel: PRESSURE_LEVEL_LABELS,
+  ageBin: AGE_BIN_LABELS,
+  opportunityType: OPPORTUNITY_TYPE_LABELS,
+};
+
+/**
+ * 格式化字段值，对枚举类型进行汉化
+ */
+function formatFieldValue(fieldName: string, value: unknown): string {
+  if (value === null || value === undefined) {
+    return '-';
+  }
+
+  // 处理数组类型
+  if (Array.isArray(value)) {
+    const labelMap = ENUM_VALUE_LABELS[fieldName];
+    if (labelMap) {
+      // 数组中每个枚举值都进行汉化
+      return value.map((v) => labelMap[String(v)] || String(v)).join(', ');
+    }
+    // 普通数组，直接 join
+    return value.map((v) => (typeof v === 'object' ? JSON.stringify(v) : String(v))).join(', ');
+  }
+
+  // 处理对象类型（如 trend、reasons 等）
+  if (typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+
+  // 特殊处理 alertLevel 字段（需要通过 parseAlertLevel 转换）
+  if (fieldName === 'alertLevel') {
+    return getAlertLevelLabel(String(value));
+  }
+
+  // 处理枚举值
+  const labelMap = ENUM_VALUE_LABELS[fieldName];
+  if (labelMap) {
+    return labelMap[String(value)] || String(value);
+  }
+
+  // 处理百分比字段
+  if (fieldName.endsWith('Pct') || fieldName === 'completionRate') {
+    return `${Number(value).toFixed(1)}%`;
+  }
+
+  return String(value);
+}
 
 interface DrilldownDrawerProps {
   open: boolean;
@@ -207,8 +367,8 @@ const DrilldownDrawer: React.FC<DrilldownDrawerProps> = ({
         {detailRecord ? (
           <Descriptions size="small" column={1} bordered>
             {Object.entries(detailRecord).map(([k, v]) => (
-              <Descriptions.Item key={k} label={k}>
-                {Array.isArray(v) ? v.join(', ') : typeof v === 'object' ? JSON.stringify(v) : String(v)}
+              <Descriptions.Item key={k} label={getFieldLabel(k)}>
+                {formatFieldValue(k, v)}
               </Descriptions.Item>
             ))}
           </Descriptions>

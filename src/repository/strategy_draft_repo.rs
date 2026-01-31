@@ -362,6 +362,22 @@ impl StrategyDraftRepository {
         let rows = conn.execute(&sql, [])?;
         Ok(rows)
     }
+
+    /// 删除与指定版本关联的所有策略草稿
+    ///
+    /// # 说明
+    /// 删除 base_version_id 或 published_as_version_id 匹配的所有策略草稿
+    pub fn delete_by_version(&self, version_id: &str) -> RepositoryResult<usize> {
+        let conn = self.get_conn()?;
+        let rows = conn.execute(
+            r#"
+            DELETE FROM decision_strategy_draft
+            WHERE base_version_id = ?1 OR published_as_version_id = ?1
+            "#,
+            params![version_id],
+        )?;
+        Ok(rows)
+    }
 }
 
 fn map_row(row: &Row) -> SqliteResult<StrategyDraftEntity> {

@@ -176,11 +176,11 @@ impl MaterialMasterRepository {
                 created_at: row
                     .get::<_, String>(21)?
                     .parse::<chrono::DateTime<chrono::Utc>>()
-                    .unwrap(),
+                    .unwrap_or_else(|_| chrono::Utc::now()),
                 updated_at: row
                     .get::<_, String>(22)?
                     .parse::<chrono::DateTime<chrono::Utc>>()
-                    .unwrap(),
+                    .unwrap_or_else(|_| chrono::Utc::now()),
             })
         });
 
@@ -394,6 +394,59 @@ impl MaterialMasterRepository {
             .collect::<SqliteResult<Vec<MaterialMaster>>>()?;
 
         Ok(materials)
+    }
+
+    /// 批量查询材料的出钢记号（steel_mark → 前端称为 steel_grade）
+    ///
+    /// # 参数
+    /// - material_ids: 材料ID列表
+    ///
+    /// # 返回
+    /// - Ok(HashMap<String, String>): material_id → steel_mark 映射
+    pub fn find_steel_marks_by_ids(
+        &self,
+        material_ids: &[String],
+    ) -> RepositoryResult<std::collections::HashMap<String, String>> {
+        if material_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        const CHUNK_SIZE: usize = 900;
+
+        let conn = self.get_conn()?;
+        let mut result = std::collections::HashMap::with_capacity(material_ids.len());
+
+        for chunk in material_ids.chunks(CHUNK_SIZE) {
+            let placeholders = std::iter::repeat("?")
+                .take(chunk.len())
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            let sql = format!(
+                "SELECT material_id, steel_mark FROM material_master WHERE material_id IN ({})",
+                placeholders
+            );
+
+            let mut stmt = conn.prepare(&sql)?;
+            let params_vec: Vec<&dyn rusqlite::ToSql> =
+                chunk.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
+
+            let rows = stmt.query_map(params_vec.as_slice(), |row| {
+                let id: String = row.get(0)?;
+                let mark: Option<String> = row.get(1)?;
+                Ok((id, mark))
+            })?;
+
+            for row in rows {
+                if let Ok((id, Some(mark))) = row {
+                    if !mark.is_empty() {
+                        result.insert(id, mark);
+                    }
+                }
+            }
+        }
+
+        Ok(result)
     }
 }
 
@@ -994,7 +1047,7 @@ impl MaterialStateRepository {
             updated_at: row
                 .get::<_, String>(17)?
                 .parse::<chrono::DateTime<chrono::Utc>>()
-                .unwrap(),
+                .unwrap_or_else(|_| chrono::Utc::now()),
             updated_by: row.get(18)?,
         })
     }

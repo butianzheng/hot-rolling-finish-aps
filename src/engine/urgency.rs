@@ -13,6 +13,7 @@ use crate::domain::material::{MaterialMaster, MaterialState};
 use crate::domain::types::{RushLevel, UrgentLevel};
 use chrono::{Duration, NaiveDate};
 use serde_json::json;
+use tracing::instrument;
 
 
 // ==========================================
@@ -38,6 +39,7 @@ impl UrgencyEngine {
     /// 批量处理可以优化性能，避免重复计算
     ///
     /// 返回更新后的 MaterialState 列表
+    #[instrument(skip(self, materials), fields(count = materials.len()))]
     pub fn evaluate_batch(
         &self,
         materials: Vec<(MaterialMaster, MaterialState)>,

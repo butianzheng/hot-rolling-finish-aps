@@ -579,7 +579,7 @@ mod tests {
 
         let found_log = found.unwrap();
         assert_eq!(found_log.action_id, "log1");
-        assert_eq!(found_log.version_id, "v1");
+        assert_eq!(found_log.version_id, Some("v1".to_string()));
         assert_eq!(found_log.actor, "user1");
     }
 

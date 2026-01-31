@@ -13,7 +13,7 @@
 use crate::domain::capacity::CapacityPool;
 use crate::domain::material::MaterialState;
 use crate::domain::plan::{PlanItem, PlanVersion};
-use crate::domain::types::SchedState;
+use crate::domain::types::{PlanVersionStatus, SchedState};
 use crate::engine::events::{OptionalEventPublisher, ScheduleEvent, ScheduleEventPublisher, ScheduleEventType};
 use crate::engine::orchestrator::ScheduleOrchestrator;
 use crate::engine::{CapacityFiller, EligibilityEngine, PrioritySorter, UrgencyEngine};
@@ -30,6 +30,7 @@ use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
+use tracing::instrument;
 use uuid::Uuid;
 
 // ==========================================
@@ -366,6 +367,7 @@ impl RecalcEngine {
         self.recalc_full_with_profile(plan_id, base_date, window_days, operator, is_dry_run, profile)
     }
 
+    #[instrument(skip(self), fields(plan_id = %plan_id, window_days = %window_days, is_dry_run = %is_dry_run))]
     pub fn recalc_full(
         &self,
         plan_id: &str,
@@ -384,6 +386,7 @@ impl RecalcEngine {
         self.recalc_full_with_profile(plan_id, base_date, window_days, operator, is_dry_run, profile)
     }
 
+    #[instrument(skip(self, profile), fields(plan_id = %plan_id, window_days = %window_days, is_dry_run = %is_dry_run, strategy = %profile.strategy_key))]
     pub(crate) fn recalc_full_with_profile(
         &self,
         plan_id: &str,
@@ -403,7 +406,7 @@ impl RecalcEngine {
                 version_id: Uuid::new_v4().to_string(),
                 plan_id: plan_id.to_string(),
                 version_no: 0, // 试算版本号为0
-                status: "SIMULATE".to_string(),
+                status: PlanVersionStatus::Draft, // 试算也用 Draft 状态
                 frozen_from_date: None,
                 recalc_window_days: Some(window_days),
                 config_snapshot_json: Some(format!("试算 (操作人: {})", operator)),
@@ -740,7 +743,7 @@ impl RecalcEngine {
             version_id: Uuid::new_v4().to_string(),
             plan_id: plan_id.to_string(),
             version_no: 0,
-            status: "DRAFT".to_string(),
+            status: PlanVersionStatus::Draft,
             frozen_from_date: None, // 将在recalc_full中设置
             recalc_window_days: Some(window_days),
             config_snapshot_json: Some(config_snapshot), // 存储配置快照

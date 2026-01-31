@@ -294,6 +294,12 @@ export const D4Bottleneck: React.FC<D4BottleneckProps> = ({ embedded, onOpenDril
             <Descriptions.Item label="容量利用率">
               {selectedPointData.capacityUtilPct.toFixed(1)}%
             </Descriptions.Item>
+            <Descriptions.Item label="已排材料数">
+              {selectedPointData.scheduledMaterialCount ?? 0}
+            </Descriptions.Item>
+            <Descriptions.Item label="已排重量">
+              {(selectedPointData.scheduledWeightT ?? 0).toFixed(1)} 吨
+            </Descriptions.Item>
             <Descriptions.Item label="待排材料数">
               {selectedPointData.pendingMaterialCount}
             </Descriptions.Item>

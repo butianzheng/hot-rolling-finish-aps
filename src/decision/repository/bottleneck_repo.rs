@@ -216,8 +216,11 @@ impl BottleneckRepository {
             self.query_capacity_for_all(&conn, start_date, end_date, &mut bottleneck_map)?;
         }
 
-        // 查询 plan_item 表以获取待排材料数据
+        // 查询 plan_item 表以获取已排材料数据
         self.enrich_with_plan_items(&conn, version_id, start_date, end_date, &mut bottleneck_map)?;
+
+        // 查询 material_state 表以获取真实的待排材料数据
+        self.enrich_with_pending_materials(&conn, &mut bottleneck_map)?;
 
         // 转换为 MachineBottleneckProfile 并排序
         let mut profiles: Vec<MachineBottleneckProfile> = bottleneck_map
@@ -362,7 +365,7 @@ impl BottleneckRepository {
         Ok(())
     }
 
-    /// 从 plan_item 表查询待排材料数据并填充到聚合数据中
+    /// 从 plan_item 表查询已排材料数据并填充到聚合数据中
     fn enrich_with_plan_items(
         &self,
         conn: &Connection,
@@ -390,19 +393,85 @@ impl BottleneckRepository {
             Ok((
                 row.get::<_, String>(0)?,  // machine_code
                 row.get::<_, String>(1)?,  // plan_date
-                row.get::<_, i32>(2)?,     // material_count
-                row.get::<_, f64>(3)?,     // total_weight_t
+                row.get::<_, i32>(2)?,     // material_count (已排材料数)
+                row.get::<_, f64>(3)?,     // total_weight_t (已排材料重量)
                 row.get::<_, i32>(4)?,     // violation_count
             ))
         })?;
 
         for row_result in rows {
-            let (machine_code, plan_date, material_count, total_weight_t, violation_count) =
+            let (machine_code, plan_date, scheduled_count, scheduled_weight, violation_count) =
                 row_result?;
 
             let key = (machine_code, plan_date);
             if let Some(entry) = bottleneck_map.get_mut(&key) {
-                entry.set_plan_item_data(material_count, total_weight_t, violation_count);
+                // plan_item 数据代表已排材料，直接赋值给 scheduled 字段
+                // pending 字段将从 material_state 表查询，不在此处赋值
+                entry.set_plan_item_data(
+                    0,                   // pending_materials（暂不赋值，由 enrich_with_pending_materials 填充）
+                    0.0,                 // pending_weight_t（暂不赋值）
+                    violation_count,
+                    scheduled_count,     // scheduled_materials（已排材料数）
+                    scheduled_weight,    // scheduled_weight_t（已排材料重量）
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    /// 从 material_state 表查询真实的待排材料数据并填充到聚合数据中
+    ///
+    /// # 说明
+    /// - 查询 sched_state IN ('READY', 'FORCE_RELEASE') 的材料（真正的待排状态）
+    /// - 通过 JOIN material_master 获取机组代码和材料重量
+    /// - 按机组聚合统计，将结果填充到每个(机组, 日期)的 pending_materials 和 pending_weight_t
+    ///
+    /// # 业务含义
+    /// - 待排材料是按机组级别统计的，不分日期（因为还未排入具体日期）
+    /// - 因此，同一机组的所有日期点将显示相同的待排材料数量和重量
+    fn enrich_with_pending_materials(
+        &self,
+        conn: &Connection,
+        bottleneck_map: &mut HashMap<(String, String), MachineBottleneckAggregateData>,
+    ) -> Result<(), Box<dyn Error>> {
+        // 查询待排材料：从 material_state 中筛选 READY/FORCE_RELEASE 状态的材料
+        // JOIN material_master 获取机组代码和重量
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT
+                mm.next_machine_code as machine_code,
+                COUNT(*) as pending_count,
+                SUM(mm.weight_t) as pending_weight_t
+            FROM material_state ms
+            INNER JOIN material_master mm ON ms.material_id = mm.material_id
+            WHERE ms.sched_state IN ('READY', 'FORCE_RELEASE')
+              AND mm.next_machine_code IS NOT NULL
+              AND mm.next_machine_code != ''
+            GROUP BY mm.next_machine_code
+            "#,
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,  // machine_code
+                row.get::<_, i32>(1)?,     // pending_count
+                row.get::<_, f64>(2)?,     // pending_weight_t
+            ))
+        })?;
+
+        // 构建机组 -> (待排数, 待排重量) 的映射
+        let mut machine_pending_map: HashMap<String, (i32, f64)> = HashMap::new();
+        for row_result in rows {
+            let (machine_code, pending_count, pending_weight) = row_result?;
+            machine_pending_map.insert(machine_code, (pending_count, pending_weight));
+        }
+
+        // 将待排数据填充到每个(机组, 日期)的聚合数据中
+        for ((machine_code, _plan_date), entry) in bottleneck_map.iter_mut() {
+            if let Some((pending_count, pending_weight)) = machine_pending_map.get(machine_code) {
+                entry.pending_materials = *pending_count;
+                entry.pending_weight_t = *pending_weight;
             }
         }
 
@@ -464,6 +533,8 @@ struct MachineBottleneckAggregateData {
     pending_materials: i32,
     pending_weight_t: f64,
     structure_violations: i32,
+    scheduled_materials: i32,
+    scheduled_weight_t: f64,
 }
 
 impl MachineBottleneckAggregateData {
@@ -481,6 +552,8 @@ impl MachineBottleneckAggregateData {
             pending_materials: 0,
             pending_weight_t: 0.0,
             structure_violations: 0,
+            scheduled_materials: 0,
+            scheduled_weight_t: 0.0,
         }
     }
 
@@ -513,10 +586,14 @@ impl MachineBottleneckAggregateData {
         pending_materials: i32,
         pending_weight_t: f64,
         structure_violations: i32,
+        scheduled_materials: i32,
+        scheduled_weight_t: f64,
     ) {
         self.pending_materials = pending_materials;
         self.pending_weight_t = pending_weight_t;
         self.structure_violations = structure_violations;
+        self.scheduled_materials = scheduled_materials;
+        self.scheduled_weight_t = scheduled_weight_t;
     }
 
     fn into_profile(self, version_id: String) -> MachineBottleneckProfile {
@@ -539,10 +616,28 @@ impl MachineBottleneckAggregateData {
         // 设置结构信息
         profile.set_structure_info(self.structure_violations);
 
-        // 设置待排材料数量
+        // 设置待排材料数量和重量
         profile.pending_materials = self.pending_materials;
+        profile.pending_weight_t = self.pending_weight_t;
+
+        // 设置已排材料数量和重量
+        profile.scheduled_materials = self.scheduled_materials;
+        profile.scheduled_weight_t = self.scheduled_weight_t;
 
         // 添加堵塞原因
+        // 数据一致性校验：如果显示超限但无已排材料，添加警告原因
+        if self.overflow_t > 0.0 && self.scheduled_materials == 0 {
+            profile.add_reason(
+                "DATA_INCONSISTENCY_WARNING".to_string(),
+                format!(
+                    "数据不一致：容量池显示超限 {:.1}t，但无已排材料。请检查容量配置或排程状态",
+                    self.overflow_t
+                ),
+                0.3,
+                0,
+            );
+        }
+
         if self.overflow_t > 0.0 {
             profile.add_reason(
                 "CAPACITY_OVERFLOW".to_string(),
@@ -664,6 +759,68 @@ mod tests {
         )
         .unwrap();
 
+        // 创建 material_master 表（用于待排材料查询）
+        conn.execute(
+            r#"
+            CREATE TABLE IF NOT EXISTS material_master (
+                material_id TEXT PRIMARY KEY,
+                manufacturing_order_id TEXT,
+                contract_no TEXT,
+                due_date TEXT,
+                next_machine_code TEXT,
+                rework_machine_code TEXT,
+                current_machine_code TEXT,
+                width_mm REAL,
+                thickness_mm REAL,
+                length_m REAL,
+                weight_t REAL,
+                available_width_mm REAL,
+                steel_mark TEXT,
+                slab_id TEXT,
+                material_status_code_src TEXT,
+                status_updated_at TEXT,
+                output_age_days_raw INTEGER,
+                stock_age_days INTEGER,
+                contract_nature TEXT,
+                weekly_delivery_flag TEXT,
+                export_flag TEXT,
+                created_at TEXT NOT NULL DEFAULT '2026-01-01T00:00:00Z',
+                updated_at TEXT NOT NULL DEFAULT '2026-01-01T00:00:00Z'
+            )
+            "#,
+            [],
+        )
+        .unwrap();
+
+        // 创建 material_state 表（用于待排材料查询）
+        conn.execute(
+            r#"
+            CREATE TABLE IF NOT EXISTS material_state (
+                material_id TEXT PRIMARY KEY,
+                sched_state TEXT NOT NULL DEFAULT 'READY',
+                lock_flag INTEGER NOT NULL DEFAULT 0,
+                force_release_flag INTEGER NOT NULL DEFAULT 0,
+                urgent_level TEXT NOT NULL DEFAULT 'L0',
+                urgent_reason TEXT,
+                rush_level TEXT DEFAULT 'L0',
+                rolling_output_age_days INTEGER DEFAULT 0,
+                ready_in_days INTEGER DEFAULT 0,
+                earliest_sched_date TEXT,
+                stock_age_days INTEGER DEFAULT 0,
+                scheduled_date TEXT,
+                scheduled_machine_code TEXT,
+                seq_no INTEGER,
+                manual_urgent_flag INTEGER NOT NULL DEFAULT 0,
+                in_frozen_zone INTEGER NOT NULL DEFAULT 0,
+                last_calc_version_id TEXT,
+                updated_at TEXT NOT NULL DEFAULT '2026-01-01T00:00:00Z',
+                updated_by TEXT
+            )
+            "#,
+            [],
+        )
+        .unwrap();
+
         Arc::new(Mutex::new(conn))
     }
 
@@ -767,6 +924,184 @@ mod tests {
         }
     }
 
+    fn insert_test_material_master(conn: &Connection) {
+        // H032: 插入 10 个已排材料（对应 plan_item）
+        for i in 1..=10 {
+            conn.execute(
+                r#"
+                INSERT INTO material_master (
+                    material_id, current_machine_code, next_machine_code, weight_t,
+                    manufacturing_order_id, contract_no, due_date,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                "#,
+                params![
+                    format!("MAT{:03}", i),
+                    "H031",
+                    "H032",
+                    150.0,
+                    format!("MO{:03}", i),
+                    format!("C{:03}", i),
+                    "2026-02-01",
+                    "2026-01-01T00:00:00Z",
+                    "2026-01-01T00:00:00Z"
+                ],
+            )
+            .unwrap();
+        }
+
+        // H033: 插入 25 个已排材料（对应 plan_item）
+        for i in 11..=35 {
+            conn.execute(
+                r#"
+                INSERT INTO material_master (
+                    material_id, current_machine_code, next_machine_code, weight_t,
+                    manufacturing_order_id, contract_no, due_date,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                "#,
+                params![
+                    format!("MAT{:03}", i),
+                    "H031",
+                    "H033",
+                    100.0,
+                    format!("MO{:03}", i),
+                    format!("C{:03}", i),
+                    "2026-02-01",
+                    "2026-01-01T00:00:00Z",
+                    "2026-01-01T00:00:00Z"
+                ],
+            )
+            .unwrap();
+        }
+
+        // H032: 插入 3 个待排材料（READY 状态的 material_master 记录）
+        for i in 36..=38 {
+            conn.execute(
+                r#"
+                INSERT INTO material_master (
+                    material_id, current_machine_code, next_machine_code, weight_t,
+                    manufacturing_order_id, contract_no, due_date,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                "#,
+                params![
+                    format!("MAT{:03}", i),
+                    "H031",
+                    "H032",
+                    120.0,
+                    format!("MO{:03}", i),
+                    format!("C{:03}", i),
+                    "2026-02-05",
+                    "2026-01-01T00:00:00Z",
+                    "2026-01-01T00:00:00Z"
+                ],
+            )
+            .unwrap();
+        }
+
+        // H033: 插入 5 个待排材料（READY 状态的 material_master 记录）
+        for i in 39..=43 {
+            conn.execute(
+                r#"
+                INSERT INTO material_master (
+                    material_id, current_machine_code, next_machine_code, weight_t,
+                    manufacturing_order_id, contract_no, due_date,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                "#,
+                params![
+                    format!("MAT{:03}", i),
+                    "H031",
+                    "H033",
+                    80.0,
+                    format!("MO{:03}", i),
+                    format!("C{:03}", i),
+                    "2026-02-05",
+                    "2026-01-01T00:00:00Z",
+                    "2026-01-01T00:00:00Z"
+                ],
+            )
+            .unwrap();
+        }
+    }
+
+    fn insert_test_material_state(conn: &Connection) {
+        // H032: 3 个待排材料（READY 状态）
+        for i in 36..=38 {
+            conn.execute(
+                r#"
+                INSERT INTO material_state (
+                    material_id, sched_state, lock_flag, force_release_flag,
+                    urgent_level, updated_at, updated_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                "#,
+                params![
+                    format!("MAT{:03}", i),
+                    "READY",
+                    0,
+                    0,
+                    "L0",
+                    "2026-01-01T00:00:00Z",
+                    "SYSTEM"
+                ],
+            )
+            .unwrap();
+        }
+
+        // H033: 5 个待排材料（READY 状态）
+        for i in 39..=43 {
+            conn.execute(
+                r#"
+                INSERT INTO material_state (
+                    material_id, sched_state, lock_flag, force_release_flag,
+                    urgent_level, updated_at, updated_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                "#,
+                params![
+                    format!("MAT{:03}", i),
+                    "READY",
+                    0,
+                    0,
+                    "L0",
+                    "2026-01-01T00:00:00Z",
+                    "SYSTEM"
+                ],
+            )
+            .unwrap();
+        }
+
+        // 已排材料（SCHEDULED 状态）
+        for i in 1..=35 {
+            let (machine_code, plan_date) = if i <= 10 {
+                ("H032", "2026-01-24")
+            } else {
+                ("H033", "2026-01-24")
+            };
+            conn.execute(
+                r#"
+                INSERT INTO material_state (
+                    material_id, sched_state, lock_flag, force_release_flag,
+                    urgent_level, scheduled_machine_code, scheduled_date,
+                    updated_at, updated_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                "#,
+                params![
+                    format!("MAT{:03}", i),
+                    "SCHEDULED",
+                    0,
+                    0,
+                    "L0",
+                    machine_code,
+                    plan_date,
+                    "2026-01-01T00:00:00Z",
+                    "SYSTEM"
+                ],
+            )
+            .unwrap();
+        }
+    }
+
     #[test]
     fn test_get_bottleneck_profile() {
         let conn_arc = setup_test_db();
@@ -774,6 +1109,8 @@ mod tests {
             let conn = conn_arc.lock().expect("锁获取失败");
             insert_test_capacity_data(&conn);
             insert_test_plan_items(&conn);
+            insert_test_material_master(&conn);
+            insert_test_material_state(&conn);
         }
 
         let repo = BottleneckRepository::new(conn_arc);
@@ -788,15 +1125,21 @@ mod tests {
         assert_eq!(h033.machine_code, "H033");
         assert!(h033.bottleneck_score > 0.0);
         assert!(h033.is_severe());
-        assert_eq!(h033.pending_materials, 25);
+        // pending_materials 来自 material_state（READY 状态），H033 有 5 个待排
+        assert_eq!(h033.pending_materials, 5);
         assert_eq!(h033.structure_violations, 5);
+        // scheduled_materials 来自 plan_item
+        assert_eq!(h033.scheduled_materials, 25);
 
         // 第二个应该是 H032（高利用率）
         let h032 = &profiles[1];
         assert_eq!(h032.machine_code, "H032");
         assert!(h032.bottleneck_score > 0.0);
-        assert_eq!(h032.pending_materials, 10);
+        // pending_materials 来自 material_state（READY 状态），H032 有 3 个待排
+        assert_eq!(h032.pending_materials, 3);
         assert_eq!(h032.structure_violations, 2);
+        // scheduled_materials 来自 plan_item
+        assert_eq!(h032.scheduled_materials, 10);
     }
 
     #[test]
@@ -806,6 +1149,8 @@ mod tests {
             let conn = conn_arc.lock().expect("锁获取失败");
             insert_test_capacity_data(&conn);
             insert_test_plan_items(&conn);
+            insert_test_material_master(&conn);
+            insert_test_material_state(&conn);
         }
 
         let repo = BottleneckRepository::new(conn_arc);
@@ -824,6 +1169,8 @@ mod tests {
             let conn = conn_arc.lock().expect("锁获取失败");
             insert_test_capacity_data(&conn);
             insert_test_plan_items(&conn);
+            insert_test_material_master(&conn);
+            insert_test_material_state(&conn);
         }
 
         let repo = BottleneckRepository::new(conn_arc);
@@ -849,6 +1196,8 @@ mod tests {
             let conn = conn_arc.lock().expect("锁获取失败");
             insert_test_capacity_data(&conn);
             insert_test_plan_items(&conn);
+            insert_test_material_master(&conn);
+            insert_test_material_state(&conn);
         }
 
         let repo = BottleneckRepository::new(conn_arc);
@@ -858,5 +1207,87 @@ mod tests {
 
         assert_eq!(profiles.len(), 1);
         assert_eq!(profiles[0].machine_code, "H032");
+        assert_eq!(profiles[0].pending_materials, 3);  // H032 有 3 个待排材料
+        assert_eq!(profiles[0].scheduled_materials, 10);  // H032 有 10 个已排材料
+    }
+
+    #[test]
+    fn test_pending_materials_from_material_state() {
+        // 新测试：验证待排材料正确地从 material_state 查询
+        let conn_arc = setup_test_db();
+        {
+            let conn = conn_arc.lock().expect("锁获取失败");
+            insert_test_capacity_data(&conn);
+            insert_test_plan_items(&conn);
+            insert_test_material_master(&conn);
+            insert_test_material_state(&conn);
+        }
+
+        let repo = BottleneckRepository::new(conn_arc);
+        let profiles = repo
+            .get_bottleneck_profile("V001", None, "2026-01-24", "2026-01-24")
+            .unwrap();
+
+        // 验证 pending 和 scheduled 不相等（之前的 bug）
+        for profile in profiles {
+            if profile.machine_code == "H032" {
+                // 待排：3 个，已排：10 个
+                assert_eq!(profile.pending_materials, 3);
+                assert_eq!(profile.scheduled_materials, 10);
+                assert_eq!(profile.pending_weight_t, 3.0 * 120.0);  // 3 个 × 120t
+                assert_eq!(profile.scheduled_weight_t, 10.0 * 150.0);  // 10 个 × 150t
+            } else if profile.machine_code == "H033" {
+                // 待排：5 个，已排：25 个
+                assert_eq!(profile.pending_materials, 5);
+                assert_eq!(profile.scheduled_materials, 25);
+                assert_eq!(profile.pending_weight_t, 5.0 * 80.0);  // 5 个 × 80t
+                assert_eq!(profile.scheduled_weight_t, 25.0 * 100.0);  // 25 个 × 100t
+            }
+        }
+    }
+
+    #[test]
+    fn test_data_inconsistency_warning() {
+        // 新测试：验证数据一致性校验（超限但无已排材料）
+        let conn_arc = setup_test_db();
+        {
+            let conn = conn_arc.lock().expect("锁获取失败");
+            // 插入产能超限的 capacity_pool 数据
+            conn.execute(
+                r#"
+                INSERT INTO capacity_pool (
+                    machine_code, plan_date, target_capacity_t, limit_capacity_t,
+                    used_capacity_t, overflow_t, frozen_capacity_t, accumulated_tonnage_t, roll_campaign_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                "#,
+                params![
+                    "H034",
+                    "2026-01-25",
+                    1500.0,
+                    2000.0,
+                    2300.0,
+                    300.0,  // 超限
+                    0.0,
+                    0.0,
+                    "RC003"
+                ],
+            )
+            .unwrap();
+            // 故意不插入 plan_item（没有已排材料）
+        }
+
+        let repo = BottleneckRepository::new(conn_arc);
+        let profiles = repo
+            .get_bottleneck_profile("V001", Some("H034"), "2026-01-25", "2026-01-25")
+            .unwrap();
+
+        assert_eq!(profiles.len(), 1);
+        let h034 = &profiles[0];
+
+        // 应该包含数据不一致警告原因
+        let warning_reason = h034.reasons.iter()
+            .find(|r| r.code == "DATA_INCONSISTENCY_WARNING");
+        assert!(warning_reason.is_some(), "应该包含数据不一致警告");
+        assert_eq!(h034.scheduled_materials, 0);  // 没有已排材料
     }
 }

@@ -149,7 +149,7 @@ impl RiskSnapshotRepository {
                     version_id: row.get(0)?,
                     machine_code: row.get(1)?,
                     snapshot_date: NaiveDate::parse_from_str(&row.get::<_, String>(2)?, "%Y-%m-%d")
-                        .unwrap(),
+                        .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
                     risk_level: parse_risk_level(&row.get::<_, String>(3)?),
                     risk_reason: row.get(4)?,
                     target_capacity_t: row.get(5)?,
@@ -167,7 +167,7 @@ impl RiskSnapshotRepository {
                         &row.get::<_, String>(13)?,
                         "%Y-%m-%d %H:%M:%S",
                     )
-                    .unwrap(),
+                    .unwrap_or_else(|_| chrono::NaiveDateTime::default()),
                 })
             },
         );
@@ -215,7 +215,7 @@ impl RiskSnapshotRepository {
                     version_id: row.get(0)?,
                     machine_code: row.get(1)?,
                     snapshot_date: NaiveDate::parse_from_str(&row.get::<_, String>(2)?, "%Y-%m-%d")
-                        .unwrap(),
+                        .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
                     risk_level: parse_risk_level(&row.get::<_, String>(3)?),
                     risk_reason: row.get(4)?,
                     target_capacity_t: row.get(5)?,
@@ -233,7 +233,7 @@ impl RiskSnapshotRepository {
                         &row.get::<_, String>(13)?,
                         "%Y-%m-%d %H:%M:%S",
                     )
-                    .unwrap(),
+                    .unwrap_or_else(|_| chrono::NaiveDateTime::default()),
                 })
             })?
             .collect::<SqliteResult<Vec<_>>>()?;
@@ -282,7 +282,7 @@ impl RiskSnapshotRepository {
                     version_id: row.get(0)?,
                     machine_code: row.get(1)?,
                     snapshot_date: NaiveDate::parse_from_str(&row.get::<_, String>(2)?, "%Y-%m-%d")
-                        .unwrap(),
+                        .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
                     risk_level: parse_risk_level(&row.get::<_, String>(3)?),
                     risk_reason: row.get(4)?,
                     target_capacity_t: row.get(5)?,
@@ -300,7 +300,7 @@ impl RiskSnapshotRepository {
                         &row.get::<_, String>(13)?,
                         "%Y-%m-%d %H:%M:%S",
                     )
-                    .unwrap(),
+                    .unwrap_or_else(|_| chrono::NaiveDateTime::default()),
                 })
             })?
             .collect::<SqliteResult<Vec<_>>>()?;
@@ -356,7 +356,7 @@ impl RiskSnapshotRepository {
                             &row.get::<_, String>(2)?,
                             "%Y-%m-%d",
                         )
-                        .unwrap(),
+                        .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
                         risk_level: parse_risk_level(&row.get::<_, String>(3)?),
                         risk_reason: row.get(4)?,
                         target_capacity_t: row.get(5)?,
@@ -374,7 +374,7 @@ impl RiskSnapshotRepository {
                             &row.get::<_, String>(13)?,
                             "%Y-%m-%d %H:%M:%S",
                         )
-                        .unwrap(),
+                        .unwrap_or_else(|_| chrono::NaiveDateTime::default()),
                     })
                 },
             )?
@@ -436,7 +436,7 @@ impl RiskSnapshotRepository {
                 version_id: row.get(0)?,
                 machine_code: row.get(1)?,
                 snapshot_date: NaiveDate::parse_from_str(&row.get::<_, String>(2)?, "%Y-%m-%d")
-                    .unwrap(),
+                    .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
                 risk_level: parse_risk_level(&row.get::<_, String>(3)?),
                 risk_reason: row.get(4)?,
                 target_capacity_t: row.get(5)?,
@@ -454,7 +454,7 @@ impl RiskSnapshotRepository {
                     &row.get::<_, String>(13)?,
                     "%Y-%m-%d %H:%M:%S",
                 )
-                .unwrap(),
+                .unwrap_or_else(|_| chrono::NaiveDateTime::default()),
             })
         });
 
@@ -506,7 +506,7 @@ impl RiskSnapshotRepository {
                     version_id: row.get(0)?,
                     machine_code: row.get(1)?,
                     snapshot_date: NaiveDate::parse_from_str(&row.get::<_, String>(2)?, "%Y-%m-%d")
-                        .unwrap(),
+                        .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
                     risk_level: parse_risk_level(&row.get::<_, String>(3)?),
                     risk_reason: row.get(4)?,
                     target_capacity_t: row.get(5)?,
@@ -524,7 +524,7 @@ impl RiskSnapshotRepository {
                         &row.get::<_, String>(13)?,
                         "%Y-%m-%d %H:%M:%S",
                     )
-                    .unwrap(),
+                    .unwrap_or_else(|_| chrono::NaiveDateTime::default()),
                 })
             })?
             .collect::<SqliteResult<Vec<_>>>()?;
@@ -590,7 +590,7 @@ impl RiskSnapshotRepository {
                     version_id: row.get(0)?,
                     machine_code: row.get(1)?,
                     snapshot_date: NaiveDate::parse_from_str(&row.get::<_, String>(2)?, "%Y-%m-%d")
-                        .unwrap(),
+                        .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
                     risk_level: parse_risk_level(&row.get::<_, String>(3)?),
                     risk_reason: row.get(4)?,
                     target_capacity_t: row.get(5)?,
@@ -608,7 +608,7 @@ impl RiskSnapshotRepository {
                         &row.get::<_, String>(13)?,
                         "%Y-%m-%d %H:%M:%S",
                     )
-                    .unwrap(),
+                    .unwrap_or_else(|_| chrono::NaiveDateTime::default()),
                 })
             })?
             .collect::<SqliteResult<Vec<_>>>()?;

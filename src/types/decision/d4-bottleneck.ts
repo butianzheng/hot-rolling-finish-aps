@@ -79,6 +79,12 @@ export interface BottleneckPoint {
   /** 待排产重量 (t) */
   pendingWeightT: number;
 
+  /** 已排产材料数量 */
+  scheduledMaterialCount: number;
+
+  /** 已排产重量 (t) */
+  scheduledWeightT: number;
+
   /** 堵塞原因（按影响降序） */
   reasons: ReasonItem[];
 

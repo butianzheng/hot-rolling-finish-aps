@@ -2,10 +2,9 @@
 // 全局 KPI 显示组件
 // ==========================================
 // 在 Header 中显示关键性能指标
-// 使用 React.memo 和 useMemo 优化性能
 // ==========================================
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Space, Badge, Tooltip, Typography } from 'antd';
 import {
   WarningOutlined,
@@ -19,6 +18,20 @@ import type { GlobalKPI } from '../types/kpi';
 
 const { Text } = Typography;
 
+// 状态颜色常量
+const ROLL_STATUS_COLORS: Record<string, string> = {
+  critical: '#ff4d4f',
+  warning: '#faad14',
+  healthy: '#52c41a',
+};
+
+const RISK_LEVEL_COLORS: Record<string, string> = {
+  critical: '#ff4d4f',
+  high: '#faad14',
+  medium: '#1677ff',
+  low: '#52c41a',
+};
+
 interface GlobalKPIDisplayProps {
   kpi: GlobalKPI;
 }
@@ -26,30 +39,9 @@ interface GlobalKPIDisplayProps {
 export const GlobalKPIDisplay: React.FC<GlobalKPIDisplayProps> = ({ kpi }) => {
   const { theme } = useTheme();
 
-  // 使用 useMemo 缓存颜色计算
-  const rollStatusColor = useMemo(() => {
-    switch (kpi.rollStatus) {
-      case 'critical':
-        return '#ff4d4f';
-      case 'warning':
-        return '#faad14';
-      default:
-        return '#52c41a';
-    }
-  }, [kpi.rollStatus]);
-
-  const riskColor = useMemo(() => {
-    switch (kpi.riskLevel) {
-      case 'critical':
-        return '#ff4d4f';
-      case 'high':
-        return '#faad14';
-      case 'medium':
-        return '#1677ff';
-      default:
-        return '#52c41a';
-    }
-  }, [kpi.riskLevel]);
+  // 使用常量对象替代 useMemo
+  const rollStatusColor = (kpi.rollStatus && ROLL_STATUS_COLORS[kpi.rollStatus]) || ROLL_STATUS_COLORS.healthy;
+  const riskColor = (kpi.riskLevel && RISK_LEVEL_COLORS[kpi.riskLevel]) || RISK_LEVEL_COLORS.low;
 
   const textColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.85)';
   const urgentL3Total = kpi.urgentBreakdown?.L3?.total ?? null;

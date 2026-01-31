@@ -719,6 +719,31 @@ mod tests {
         ) -> Result<(), Box<dyn Error>> {
             Ok(())
         }
+        async fn count_conflicts_by_batch(
+            &self,
+            _batch_id: &str,
+            _status: Option<&str>,
+        ) -> Result<i64, Box<dyn Error>> {
+            Ok(0)
+        }
+        async fn delete_materials_by_batch(
+            &self,
+            _batch_id: &str,
+        ) -> Result<usize, Box<dyn Error>> {
+            Ok(0)
+        }
+        async fn delete_conflicts_by_batch(
+            &self,
+            _batch_id: &str,
+        ) -> Result<usize, Box<dyn Error>> {
+            Ok(0)
+        }
+        async fn delete_batch(
+            &self,
+            _batch_id: &str,
+        ) -> Result<(), Box<dyn Error>> {
+            Ok(())
+        }
     }
 
     struct DummyConfig;

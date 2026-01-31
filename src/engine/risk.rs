@@ -16,6 +16,7 @@ use crate::domain::risk::RiskSnapshot;
 use crate::domain::types::{RiskLevel, SchedState, UrgentLevel};
 use chrono::{NaiveDate, Utc};
 use serde_json::json;
+use tracing::instrument;
 use uuid::Uuid;
 
 // ==========================================
@@ -53,6 +54,11 @@ impl RiskEngine {
     ///
     /// # 返回
     /// RiskSnapshot 风险快照
+    #[instrument(skip(self, pool, scheduled_items, all_materials, material_weights), fields(
+        version_id = %version_id,
+        machine_code = %machine_code,
+        snapshot_date = %snapshot_date
+    ))]
     pub fn generate_snapshot(
         &self,
         version_id: &str,
@@ -455,6 +461,7 @@ mod tests {
                 urgent_level: Some("L0".to_string()),
                 sched_state: Some("SCHEDULED".to_string()),
                 assign_reason: Some("Test".to_string()),
+                steel_grade: None,
             },
             PlanItem {
                 version_id: "v1".to_string(),
@@ -470,6 +477,7 @@ mod tests {
                 urgent_level: Some("L1".to_string()),
                 sched_state: Some("SCHEDULED".to_string()),
                 assign_reason: Some("Test".to_string()),
+                steel_grade: None,
             },
         ]
     }

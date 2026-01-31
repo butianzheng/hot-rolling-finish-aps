@@ -6,7 +6,7 @@ import React from 'react';
 import { Button, Space, Table, Tag, theme } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { RollCampaignAlert } from '../../../types/decision';
-import { parseAlertLevel, getHighlightStyle, type WorkbenchCallback } from './shared';
+import { getAlertLevelLabel, getAlertLevelColor, getHighlightStyle, type WorkbenchCallback } from './shared';
 
 export interface RollAlertContentProps {
   alerts: RollCampaignAlert[];
@@ -33,18 +33,7 @@ export const RollAlertContent: React.FC<RollAlertContentProps> = ({
       dataIndex: 'alertLevel',
       key: 'alertLevel',
       width: 120,
-      render: (v: string) => {
-        const status = parseAlertLevel(String(v || ''));
-        const color =
-          status === 'HARD_STOP'
-            ? '#ff4d4f'
-            : status === 'WARNING'
-              ? '#faad14'
-              : status === 'SUGGEST'
-                ? '#1677ff'
-                : '#52c41a';
-        return <Tag color={color}>{status}</Tag>;
-      },
+      render: (v: string) => <Tag color={getAlertLevelColor(v)}>{getAlertLevelLabel(v)}</Tag>,
     },
     { title: '当前吨位', dataIndex: 'currentTonnageT', key: 'currentTonnageT', width: 100 },
     { title: '硬上限', dataIndex: 'hardLimitT', key: 'hardLimitT', width: 100 },
@@ -79,8 +68,8 @@ export const RollAlertContent: React.FC<RollAlertContentProps> = ({
       {selected ? (
         <Space wrap align="center">
           <Tag color="blue">{selected.machineCode}</Tag>
-          <Tag color={parseAlertLevel(String(selected.alertLevel || '')) === 'HARD_STOP' ? '#ff4d4f' : '#8c8c8c'}>
-            {parseAlertLevel(String(selected.alertLevel || ''))}
+          <Tag color={getAlertLevelColor(selected.alertLevel || '')}>
+            {getAlertLevelLabel(selected.alertLevel || '')}
           </Tag>
           {onGoWorkbench ? (
             <Button

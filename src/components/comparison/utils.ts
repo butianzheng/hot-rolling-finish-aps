@@ -42,7 +42,33 @@ export function formatVersionLabel(version: Version): string {
   if (nameCn) return nameCn;
   const no = Number(version.version_no ?? 0);
   if (Number.isFinite(no) && no > 0) return `V${no}`;
-  return version.version_id;
+  // 降级显示：UUID前8位
+  return version.version_id.substring(0, 8);
+}
+
+/**
+ * 格式化版本标签（带完整信息：中文名称 + 版本号）
+ *
+ * @example
+ * - 有中文名称和版本号: "重排产优化 (V10)"
+ * - 只有中文名称: "测试方案A"
+ * - 只有版本号: "V12"
+ * - 都没有: "31c46b4d"（UUID前8位）
+ */
+export function formatVersionLabelWithCode(version: Version): string {
+  const nameCn = extractVersionNameCn(version);
+  const no = Number(version.version_no ?? 0);
+
+  if (nameCn && Number.isFinite(no) && no > 0) {
+    return `${nameCn} (V${no})`;
+  } else if (nameCn) {
+    return nameCn;
+  } else if (Number.isFinite(no) && no > 0) {
+    return `V${no}`;
+  } else {
+    // 降级显示：UUID前8位
+    return version.version_id.substring(0, 8);
+  }
 }
 
 /**

@@ -220,6 +220,7 @@ fn test_capacity_filler_frozen_zone_priority() {
             urgent_level: None,
             sched_state: None,
             assign_reason: None,
+            steel_grade: None,
         },
         PlanItem {
             version_id: "V001".to_string(),
@@ -235,6 +236,7 @@ fn test_capacity_filler_frozen_zone_priority() {
             urgent_level: None,
             sched_state: None,
             assign_reason: None,
+            steel_grade: None,
         },
     ];
 

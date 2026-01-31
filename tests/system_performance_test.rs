@@ -164,6 +164,7 @@ mod system_performance_test {
             plan_version_repo,
             plan_item_repo,
             material_state_repo.clone(),
+            material_master_repo.clone(),
             strategy_draft_repo,
             action_log_repo,
             risk_snapshot_repo,

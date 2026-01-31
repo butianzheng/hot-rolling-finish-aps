@@ -5,7 +5,7 @@
 import { Button, Space, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { Plan, Version } from '../comparison/types';
-import { extractVersionNameCn } from '../comparison/utils';
+import { formatVersionLabelWithCode } from '../comparison/utils';
 
 export const createPlanColumns = (
   onLoadVersions: (planId: string) => void,
@@ -59,11 +59,13 @@ export const createVersionColumns = (
     title: '版本',
     key: 'version',
     render: (_: any, record) => {
-      const nameCn = extractVersionNameCn(record);
+      const label = formatVersionLabelWithCode(record);
       return (
         <Space size={6}>
-          <Tag color={record.status === 'ACTIVE' ? 'green' : 'default'}>V{record.version_no}</Tag>
-          {nameCn ? <Typography.Text>{nameCn}</Typography.Text> : <Typography.Text type="secondary">—</Typography.Text>}
+          <Tag color={record.status === 'ACTIVE' ? 'green' : 'default'}>
+            {record.status === 'ACTIVE' ? '激活' : `V${record.version_no}`}
+          </Tag>
+          <Typography.Text strong={record.status === 'ACTIVE'}>{label}</Typography.Text>
         </Space>
       );
     },

@@ -12,6 +12,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useNavigate } from 'react-router-dom';
 import { exportCSV, exportJSON } from '../../utils/exportUtils';
 import { formatWeight } from '../../utils/formatters';
+import { getErrorMessage } from '../../utils/errorUtils';
 import type { PlanItemStatusFilter } from '../../utils/planItemStatus';
 import { PLAN_ITEM_STATUS_FILTER_META } from '../../utils/planItemStatus';
 import { tableFilterEmptyConfig } from '../CustomEmpty';
@@ -67,8 +68,8 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = (props) => {
       }));
       exportCSV(data, '排产明细');
       message.success('导出成功');
-    } catch (error: any) {
-      message.error(`导出失败: ${error.message}`);
+    } catch (error: unknown) {
+      message.error(`导出失败: ${getErrorMessage(error)}`);
     }
   };
 
@@ -76,8 +77,8 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = (props) => {
     try {
       exportJSON(state.filteredItems, '排产明细');
       message.success('导出成功');
-    } catch (error: any) {
-      message.error(`导出失败: ${error.message}`);
+    } catch (error: unknown) {
+      message.error(`导出失败: ${getErrorMessage(error)}`);
     }
   };
 

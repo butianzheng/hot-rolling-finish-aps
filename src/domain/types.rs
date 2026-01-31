@@ -167,5 +167,48 @@ impl fmt::Display for RollStatus {
     }
 }
 
+// ==========================================
+// 方案版本状态 (Plan Version Status)
+// ==========================================
+// 依据: Engine_Specs - plan_version 表
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PlanVersionStatus {
+    Draft,    // 草稿
+    Active,   // 激活
+    Archived, // 归档
+}
+
+impl fmt::Display for PlanVersionStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PlanVersionStatus::Draft => write!(f, "DRAFT"),
+            PlanVersionStatus::Active => write!(f, "ACTIVE"),
+            PlanVersionStatus::Archived => write!(f, "ARCHIVED"),
+        }
+    }
+}
+
+impl PlanVersionStatus {
+    /// 从字符串解析状态
+    pub fn from_str(s: &str) -> Self {
+        match s.to_uppercase().as_str() {
+            "DRAFT" => PlanVersionStatus::Draft,
+            "ACTIVE" => PlanVersionStatus::Active,
+            "ARCHIVED" => PlanVersionStatus::Archived,
+            _ => PlanVersionStatus::Draft, // 默认值
+        }
+    }
+
+    /// 转换为数据库存储的字符串
+    pub fn to_db_str(&self) -> &'static str {
+        match self {
+            PlanVersionStatus::Draft => "DRAFT",
+            PlanVersionStatus::Active => "ACTIVE",
+            PlanVersionStatus::Archived => "ARCHIVED",
+        }
+    }
+}
+
 // TODO(P3-TD001): 实现 FromStr trait 便于配置解析
 // TODO(P3-TD002): 实现数据库映射 (sqlx derive)

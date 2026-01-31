@@ -298,6 +298,7 @@ pub struct PlanItemBuilder {
     urgent_level: Option<String>,
     sched_state: Option<String>,
     assign_reason: Option<String>,
+    steel_grade: Option<String>,
 }
 
 impl PlanItemBuilder {
@@ -321,6 +322,7 @@ impl PlanItemBuilder {
             urgent_level: Some("L0".to_string()),
             sched_state: Some("READY".to_string()),
             assign_reason: Some("TEST".to_string()),
+            steel_grade: None,
         }
     }
 
@@ -365,6 +367,7 @@ impl PlanItemBuilder {
             urgent_level: self.urgent_level,
             sched_state: self.sched_state,
             assign_reason: self.assign_reason,
+            steel_grade: None,
         }
     }
 }

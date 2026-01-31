@@ -9,6 +9,7 @@ import { capacityApi, planApi } from '../api/tauri';
 import { useCurrentUser, useGlobalActions } from '../stores/use-global-store';
 import dayjs from 'dayjs';
 import { formatDate } from '../utils/formatters';
+import { getErrorMessage } from '../utils/errorUtils';
 import type { BackendVersionComparisonKpiResult, BackendVersionComparisonResult, PlanItemSnapshot } from '../types/comparison';
 import { VersionComparisonModal } from './comparison/VersionComparisonModal';
 import { Plan, Version, LocalCapacityDeltaRow } from './comparison/types';
@@ -66,8 +67,8 @@ const PlanManagement: React.FC = () => {
       const result = await planApi.listPlans();
       setPlans(result);
       setFilteredPlans(result);
-    } catch (error: any) {
-      message.error(`加载失败: ${error.message || error}`);
+    } catch (error: unknown) {
+      message.error(`加载失败: ${getErrorMessage(error)}`);
     } finally {
       setLoading(false);
     }
@@ -100,8 +101,8 @@ const PlanManagement: React.FC = () => {
       if (active) {
         setActiveVersion(active.version_id);
       }
-    } catch (error: any) {
-      message.error(`加载失败: ${error.message || error}`);
+    } catch (error: unknown) {
+      message.error(`加载失败: ${getErrorMessage(error)}`);
     } finally {
       setLoading(false);
     }
@@ -120,8 +121,8 @@ const PlanManagement: React.FC = () => {
       setCreatePlanVisible(false);
       setPlanName('');
       await loadPlans();
-    } catch (error: any) {
-      message.error(`创建失败: ${error.message || error}`);
+    } catch (error: unknown) {
+      message.error(`创建失败: ${getErrorMessage(error)}`);
     } finally {
       setLoading(false);
     }
@@ -142,8 +143,8 @@ const PlanManagement: React.FC = () => {
       setCreateVersionVisible(false);
       setWindowDays(30);
       await loadVersions(selectedPlanId);
-    } catch (error: any) {
-      message.error(`创建失败: ${error.message || error}`);
+    } catch (error: unknown) {
+      message.error(`创建失败: ${getErrorMessage(error)}`);
     } finally {
       setLoading(false);
     }
@@ -203,8 +204,8 @@ const PlanManagement: React.FC = () => {
             message.warning(String(res.config_restore_skipped));
           }
           await loadVersions(selectedPlanId);
-        } catch (error: any) {
-          message.error(`回滚失败: ${error?.message || error}`);
+        } catch (error: unknown) {
+          message.error(`回滚失败: ${getErrorMessage(error)}`);
           throw error;
         } finally {
           setLoading(false);
@@ -250,8 +251,8 @@ const PlanManagement: React.FC = () => {
           }
 
           await loadPlans();
-        } catch (error: any) {
-          message.error(`删除失败: ${error.message || error}`);
+        } catch (error: unknown) {
+          message.error(`删除失败: ${getErrorMessage(error)}`);
         } finally {
           setLoading(false);
         }
@@ -284,8 +285,8 @@ const PlanManagement: React.FC = () => {
           if (selectedPlanId) {
             await loadVersions(selectedPlanId);
           }
-        } catch (error: any) {
-          message.error(`删除失败: ${error.message || error}`);
+        } catch (error: unknown) {
+          message.error(`删除失败: ${getErrorMessage(error)}`);
         } finally {
           setLoading(false);
         }
@@ -302,7 +303,7 @@ const PlanManagement: React.FC = () => {
       if (selectedPlanId) {
         await loadVersions(selectedPlanId);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('重算失败:', error);
     } finally {
       setRecalculating(false);
@@ -339,7 +340,7 @@ const PlanManagement: React.FC = () => {
       setShowAllCapacityRows(false);
       setLoadLocalCompareDetail(false);
       message.success('版本对比完成');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('版本对比失败:', error);
     } finally {
       setLoading(false);

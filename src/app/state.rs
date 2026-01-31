@@ -314,6 +314,8 @@ impl AppState {
             plan_version_repo,
             plan_item_repo.clone(),
             material_state_repo.clone(),
+            material_master_repo.clone(),
+            capacity_pool_repo.clone(),
             strategy_draft_repo.clone(),
             action_log_repo.clone(),
             risk_snapshot_repo.clone(),

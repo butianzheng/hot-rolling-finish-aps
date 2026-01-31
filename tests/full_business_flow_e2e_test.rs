@@ -135,7 +135,7 @@ mod full_business_flow_e2e_test {
 
         // === API 层 ===
         let material_api = Arc::new(MaterialApi::new(
-            material_master_repo,
+            material_master_repo.clone(),
             material_state_repo.clone(),
             action_log_repo.clone(),
             eligibility_engine,
@@ -148,6 +148,7 @@ mod full_business_flow_e2e_test {
             plan_version_repo,
             plan_item_repo.clone(),
             material_state_repo.clone(),
+            material_master_repo,
             strategy_draft_repo,
             action_log_repo.clone(),
             risk_snapshot_repo,

@@ -27,6 +27,7 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import { conflictTypeLabel } from '../../utils/importFormatters';
+import { getErrorMessage } from '../../utils/errorUtils';
 import type { ImportConflict } from '../../types/import';
 import { importApi } from '../../api/tauri';
 
@@ -286,7 +287,9 @@ export const ConflictsTabContent: React.FC<ConflictsTabContentProps> = ({
               style={{ width: '100%' }}
               onChange={(v) => {
                 onStatusChange(v);
-                onLoadConflicts({ status: v, page: 1 }).catch(() => void 0);
+                onLoadConflicts({ status: v, page: 1 }).catch((e: unknown) => {
+                  console.error('加载冲突失败:', getErrorMessage(e));
+                });
               }}
               options={[
                 { value: 'OPEN', label: 'OPEN' },
@@ -301,7 +304,9 @@ export const ConflictsTabContent: React.FC<ConflictsTabContentProps> = ({
               value={conflictBatchId}
               placeholder="留空=查询所有批次"
               onChange={(e) => onBatchIdChange(e.target.value)}
-              onPressEnter={() => onLoadConflicts({ page: 1 }).catch(() => void 0)}
+              onPressEnter={() => onLoadConflicts({ page: 1 }).catch((e: unknown) => {
+                console.error('加载冲突失败:', getErrorMessage(e));
+              })}
             />
           </Col>
           <Col xs={24} md={6} style={{ display: 'flex', alignItems: 'end' }}>
@@ -364,7 +369,9 @@ export const ConflictsTabContent: React.FC<ConflictsTabContentProps> = ({
           onChange={(pagination) => {
             const current = pagination.current ?? 1;
             const pageSize = pagination.pageSize ?? 20;
-            onLoadConflicts({ page: current, pageSize }).catch(() => void 0);
+            onLoadConflicts({ page: current, pageSize }).catch((e: unknown) => {
+              console.error('加载冲突失败:', getErrorMessage(e));
+            });
           }}
           scroll={{ x: 1200, y: 520 }}
           size="middle"

@@ -16,6 +16,7 @@ use crate::engine::EligibilityCore;
 use chrono::{NaiveDate, Utc};
 use std::error::Error;
 use std::sync::Arc;
+use tracing::instrument;
 
 // ==========================================
 // EligibilityEngine - 适温准入引擎
@@ -49,6 +50,7 @@ where
     ///
     /// # 返回
     /// - (MaterialState, Vec<String>): 更新后的状态和决策原因
+    #[instrument(skip(self, material, state), fields(material_id = %state.material_id))]
     pub async fn evaluate_single(
         &self,
         material: &MaterialMaster,

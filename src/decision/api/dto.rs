@@ -177,6 +177,12 @@ pub struct BottleneckPointDto {
     /// 待排产重量 (t)
     pub pending_weight_t: f64,
 
+    /// 已排产材料数量
+    pub scheduled_material_count: u32,
+
+    /// 已排产重量 (t)
+    pub scheduled_weight_t: f64,
+
     /// 堵塞原因（按影响降序）
     pub reasons: Vec<ReasonItemDto>,
 

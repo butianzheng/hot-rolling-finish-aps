@@ -242,6 +242,7 @@ fn test_e2e_scheduling_with_frozen_zone() {
             urgent_level: Some("L1".to_string()),
             sched_state: Some("LOCKED".to_string()),
             assign_reason: Some("FROZEN_ZONE".to_string()),
+            steel_grade: None,
         },
     ];
 

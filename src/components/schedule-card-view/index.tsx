@@ -1,15 +1,14 @@
 import React, { useMemo } from 'react';
 import { Alert, Empty, Skeleton, Space, Tag } from 'antd';
-import AutoSizer from 'react-virtualized-auto-sizer';
-import { List } from 'react-window';
 import { useActiveVersionId } from '../../stores/use-global-store';
 import type { PlanItemStatusFilter } from '../../utils/planItemStatus';
 import { PLAN_ITEM_STATUS_FILTER_META, matchPlanItemStatusFilter, summarizePlanItemStatus } from '../../utils/planItemStatus';
 import { formatWeight } from '../../utils/formatters';
 import type { ScheduleCardViewProps } from './types';
-import { ROW_HEIGHT } from './types';
+import { MACHINE_HEADER_HEIGHT, DATE_ROW_HEIGHT } from './types';
 import { usePlanItems, normalizePlanItems } from './usePlanItems';
 import { useFilteredPlanItems } from './useFilteredPlanItems';
+import { useScheduleTree } from './useScheduleTree';
 import { ScheduleCardRow } from './ScheduleCardRow';
 import { CountInfo } from './CountInfo';
 
@@ -20,9 +19,6 @@ const ScheduleCardView: React.FC<ScheduleCardViewProps> = ({
   statusFilter = 'ALL',
   onStatusFilterChange,
   refreshSignal,
-  selectedMaterialIds,
-  onSelectedMaterialIdsChange,
-  onInspectMaterialId,
 }) => {
   const activeVersionId = useActiveVersionId();
   const query = usePlanItems(machineCode, refreshSignal);
@@ -40,14 +36,8 @@ const ScheduleCardView: React.FC<ScheduleCardViewProps> = ({
     return filtered.reduce((acc, it) => acc + Number(it.weight_t || 0), 0);
   }, [filtered]);
 
-  const selectedSet = useMemo(() => new Set(selectedMaterialIds), [selectedMaterialIds]);
-
-  const toggleSelection = (materialId: string, checked: boolean) => {
-    const next = new Set(selectedSet);
-    if (checked) next.add(materialId);
-    else next.delete(materialId);
-    onSelectedMaterialIdsChange(Array.from(next));
-  };
+  // 树形分解图数据（机组 → 日期条形图）
+  const { rows, toggleMachine } = useScheduleTree(filtered);
 
   if (!activeVersionId) {
     return (
@@ -80,7 +70,7 @@ const ScheduleCardView: React.FC<ScheduleCardViewProps> = ({
     return <Skeleton active paragraph={{ rows: 10 }} />;
   }
 
-  const showEmpty = filtered.length === 0;
+  const showEmpty = rows.length === 0;
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -173,7 +163,7 @@ const ScheduleCardView: React.FC<ScheduleCardViewProps> = ({
         </Space>
       </div>
 
-      <div style={{ flex: 1, minHeight: 240 }}>
+      <div style={{ flex: 1, minHeight: 240, overflow: 'auto' }}>
         {showEmpty ? (
           <div style={{ padding: 24 }}>
             <Empty
@@ -185,25 +175,16 @@ const ScheduleCardView: React.FC<ScheduleCardViewProps> = ({
             />
           </div>
         ) : (
-          <AutoSizer disableWidth defaultHeight={360} doNotBailOutOnEmptyChildren>
-            {({ height }) => (
-              <List
-                rowCount={filtered.length}
-                rowHeight={ROW_HEIGHT}
-                rowComponent={ScheduleCardRow}
-                rowProps={{
-                  items: filtered,
-                  selected: selectedSet,
-                  onToggle: toggleSelection,
-                  onInspect: onInspectMaterialId,
-                }}
-                style={{
-                  height: Number.isFinite(height) ? Math.max(height, 240) : 240,
-                  width: '100%',
-                }}
+          <div>
+            {rows.map((row) => (
+              <ScheduleCardRow
+                key={row.type === 'machine' ? `m-${row.machineCode}` : `d-${row.machineCode}-${row.date}`}
+                row={row}
+                style={{ height: row.type === 'machine' ? MACHINE_HEADER_HEIGHT : DATE_ROW_HEIGHT }}
+                onToggleMachine={toggleMachine}
               />
-            )}
-          </AutoSizer>
+            ))}
+          </div>
         )}
       </div>
     </div>

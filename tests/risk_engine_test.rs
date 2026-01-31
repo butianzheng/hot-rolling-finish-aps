@@ -55,6 +55,7 @@ fn create_test_plan_item(
         urgent_level: None,
         sched_state: None,
         assign_reason: None,
+        steel_grade: None,
     }
 }
 

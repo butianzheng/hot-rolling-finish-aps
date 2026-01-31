@@ -8,6 +8,7 @@ import type { ColumnsType } from 'antd/es/table';
 import type { BottleneckPoint } from '../../../types/decision';
 import {
   BOTTLENECK_LEVEL_COLORS,
+  BOTTLENECK_LEVEL_LABELS,
   getBottleneckTypeColor,
   getBottleneckTypeLabel,
   ReasonTable,
@@ -51,7 +52,7 @@ export const BottleneckContent: React.FC<BottleneckContentProps> = ({
       key: 'bottleneckLevel',
       width: 110,
       render: (v: BottleneckPoint['bottleneckLevel']) => (
-        <Tag color={BOTTLENECK_LEVEL_COLORS[v] || '#8c8c8c'}>{v}</Tag>
+        <Tag color={BOTTLENECK_LEVEL_COLORS[v] || '#8c8c8c'}>{BOTTLENECK_LEVEL_LABELS[v] || v}</Tag>
       ),
     },
     { title: '分数', dataIndex: 'bottleneckScore', key: 'bottleneckScore', width: 90 },
@@ -93,7 +94,7 @@ export const BottleneckContent: React.FC<BottleneckContentProps> = ({
         <>
           <Space wrap align="center">
             <Tag color={BOTTLENECK_LEVEL_COLORS[selectedPoint.bottleneckLevel] || '#8c8c8c'}>
-              {selectedPoint.bottleneckLevel} / {selectedPoint.bottleneckScore.toFixed(1)}
+              {BOTTLENECK_LEVEL_LABELS[selectedPoint.bottleneckLevel] || selectedPoint.bottleneckLevel} / {selectedPoint.bottleneckScore.toFixed(1)}
             </Tag>
             <Text strong>
               {selectedPoint.machineCode} · {selectedPoint.planDate}

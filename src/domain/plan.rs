@@ -7,6 +7,7 @@
 
 use chrono::{NaiveDate, NaiveDateTime};
 use serde::{Deserialize, Serialize};
+use crate::domain::types::PlanVersionStatus;
 
 // ==========================================
 // Plan - 排产方案
@@ -31,7 +32,7 @@ pub struct PlanVersion {
     pub version_id: String,                  // 版本ID
     pub plan_id: String,                     // 关联方案
     pub version_no: i32,                     // 版本号
-    pub status: String,                      // 状态 (DRAFT/ACTIVE/ARCHIVED)
+    pub status: PlanVersionStatus,           // 状态 (类型安全的枚举)
     pub frozen_from_date: Option<NaiveDate>, // 冻结区起始日期
     pub recalc_window_days: Option<i32>,     // 重算窗口天数
     pub config_snapshot_json: Option<String>,// 配置快照 (JSON)
@@ -43,17 +44,17 @@ pub struct PlanVersion {
 impl PlanVersion {
     /// 判断是否为草稿状态
     pub fn is_draft(&self) -> bool {
-        self.status == "DRAFT"
+        self.status == PlanVersionStatus::Draft
     }
 
     /// 判断是否为激活状态
     pub fn is_active(&self) -> bool {
-        self.status == "ACTIVE"
+        self.status == PlanVersionStatus::Active
     }
 
     /// 判断是否为归档状态
     pub fn is_archived(&self) -> bool {
-        self.status == "ARCHIVED"
+        self.status == PlanVersionStatus::Archived
     }
 }
 
@@ -80,10 +81,11 @@ pub struct PlanItem {
     pub violation_flags: Option<String>, // 违规标志 (JSON字符串, 对齐schema)
 
     // ===== 快照字段 (业务逻辑需要，但不存储在schema中) =====
-    // 注: 这些字段在Repository层保存为JSON字段或扩展字段
+    // 注: 这些字段由 API 层从 material_state / material_master 动态补充
     pub urgent_level: Option<String>,  // 紧急等级快照 (可选，用于可解释性)
     pub sched_state: Option<String>,   // 状态快照 (可选，用于可解释性)
     pub assign_reason: Option<String>, // 落位原因 (可选，用于可解释性)
+    pub steel_grade: Option<String>,   // 钢种/出钢记号 (来自 material_master.steel_mark)
 }
 
 // 辅助类型别名 (兼容旧代码)

@@ -125,7 +125,7 @@ mod api_integration_e2e_test {
 
         // APIs
         let material_api = Arc::new(MaterialApi::new(
-            material_master_repo,
+            material_master_repo.clone(),
             material_state_repo.clone(),
             action_log_repo.clone(),
             eligibility_engine,
@@ -138,6 +138,7 @@ mod api_integration_e2e_test {
             plan_version_repo,
             plan_item_repo,
             material_state_repo,
+            material_master_repo,
             strategy_draft_repo,
             action_log_repo.clone(),
             risk_snapshot_repo,

@@ -500,6 +500,7 @@ fn test_integration_frozen_zone_priority_with_risk() {
             urgent_level: Some("L2".to_string()),
             sched_state: Some("LOCKED".to_string()),
             assign_reason: Some("FROZEN_ZONE".to_string()),
+            steel_grade: None,
         },
     ];
 

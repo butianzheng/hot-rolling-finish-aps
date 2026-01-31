@@ -17,6 +17,7 @@ export type WorkbenchCallback = (opts: {
 }) => void;
 import {
   BOTTLENECK_LEVEL_COLORS,
+  BOTTLENECK_LEVEL_LABELS,
   OPPORTUNITY_TYPE_COLORS,
   OPPORTUNITY_TYPE_LABELS,
   getBottleneckTypeColor as _getBottleneckTypeColor,
@@ -28,6 +29,8 @@ import {
   getUrgencyLevelColor as _getUrgencyLevelColor,
   getUrgencyLevelLabel as _getUrgencyLevelLabel,
   parseAlertLevel as _parseAlertLevel,
+  getAlertLevelLabel as _getAlertLevelLabel,
+  getAlertLevelColor as _getAlertLevelColor,
 } from '../../../types/decision';
 
 const { Text } = Typography;
@@ -42,7 +45,9 @@ export const getRiskLevelLabel = _getRiskLevelLabel;
 export const getBottleneckTypeColor = _getBottleneckTypeColor;
 export const getBottleneckTypeLabel = _getBottleneckTypeLabel;
 export const parseAlertLevel = _parseAlertLevel;
-export { BOTTLENECK_LEVEL_COLORS, OPPORTUNITY_TYPE_COLORS, OPPORTUNITY_TYPE_LABELS };
+export const getAlertLevelLabel = _getAlertLevelLabel;
+export const getAlertLevelColor = _getAlertLevelColor;
+export { BOTTLENECK_LEVEL_COLORS, BOTTLENECK_LEVEL_LABELS, OPPORTUNITY_TYPE_COLORS, OPPORTUNITY_TYPE_LABELS };
 
 // Simple Tag component
 export const TagWithColor: React.FC<{ color: string; children: React.ReactNode }> = ({ color, children }) => (

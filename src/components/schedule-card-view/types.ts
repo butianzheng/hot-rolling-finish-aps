@@ -31,3 +31,19 @@ export interface ScheduleCardViewProps {
 }
 
 export const ROW_HEIGHT = 92;
+
+// 树形分解图行高常量
+export const MACHINE_HEADER_HEIGHT = 48;
+export const DATE_ROW_HEIGHT = 52;
+
+// 日期行状态统计
+export interface DateStatusSummary {
+  lockedCount: number;
+  forceReleaseCount: number;
+  adjustableCount: number;
+}
+
+// 树形分解图行类型（机组 → 日期条形图，无物料明细）
+export type ScheduleTreeRow =
+  | { type: 'machine'; machineCode: string; count: number; weightT: number; collapsed: boolean }
+  | { type: 'date'; machineCode: string; date: string; count: number; weightT: number; status: DateStatusSummary };

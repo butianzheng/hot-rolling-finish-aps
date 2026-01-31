@@ -15,11 +15,14 @@ use serde_json::Value;
 use crate::api::error::{ApiError, ApiResult};
 use crate::config::ConfigManager;
 use crate::domain::plan::{Plan, PlanVersion, PlanItem};
+use crate::domain::types::PlanVersionStatus;
 use crate::domain::action_log::ActionLog;
+use crate::domain::capacity::CapacityPool;
 use crate::repository::plan_repo::{PlanItemRepository, PlanItemVersionAgg, PlanRepository, PlanVersionRepository};
 use crate::repository::action_log_repo::ActionLogRepository;
-use crate::repository::material_repo::{MaterialStateRepository, MaterialStateSnapshotLite};
+use crate::repository::material_repo::{MaterialMasterRepository, MaterialStateRepository, MaterialStateSnapshotLite};
 use crate::repository::risk_repo::RiskSnapshotRepository;
+use crate::repository::capacity_repo::CapacityPoolRepository;
 use crate::repository::{StrategyDraftEntity, StrategyDraftRepository, StrategyDraftStatus};
 use crate::engine::recalc::{RecalcEngine, ResolvedStrategyProfile};
 use crate::engine::risk::RiskEngine;
@@ -43,6 +46,8 @@ pub struct PlanApi {
     plan_version_repo: Arc<PlanVersionRepository>,
     plan_item_repo: Arc<PlanItemRepository>,
     material_state_repo: Arc<MaterialStateRepository>,
+    material_master_repo: Arc<MaterialMasterRepository>,
+    capacity_repo: Arc<CapacityPoolRepository>,
     strategy_draft_repo: Arc<StrategyDraftRepository>,
     action_log_repo: Arc<ActionLogRepository>,
     risk_snapshot_repo: Arc<RiskSnapshotRepository>,
@@ -60,6 +65,8 @@ impl PlanApi {
         plan_version_repo: Arc<PlanVersionRepository>,
         plan_item_repo: Arc<PlanItemRepository>,
         material_state_repo: Arc<MaterialStateRepository>,
+        material_master_repo: Arc<MaterialMasterRepository>,
+        capacity_repo: Arc<CapacityPoolRepository>,
         strategy_draft_repo: Arc<StrategyDraftRepository>,
         action_log_repo: Arc<ActionLogRepository>,
         risk_snapshot_repo: Arc<RiskSnapshotRepository>,
@@ -78,6 +85,8 @@ impl PlanApi {
             plan_version_repo,
             plan_item_repo,
             material_state_repo,
+            material_master_repo,
+            capacity_repo,
             strategy_draft_repo,
             action_log_repo,
             risk_snapshot_repo,
@@ -321,7 +330,7 @@ impl PlanApi {
             version_id: uuid::Uuid::new_v4().to_string(),
             plan_id: plan_id.clone(),
             version_no: 0,
-            status: "DRAFT".to_string(),
+            status: PlanVersionStatus::Draft,
             frozen_from_date,
             recalc_window_days: Some(window_days),
             config_snapshot_json,
@@ -419,18 +428,43 @@ impl PlanApi {
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?
             .ok_or_else(|| ApiError::NotFound(format!("版本{}不存在", version_id)))?;
 
-        if version.status == "ACTIVE" {
+        if version.status == PlanVersionStatus::Active {
             return Err(ApiError::BusinessRuleViolation(
                 "不能删除激活版本，请先激活其他版本或将其归档".to_string(),
             ));
         }
 
         // 显式删除关联数据（避免依赖 SQLite foreign_keys 配置）
+        // 0. 删除策略草稿（strategy_draft 表有外键引用）
+        let deleted_drafts = self
+            .strategy_draft_repo
+            .delete_by_version(version_id)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        // 1. 在删除 plan_item 之前，查询受影响的产能池
+        let affected_capacity_keys = self
+            .get_affected_capacity_keys_for_version(version_id)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        // 2. 删除 plan_item
         let deleted_items = self
             .plan_item_repo
             .delete_by_version(version_id)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
+        // 3. 同步重置受影响的产能池
+        if !affected_capacity_keys.is_empty() {
+            tracing::info!(
+                "版本删除后开始重置产能池: version_id={}, 涉及 {} 个(机组,日期)组合",
+                version_id,
+                affected_capacity_keys.len()
+            );
+            if let Err(e) = self.reset_capacity_pools(&affected_capacity_keys) {
+                tracing::warn!("产能池重置失败: {}, 继续执行", e);
+            }
+        }
+
+        // 4. 删除风险快照
         let deleted_risks = self
             .risk_snapshot_repo
             .delete_by_version(version_id)
@@ -517,6 +551,13 @@ impl PlanApi {
             .insert(&action_log)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
+        // 同步刷新产能池以匹配该版本的 plan_item
+        tracing::info!("版本激活后开始同步刷新产能池: version_id={}", version_id);
+        if let Err(e) = self.recalculate_capacity_pool_for_version(version_id) {
+            tracing::warn!("产能池同步刷新失败: {}, 继续执行", e);
+            // 不阻断流程，仅记录警告
+        }
+
         // 触发决策视图全量刷新
         let event = ScheduleEvent::full_scope(
             version_id.to_string(),
@@ -532,6 +573,128 @@ impl PlanApi {
             }
             Err(e) => {
                 tracing::warn!("版本激活后决策视图刷新事件发布失败: {}", e);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// 根据版本的 plan_item 重新计算产能池
+    ///
+    /// # 说明
+    /// 当版本切换时，需要同步刷新产能池数据，确保：
+    /// - used_capacity_t = 该版本 plan_item 的实际 weight_t 总和
+    /// - overflow_t = max(0, used_capacity_t - limit_capacity_t)
+    ///
+    /// # 参数
+    /// - version_id: 版本ID
+    ///
+    /// # 返回
+    /// - Ok(()): 成功
+    /// - Err(ApiError): API错误
+    fn recalculate_capacity_pool_for_version(&self, version_id: &str) -> ApiResult<()> {
+        // 1. 查询该版本的所有 plan_item
+        let items = self.plan_item_repo.find_by_version(version_id)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        // 2. 按 (machine_code, plan_date) 聚合计算 used_capacity_t
+        let mut capacity_updates: HashMap<(String, String), f64> = HashMap::new();
+        for item in items {
+            let key = (item.machine_code.clone(), item.plan_date.to_string());
+            *capacity_updates.entry(key).or_insert(0.0) += item.weight_t;
+        }
+
+        tracing::info!("产能池同步：version_id={}, 涉及 {} 个(机组,日期)组合",
+            version_id, capacity_updates.len());
+
+        // 3. 查询现有产能池，更新 used_capacity_t 和 overflow_t
+        for ((machine_code, plan_date_str), used_weight) in capacity_updates {
+            let plan_date = NaiveDate::parse_from_str(&plan_date_str, "%Y-%m-%d")
+                .map_err(|_| ApiError::InvalidInput(format!("日期格式错误: {}", plan_date_str)))?;
+
+            // 查询现有产能池
+            let mut capacity_pool = self.capacity_repo
+                .find_by_machine_and_date(&machine_code, plan_date)
+                .map_err(|e| ApiError::DatabaseError(e.to_string()))?
+                .unwrap_or_else(|| {
+                    // 如果不存在，创建默认产能池
+                    tracing::debug!("产能池不存在，创建默认值: machine={}, date={}",
+                        machine_code, plan_date);
+                    CapacityPool {
+                        machine_code: machine_code.clone(),
+                        plan_date,
+                        target_capacity_t: 0.0,
+                        limit_capacity_t: 0.0,
+                        used_capacity_t: 0.0,
+                        overflow_t: 0.0,
+                        frozen_capacity_t: 0.0,
+                        accumulated_tonnage_t: 0.0,
+                        roll_campaign_id: None,
+                    }
+                });
+
+            // 更新 used_capacity_t
+            capacity_pool.used_capacity_t = used_weight;
+
+            // 重新计算 overflow_t
+            capacity_pool.overflow_t = if used_weight > capacity_pool.limit_capacity_t {
+                used_weight - capacity_pool.limit_capacity_t
+            } else {
+                0.0
+            };
+
+            // 持久化
+            self.capacity_repo.upsert_single(&capacity_pool)
+                .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+        }
+
+        Ok(())
+    }
+
+    /// 查询版本中所有 plan_item 的 (machine_code, plan_date) 组合
+    ///
+    /// # 说明
+    /// 用于在删除 plan_item 之前，获取受影响的产能池位置，以便后续重置
+    fn get_affected_capacity_keys_for_version(
+        &self,
+        version_id: &str,
+    ) -> ApiResult<Vec<(String, NaiveDate)>> {
+        let items = self
+            .plan_item_repo
+            .find_by_version(version_id)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        let mut keys = std::collections::HashSet::new();
+        for item in items {
+            keys.insert((item.machine_code, item.plan_date));
+        }
+
+        Ok(keys.into_iter().collect())
+    }
+
+    /// 重置产能池（将 used_capacity_t 和 overflow_t 清零）
+    ///
+    /// # 说明
+    /// 当删除 plan_item 后，需要同步重置产能池数据，确保数据一致性
+    ///
+    /// # 参数
+    /// - keys: (machine_code, plan_date) 列表
+    fn reset_capacity_pools(&self, keys: &[(String, NaiveDate)]) -> ApiResult<()> {
+        for (machine_code, plan_date) in keys {
+            // 查询产能池（如果不存在则跳过）
+            if let Some(mut capacity_pool) = self
+                .capacity_repo
+                .find_by_machine_and_date(machine_code, *plan_date)
+                .map_err(|e| ApiError::DatabaseError(e.to_string()))?
+            {
+                // 重置 used_capacity_t 和 overflow_t
+                capacity_pool.used_capacity_t = 0.0;
+                capacity_pool.overflow_t = 0.0;
+
+                // 持久化
+                self.capacity_repo
+                    .upsert_single(&capacity_pool)
+                    .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
             }
         }
 
@@ -1785,9 +1948,12 @@ impl PlanApi {
             return Err(ApiError::InvalidInput("版本ID不能为空".to_string()));
         }
 
-        self.plan_item_repo
+        let mut items = self.plan_item_repo
             .find_by_version(version_id)
-            .map_err(|e| ApiError::DatabaseError(e.to_string()))
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        self.enrich_plan_items(&mut items);
+        Ok(items)
     }
 
     /// 查询排产明细（可选过滤 + 分页）
@@ -1830,6 +1996,10 @@ impl PlanApi {
                 limit,
                 offset,
             )
+            .map(|mut items| {
+                self.enrich_plan_items(&mut items);
+                items
+            })
             .map_err(|e| ApiError::DatabaseError(e.to_string()))
     }
 
@@ -1853,7 +2023,52 @@ impl PlanApi {
 
         self.plan_item_repo
             .find_by_date(version_id, plan_date)
+            .map(|mut items| {
+                self.enrich_plan_items(&mut items);
+                items
+            })
             .map_err(|e| ApiError::DatabaseError(e.to_string()))
+    }
+
+    /// 从 material_state 和 material_master 批量补充排产明细的快照字段
+    ///
+    /// 补充字段：urgent_level, sched_state (来自 material_state)，steel_grade (来自 material_master.steel_mark)
+    fn enrich_plan_items(&self, items: &mut [PlanItem]) {
+        if items.is_empty() {
+            return;
+        }
+
+        let material_ids: Vec<String> = items.iter().map(|it| it.material_id.clone()).collect();
+
+        // 1. 从 material_state 获取 urgent_level, sched_state
+        if let Ok(snapshots) = self.material_state_repo.find_snapshots_by_material_ids(&material_ids) {
+            let state_map: HashMap<String, MaterialStateSnapshotLite> = snapshots
+                .into_iter()
+                .map(|s| (s.material_id.clone(), s))
+                .collect();
+
+            for item in items.iter_mut() {
+                if let Some(snap) = state_map.get(&item.material_id) {
+                    if item.urgent_level.is_none() {
+                        item.urgent_level = snap.urgent_level.clone();
+                    }
+                    if item.sched_state.is_none() {
+                        item.sched_state = snap.sched_state.clone();
+                    }
+                }
+            }
+        }
+
+        // 2. 从 material_master 获取 steel_mark → steel_grade
+        if let Ok(steel_map) = self.material_master_repo.find_steel_marks_by_ids(&material_ids) {
+            for item in items.iter_mut() {
+                if item.steel_grade.is_none() {
+                    if let Some(mark) = steel_map.get(&item.material_id) {
+                        item.steel_grade = Some(mark.clone());
+                    }
+                }
+            }
+        }
     }
 
     // ==========================================
@@ -2318,6 +2533,7 @@ impl PlanApi {
                 urgent_level: original_item.urgent_level.clone(),
                 sched_state: original_item.sched_state.clone(),
                 assign_reason: Some("MANUAL_MOVE".to_string()),
+                steel_grade: original_item.steel_grade.clone(),
             };
 
             items_to_update.push(updated_item);

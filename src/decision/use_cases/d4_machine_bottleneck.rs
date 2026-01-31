@@ -79,6 +79,15 @@ pub struct MachineBottleneckProfile {
     /// 待排材料数量
     pub pending_materials: i32,
 
+    /// 待排材料重量 (吨)
+    pub pending_weight_t: f64,
+
+    /// 已排材料数量
+    pub scheduled_materials: i32,
+
+    /// 已排材料重量 (吨)
+    pub scheduled_weight_t: f64,
+
     /// 建议措施
     pub suggested_actions: Vec<String>,
 }
@@ -168,6 +177,9 @@ impl MachineBottleneckProfile {
             needs_roll_change: false,
             structure_violations: 0,
             pending_materials: 0,
+            pending_weight_t: 0.0,
+            scheduled_materials: 0,
+            scheduled_weight_t: 0.0,
             suggested_actions: Vec::new(),
         }
     }

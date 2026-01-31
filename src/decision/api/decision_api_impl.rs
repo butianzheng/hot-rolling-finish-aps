@@ -540,7 +540,9 @@ fn convert_bottleneck_profile_to_dto(
             .collect(),
         capacity_util_pct: profile.capacity_utilization * 100.0, // 转换为百分比
         pending_material_count: profile.pending_materials as u32,
-        pending_weight_t: 0.0, // TODO: 从用例层获取
+        pending_weight_t: profile.pending_weight_t, // 从 material_state 查询的真实待排材料重量
+        scheduled_material_count: profile.scheduled_materials as u32,
+        scheduled_weight_t: profile.scheduled_weight_t,
         reasons: profile
             .reasons
             .iter()
@@ -902,6 +904,33 @@ mod tests {
                     force_release_in_plan INTEGER NOT NULL DEFAULT 0,
                     violation_flags TEXT,
                     PRIMARY KEY (version_id, material_id)
+                )
+                "#,
+                [],
+            )
+            .unwrap();
+
+            c.execute(
+                r#"
+                CREATE TABLE IF NOT EXISTS material_master (
+                    material_id TEXT PRIMARY KEY,
+                    current_machine_code TEXT,
+                    next_machine_code TEXT,
+                    weight_t REAL,
+                    created_at TEXT NOT NULL DEFAULT '2026-01-01T00:00:00Z',
+                    updated_at TEXT NOT NULL DEFAULT '2026-01-01T00:00:00Z'
+                )
+                "#,
+                [],
+            )
+            .unwrap();
+
+            c.execute(
+                r#"
+                CREATE TABLE IF NOT EXISTS material_state (
+                    material_id TEXT PRIMARY KEY,
+                    sched_state TEXT NOT NULL DEFAULT 'READY',
+                    updated_at TEXT NOT NULL DEFAULT '2026-01-01T00:00:00Z'
                 )
                 "#,
                 [],

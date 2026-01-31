@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCurrentUser, useGlobalActions } from '../stores/use-global-store';
 import { useImportWorkflow } from '../hooks/useImportWorkflow';
 import { safeReadImportHistory, safeWriteImportHistory } from '../utils/importHistoryStorage';
+import { getErrorMessage } from '../utils/errorUtils';
 import { importApi } from '../api/tauri';
 import { ImportTabContent } from './material-import/ImportTabContent';
 import { ConflictsTabContent } from './material-import/ConflictsTabContent';
@@ -118,7 +119,9 @@ const MaterialImport: React.FC = () => {
           const key = k as 'import' | 'conflicts' | 'history';
           workflow.setActiveTab(key);
           if (key === 'conflicts') {
-            workflow.loadConflicts({ page: 1 }).catch(() => void 0);
+            workflow.loadConflicts({ page: 1 }).catch((e: unknown) => {
+              console.error('加载冲突失败:', getErrorMessage(e));
+            });
           }
         }}
         items={[
