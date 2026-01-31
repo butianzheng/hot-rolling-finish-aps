@@ -17,4 +17,5 @@ export interface CapacityTimelineData {
   segments: CapacitySegment[]; // 按紧急度分段
   rollCampaignProgress: number; // 轧辊吨位进度
   rollChangeThreshold: number; // 轧辊更换阈值 (1500 或 2500)
+  materialIds?: string[]; // 该日期包含的所有物料ID（用于高亮）
 }

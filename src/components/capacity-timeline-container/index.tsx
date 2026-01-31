@@ -4,21 +4,36 @@
  * 重构后：253 行 → ~55 行 (-78%)
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Alert, Empty, Space, Spin } from 'antd';
 import { CapacityTimeline } from '../CapacityTimeline';
 import type { CapacityTimelineContainerProps } from './types';
 import { useCapacityTimelineContainer } from './useCapacityTimelineContainer';
 import { ToolBar } from './ToolBar';
 
-export const CapacityTimelineContainer: React.FC<CapacityTimelineContainerProps> = ({ machineCode }) => {
+export const CapacityTimelineContainer: React.FC<CapacityTimelineContainerProps> = ({
+  machineCode,
+  dateRange: externalDateRange,
+  selectedMaterialIds = [],
+  focusedMaterialId,
+}) => {
   const state = useCapacityTimelineContainer(machineCode);
+
+  // 当外部日期范围变化时，同步到内部状态
+  useEffect(() => {
+    if (externalDateRange) {
+      state.setDateRange(externalDateRange);
+    }
+  }, [externalDateRange, state.setDateRange]);
+
+  // 使用外部传入的日期范围（优先级更高）或内部状态
+  const effectiveDateRange = externalDateRange || state.dateRange;
 
   return (
     <div>
       {/* 工具栏 */}
       <ToolBar
-        dateRange={state.dateRange}
+        dateRange={effectiveDateRange}
         onDateRangeChange={state.setDateRange}
         selectedMachine={state.selectedMachine}
         onMachineChange={state.setSelectedMachine}
@@ -44,7 +59,12 @@ export const CapacityTimelineContainer: React.FC<CapacityTimelineContainerProps>
         <Spin spinning={state.loading}>
           <Space direction="vertical" style={{ width: '100%' }} size={0}>
             {state.timelineData.map((data, index) => (
-              <CapacityTimeline key={`${data.machineCode}__${data.date}__${index}`} data={data} />
+              <CapacityTimeline
+                key={`${data.machineCode}__${data.date}__${index}`}
+                data={data}
+                selectedMaterialIds={selectedMaterialIds}
+                focusedMaterialId={focusedMaterialId}
+              />
             ))}
           </Space>
         </Spin>

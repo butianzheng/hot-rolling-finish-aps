@@ -204,6 +204,36 @@ const PlanningWorkbench: React.FC = () => {
     planItemsQuery.refetch();
   }, [activeVersionId, refreshSignal, planItemsQuery.refetch]);
 
+  // 计算全局日期范围（基于当前机组的排程数据）
+  const globalDateRange = useMemo<[dayjs.Dayjs, dayjs.Dayjs]>(() => {
+    const filteredItems = (planItemsQuery.data || []).filter(
+      (item: any) => !poolSelection.machineCode ||
+                    poolSelection.machineCode === 'all' ||
+                    item.machine_code === poolSelection.machineCode
+    );
+
+    if (filteredItems.length === 0) {
+      // 默认日期范围：今天前 3 天到后 10 天
+      return [dayjs().subtract(3, 'day'), dayjs().add(10, 'day')];
+    }
+
+    // 提取所有排程日期
+    const dates = filteredItems
+      .map((item: any) => dayjs(item.plan_date))
+      .filter((d: dayjs.Dayjs) => d.isValid());
+
+    if (dates.length === 0) {
+      return [dayjs().subtract(3, 'day'), dayjs().add(10, 'day')];
+    }
+
+    // 找到最早和最晚的日期
+    const sortedDates = dates.sort((a: dayjs.Dayjs, b: dayjs.Dayjs) => a.valueOf() - b.valueOf());
+    const minDate = sortedDates[0].subtract(1, 'day'); // 前面留 1 天余量
+    const maxDate = sortedDates[sortedDates.length - 1].add(3, 'day'); // 后面留 3 天余量
+
+    return [minDate, maxDate];
+  }, [planItemsQuery.data, poolSelection.machineCode]);
+
   const openInspector = (materialId: string) => {
     setInspectedMaterialId(materialId);
     setInspectorOpen(true);
@@ -1047,7 +1077,11 @@ const PlanningWorkbench: React.FC = () => {
           >
             <Card size="small" title="产能概览" bodyStyle={{ padding: 12 }}>
               <div style={{ maxHeight: 260, overflow: 'auto' }}>
-                <CapacityTimelineContainer machineCode={poolSelection.machineCode} />
+                <CapacityTimelineContainer
+                  machineCode={poolSelection.machineCode}
+                  dateRange={globalDateRange}
+                  selectedMaterialIds={selectedMaterialIds}
+                />
               </div>
             </Card>
 

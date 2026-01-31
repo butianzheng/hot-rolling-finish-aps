@@ -100,6 +100,8 @@ export function useCapacityTimelineContainer(
 
       // (machine_code, plan_date) -> urgency buckets
       const bucketMap = new Map<string, UrgencyBucketMap>();
+      // (machine_code, plan_date) -> material IDs
+      const materialIdsMap = new Map<string, string[]>();
 
       const inRange = (d: string) => {
         const day = dayjs(d);
@@ -126,11 +128,18 @@ export function useCapacityTimelineContainer(
             L2: { tonnage: 0, count: 0 },
             L3: { tonnage: 0, count: 0 },
           });
+          materialIdsMap.set(key, []);
         }
 
         const bucket = bucketMap.get(key)!;
         bucket[level].tonnage += weight;
         bucket[level].count += 1;
+
+        // 收集物料ID
+        const materialId = String(it?.material_id ?? '').trim();
+        if (materialId) {
+          materialIdsMap.get(key)!.push(materialId);
+        }
       });
 
       const normalized = pools
@@ -185,6 +194,7 @@ export function useCapacityTimelineContainer(
             })),
             rollCampaignProgress: Number.isFinite(accumulated) ? accumulated : 0,
             rollChangeThreshold: 2500,
+            materialIds: materialIdsMap.get(key) || [],
           } satisfies CapacityTimelineData;
         })
         .sort((a, b) => {

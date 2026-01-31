@@ -7,6 +7,8 @@ import { URGENCY_COLORS } from '../../theme';
 export interface CapacityTimelineProps {
   data: import('../../types/capacity').CapacityTimelineData;
   height?: number;
+  selectedMaterialIds?: string[]; // 选中的物料ID列表
+  focusedMaterialId?: string | null; // 聚焦的物料ID
 }
 
 export type RollStatus = 'critical' | 'warning' | 'healthy';

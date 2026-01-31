@@ -15,7 +15,12 @@ import { Legend } from './Legend';
 
 const { Text, Title } = Typography;
 
-const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({ data, height = 120 }) => {
+const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
+  data,
+  height = 120,
+  selectedMaterialIds = [],
+  focusedMaterialId,
+}) => {
   const {
     utilizationPercent,
     isOverLimit,
@@ -23,12 +28,28 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({ data, heig
     segments,
   } = useCapacityTimeline(data);
 
+  // 检查该日期是否包含选中的物料
+  const materialIds = data.materialIds || [];
+  const hasSelectedMaterial = selectedMaterialIds.some(id => materialIds.includes(id));
+  const hasFocusedMaterial = focusedMaterialId && materialIds.includes(focusedMaterialId);
+
   return (
     <Card
       size="small"
       style={{
         marginBottom: 16,
         borderRadius: 8,
+        // 选中状态：添加蓝色边框
+        border: hasSelectedMaterial ? '2px solid #1890ff' : undefined,
+        // 聚焦状态：添加阴影
+        boxShadow: hasFocusedMaterial
+          ? '0 0 8px rgba(24, 144, 255, 0.6)'
+          : hasSelectedMaterial
+          ? '0 0 4px rgba(24, 144, 255, 0.3)'
+          : undefined,
+        // 选中状态：添加背景色
+        backgroundColor: hasSelectedMaterial ? 'rgba(24, 144, 255, 0.05)' : undefined,
+        transition: 'all 0.2s ease',
       }}
     >
       <Space direction="vertical" style={{ width: '100%' }} size={12}>
