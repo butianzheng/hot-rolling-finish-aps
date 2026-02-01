@@ -49,9 +49,10 @@ impl CapacityPoolRepository {
             .map_err(|e| RepositoryError::LockError(e.to_string()))
     }
 
-    /// 按机组代码和计划日期查询单个产能池
+    /// 按版本、机组代码和计划日期查询单个产能池
     ///
     /// # 参数
+    /// - version_id: 版本ID (P1-1: 版本化改造)
     /// - machine_code: 机组代码
     /// - plan_date: 计划日期
     ///
@@ -61,6 +62,7 @@ impl CapacityPoolRepository {
     /// - Err: 数据库错误
     pub fn find_by_machine_and_date(
         &self,
+        version_id: &str,
         machine_code: &str,
         plan_date: NaiveDate,
     ) -> RepositoryResult<Option<CapacityPool>> {
@@ -70,27 +72,28 @@ impl CapacityPoolRepository {
         let mut stmt = conn.prepare(
             r#"
             SELECT
-                machine_code, plan_date, target_capacity_t, limit_capacity_t,
+                version_id, machine_code, plan_date, target_capacity_t, limit_capacity_t,
                 used_capacity_t, overflow_t, frozen_capacity_t,
                 accumulated_tonnage_t, roll_campaign_id
             FROM capacity_pool
-            WHERE machine_code = ?1 AND plan_date = ?2
+            WHERE version_id = ?1 AND machine_code = ?2 AND plan_date = ?3
             "#,
         )?;
 
         let pool = stmt
-            .query_row(params![machine_code, plan_date_str], |row| {
+            .query_row(params![version_id, machine_code, plan_date_str], |row| {
                 Ok(CapacityPool {
-                    machine_code: row.get(0)?,
-                    plan_date: NaiveDate::parse_from_str(&row.get::<_, String>(1)?, "%Y-%m-%d")
+                    version_id: row.get(0)?,
+                    machine_code: row.get(1)?,
+                    plan_date: NaiveDate::parse_from_str(&row.get::<_, String>(2)?, "%Y-%m-%d")
                         .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
-                    target_capacity_t: row.get(2)?,
-                    limit_capacity_t: row.get(3)?,
-                    used_capacity_t: row.get(4)?,
-                    overflow_t: row.get(5)?,
-                    frozen_capacity_t: row.get(6)?,
-                    accumulated_tonnage_t: row.get(7)?,
-                    roll_campaign_id: row.get(8)?,
+                    target_capacity_t: row.get(3)?,
+                    limit_capacity_t: row.get(4)?,
+                    used_capacity_t: row.get(5)?,
+                    overflow_t: row.get(6)?,
+                    frozen_capacity_t: row.get(7)?,
+                    accumulated_tonnage_t: row.get(8)?,
+                    roll_campaign_id: row.get(9)?,
                 })
             })
             .optional()?;
@@ -98,9 +101,10 @@ impl CapacityPoolRepository {
         Ok(pool)
     }
 
-    /// 按机组代码和日期范围查询产能池列表
+    /// 按版本、机组代码和日期范围查询产能池列表
     ///
     /// # 参数
+    /// - version_id: 版本ID (P1-1: 版本化改造)
     /// - machine_code: 机组代码
     /// - start_date: 起始日期
     /// - end_date: 结束日期
@@ -110,6 +114,7 @@ impl CapacityPoolRepository {
     /// - Err: 数据库错误
     pub fn find_by_date_range(
         &self,
+        version_id: &str,
         machine_code: &str,
         start_date: NaiveDate,
         end_date: NaiveDate,
@@ -121,34 +126,36 @@ impl CapacityPoolRepository {
         let mut stmt = conn.prepare(
             r#"
             SELECT
-                machine_code, plan_date, target_capacity_t, limit_capacity_t,
+                version_id, machine_code, plan_date, target_capacity_t, limit_capacity_t,
                 used_capacity_t, overflow_t, frozen_capacity_t,
                 accumulated_tonnage_t, roll_campaign_id
             FROM capacity_pool
-            WHERE machine_code = ?1
-              AND plan_date BETWEEN ?2 AND ?3
+            WHERE version_id = ?1
+              AND machine_code = ?2
+              AND plan_date BETWEEN ?3 AND ?4
             ORDER BY plan_date
             "#,
         )?;
 
         let pools = stmt
             .query_map(
-                params![machine_code, start_date_str, end_date_str],
+                params![version_id, machine_code, start_date_str, end_date_str],
                 |row| {
                     Ok(CapacityPool {
-                        machine_code: row.get(0)?,
+                        version_id: row.get(0)?,
+                        machine_code: row.get(1)?,
                         plan_date: NaiveDate::parse_from_str(
-                            &row.get::<_, String>(1)?,
+                            &row.get::<_, String>(2)?,
                             "%Y-%m-%d",
                         )
                         .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
-                        target_capacity_t: row.get(2)?,
-                        limit_capacity_t: row.get(3)?,
-                        used_capacity_t: row.get(4)?,
-                        overflow_t: row.get(5)?,
-                        frozen_capacity_t: row.get(6)?,
-                        accumulated_tonnage_t: row.get(7)?,
-                        roll_campaign_id: row.get(8)?,
+                        target_capacity_t: row.get(3)?,
+                        limit_capacity_t: row.get(4)?,
+                        used_capacity_t: row.get(5)?,
+                        overflow_t: row.get(6)?,
+                        frozen_capacity_t: row.get(7)?,
+                        accumulated_tonnage_t: row.get(8)?,
+                        roll_campaign_id: row.get(9)?,
                     })
                 },
             )?
@@ -160,7 +167,7 @@ impl CapacityPoolRepository {
     /// 插入或更新单个产能池
     ///
     /// # 参数
-    /// - pool: 产能池数据
+    /// - pool: 产能池数据 (包含 version_id)
     ///
     /// # 返回
     /// - Ok(()): 操作成功
@@ -172,12 +179,13 @@ impl CapacityPoolRepository {
         conn.execute(
             r#"
             INSERT OR REPLACE INTO capacity_pool (
-                machine_code, plan_date, target_capacity_t, limit_capacity_t,
+                version_id, machine_code, plan_date, target_capacity_t, limit_capacity_t,
                 used_capacity_t, overflow_t, frozen_capacity_t,
                 accumulated_tonnage_t, roll_campaign_id
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
             "#,
             params![
+                pool.version_id,
                 pool.machine_code,
                 plan_date_str,
                 pool.target_capacity_t,
@@ -196,7 +204,7 @@ impl CapacityPoolRepository {
     /// 批量插入或更新产能池
     ///
     /// # 参数
-    /// - pools: 产能池列表
+    /// - pools: 产能池列表 (每个元素包含 version_id)
     ///
     /// # 返回
     /// - Ok(usize): 成功更新的记录数
@@ -215,12 +223,13 @@ impl CapacityPoolRepository {
             let affected = conn.execute(
                 r#"
                 INSERT OR REPLACE INTO capacity_pool (
-                    machine_code, plan_date, target_capacity_t, limit_capacity_t,
+                    version_id, machine_code, plan_date, target_capacity_t, limit_capacity_t,
                     used_capacity_t, overflow_t, frozen_capacity_t,
                     accumulated_tonnage_t, roll_campaign_id
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
                 "#,
                 params![
+                    pool.version_id,
                     pool.machine_code,
                     plan_date_str,
                     pool.target_capacity_t,
@@ -242,9 +251,52 @@ impl CapacityPoolRepository {
         Ok(updated_count)
     }
 
-    /// 查询超限产能池列表（overflow_t > 0）
+    /// 重置指定版本日期范围内所有 capacity_pool 的 used_capacity_t 和 overflow_t
+    ///
+    /// 用于版本激活时先清零，再根据新版本的 plan_item 重新聚合
     ///
     /// # 参数
+    /// - version_id: 版本ID (P1-1: 版本化改造)
+    /// - start_date: 开始日期
+    /// - end_date: 结束日期
+    ///
+    /// # 返回
+    /// - Ok(usize): 受影响的行数
+    /// - Err: 数据库错误
+    pub fn reset_used_in_date_range(
+        &self,
+        version_id: &str,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> RepositoryResult<usize> {
+        let conn = self.get_conn()?;
+        let start_date_str = start_date.format("%Y-%m-%d").to_string();
+        let end_date_str = end_date.format("%Y-%m-%d").to_string();
+
+        let rows = conn.execute(
+            r#"
+            UPDATE capacity_pool
+            SET used_capacity_t = 0.0, overflow_t = 0.0
+            WHERE version_id = ?1 AND plan_date BETWEEN ?2 AND ?3
+            "#,
+            params![version_id, start_date_str, end_date_str],
+        )?;
+
+        tracing::debug!(
+            "已清零产能池 used_capacity_t: version_id={}, date_range=[{}, {}], rows={}",
+            version_id,
+            start_date,
+            end_date,
+            rows
+        );
+
+        Ok(rows)
+    }
+
+    /// 查询指定版本超限产能池列表（overflow_t > 0）
+    ///
+    /// # 参数
+    /// - version_id: 版本ID (P1-1: 版本化改造)
     /// - date_range: 日期范围 (start_date, end_date)
     ///
     /// # 返回
@@ -252,6 +304,7 @@ impl CapacityPoolRepository {
     /// - Err: 数据库错误
     pub fn find_overflow_pools(
         &self,
+        version_id: &str,
         date_range: (NaiveDate, NaiveDate),
     ) -> RepositoryResult<Vec<CapacityPool>> {
         let conn = self.get_conn()?;
@@ -262,29 +315,31 @@ impl CapacityPoolRepository {
         let mut stmt = conn.prepare(
             r#"
             SELECT
-                machine_code, plan_date, target_capacity_t, limit_capacity_t,
+                version_id, machine_code, plan_date, target_capacity_t, limit_capacity_t,
                 used_capacity_t, overflow_t, frozen_capacity_t,
                 accumulated_tonnage_t, roll_campaign_id
             FROM capacity_pool
-            WHERE plan_date BETWEEN ?1 AND ?2
+            WHERE version_id = ?1
+              AND plan_date BETWEEN ?2 AND ?3
               AND overflow_t > 0
             ORDER BY overflow_t DESC, plan_date
             "#,
         )?;
 
         let pools = stmt
-            .query_map(params![start_date_str, end_date_str], |row| {
+            .query_map(params![version_id, start_date_str, end_date_str], |row| {
                 Ok(CapacityPool {
-                    machine_code: row.get(0)?,
-                    plan_date: NaiveDate::parse_from_str(&row.get::<_, String>(1)?, "%Y-%m-%d")
+                    version_id: row.get(0)?,
+                    machine_code: row.get(1)?,
+                    plan_date: NaiveDate::parse_from_str(&row.get::<_, String>(2)?, "%Y-%m-%d")
                         .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
-                    target_capacity_t: row.get(2)?,
-                    limit_capacity_t: row.get(3)?,
-                    used_capacity_t: row.get(4)?,
-                    overflow_t: row.get(5)?,
-                    frozen_capacity_t: row.get(6)?,
-                    accumulated_tonnage_t: row.get(7)?,
-                    roll_campaign_id: row.get(8)?,
+                    target_capacity_t: row.get(3)?,
+                    limit_capacity_t: row.get(4)?,
+                    used_capacity_t: row.get(5)?,
+                    overflow_t: row.get(6)?,
+                    frozen_capacity_t: row.get(7)?,
+                    accumulated_tonnage_t: row.get(8)?,
+                    roll_campaign_id: row.get(9)?,
                 })
             })?
             .collect::<SqliteResult<Vec<CapacityPool>>>()?;
@@ -292,9 +347,10 @@ impl CapacityPoolRepository {
         Ok(pools)
     }
 
-    /// 查询所有机组的指定日期产能池
+    /// 查询指定版本所有机组的指定日期产能池
     ///
     /// # 参数
+    /// - version_id: 版本ID (P1-1: 版本化改造)
     /// - plan_date: 计划日期
     ///
     /// # 返回
@@ -302,6 +358,7 @@ impl CapacityPoolRepository {
     /// - Err: 数据库错误
     pub fn find_all_machines_by_date(
         &self,
+        version_id: &str,
         plan_date: NaiveDate,
     ) -> RepositoryResult<Vec<CapacityPool>> {
         let conn = self.get_conn()?;
@@ -310,28 +367,29 @@ impl CapacityPoolRepository {
         let mut stmt = conn.prepare(
             r#"
             SELECT
-                machine_code, plan_date, target_capacity_t, limit_capacity_t,
+                version_id, machine_code, plan_date, target_capacity_t, limit_capacity_t,
                 used_capacity_t, overflow_t, frozen_capacity_t,
                 accumulated_tonnage_t, roll_campaign_id
             FROM capacity_pool
-            WHERE plan_date = ?1
+            WHERE version_id = ?1 AND plan_date = ?2
             ORDER BY machine_code
             "#,
         )?;
 
         let pools = stmt
-            .query_map(params![plan_date_str], |row| {
+            .query_map(params![version_id, plan_date_str], |row| {
                 Ok(CapacityPool {
-                    machine_code: row.get(0)?,
-                    plan_date: NaiveDate::parse_from_str(&row.get::<_, String>(1)?, "%Y-%m-%d")
+                    version_id: row.get(0)?,
+                    machine_code: row.get(1)?,
+                    plan_date: NaiveDate::parse_from_str(&row.get::<_, String>(2)?, "%Y-%m-%d")
                         .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
-                    target_capacity_t: row.get(2)?,
-                    limit_capacity_t: row.get(3)?,
-                    used_capacity_t: row.get(4)?,
-                    overflow_t: row.get(5)?,
-                    frozen_capacity_t: row.get(6)?,
-                    accumulated_tonnage_t: row.get(7)?,
-                    roll_campaign_id: row.get(8)?,
+                    target_capacity_t: row.get(3)?,
+                    limit_capacity_t: row.get(4)?,
+                    used_capacity_t: row.get(5)?,
+                    overflow_t: row.get(6)?,
+                    frozen_capacity_t: row.get(7)?,
+                    accumulated_tonnage_t: row.get(8)?,
+                    roll_campaign_id: row.get(9)?,
                 })
             })?
             .collect::<SqliteResult<Vec<CapacityPool>>>()?;

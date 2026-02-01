@@ -15,7 +15,7 @@ use uuid::Uuid;
 use crate::app::state::AppState;
 use crate::api::error::ApiError;
 use crate::domain::action_log::ActionLog;
-use crate::engine::ScheduleStrategy;
+use crate::engine::{ScheduleStrategy, ScheduleEvent, ScheduleEventType};
 
 // ==========================================
 // 错误响应类型
@@ -260,6 +260,20 @@ pub async fn batch_lock_materials(
         .batch_lock_materials(material_ids, lock_flag, &operator, &reason, validation_mode)
         .map_err(map_api_error)?;
 
+    // 发布 ScheduleEvent 触发决策读模型刷新
+    if let Some(ref publisher) = state.event_publisher {
+        if let Ok(Some(version_id)) = state.plan_api.get_latest_active_version_id() {
+            let event = ScheduleEvent::full_scope(
+                version_id,
+                ScheduleEventType::MaterialStateChanged,
+                Some("batch_lock_materials".to_string()),
+            );
+            if let Err(e) = publisher.publish(event) {
+                tracing::warn!("发布 MaterialStateChanged 事件失败: {}", e);
+            }
+        }
+    }
+
     emit_frontend_event(
         &app,
         "material_state_changed",
@@ -294,6 +308,20 @@ pub async fn batch_force_release(
         .batch_force_release(material_ids, &operator, &reason, validation_mode)
         .map_err(map_api_error)?;
 
+    // 发布 ScheduleEvent 触发决策读模型刷新
+    if let Some(ref publisher) = state.event_publisher {
+        if let Ok(Some(version_id)) = state.plan_api.get_latest_active_version_id() {
+            let event = ScheduleEvent::full_scope(
+                version_id,
+                ScheduleEventType::MaterialStateChanged,
+                Some("batch_force_release".to_string()),
+            );
+            if let Err(e) = publisher.publish(event) {
+                tracing::warn!("发布 MaterialStateChanged 事件失败: {}", e);
+            }
+        }
+    }
+
     emit_frontend_event(&app, "material_state_changed", serde_json::json!({ "count": material_count }));
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
@@ -315,6 +343,20 @@ pub async fn batch_set_urgent(
         .material_api
         .batch_set_urgent(material_ids, manual_urgent_flag, &operator, &reason)
         .map_err(map_api_error)?;
+
+    // 发布 ScheduleEvent 触发决策读模型刷新
+    if let Some(ref publisher) = state.event_publisher {
+        if let Ok(Some(version_id)) = state.plan_api.get_latest_active_version_id() {
+            let event = ScheduleEvent::full_scope(
+                version_id,
+                ScheduleEventType::MaterialStateChanged,
+                Some("batch_set_urgent".to_string()),
+            );
+            if let Err(e) = publisher.publish(event) {
+                tracing::warn!("发布 MaterialStateChanged 事件失败: {}", e);
+            }
+        }
+    }
 
     emit_frontend_event(
         &app,
@@ -1116,6 +1158,20 @@ pub async fn update_config(
         .update_config(&scope_id, &key, &value, &operator, &reason)
         .map_err(map_api_error)?;
 
+    // 发布 ManualTrigger 事件（配置变更可能影响多个决策口径）
+    if let Some(ref publisher) = state.event_publisher {
+        if let Ok(Some(version_id)) = state.plan_api.get_latest_active_version_id() {
+            let event = ScheduleEvent::full_scope(
+                version_id,
+                ScheduleEventType::ManualTrigger,
+                Some(format!("update_config: {}.{}", scope_id, key)),
+            );
+            if let Err(e) = publisher.publish(event) {
+                tracing::warn!("发布 ManualTrigger 事件失败: {}", e);
+            }
+        }
+    }
+
     Ok("{}".to_string())
 }
 
@@ -1136,6 +1192,20 @@ pub async fn batch_update_configs(
         .config_api
         .batch_update_configs(configs, &operator, &reason)
         .map_err(map_api_error)?;
+
+    // 发布 ManualTrigger 事件（批量配置变更可能影响多个决策口径）
+    if let Some(ref publisher) = state.event_publisher {
+        if let Ok(Some(version_id)) = state.plan_api.get_latest_active_version_id() {
+            let event = ScheduleEvent::full_scope(
+                version_id,
+                ScheduleEventType::ManualTrigger,
+                Some("batch_update_configs".to_string()),
+            );
+            if let Err(e) = publisher.publish(event) {
+                tracing::warn!("发布 ManualTrigger 事件失败: {}", e);
+            }
+        }
+    }
 
     serde_json::to_string(&serde_json::json!({ "updated_count": count }))
         .map_err(|e| format!("序列化失败: {}", e))
@@ -1747,6 +1817,21 @@ pub async fn import_materials(
         })?;
 
     tracing::info!("[import_materials] 导入成功: {:?}", result);
+
+    // 发布 ScheduleEvent 触发决策读模型刷新
+    if let Some(ref publisher) = state.event_publisher {
+        if let Ok(Some(version_id)) = state.plan_api.get_latest_active_version_id() {
+            let event = ScheduleEvent::full_scope(
+                version_id,
+                ScheduleEventType::MaterialStateChanged,
+                Some("import_materials".to_string()),
+            );
+            if let Err(e) = publisher.publish(event) {
+                tracing::warn!("发布 MaterialStateChanged 事件失败: {}", e);
+            }
+        }
+    }
+
     emit_frontend_event(
         &app,
         "material_state_changed",
@@ -1977,7 +2062,7 @@ pub async fn cancel_import_batch(
 /// - machine_codes: 机组代码列表 (JSON数组字符串, 如: ["H032", "H033"])
 /// - date_from: 日期范围起始 (YYYY-MM-DD)
 /// - date_to: 日期范围结束 (YYYY-MM-DD)
-/// - version_id: 方案版本ID (可选，暂未使用)
+/// - version_id: 方案版本ID (可选，若未提供则使用当前激活版本)
 ///
 /// # 返回
 /// - 成功: JSON字符串, 包含产能池列表
@@ -1988,7 +2073,7 @@ pub async fn get_capacity_pools(
     machine_codes: String,
     date_from: String,
     date_to: String,
-    _version_id: Option<String>,
+    version_id: Option<String>,
 ) -> Result<String, String> {
     use chrono::NaiveDate;
 
@@ -2002,13 +2087,21 @@ pub async fn get_capacity_pools(
     let end_date = NaiveDate::parse_from_str(&date_to, "%Y-%m-%d")
         .map_err(|e| format!("结束日期格式错误（应为YYYY-MM-DD）: {}", e))?;
 
+    // 获取版本ID（如未提供则使用当前激活版本）
+    let vid = match version_id.as_ref() {
+        Some(v) => v.clone(),
+        None => state.plan_api.get_latest_active_version_id()
+            .map_err(|e| format!("获取激活版本失败: {}", e))?
+            .ok_or_else(|| "当前没有激活版本".to_string())?,
+    };
+
     // 收集所有机组的产能池
     let mut all_pools = Vec::new();
 
     for code in &codes {
         let pools = state
             .capacity_pool_repo
-            .find_by_date_range(code, start_date, end_date)
+            .find_by_date_range(&vid, code, start_date, end_date)
             .map_err(|e| format!("查询产能池失败: {}", e))?;
         all_pools.extend(pools);
     }
@@ -2065,10 +2158,18 @@ pub async fn update_capacity_pool(
         machine_code, plan_date, target_capacity_t, limit_capacity_t, reason, operator
     );
 
+    // 获取版本ID（如未提供则使用当前激活版本）
+    let vid = match version_id.as_ref() {
+        Some(v) => v.clone(),
+        None => state.plan_api.get_latest_active_version_id()
+            .map_err(|e| format!("获取激活版本失败: {}", e))?
+            .ok_or_else(|| "当前没有激活版本".to_string())?,
+    };
+
     // 查询现有产能池
     let existing = state
         .capacity_pool_repo
-        .find_by_machine_and_date(&machine_code, date)
+        .find_by_machine_and_date(&vid, &machine_code, date)
         .map_err(|e| format!("查询产能池失败: {}", e))?;
 
     // 记录旧值用于审计
@@ -2086,6 +2187,7 @@ pub async fn update_capacity_pool(
         None => {
             // 创建新记录
             CapacityPool {
+                version_id: vid.clone(),
                 machine_code: machine_code.clone(),
                 plan_date: date,
                 target_capacity_t,
@@ -2208,6 +2310,14 @@ pub async fn batch_update_capacity_pools(
         return Err("操作人不能为空".to_string());
     }
 
+    // 获取版本ID（如未提供则使用当前激活版本）
+    let vid = match version_id.as_ref() {
+        Some(v) => v.clone(),
+        None => state.plan_api.get_latest_active_version_id()
+            .map_err(|e| format!("获取激活版本失败: {}", e))?
+            .ok_or_else(|| "当前没有激活版本".to_string())?,
+    };
+
     let items: Vec<CapacityPoolUpdate> =
         serde_json::from_str(&updates).map_err(|e| format!("updates格式错误: {}", e))?;
     if items.is_empty() {
@@ -2250,7 +2360,7 @@ pub async fn batch_update_capacity_pools(
 
         let existing = state
             .capacity_pool_repo
-            .find_by_machine_and_date(&it.machine_code, date)
+            .find_by_machine_and_date(&vid, &it.machine_code, date)
             .map_err(|e| format!("查询产能池失败: {}", e))?;
 
         // 跳过无变化项（避免无意义的 OR REPLACE + 审计噪音）
@@ -2273,6 +2383,7 @@ pub async fn batch_update_capacity_pools(
                 p
             }
             None => CapacityPool {
+                version_id: vid.clone(),
                 machine_code: it.machine_code.clone(),
                 plan_date: date,
                 target_capacity_t: it.target_capacity_t,

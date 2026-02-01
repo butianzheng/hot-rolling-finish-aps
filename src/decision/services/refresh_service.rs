@@ -564,7 +564,8 @@ impl DecisionRefreshService {
                 FROM plan_item
                 WHERE version_id = ?1
                 GROUP BY machine_code, plan_date
-            ) pi ON cp.machine_code = pi.machine_code AND cp.plan_date = pi.plan_date{}
+            ) pi ON cp.machine_code = pi.machine_code AND cp.plan_date = pi.plan_date
+            WHERE cp.version_id = ?1{}
             "#,
             insert_where_clause
         );
@@ -1059,6 +1060,7 @@ impl DecisionRefreshService {
 
         // 2. 构建 INSERT WHERE 条件
         insert_conditions.push("cp.used_capacity_t / NULLIF(cp.target_capacity_t, 0) < 0.9".to_string());
+        insert_conditions.push("cp.version_id = ?1".to_string());
         let insert_where_clause = format!("\n            WHERE {}", insert_conditions.join(" AND "));
 
         // 3. 从 capacity_pool 计算产能优化空间

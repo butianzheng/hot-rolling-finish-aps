@@ -185,7 +185,10 @@ CREATE INDEX idx_item_version_machine_date ON plan_item(version_id, machine_code
 -- Capacity / risk / roll
 -- ==========================================
 
+-- P1-1: capacity_pool 版本化改造
+-- 将 version_id 纳入主键，避免跨版本产能污染
 CREATE TABLE capacity_pool (
+  version_id TEXT NOT NULL REFERENCES plan_version(version_id) ON DELETE CASCADE,
   machine_code TEXT NOT NULL REFERENCES machine_master(machine_code),
   plan_date TEXT NOT NULL,
   target_capacity_t REAL NOT NULL,
@@ -195,9 +198,10 @@ CREATE TABLE capacity_pool (
   frozen_capacity_t REAL NOT NULL DEFAULT 0.0,
   accumulated_tonnage_t REAL NOT NULL DEFAULT 0.0,
   roll_campaign_id TEXT,
-  PRIMARY KEY (machine_code, plan_date)
+  PRIMARY KEY (version_id, machine_code, plan_date)
 );
 
+CREATE INDEX idx_pool_version_machine_date ON capacity_pool(version_id, machine_code, plan_date);
 CREATE INDEX idx_pool_machine_date ON capacity_pool(machine_code, plan_date);
 
 CREATE TABLE risk_snapshot (

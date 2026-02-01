@@ -15,7 +15,8 @@ use serde::{Deserialize, Serialize};
 // 用途: 吨位池管理,换辊触发
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapacityPool {
-    // ===== 主键 =====
+    // ===== 主键 (版本化后) =====
+    pub version_id: String,        // 所属版本ID (P1-1: 版本化改造)
     pub machine_code: String,      // 机组代码
     pub plan_date: NaiveDate,      // 排产日期
 

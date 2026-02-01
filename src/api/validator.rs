@@ -206,6 +206,7 @@ impl ManualOperationValidator {
     /// - 红线4: 验证产能约束
     pub fn validate_manual_schedule(
         &self,
+        version_id: &str,
         material_id: &str,
         target_date: NaiveDate,
         machine_code: &str,
@@ -238,7 +239,7 @@ impl ManualOperationValidator {
         // 2. 验证产能约束（红线4）
         if let Some(capacity_pool) = self
             .capacity_repo
-            .find_by_machine_and_date(machine_code, target_date)
+            .find_by_machine_and_date(version_id, machine_code, target_date)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?
         {
             let remaining_capacity = capacity_pool.limit_capacity_t - capacity_pool.used_capacity_t;

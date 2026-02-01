@@ -79,6 +79,9 @@ pub struct AppState {
 
     /// 操作日志仓储（用于审计追踪）
     pub action_log_repo: Arc<ActionLogRepository>,
+
+    /// 事件发布器（用于触发决策读模型刷新）
+    pub event_publisher: Option<Arc<dyn ScheduleEventPublisher>>,
 }
 
 impl AppState {
@@ -278,10 +281,12 @@ impl AppState {
             material_master_repo.clone(),
             capacity_pool_repo.clone(),
             action_log_repo.clone(),
+            risk_snapshot_repo.clone(),
             eligibility_engine.clone(),
             urgency_engine.clone(),
             priority_sorter.clone(),
             capacity_filler.clone(),
+            risk_engine.clone(),
             config_manager.clone(),
             event_publisher.clone(),
         ));
@@ -322,7 +327,7 @@ impl AppState {
             config_manager.clone(),
             recalc_engine,
             risk_engine,
-            event_publisher,
+            event_publisher.clone(),
         ));
 
         // 决策支持API（需要在 DashboardApi 之前初始化）
@@ -381,6 +386,7 @@ impl AppState {
             import_api,
             capacity_pool_repo,
             action_log_repo,
+            event_publisher,
         })
     }
 

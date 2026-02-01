@@ -432,6 +432,7 @@ mod tests {
     /// 创建测试用的产能池
     fn create_test_pool() -> CapacityPool {
         CapacityPool {
+            version_id: "v1".to_string(),
             machine_code: "H032".to_string(),
             plan_date: NaiveDate::from_ymd_opt(2025, 1, 20).unwrap(),
             target_capacity_t: 1000.0,

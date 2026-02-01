@@ -271,10 +271,20 @@ const PlanningWorkbench: React.FC = () => {
     return '';
   }, [deepLinkContext?.context]);
 
+  // P2-2 修复：queryKey 包含筛选参数，避免缓存污染
+  // 注意：暂保留 limit=1000 硬编码，待后续实施 useInfiniteQuery 分页优化
+  const materialQueryParams = useMemo(() => ({
+    machine_code: poolSelection.machineCode && poolSelection.machineCode !== 'all'
+      ? poolSelection.machineCode
+      : undefined,
+    limit: 1000,
+    offset: 0,
+  }), [poolSelection.machineCode]);
+
   const materialsQuery = useQuery({
-    queryKey: ['materials'],
+    queryKey: ['materials', materialQueryParams],
     queryFn: async () => {
-      const res = await materialApi.listMaterials({ limit: 1000, offset: 0 });
+      const res = await materialApi.listMaterials(materialQueryParams);
       return Array.isArray(res) ? res : [];
     },
     staleTime: 30 * 1000,

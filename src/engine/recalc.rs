@@ -23,7 +23,9 @@ use crate::config::strategy_profile::{CustomStrategyParameters, CustomStrategyPr
 use crate::repository::{
     ActionLogRepository, CapacityPoolRepository, MaterialMasterRepository,
     MaterialStateRepository, PlanItemRepository, PlanVersionRepository,
+    RiskSnapshotRepository,
 };
+use crate::engine::RiskEngine;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -134,12 +136,14 @@ pub struct RecalcEngine {
     material_master_repo: Arc<MaterialMasterRepository>,
     capacity_repo: Arc<CapacityPoolRepository>,
     action_log_repo: Arc<ActionLogRepository>,
+    risk_snapshot_repo: Arc<RiskSnapshotRepository>,
 
     // 引擎依赖
     eligibility_engine: Arc<EligibilityEngine<ConfigManager>>,
     urgency_engine: Arc<UrgencyEngine>,
     priority_sorter: Arc<PrioritySorter>,
     capacity_filler: Arc<CapacityFiller>,
+    risk_engine: Arc<RiskEngine>,
 
     // 事件发布器 (依赖倒置: Engine 定义 trait, Decision 实现)
     event_publisher: OptionalEventPublisher,
@@ -159,10 +163,12 @@ impl RecalcEngine {
         material_master_repo: Arc<MaterialMasterRepository>,
         capacity_repo: Arc<CapacityPoolRepository>,
         action_log_repo: Arc<ActionLogRepository>,
+        risk_snapshot_repo: Arc<RiskSnapshotRepository>,
         eligibility_engine: Arc<EligibilityEngine<ConfigManager>>,
         urgency_engine: Arc<UrgencyEngine>,
         priority_sorter: Arc<PrioritySorter>,
         capacity_filler: Arc<CapacityFiller>,
+        risk_engine: Arc<RiskEngine>,
         config: RecalcConfig,
         config_manager: Arc<ConfigManager>,
         event_publisher: Option<Arc<dyn ScheduleEventPublisher>>,
@@ -179,10 +185,12 @@ impl RecalcEngine {
             material_master_repo,
             capacity_repo,
             action_log_repo,
+            risk_snapshot_repo,
             eligibility_engine,
             urgency_engine,
             priority_sorter,
             capacity_filler,
+            risk_engine,
             event_publisher,
             config,
             config_manager,
@@ -198,10 +206,12 @@ impl RecalcEngine {
         material_master_repo: Arc<MaterialMasterRepository>,
         capacity_repo: Arc<CapacityPoolRepository>,
         action_log_repo: Arc<ActionLogRepository>,
+        risk_snapshot_repo: Arc<RiskSnapshotRepository>,
         eligibility_engine: Arc<EligibilityEngine<ConfigManager>>,
         urgency_engine: Arc<UrgencyEngine>,
         priority_sorter: Arc<PrioritySorter>,
         capacity_filler: Arc<CapacityFiller>,
+        risk_engine: Arc<RiskEngine>,
         config_manager: Arc<ConfigManager>,
         event_publisher: Option<Arc<dyn ScheduleEventPublisher>>,
     ) -> Self {
@@ -212,10 +222,12 @@ impl RecalcEngine {
             material_master_repo,
             capacity_repo,
             action_log_repo,
+            risk_snapshot_repo,
             eligibility_engine,
             urgency_engine,
             priority_sorter,
             capacity_filler,
+            risk_engine,
             RecalcConfig::default(),
             config_manager,
             event_publisher,
@@ -255,10 +267,12 @@ impl RecalcEngine {
     /// ```
     pub fn from_repositories(
         repos: crate::engine::repositories::ScheduleRepositories,
+        risk_snapshot_repo: Arc<RiskSnapshotRepository>,
         eligibility_engine: Arc<EligibilityEngine<ConfigManager>>,
         urgency_engine: Arc<UrgencyEngine>,
         priority_sorter: Arc<PrioritySorter>,
         capacity_filler: Arc<CapacityFiller>,
+        risk_engine: Arc<RiskEngine>,
         config: RecalcConfig,
         config_manager: Arc<ConfigManager>,
         event_publisher: Option<Arc<dyn ScheduleEventPublisher>>,
@@ -270,10 +284,12 @@ impl RecalcEngine {
             repos.material_master_repo,
             repos.capacity_repo,
             repos.action_log_repo,
+            risk_snapshot_repo,
             eligibility_engine,
             urgency_engine,
             priority_sorter,
             capacity_filler,
+            risk_engine,
             config,
             config_manager,
             event_publisher,
@@ -482,10 +498,17 @@ impl RecalcEngine {
             self.version_repo.update(&new_version)?;
         }
 
-        // 9. 生成风险快照（仅生产模式，TODO: 阶段3实施）
-        // if !is_dry_run {
-        //     RiskEngine.generate_snapshot()
-        // }
+        // 9. 生成风险快照（仅生产模式）
+        if !is_dry_run {
+            match self.generate_risk_snapshots(&new_version.version_id, base_date, end_date, &machine_codes) {
+                Ok(count) => {
+                    tracing::info!("已生成风险快照: version_id={}, count={}", new_version.version_id, count);
+                }
+                Err(e) => {
+                    tracing::warn!("生成风险快照失败: {}, 继续执行", e);
+                }
+            }
+        }
 
         // 10. 记录操作日志（仅生产模式，TODO: 阶段3实施）
         // if !is_dry_run {
@@ -959,8 +982,9 @@ impl RecalcEngine {
                 // ----- 4.4 查询或创建产能池 -----
                 let mut capacity_pool = self
                     .capacity_repo
-                    .find_by_machine_and_date(machine_code, current_date)?
+                    .find_by_machine_and_date(version_id, machine_code, current_date)?
                     .unwrap_or_else(|| CapacityPool {
+                        version_id: version_id.to_string(),
                         machine_code: machine_code.clone(),
                         plan_date: current_date,
                         target_capacity_t: 1800.0, // 默认值
@@ -1084,6 +1108,113 @@ impl RecalcEngine {
         let scheduled_count = items.len();
         let frozen_count = items.iter().filter(|i| i.locked_in_plan).count();
         (scheduled_count, frozen_count)
+    }
+
+    /// 生成风险快照（批量）
+    ///
+    /// # 参数
+    /// - `version_id`: 版本ID
+    /// - `start_date`: 起始日期
+    /// - `end_date`: 结束日期
+    /// - `machine_codes`: 机组代码列表
+    ///
+    /// # 返回
+    /// - Ok(usize): 成功生成的快照数量
+    /// - Err: 生成失败
+    ///
+    /// # 说明
+    /// - 为每个机组、每个日期生成一个风险快照
+    /// - 使用 RiskEngine 计算风险等级
+    /// - 批量插入到 risk_snapshot 表
+    fn generate_risk_snapshots(
+        &self,
+        version_id: &str,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+        machine_codes: &[String],
+    ) -> Result<usize, Box<dyn Error>> {
+        use std::collections::HashMap;
+
+        // 1. 查询版本的所有 plan_item（已排产材料）
+        let all_plan_items = self.item_repo.find_by_version(version_id)?;
+
+        // 2. 对每个机组，查询材料主数据和材料状态
+        let mut snapshots = Vec::new();
+
+        for machine_code in machine_codes {
+            // 2.1 查询该机组的材料主数据
+            let materials = self.material_master_repo.find_by_machine(machine_code)?;
+
+            // 2.2 构建材料重量映射
+            let material_weights: HashMap<String, f64> = materials
+                .iter()
+                .map(|m| (m.material_id.clone(), m.weight_t.unwrap_or(0.0)))
+                .collect();
+
+            // 2.3 查询材料状态
+            let material_states: Vec<MaterialState> = materials
+                .iter()
+                .filter_map(|m| {
+                    self.material_state_repo
+                        .find_by_id(&m.material_id)
+                        .ok()
+                        .flatten()
+                })
+                .collect();
+
+            // 2.4 遍历日期，生成快照
+            let mut current_date = start_date;
+            while current_date <= end_date {
+                // 查询或创建产能池
+                let pool = self
+                    .capacity_repo
+                    .find_by_machine_and_date(version_id, machine_code, current_date)?
+                    .unwrap_or_else(|| CapacityPool {
+                        version_id: version_id.to_string(),
+                        machine_code: machine_code.clone(),
+                        plan_date: current_date,
+                        target_capacity_t: 1800.0,
+                        limit_capacity_t: 2000.0,
+                        used_capacity_t: 0.0,
+                        overflow_t: 0.0,
+                        frozen_capacity_t: 0.0,
+                        accumulated_tonnage_t: 0.0,
+                        roll_campaign_id: None,
+                    });
+
+                // 筛选当日当机组的排产明细
+                let scheduled_items: Vec<PlanItem> = all_plan_items
+                    .iter()
+                    .filter(|item| {
+                        item.machine_code == *machine_code && item.plan_date == current_date
+                    })
+                    .cloned()
+                    .collect();
+
+                // 生成快照
+                let snapshot = self.risk_engine.generate_snapshot(
+                    version_id,
+                    machine_code,
+                    current_date,
+                    &pool,
+                    &scheduled_items,
+                    &material_states,
+                    &material_weights,
+                    None,
+                );
+
+                snapshots.push(snapshot);
+
+                current_date = current_date
+                    .checked_add_signed(chrono::Duration::days(1))
+                    .ok_or("Date overflow")?;
+            }
+        }
+
+        // 3. 批量插入快照
+        let count = self.risk_snapshot_repo.batch_insert(snapshots)?;
+
+        Ok(count)
     }
 
     /// 触发决策视图刷新

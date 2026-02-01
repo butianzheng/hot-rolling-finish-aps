@@ -1,5 +1,19 @@
 import { z } from 'zod';
 
+// ==========================================
+// P2-1: 统一 IPC Schema 源
+// ==========================================
+// 从 decision-schema.ts 导入 D1-D6 决策看板 Schema，避免重复定义
+// decision-schema.ts 是决策层的单一真实源（Single Source of Truth）
+import {
+  DecisionDaySummaryResponseSchema as DecisionDaySummaryResponseSchemaStrict,
+  MachineBottleneckProfileResponseSchema as MachineBottleneckProfileResponseSchemaStrict,
+  OrderFailureSetResponseSchema as OrderFailureSetResponseSchemaStrict,
+  ColdStockProfileResponseSchema as ColdStockProfileResponseSchemaStrict,
+  RollCampaignAlertResponseSchema as RollCampaignAlertResponseSchemaStrict,
+  CapacityOpportunityResponseSchema as CapacityOpportunityResponseSchemaStrict,
+} from '../types/schemas/decision-schema';
+
 export { z };
 
 // ==========================================================
@@ -242,293 +256,28 @@ export const DecisionRefreshStatusResponseSchema = z
 // ==========================================================
 // Dashboard API 响应 Schema（优先级1 - D1-D6决策看板）
 // ==========================================================
+// P2-1 修复：从 decision-schema.ts 导入统一 schema，避免双重定义
+// 保留 .passthrough() 以向后兼容（宽松解析）
+//
+// 注意：decision-schema.ts 是真实源，这里只是re-export并添加 .passthrough()
 
 // D1: 哪天最危险
-export const ReasonItemDtoSchema = z
-  .object({
-    code: z.string(),
-    msg: z.string(),
-    weight: z.number(),
-    affected_count: z.number().nullable().optional(),
-  })
-  .passthrough();
-
-export const DaySummaryDtoSchema = z
-  .object({
-    plan_date: DateString,
-    risk_score: z.number(),
-    risk_level: z.string(),
-    capacity_util_pct: z.number(),
-    overload_weight_t: z.number(),
-    urgent_failure_count: z.number(),
-    top_reasons: z.array(ReasonItemDtoSchema),
-    involved_machines: z.array(z.string()),
-  })
-  .passthrough();
-
-export const DecisionDaySummaryResponseSchema = z
-  .object({
-    version_id: z.string(),
-    as_of: DateString,
-    items: z.array(DaySummaryDtoSchema),
-    total_count: z.number(),
-  })
-  .passthrough();
+export const DecisionDaySummaryResponseSchema = DecisionDaySummaryResponseSchemaStrict.passthrough();
 
 // D2: 哪些紧急单无法完成
-export const BlockingFactorDtoSchema = z
-  .object({
-    factor_type: z.string(),
-    description: z.string(),
-    impact: z.number(),
-    affected_material_count: z.number(),
-  })
-  .passthrough();
-
-export const OrderFailureDtoSchema = z
-  .object({
-    contract_no: z.string(),
-    due_date: DateString,
-    days_to_due: z.number(),
-    urgency_level: z.string(),
-    fail_type: z.string(),
-    completion_rate: z.number(),
-    total_weight_t: z.number(),
-    scheduled_weight_t: z.number(),
-    unscheduled_weight_t: z.number(),
-    machine_code: z.string(),
-    blocking_factors: z.array(BlockingFactorDtoSchema),
-    failure_reasons: z.array(z.string()),
-    recommended_actions: z.array(z.string()).nullable().optional(),
-  })
-  .passthrough();
-
-export const TypeCountDtoSchema = z
-  .object({
-    type_name: z.string(),
-    count: z.number(),
-    weight_t: z.number().nullable().optional(),
-  })
-  .passthrough();
-
-export const OrderFailureSummaryDtoSchema = z
-  .object({
-    total_failures: z.number(),
-    by_fail_type: z.array(TypeCountDtoSchema),
-    by_urgency: z.array(TypeCountDtoSchema),
-    total_unscheduled_weight_t: z.number(),
-  })
-  .passthrough();
-
-export const OrderFailureSetResponseSchema = z
-  .object({
-    version_id: z.string(),
-    as_of: DateString,
-    items: z.array(OrderFailureDtoSchema),
-    total_count: z.number(),
-    summary: OrderFailureSummaryDtoSchema,
-  })
-  .passthrough();
+export const OrderFailureSetResponseSchema = OrderFailureSetResponseSchemaStrict.passthrough();
 
 // D3: 哪些冷料压库
-export const ColdStockTrendDtoSchema = z
-  .object({
-    direction: z.string(),
-    change_rate_pct: z.number(),
-    baseline_days: z.number(),
-  })
-  .passthrough();
-
-export const ColdStockBucketDtoSchema = z
-  .object({
-    machine_code: z.string(),
-    age_bin: z.string(),
-    count: z.number(),
-    weight_t: z.number(),
-    pressure_score: z.number(),
-    pressure_level: z.string(),
-    avg_age_days: z.number(),
-    max_age_days: z.number(),
-    structure_gap: z.string(),
-    reasons: z.array(ReasonItemDtoSchema),
-    trend: ColdStockTrendDtoSchema.nullable().optional(),
-  })
-  .passthrough();
-
-export const MachineStockStatsDtoSchema = z
-  .object({
-    machine_code: z.string(),
-    count: z.number(),
-    weight_t: z.number(),
-    avg_pressure_score: z.number(),
-  })
-  .passthrough();
-
-export const AgeBinStatsDtoSchema = z
-  .object({
-    age_bin: z.string(),
-    count: z.number(),
-    weight_t: z.number(),
-  })
-  .passthrough();
-
-export const ColdStockSummaryDtoSchema = z
-  .object({
-    total_cold_stock_count: z.number(),
-    total_cold_stock_weight_t: z.number(),
-    avg_age_days: z.number(),
-    high_pressure_count: z.number(),
-    by_machine: z.array(MachineStockStatsDtoSchema),
-    by_age_bin: z.array(AgeBinStatsDtoSchema),
-  })
-  .passthrough();
-
-export const ColdStockProfileResponseSchema = z
-  .object({
-    version_id: z.string(),
-    as_of: DateString,
-    items: z.array(ColdStockBucketDtoSchema),
-    total_count: z.number(),
-    summary: ColdStockSummaryDtoSchema,
-  })
-  .passthrough();
+export const ColdStockProfileResponseSchema = ColdStockProfileResponseSchemaStrict.passthrough();
 
 // D4: 哪个机组最堵
-export const MachineStatsDtoSchema = z
-  .object({
-    machine_code: z.string(),
-    avg_score: z.number(),
-    max_score: z.number(),
-    bottleneck_days: z.number(),
-  })
-  .passthrough();
+export const MachineBottleneckProfileResponseSchema = MachineBottleneckProfileResponseSchemaStrict.passthrough();
 
-export const HeatmapStatsDtoSchema = z
-  .object({
-    avg_score: z.number(),
-    max_score: z.number(),
-    bottleneck_days_count: z.number(),
-    by_machine: z.array(MachineStatsDtoSchema),
-  })
-  .passthrough();
-
-export const BottleneckPointDtoSchema = z
-  .object({
-    machine_code: z.string(),
-    plan_date: DateString,
-    bottleneck_score: z.number(),
-    bottleneck_level: z.string(),
-    bottleneck_types: z.array(z.string()),
-    capacity_util_pct: z.number(),
-    pending_material_count: z.number(),
-    pending_weight_t: z.number(),
-    reasons: z.array(ReasonItemDtoSchema),
-    recommended_actions: z.array(z.string()).nullable().optional(),
-  })
-  .passthrough();
-
-export const MachineBottleneckProfileResponseSchema = z
-  .object({
-    version_id: z.string(),
-    as_of: DateString,
-    items: z.array(BottleneckPointDtoSchema),
-    total_count: z.number(),
-    heatmap_stats: HeatmapStatsDtoSchema.nullable().optional(),
-  })
-  .passthrough();
-
-// D5: 换辊是否异常
-export const RollAlertDtoSchema = z
-  .object({
-    machine_code: z.string(),
-    campaign_id: z.string(),
-    campaign_start_date: DateString,
-    current_tonnage_t: z.number(),
-    soft_limit_t: z.number(),
-    hard_limit_t: z.number(),
-    remaining_tonnage_t: z.number(),
-    alert_level: z.string(),
-    alert_type: z.string(),
-    estimated_hard_stop_date: DateString.nullable().optional(),
-    alert_message: z.string(),
-    impact_description: z.string(),
-    recommended_actions: z.array(z.string()),
-  })
-  .passthrough();
-
-export const RollAlertSummaryDtoSchema = z
-  .object({
-    total_alerts: z.number(),
-    by_level: z.array(TypeCountDtoSchema),
-    by_type: z.array(TypeCountDtoSchema),
-    near_hard_stop_count: z.number(),
-  })
-  .passthrough();
-
-export const RollCampaignAlertsResponseSchema = z
-  .object({
-    version_id: z.string(),
-    as_of: DateString,
-    items: z.array(RollAlertDtoSchema),
-    total_count: z.number(),
-    summary: RollAlertSummaryDtoSchema,
-  })
-  .passthrough();
+// D5: 换辊是否异常 (保留 plural 命名以兼容旧代码)
+export const RollCampaignAlertsResponseSchema = RollCampaignAlertResponseSchemaStrict.passthrough();
 
 // D6: 是否存在产能优化空间
-export const ScenarioDtoSchema = z
-  .object({
-    name: z.string(),
-    adjustment: z.string(),
-    util_pct: z.number(),
-    risk_score: z.number(),
-    affected_material_count: z.number(),
-  })
-  .passthrough();
-
-export const SensitivityAnalysisDtoSchema = z
-  .object({
-    scenarios: z.array(ScenarioDtoSchema),
-    best_scenario_index: z.number(),
-  })
-  .passthrough();
-
-export const CapacityOpportunityDtoSchema = z
-  .object({
-    machine_code: z.string(),
-    plan_date: DateString,
-    opportunity_type: z.string(),
-    current_util_pct: z.number(),
-    target_capacity_t: z.number(),
-    used_capacity_t: z.number(),
-    opportunity_space_t: z.number(),
-    optimized_util_pct: z.number(),
-    sensitivity: SensitivityAnalysisDtoSchema.nullable().optional(),
-    description: z.string(),
-    recommended_actions: z.array(z.string()),
-    potential_benefits: z.array(z.string()),
-  })
-  .passthrough();
-
-export const CapacityOpportunitySummaryDtoSchema = z
-  .object({
-    total_opportunities: z.number(),
-    total_opportunity_space_t: z.number(),
-    by_type: z.array(TypeCountDtoSchema),
-    avg_current_util_pct: z.number(),
-    avg_optimized_util_pct: z.number(),
-  })
-  .passthrough();
-
-export const CapacityOpportunityResponseSchema = z
-  .object({
-    version_id: z.string(),
-    as_of: DateString,
-    items: z.array(CapacityOpportunityDtoSchema),
-    total_count: z.number(),
-    summary: CapacityOpportunitySummaryDtoSchema,
-  })
-  .passthrough();
+export const CapacityOpportunityResponseSchema = CapacityOpportunityResponseSchemaStrict.passthrough();
 
 // ==========================================================
 // Material API 响应 Schema（优先级2）
