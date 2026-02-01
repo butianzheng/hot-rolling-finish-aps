@@ -96,6 +96,8 @@ export const BottleneckPointSchema = z.object({
   capacity_util_pct: z.number().nonnegative(),
   pending_material_count: z.number().int().nonnegative(),
   pending_weight_t: z.number().nonnegative(),
+  scheduled_material_count: z.number().int().nonnegative(),
+  scheduled_weight_t: z.number().nonnegative(),
   reasons: z.array(ReasonItemSchema),
   recommended_actions: z.array(z.string()).optional(),
 });

@@ -549,7 +549,9 @@ fn convert_bottleneck_profile_to_dto(
             .map(|r| ReasonItemDto {
                 code: r.code.clone(),
                 msg: r.description.clone(),
-                weight: r.severity,
+                // 权重口径要求 0-1（前端契约校验也按 0-1）。
+                // 读模型 reasons.severity 可能直接写入了利用率比值（>1），这里做兜底钳制避免前端校验失败。
+                weight: r.severity.max(0.0).min(1.0),
                 affected_count: Some(r.affected_materials as u32),
             })
             .collect(),

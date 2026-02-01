@@ -225,8 +225,15 @@ impl PlanApi {
 
         let mut deleted_items = 0usize;
         let mut deleted_risks = 0usize;
+        let mut deleted_drafts = 0usize;
+        let mut detached_action_logs = 0usize;
 
         for v in &versions {
+            deleted_drafts += self
+                .strategy_draft_repo
+                .delete_by_version(&v.version_id)
+                .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
             deleted_items += self
                 .plan_item_repo
                 .delete_by_version(&v.version_id)
@@ -234,6 +241,11 @@ impl PlanApi {
             deleted_risks += self
                 .risk_snapshot_repo
                 .delete_by_version(&v.version_id)
+                .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+            detached_action_logs += self
+                .action_log_repo
+                .detach_version(&v.version_id)
                 .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
             self.plan_version_repo
@@ -258,6 +270,8 @@ impl PlanApi {
                 "deleted_versions": versions.len(),
                 "deleted_plan_items": deleted_items,
                 "deleted_risk_snapshots": deleted_risks,
+                "deleted_strategy_drafts": deleted_drafts,
+                "detached_action_logs": detached_action_logs,
             })),
             impact_summary_json: None,
             machine_code: None,
@@ -470,6 +484,12 @@ impl PlanApi {
             .delete_by_version(version_id)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
+        // 4.5 解绑 action_log（action_log.version_id 有外键约束，删除 plan_version 前必须置空）
+        let detached_action_logs = self
+            .action_log_repo
+            .detach_version(version_id)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
         self.plan_version_repo
             .delete(version_id)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
@@ -477,15 +497,19 @@ impl PlanApi {
         // 记录ActionLog
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
-            version_id: Some(version_id.to_string()),
+            // 版本已删除，action_log.version_id 不能再引用已不存在的 plan_version（否则会触发外键约束失败）
+            version_id: None,
             action_type: "DELETE_VERSION".to_string(),
             action_ts: chrono::Local::now().naive_local(),
             actor: operator.to_string(),
             payload_json: Some(serde_json::json!({
+                "version_id": version_id,
                 "plan_id": version.plan_id,
                 "version_no": version.version_no,
                 "deleted_plan_items": deleted_items,
                 "deleted_risk_snapshots": deleted_risks,
+                "deleted_strategy_drafts": deleted_drafts,
+                "detached_action_logs": detached_action_logs,
             })),
             impact_summary_json: None,
             machine_code: None,

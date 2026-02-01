@@ -74,6 +74,22 @@ impl ActionLogRepository {
         Ok(log.action_id.clone())
     }
 
+    /// 将指定版本相关的日志从外键关系中“解绑”
+    ///
+    /// 背景：action_log.version_id 存在外键约束（REFERENCES plan_version）。
+    /// 当删除 plan_version 时，需要先将历史日志的 version_id 置空，否则会触发外键约束失败。
+    ///
+    /// # 返回
+    /// - Ok(rows): 被更新的行数
+    pub fn detach_version(&self, version_id: &str) -> RepositoryResult<usize> {
+        let conn = self.get_conn()?;
+        let rows = conn.execute(
+            "UPDATE action_log SET version_id = NULL WHERE version_id = ?1",
+            params![version_id],
+        )?;
+        Ok(rows)
+    }
+
     /// 批量插入操作日志
     pub fn batch_insert(&self, logs: Vec<ActionLog>) -> RepositoryResult<usize> {
         let mut conn = self.get_conn()?;

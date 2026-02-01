@@ -14,6 +14,8 @@ use hot_rolling_aps::decision::repository::{
 const ACTIVE_PLAN_ID: &str = "P001";
 const ACTIVE_VERSION_ID: &str = "V001";
 const DRAFT_VERSION_ID: &str = "V002";
+const DEFAULT_MATERIAL_COUNT: i32 = 2000;
+const HORIZON_DAYS: i64 = 30;
 
 #[derive(Debug, Clone)]
 struct ScheduledItem {
@@ -32,6 +34,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         .nth(1)
         .unwrap_or_else(|| "hot_rolling_aps.db".to_string());
 
+    let material_count = std::env::args()
+        .nth(2)
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(DEFAULT_MATERIAL_COUNT)
+        .max(1000);
+
     backup_and_reset_db(&db_path)?;
 
     let conn = Connection::open(&db_path)?;
@@ -42,7 +50,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     conn.execute_batch(schema_sql)?;
 
     // Seed data
-    seed_full_scenario(&conn)?;
+    seed_full_scenario(&conn, material_count)?;
 
     // Refresh decision read models that do not have realtime fallback (D2/D3/D5/D6).
     let conn_arc = Arc::new(Mutex::new(conn));
@@ -68,11 +76,11 @@ fn backup_and_reset_db(db_path: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn seed_full_scenario(conn: &Connection) -> Result<(), Box<dyn Error>> {
+fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<dyn Error>> {
     let base_date = Local::now().date_naive();
 
     // Pre-compute scheduling so we can keep plan_item and material_state consistent.
-    let schedule_map = build_schedule_map(base_date);
+    let schedule_map = build_schedule_map(base_date, material_count);
 
     let now_naive = Local::now().naive_local();
     let now_sql_dt = now_naive.format("%Y-%m-%d %H:%M:%S").to_string();
@@ -238,7 +246,7 @@ fn seed_full_scenario(conn: &Connection) -> Result<(), Box<dyn Error>> {
     )?;
 
     // Materials (material_master + material_state)
-    for i in 1..=160 {
+    for i in 1..=material_count {
         let material_id = format!("MAT{:04}", i);
         let machine_code = match i % 4 {
             0 => "H031",
@@ -263,7 +271,7 @@ fn seed_full_scenario(conn: &Connection) -> Result<(), Box<dyn Error>> {
         let width_mm = 1200.0 + ((i % 10) as f64) * 50.0;
         let thickness_mm = 2.0 + ((i % 5) as f64) * 0.5;
         let length_m = 10.0 + ((i % 3) as f64);
-        let weight_t = 50.0;
+        let weight_t = material_weight_t(i);
         let available_width_mm = width_mm - 20.0;
 
         let steel_mark: Option<String> = if i % 13 == 0 {
@@ -331,7 +339,7 @@ fn seed_full_scenario(conn: &Connection) -> Result<(), Box<dyn Error>> {
 
         // Seed a few immature (not temperature-ready) materials across multiple contracts
         // so D2/D3 have realistic cold-stock signals.
-        let is_immature = (91..=120).contains(&i) || (7..=10).contains(&i) || (55..=60).contains(&i);
+        let is_immature = is_immature_seed(i);
         let ready_in_days = if is_immature { ((i % 5) + 1) as i32 } else { 0 };
         let earliest_sched_date = (base_date + Duration::days(ready_in_days as i64)).to_string();
 
@@ -459,7 +467,6 @@ fn seed_full_scenario(conn: &Connection) -> Result<(), Box<dyn Error>> {
     }
 
     // capacity_pool (30 days horizon)
-    let horizon_days = 30i64;
     let machine_targets: HashMap<&str, f64> = HashMap::from([
         ("H031", 1400.0),
         ("H032", 1500.0),
@@ -474,7 +481,7 @@ fn seed_full_scenario(conn: &Connection) -> Result<(), Box<dyn Error>> {
         accumulated.insert(machine_code, 0.0);
     }
 
-    for day in 0..horizon_days {
+    for day in 0..HORIZON_DAYS {
         let plan_date = (base_date + Duration::days(day)).to_string();
         for (machine_code, target_capacity_t) in &machine_targets {
             let limit_capacity_t = target_capacity_t * 1.15;
@@ -488,10 +495,10 @@ fn seed_full_scenario(conn: &Connection) -> Result<(), Box<dyn Error>> {
             // Add deterministic extra load to create diverse utilization/overflow patterns.
             let mut used_capacity_t = base_used + ((day % 7) as f64) * 40.0;
             if *machine_code == "H033" && day == 3 {
-                used_capacity_t = limit_capacity_t + 120.0; // force overflow
+                used_capacity_t = (limit_capacity_t + 120.0).max(base_used); // force overflow (never below plan_item total)
             }
             if *machine_code == "H034" && day == 5 {
-                used_capacity_t = target_capacity_t * 0.98; // high utilization
+                used_capacity_t = (target_capacity_t * 0.98).max(base_used); // high utilization (never below plan_item total)
             }
 
             let overflow_t = (used_capacity_t - limit_capacity_t).max(0.0);
@@ -561,7 +568,7 @@ fn seed_full_scenario(conn: &Connection) -> Result<(), Box<dyn Error>> {
 
     // risk_snapshot (active version only, 30 days horizon)
     // Note: decision/dashboard expects LOW/MEDIUM/HIGH/CRITICAL (not Green/Yellow/...).
-    for day in 0..horizon_days {
+    for day in 0..HORIZON_DAYS {
         let snapshot_date = (base_date + Duration::days(day)).to_string();
         for (machine_code, target_capacity_t) in &machine_targets {
             let limit_capacity_t = target_capacity_t * 1.15;
@@ -651,6 +658,14 @@ fn seed_full_scenario(conn: &Connection) -> Result<(), Box<dyn Error>> {
 
     // Import batches + conflicts (to unblock import UI paths)
     let batch_id = Uuid::new_v4().to_string();
+    let conflict_rows: i32 = 5;
+    let warning_rows: i32 = 15;
+    let blocked_rows: i32 = 0;
+    let success_rows: i32 = (material_count - conflict_rows - warning_rows - blocked_rows).max(0);
+    let dq_report_json = format!(
+        r#"{{"summary":{{"total":{},"success":{},"warning":{},"conflict":{},"blocked":{}}},"notes":"seeded"}}"#,
+        material_count, success_rows, warning_rows, conflict_rows, blocked_rows
+    );
     tx.execute(
         r#"
         INSERT INTO import_batch (
@@ -663,15 +678,15 @@ fn seed_full_scenario(conn: &Connection) -> Result<(), Box<dyn Error>> {
             batch_id,
             "seed_full_scenario.csv",
             "tests/fixtures/datasets/01_normal_data.csv",
-            160i32,
-            150i32,
-            0i32,
-            5i32,
-            5i32,
+            material_count,
+            success_rows,
+            blocked_rows,
+            warning_rows,
+            conflict_rows,
             now_rfc3339,
             "seed",
             1234i32,
-            r#"{"summary":{"success":150,"conflict":5},"notes":"seeded"}"#,
+            dq_report_json,
         ],
     )?;
 
@@ -735,7 +750,10 @@ fn seed_full_scenario(conn: &Connection) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn build_schedule_map(base_date: chrono::NaiveDate) -> HashMap<String, ScheduledItem> {
+fn build_schedule_map(
+    base_date: chrono::NaiveDate,
+    material_count: i32,
+) -> HashMap<String, ScheduledItem> {
     let mut ids_by_machine: HashMap<&str, Vec<String>> = HashMap::from([
         ("H031", Vec::new()),
         ("H032", Vec::new()),
@@ -743,7 +761,7 @@ fn build_schedule_map(base_date: chrono::NaiveDate) -> HashMap<String, Scheduled
         ("H034", Vec::new()),
     ]);
 
-    for i in 1..=160 {
+    for i in 1..=material_count {
         let material_id = format!("MAT{:04}", i);
         let machine_code = match i % 4 {
             0 => "H031",
@@ -754,27 +772,17 @@ fn build_schedule_map(base_date: chrono::NaiveDate) -> HashMap<String, Scheduled
         ids_by_machine.get_mut(machine_code).unwrap().push(material_id);
     }
 
-    // Target total planned tonnage per machine for roll-alert variety.
-    // All scheduled items are 50t each.
-    let plan_counts: HashMap<&str, usize> = HashMap::from([
-        ("H031", 32), // 1600t
-        ("H032", 10), // 500t
-        ("H033", 18), // 900t
-        ("H034", 24), // 1200t
-    ]);
-
     let mut seq_per_machine_day: HashMap<(String, String), i32> = HashMap::new();
     let mut out: HashMap<String, ScheduledItem> = HashMap::new();
 
-    for (machine_code, count) in &plan_counts {
-        let ids = ids_by_machine.get(*machine_code).unwrap();
-        let eligible_ids: Vec<&String> = ids
-            .iter()
+    for (machine_code, ids) in ids_by_machine {
+        let eligible_ids: Vec<String> = ids
+            .into_iter()
             .filter(|mid| is_schedule_candidate(mat_index(mid)))
             .collect();
 
-        for (j, material_id) in eligible_ids.into_iter().take(*count).enumerate() {
-            let day_offset = (j % 10) as i64; // spread across 10 days
+        for (j, material_id) in eligible_ids.into_iter().enumerate() {
+            let day_offset = (j as i64 % HORIZON_DAYS) as i64; // spread across horizon days
             let plan_date = (base_date + Duration::days(day_offset)).to_string();
 
             let key = (machine_code.to_string(), plan_date.clone());
@@ -804,10 +812,10 @@ fn build_schedule_map(base_date: chrono::NaiveDate) -> HashMap<String, Scheduled
             out.insert(
                 material_id.clone(),
                 ScheduledItem {
-                    machine_code: (*machine_code).to_string(),
+                    machine_code: machine_code.to_string(),
                     plan_date,
                     seq_no: *seq,
-                    weight_t: 50.0,
+                    weight_t: material_weight_t(mat_index(&material_id)),
                     source_type: source_type.to_string(),
                     locked_in_plan,
                     force_release_in_plan,
@@ -832,15 +840,37 @@ fn is_schedule_candidate(idx: i32) -> bool {
     // - C_OVERDUE (1-10): schedule only 2 / 10
     // - C_NEAR_DUE (11-30): schedule 12 / 20
     // - C_CAP_SHORT (31-60): schedule 10 / 30
+    // Ensure a few "frozen/manual" demo items are always scheduled.
+    if matches!(idx, 5 | 6 | 7 | 8 | 15 | 16 | 32 | 36) {
+        return true;
+    }
+
     if (1..=10).contains(&idx) {
         idx <= 2 || idx == 4
     } else if (11..=30).contains(&idx) {
         idx <= 22
     } else if (31..=60).contains(&idx) {
         idx <= 40
+    } else if is_immature_seed(idx) {
+        // Keep some immature items unscheduled so cold-stock and due-date signals remain visible.
+        idx % 2 == 0
     } else {
-        true
+        // For normal items, keep a stable unscheduled tail so D2/D3 dashboards don't go empty.
+        idx % 5 != 0
     }
+}
+
+fn is_immature_seed(idx: i32) -> bool {
+    // Hand-picked clusters + a periodic spread for larger data sets.
+    (91..=120).contains(&idx) || (7..=10).contains(&idx) || (55..=60).contains(&idx) || (idx > 60 && idx % 17 == 0)
+}
+
+fn material_weight_t(idx: i32) -> f64 {
+    // Deterministic weight distribution for more realistic KPIs and aggregations.
+    // Range: ~35t - 95t, with occasional heavier items up to ~125t.
+    let base = 35.0 + ((idx % 11) as f64) * 5.5;
+    let bonus = if idx % 29 == 0 { 30.0 } else { 0.0 };
+    (base + bonus).min(125.0)
 }
 
 fn refresh_decision_read_models(

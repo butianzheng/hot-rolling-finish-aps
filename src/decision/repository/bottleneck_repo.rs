@@ -109,7 +109,7 @@ impl BottleneckRepository {
         let mut stmt = conn.prepare(&sql)?;
 
         // 构建参数
-        let profiles = if let Some(mc) = machine_code {
+        let mut profiles = if let Some(mc) = machine_code {
             stmt.query_map(params![version_id, start_date, end_date, mc], |row| {
                 Self::map_read_model_row(row, version_id)
             })?
@@ -120,6 +120,11 @@ impl BottleneckRepository {
             })?
             .collect::<Result<Vec<_>, _>>()?
         };
+
+        // 补齐读模型缺失字段（scheduled/pending weight 等）
+        // 说明：decision_machine_bottleneck 是 P2 读模型，但早期版本未落全字段。
+        //       为保证前端展示口径一致，这里用 plan_item/material_state 进行轻量 enrich。
+        Self::enrich_read_model_profiles(&conn, version_id, machine_code, start_date, end_date, &mut profiles)?;
 
         Ok(profiles)
     }
@@ -170,15 +175,35 @@ impl BottleneckRepository {
         }
 
         // 解析 reasons
+        // 兼容字段名：
+        // - 早期 refresh 写入: {code, description, severity, affected_materials}
+        // - 旧注释/草案:      {code, description, severity, impact_t}
+        // - DTO 口径:        {code, msg, weight, affected_count}
         if let Ok(reason_list) = serde_json::from_str::<Vec<serde_json::Value>>(&reasons) {
             for reason in reason_list {
-                if let (Some(code), Some(desc), Some(severity), Some(impact)) = (
-                    reason.get("code").and_then(|v| v.as_str()),
-                    reason.get("description").and_then(|v| v.as_str()),
-                    reason.get("severity").and_then(|v| v.as_f64()),
-                    reason.get("impact_t").and_then(|v| v.as_i64()),
-                ) {
-                    profile.add_reason(code.to_string(), desc.to_string(), severity, impact as i32);
+                let code = reason.get("code").and_then(|v| v.as_str());
+                let description = reason
+                    .get("description")
+                    .or_else(|| reason.get("msg"))
+                    .and_then(|v| v.as_str());
+                let severity = reason
+                    .get("severity")
+                    .or_else(|| reason.get("weight"))
+                    .and_then(|v| v.as_f64());
+                let affected_materials = reason
+                    .get("affected_materials")
+                    .or_else(|| reason.get("affected_count"))
+                    .or_else(|| reason.get("impact_t"))
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(0) as i32;
+
+                if let (Some(code), Some(description), Some(severity)) = (code, description, severity) {
+                    profile.reasons.push(crate::decision::use_cases::d4_machine_bottleneck::BottleneckReason {
+                        code: code.to_string(),
+                        description: description.to_string(),
+                        severity,
+                        affected_materials,
+                    });
                 }
             }
         }
@@ -193,6 +218,131 @@ impl BottleneckRepository {
         }
 
         Ok(profile)
+    }
+
+    /// 读模型补齐字段：scheduled/pending material & weight
+    ///
+    /// 背景：decision_machine_bottleneck 表中只有 pending_materials（且早期可能口径不准），
+    ///       未存 scheduled_materials / weight_t / pending_weight_t。
+    ///       这里用 plan_item/material_state 做补齐，避免前端看到“利用率很高但材料数全为 0 / 原因为空”。
+    fn enrich_read_model_profiles(
+        conn: &Connection,
+        version_id: &str,
+        machine_code: Option<&str>,
+        start_date: &str,
+        end_date: &str,
+        profiles: &mut [MachineBottleneckProfile],
+    ) -> Result<(), Box<dyn Error>> {
+        // 1) scheduled: 来自 plan_item (按机组×日期聚合)
+        let mut scheduled_map: HashMap<(String, String), (i32, f64)> = HashMap::new();
+        if let Some(mc) = machine_code {
+            let mut stmt = conn.prepare(
+                r#"
+                SELECT
+                    machine_code,
+                    plan_date,
+                    COUNT(*) AS material_count,
+                    COALESCE(SUM(weight_t), 0) AS total_weight_t
+                FROM plan_item
+                WHERE version_id = ?1
+                  AND plan_date BETWEEN ?2 AND ?3
+                  AND machine_code = ?4
+                GROUP BY machine_code, plan_date
+                "#,
+            )?;
+            let rows = stmt.query_map(params![version_id, start_date, end_date, mc], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i32>(2)?,
+                    row.get::<_, f64>(3)?,
+                ))
+            })?;
+            for row in rows {
+                let (machine_code, plan_date, count, weight_t) = row?;
+                scheduled_map.insert((machine_code, plan_date), (count, weight_t));
+            }
+        } else {
+            let mut stmt = conn.prepare(
+                r#"
+                SELECT
+                    machine_code,
+                    plan_date,
+                    COUNT(*) AS material_count,
+                    COALESCE(SUM(weight_t), 0) AS total_weight_t
+                FROM plan_item
+                WHERE version_id = ?1
+                  AND plan_date BETWEEN ?2 AND ?3
+                GROUP BY machine_code, plan_date
+                "#,
+            )?;
+            let rows = stmt.query_map(params![version_id, start_date, end_date], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i32>(2)?,
+                    row.get::<_, f64>(3)?,
+                ))
+            })?;
+            for row in rows {
+                let (machine_code, plan_date, count, weight_t) = row?;
+                scheduled_map.insert((machine_code, plan_date), (count, weight_t));
+            }
+        }
+
+        // 2) pending: 来自 material_state + material_master (按机组聚合)
+        let mut pending_map: HashMap<String, (i32, f64)> = HashMap::new();
+        {
+            let mut stmt = conn.prepare(
+                r#"
+                SELECT
+                    mm.next_machine_code AS machine_code,
+                    COUNT(*) AS pending_count,
+                    COALESCE(SUM(mm.weight_t), 0) AS pending_weight_t
+                FROM material_state ms
+                INNER JOIN material_master mm ON ms.material_id = mm.material_id
+                WHERE ms.sched_state IN ('READY', 'FORCE_RELEASE')
+                  AND mm.next_machine_code IS NOT NULL
+                  AND mm.next_machine_code != ''
+                GROUP BY mm.next_machine_code
+                "#,
+            )?;
+            let rows = stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i32>(1)?,
+                    row.get::<_, f64>(2)?,
+                ))
+            })?;
+            for row in rows {
+                let (machine_code, count, weight_t) = row?;
+                pending_map.insert(machine_code, (count, weight_t));
+            }
+        }
+
+        // 3) 写回 profiles
+        for profile in profiles.iter_mut() {
+            if let Some((count, weight_t)) = scheduled_map.get(&(
+                profile.machine_code.clone(),
+                profile.plan_date.clone(),
+            )) {
+                profile.scheduled_materials = *count;
+                profile.scheduled_weight_t = *weight_t;
+            } else {
+                profile.scheduled_materials = 0;
+                profile.scheduled_weight_t = 0.0;
+            }
+
+            if let Some((count, weight_t)) = pending_map.get(&profile.machine_code) {
+                profile.pending_materials = *count;
+                profile.pending_weight_t = *weight_t;
+            } else {
+                profile.pending_materials = 0;
+                profile.pending_weight_t = 0.0;
+            }
+        }
+
+        Ok(())
     }
 
     /// 从 capacity_pool/plan_item 表实时计算（P1 回退路径）
@@ -1289,5 +1439,145 @@ mod tests {
             .find(|r| r.code == "DATA_INCONSISTENCY_WARNING");
         assert!(warning_reason.is_some(), "应该包含数据不一致警告");
         assert_eq!(h034.scheduled_materials, 0);  // 没有已排材料
+    }
+
+    #[test]
+    fn test_read_model_reason_parsing_and_enrich_fields() {
+        // 回归测试：读模型 reasons 字段使用 affected_materials 时应能正常解析；
+        // 同时补齐 scheduled/pending 的数量与重量，避免前端出现“利用率很高但材料数为 0 / 原因为空”。
+        let conn_arc = setup_test_db();
+        {
+            let conn = conn_arc.lock().expect("锁获取失败");
+
+            // 创建读模型表（最小字段集）
+            conn.execute(
+                r#"
+                CREATE TABLE IF NOT EXISTS decision_machine_bottleneck (
+                    version_id TEXT NOT NULL,
+                    machine_code TEXT NOT NULL,
+                    plan_date TEXT NOT NULL,
+                    bottleneck_score REAL NOT NULL,
+                    bottleneck_level TEXT NOT NULL,
+                    bottleneck_types TEXT NOT NULL,
+                    reasons TEXT NOT NULL,
+                    remaining_capacity_t REAL NOT NULL,
+                    capacity_utilization REAL NOT NULL,
+                    needs_roll_change INTEGER NOT NULL DEFAULT 0,
+                    structure_violations INTEGER NOT NULL DEFAULT 0,
+                    pending_materials INTEGER NOT NULL DEFAULT 0,
+                    suggested_actions TEXT
+                )
+                "#,
+                [],
+            )
+            .unwrap();
+
+            conn.execute(
+                r#"
+                INSERT INTO decision_machine_bottleneck (
+                    version_id, machine_code, plan_date,
+                    bottleneck_score, bottleneck_level,
+                    bottleneck_types, reasons,
+                    remaining_capacity_t, capacity_utilization,
+                    needs_roll_change, structure_violations, pending_materials, suggested_actions
+                ) VALUES (
+                    'V001', 'H034', '2026-01-31',
+                    95.0, 'CRITICAL',
+                    '["Capacity"]',
+                    '[{"code":"CAPACITY_UTILIZATION","description":"产能利用率: 114.7%","severity":1.147,"affected_materials":0}]',
+                    -100.0, 1.147,
+                    0, 0, 0, '[]'
+                )
+                "#,
+                [],
+            )
+            .unwrap();
+
+            // 插入 plan_item（已排 2 件，共 200t）
+            for i in 1..=2 {
+                conn.execute(
+                    r#"
+                    INSERT INTO plan_item (
+                        version_id, material_id, machine_code, plan_date, seq_no, weight_t,
+                        source_type, locked_in_plan, force_release_in_plan, violation_flags
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    "#,
+                    params![
+                        "V001",
+                        format!("PM{:03}", i),
+                        "H034",
+                        "2026-01-31",
+                        i,
+                        100.0,
+                        "AUTO",
+                        0,
+                        0,
+                        ""
+                    ],
+                )
+                .unwrap();
+            }
+
+            // 插入待排材料（READY 1 件，共 50t，next_machine_code = H034）
+            conn.execute(
+                r#"
+                INSERT INTO material_master (
+                    material_id, current_machine_code, next_machine_code, weight_t,
+                    manufacturing_order_id, contract_no, due_date,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                "#,
+                params![
+                    "PENDING_001",
+                    "H031",
+                    "H034",
+                    50.0,
+                    "MO_P001",
+                    "C_P001",
+                    "2026-02-01",
+                    "2026-01-01T00:00:00Z",
+                    "2026-01-01T00:00:00Z"
+                ],
+            )
+            .unwrap();
+
+            conn.execute(
+                r#"
+                INSERT INTO material_state (
+                    material_id, sched_state, lock_flag, force_release_flag,
+                    urgent_level, updated_at, updated_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                "#,
+                params![
+                    "PENDING_001",
+                    "READY",
+                    0,
+                    0,
+                    "L0",
+                    "2026-01-01T00:00:00Z",
+                    "SYSTEM"
+                ],
+            )
+            .unwrap();
+        }
+
+        let repo = BottleneckRepository::new(conn_arc);
+        let profiles = repo
+            .get_bottleneck_profile("V001", Some("H034"), "2026-01-31", "2026-01-31")
+            .unwrap();
+
+        assert_eq!(profiles.len(), 1);
+        let p = &profiles[0];
+        assert_eq!(p.machine_code, "H034");
+        assert_eq!(p.plan_date, "2026-01-31");
+        assert_eq!(p.bottleneck_level, "CRITICAL");
+        assert_eq!(p.scheduled_materials, 2);
+        assert_eq!(p.scheduled_weight_t, 200.0);
+        assert_eq!(p.pending_materials, 1);
+        assert_eq!(p.pending_weight_t, 50.0);
+        assert!(
+            p.reasons.iter().any(|r| r.code == "CAPACITY_UTILIZATION"),
+            "应能解析读模型 reasons 字段"
+        );
     }
 }
