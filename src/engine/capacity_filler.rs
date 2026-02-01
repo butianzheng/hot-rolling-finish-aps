@@ -248,6 +248,7 @@ mod tests {
         used_capacity_t: f64,
     ) -> CapacityPool {
         CapacityPool {
+            version_id: "VTEST".to_string(),
             machine_code: machine_code.to_string(),
             plan_date,
             target_capacity_t,

@@ -7,9 +7,8 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
-use hot_rolling_aps::decision::repository::{
-    CapacityOpportunityRepository, ColdStockRepository, OrderFailureRepository, RollAlertRepository,
-};
+use hot_rolling_aps::app::get_default_db_path;
+use hot_rolling_aps::decision::services::{DecisionRefreshService, RefreshScope, RefreshTrigger};
 
 const ACTIVE_PLAN_ID: &str = "P001";
 const ACTIVE_VERSION_ID: &str = "V001";
@@ -32,7 +31,7 @@ struct ScheduledItem {
 fn main() -> Result<(), Box<dyn Error>> {
     let db_path = std::env::args()
         .nth(1)
-        .unwrap_or_else(|| "hot_rolling_aps.db".to_string());
+        .unwrap_or_else(get_default_db_path);
 
     let material_count = std::env::args()
         .nth(2)
@@ -52,9 +51,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Seed data
     seed_full_scenario(&conn, material_count)?;
 
-    // Refresh decision read models that do not have realtime fallback (D2/D3/D5/D6).
+    // Refresh decision read models (D1-D6) so the UI has deterministic results immediately after seeding.
     let conn_arc = Arc::new(Mutex::new(conn));
     refresh_decision_read_models(conn_arc.clone(), ACTIVE_VERSION_ID)?;
+    refresh_decision_read_models(conn_arc.clone(), DRAFT_VERSION_ID)?;
 
     print_quick_counts(conn_arc)?;
 
@@ -81,6 +81,7 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
 
     // Pre-compute scheduling so we can keep plan_item and material_state consistent.
     let schedule_map = build_schedule_map(base_date, material_count);
+    let draft_schedule_map = build_draft_schedule_map(&schedule_map, base_date);
 
     let now_naive = Local::now().naive_local();
     let now_sql_dt = now_naive.format("%Y-%m-%d %H:%M:%S").to_string();
@@ -466,6 +467,31 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
         )?;
     }
 
+    // plan_item (draft version)
+    for (material_id, s) in &draft_schedule_map {
+        tx.execute(
+            r#"
+            INSERT INTO plan_item (
+                version_id, material_id, machine_code, plan_date, seq_no,
+                weight_t, source_type, locked_in_plan, force_release_in_plan,
+                violation_flags
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+            "#,
+            params![
+                DRAFT_VERSION_ID,
+                material_id,
+                s.machine_code,
+                s.plan_date,
+                s.seq_no,
+                s.weight_t,
+                s.source_type,
+                if s.locked_in_plan { 1 } else { 0 },
+                if s.force_release_in_plan { 1 } else { 0 },
+                s.violation_flags,
+            ],
+        )?;
+    }
+
     // capacity_pool (30 days horizon)
     let machine_targets: HashMap<&str, f64> = HashMap::from([
         ("H031", 1400.0),
@@ -474,67 +500,66 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
         ("H034", 1700.0),
     ]);
 
-    // Used capacity per machine/date derived from plan_item (seeded schedule),
-    // then tweaked to create some overflow days.
-    let mut accumulated: HashMap<&str, f64> = HashMap::new();
-    for (machine_code, _) in machine_targets.iter() {
-        accumulated.insert(machine_code, 0.0);
-    }
+    // Used capacity per machine/date is derived from plan_item (per version) to keep data consistent.
+    for (version_id, schedule) in [
+        (ACTIVE_VERSION_ID, &schedule_map),
+        (DRAFT_VERSION_ID, &draft_schedule_map),
+    ] {
+        let mut accumulated: HashMap<&str, f64> = HashMap::new();
+        for (machine_code, _) in machine_targets.iter() {
+            accumulated.insert(machine_code, 0.0);
+        }
 
-    for day in 0..HORIZON_DAYS {
-        let plan_date = (base_date + Duration::days(day)).to_string();
-        for (machine_code, target_capacity_t) in &machine_targets {
-            let limit_capacity_t = target_capacity_t * 1.15;
+        for day in 0..HORIZON_DAYS {
+            let plan_date = (base_date + Duration::days(day)).to_string();
+            for (machine_code, target_capacity_t) in &machine_targets {
+                let limit_capacity_t = target_capacity_t * 1.15;
 
-            let base_used: f64 = schedule_map
-                .values()
-                .filter(|s| s.machine_code == *machine_code && s.plan_date == plan_date)
-                .map(|s| s.weight_t)
-                .sum();
+                let used_capacity_t: f64 = schedule
+                    .values()
+                    .filter(|s| s.machine_code == *machine_code && s.plan_date == plan_date)
+                    .map(|s| s.weight_t)
+                    .sum();
 
-            // Add deterministic extra load to create diverse utilization/overflow patterns.
-            let mut used_capacity_t = base_used + ((day % 7) as f64) * 40.0;
-            if *machine_code == "H033" && day == 3 {
-                used_capacity_t = (limit_capacity_t + 120.0).max(base_used); // force overflow (never below plan_item total)
+                let overflow_t = (used_capacity_t - limit_capacity_t).max(0.0);
+                let frozen_capacity_t: f64 = schedule
+                    .values()
+                    .filter(|s| {
+                        s.machine_code == *machine_code
+                            && s.plan_date == plan_date
+                            && s.locked_in_plan
+                    })
+                    .map(|s| s.weight_t)
+                    .sum();
+
+                let acc = accumulated.get_mut(machine_code).unwrap();
+                *acc += used_capacity_t;
+
+                tx.execute(
+                    r#"
+                    INSERT INTO capacity_pool (
+                        version_id,
+                        machine_code, plan_date,
+                        target_capacity_t, limit_capacity_t,
+                        used_capacity_t, overflow_t,
+                        frozen_capacity_t, accumulated_tonnage_t,
+                        roll_campaign_id
+                    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                    "#,
+                    params![
+                        version_id,
+                        machine_code,
+                        plan_date,
+                        target_capacity_t,
+                        limit_capacity_t,
+                        used_capacity_t,
+                        overflow_t,
+                        frozen_capacity_t,
+                        *acc,
+                        format!("{}_C1", machine_code),
+                    ],
+                )?;
             }
-            if *machine_code == "H034" && day == 5 {
-                used_capacity_t = (target_capacity_t * 0.98).max(base_used); // high utilization (never below plan_item total)
-            }
-
-            let overflow_t = (used_capacity_t - limit_capacity_t).max(0.0);
-            let frozen_capacity_t: f64 = schedule_map
-                .values()
-                .filter(|s| {
-                    s.machine_code == *machine_code && s.plan_date == plan_date && s.locked_in_plan
-                })
-                .map(|s| s.weight_t)
-                .sum();
-
-            let acc = accumulated.get_mut(machine_code).unwrap();
-            *acc += used_capacity_t;
-
-            tx.execute(
-                r#"
-                INSERT INTO capacity_pool (
-                    machine_code, plan_date,
-                    target_capacity_t, limit_capacity_t,
-                    used_capacity_t, overflow_t,
-                    frozen_capacity_t, accumulated_tonnage_t,
-                    roll_campaign_id
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-                "#,
-                params![
-                    machine_code,
-                    plan_date,
-                    target_capacity_t,
-                    limit_capacity_t,
-                    used_capacity_t,
-                    overflow_t,
-                    frozen_capacity_t,
-                    *acc,
-                    format!("{}_C1", machine_code),
-                ],
-            )?;
         }
     }
 
@@ -545,114 +570,134 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
         ("H033", (1000.0, 1500.0, "Suggest")),
         ("H034", (1000.0, 1500.0, "Suggest")),
     ]);
-    for (machine_code, (suggest_t, hard_t, status)) in &roll_thresholds {
-        tx.execute(
-            r#"
-            INSERT INTO roller_campaign (
-                version_id, machine_code, campaign_no,
-                start_date, end_date,
-                cum_weight_t, suggest_threshold_t, hard_limit_t,
-                status
-            ) VALUES (?1, ?2, 1, ?3, NULL, 0.0, ?4, ?5, ?6)
-            "#,
-            params![
-                ACTIVE_VERSION_ID,
-                machine_code,
-                (base_date - Duration::days(7)).to_string(),
-                suggest_t,
-                hard_t,
-                status,
-            ],
-        )?;
-    }
-
-    // risk_snapshot (active version only, 30 days horizon)
-    // Note: decision/dashboard expects LOW/MEDIUM/HIGH/CRITICAL (not Green/Yellow/...).
-    for day in 0..HORIZON_DAYS {
-        let snapshot_date = (base_date + Duration::days(day)).to_string();
-        for (machine_code, target_capacity_t) in &machine_targets {
-            let limit_capacity_t = target_capacity_t * 1.15;
-
-            let (used_capacity_t, overflow_t): (f64, f64) = tx.query_row(
-                r#"
-                SELECT used_capacity_t, overflow_t
-                FROM capacity_pool
-                WHERE machine_code = ?1 AND plan_date = ?2
-                "#,
-                params![machine_code, snapshot_date],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )?;
-
-            let util = if *target_capacity_t > 0.0 {
-                used_capacity_t / *target_capacity_t
-            } else {
-                0.0
-            };
-
-            let risk_level = if overflow_t > 0.0 || used_capacity_t > limit_capacity_t {
-                "CRITICAL"
-            } else if util >= 0.95 {
-                "HIGH"
-            } else if util >= 0.80 {
-                "MEDIUM"
-            } else {
-                "LOW"
-            };
-
-            let risk_reasons = match risk_level {
-                "CRITICAL" => "Capacity overflow / hard limit exceeded",
-                "HIGH" => "Utilization very high",
-                "MEDIUM" => "Utilization moderate",
-                _ => "Healthy",
-            };
-
-            // Simple backlog metrics derived from seeded material_state.
-            let (urgent_total_t, mature_backlog_t, immature_backlog_t): (f64, f64, f64) = tx.query_row(
-                r#"
-                SELECT
-                    COALESCE(SUM(CASE WHEN urgent_level IN ('L2','L3') AND scheduled_date IS NULL THEN weight_t ELSE 0 END), 0.0) AS urgent_total_t,
-                    COALESCE(SUM(CASE WHEN is_mature = 1 AND scheduled_date IS NULL THEN weight_t ELSE 0 END), 0.0) AS mature_backlog_t,
-                    COALESCE(SUM(CASE WHEN is_mature = 0 AND scheduled_date IS NULL THEN weight_t ELSE 0 END), 0.0) AS immature_backlog_t
-                FROM material_state
-                WHERE machine_code = ?1
-                "#,
-                params![machine_code],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-            )?;
-
-            let campaign_status = if *machine_code == "H034" && day >= 4 && day <= 6 {
-                Some("NEAR_HARD_STOP".to_string())
-            } else {
-                None
-            };
-
+    for version_id in [ACTIVE_VERSION_ID, DRAFT_VERSION_ID] {
+        for (machine_code, (suggest_t, hard_t, status)) in &roll_thresholds {
             tx.execute(
                 r#"
-                INSERT INTO risk_snapshot (
-                    version_id, machine_code, snapshot_date,
-                    risk_level, risk_reasons,
-                    target_capacity_t, used_capacity_t, limit_capacity_t, overflow_t,
-                    urgent_total_t, mature_backlog_t, immature_backlog_t,
-                    campaign_status, created_at
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+                INSERT INTO roller_campaign (
+                    version_id, machine_code, campaign_no,
+                    start_date, end_date,
+                    cum_weight_t, suggest_threshold_t, hard_limit_t,
+                    status
+                ) VALUES (?1, ?2, 1, ?3, NULL, 0.0, ?4, ?5, ?6)
                 "#,
                 params![
-                    ACTIVE_VERSION_ID,
+                    version_id,
                     machine_code,
-                    snapshot_date,
-                    risk_level,
-                    risk_reasons,
-                    target_capacity_t,
-                    used_capacity_t,
-                    limit_capacity_t,
-                    overflow_t,
-                    urgent_total_t,
-                    mature_backlog_t,
-                    immature_backlog_t,
-                    campaign_status,
-                    now_sql_dt,
+                    (base_date - Duration::days(7)).to_string(),
+                    suggest_t,
+                    hard_t,
+                    status,
                 ],
             )?;
+        }
+
+        // risk_snapshot (per version, 30 days horizon)
+        // Note: decision/dashboard expects LOW/MEDIUM/HIGH/CRITICAL (not Green/Yellow/...).
+        for day in 0..HORIZON_DAYS {
+            let snapshot_date = (base_date + Duration::days(day)).to_string();
+            for (machine_code, target_capacity_t) in &machine_targets {
+                let limit_capacity_t = target_capacity_t * 1.15;
+
+                let (used_capacity_t, overflow_t): (f64, f64) = tx.query_row(
+                    r#"
+                    SELECT used_capacity_t, overflow_t
+                    FROM capacity_pool
+                    WHERE version_id = ?1 AND machine_code = ?2 AND plan_date = ?3
+                    "#,
+                    params![version_id, machine_code, snapshot_date],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )?;
+
+                let util = if *target_capacity_t > 0.0 {
+                    used_capacity_t / *target_capacity_t
+                } else {
+                    0.0
+                };
+
+                let risk_level = if overflow_t > 0.0 || used_capacity_t > limit_capacity_t {
+                    "CRITICAL"
+                } else if util >= 0.95 {
+                    "HIGH"
+                } else if util >= 0.80 {
+                    "MEDIUM"
+                } else {
+                    "LOW"
+                };
+
+                let risk_reasons = match risk_level {
+                    "CRITICAL" => "Capacity overflow / hard limit exceeded",
+                    "HIGH" => "Utilization very high",
+                    "MEDIUM" => "Utilization moderate",
+                    _ => "Healthy",
+                };
+
+                // Backlog metrics are version-aware (based on whether the material is scheduled in this version).
+                let (urgent_total_t, mature_backlog_t, immature_backlog_t): (f64, f64, f64) = tx.query_row(
+                    r#"
+                    SELECT
+                        COALESCE(SUM(CASE
+                            WHEN ms.urgent_level IN ('L2','L3')
+                                 AND NOT EXISTS (
+                                     SELECT 1 FROM plan_item pi
+                                     WHERE pi.version_id = ?1 AND pi.material_id = ms.material_id
+                                 )
+                            THEN ms.weight_t ELSE 0 END), 0.0) AS urgent_total_t,
+                        COALESCE(SUM(CASE
+                            WHEN ms.is_mature = 1
+                                 AND NOT EXISTS (
+                                     SELECT 1 FROM plan_item pi
+                                     WHERE pi.version_id = ?1 AND pi.material_id = ms.material_id
+                                 )
+                            THEN ms.weight_t ELSE 0 END), 0.0) AS mature_backlog_t,
+                        COALESCE(SUM(CASE
+                            WHEN ms.is_mature = 0
+                                 AND NOT EXISTS (
+                                     SELECT 1 FROM plan_item pi
+                                     WHERE pi.version_id = ?1 AND pi.material_id = ms.material_id
+                                 )
+                            THEN ms.weight_t ELSE 0 END), 0.0) AS immature_backlog_t
+                    FROM material_state ms
+                    WHERE ms.machine_code = ?2
+                    "#,
+                    params![version_id, machine_code],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )?;
+
+                let campaign_status = if *machine_code == "H034" && day >= 4 && day <= 6 {
+                    Some("NEAR_HARD_STOP".to_string())
+                } else {
+                    None
+                };
+
+                tx.execute(
+                    r#"
+                    INSERT INTO risk_snapshot (
+                        version_id, machine_code, snapshot_date,
+                        risk_level, risk_reasons,
+                        target_capacity_t, used_capacity_t, limit_capacity_t, overflow_t,
+                        urgent_total_t, mature_backlog_t, immature_backlog_t,
+                        campaign_status, created_at
+                    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+                    "#,
+                    params![
+                        version_id,
+                        machine_code,
+                        snapshot_date,
+                        risk_level,
+                        risk_reasons,
+                        target_capacity_t,
+                        used_capacity_t,
+                        limit_capacity_t,
+                        overflow_t,
+                        urgent_total_t,
+                        mature_backlog_t,
+                        immature_backlog_t,
+                        campaign_status,
+                        now_sql_dt,
+                    ],
+                )?;
+            }
         }
     }
 
@@ -825,7 +870,99 @@ fn build_schedule_map(
         }
     }
 
+    apply_capacity_spikes(base_date, &mut out);
     out
+}
+
+fn build_draft_schedule_map(
+    base_schedule_map: &HashMap<String, ScheduledItem>,
+    base_date: chrono::NaiveDate,
+) -> HashMap<String, ScheduledItem> {
+    let mut out = base_schedule_map.clone();
+
+    // Deterministic "what-if" variations for version compare / sync testing.
+    for (material_id, item) in out.iter_mut() {
+        let idx = mat_index(material_id);
+
+        // Shift some items by +1 day.
+        if idx % 10 == 0 {
+            let original =
+                chrono::NaiveDate::parse_from_str(&item.plan_date, "%Y-%m-%d").unwrap_or(base_date);
+            let offset_days = original.signed_duration_since(base_date).num_days();
+            let next_offset = (offset_days + 1).rem_euclid(HORIZON_DAYS);
+            item.plan_date = (base_date + Duration::days(next_offset)).to_string();
+        }
+
+        // Move a smaller subset to a different machine.
+        if idx % 25 == 0 {
+            item.machine_code = match item.machine_code.as_str() {
+                "H031" => "H032",
+                "H032" => "H033",
+                "H033" => "H034",
+                _ => "H031",
+            }
+            .to_string();
+        }
+    }
+
+    // Recompute seq_no per (machine, date) to keep plan_item ordering sane.
+    recompute_seq_no(&mut out);
+    out
+}
+
+fn apply_capacity_spikes(base_date: chrono::NaiveDate, schedule_map: &mut HashMap<String, ScheduledItem>) {
+    // Goal: create a few high-util / overflow days deterministically, while keeping
+    // capacity_pool.used_capacity_t == SUM(plan_item.weight_t) (data-consistent).
+    //
+    // Strategy: move a small batch of scheduled items onto a couple of specific days.
+
+    let spikes = [
+        ("H033", 3_i64, 32_usize), // create an overflow-ish day
+        ("H034", 5_i64, 28_usize), // create a high utilization day
+        ("H032", 2_i64, 24_usize), // create a high utilization day
+    ];
+
+    for (machine, day_offset, take_n) in spikes {
+        let spike_date = (base_date + Duration::days(day_offset)).to_string();
+
+        let mut ids: Vec<String> = schedule_map
+            .iter()
+            .filter_map(|(mid, s)| if s.machine_code == machine { Some(mid.clone()) } else { None })
+            .collect();
+        ids.sort();
+
+        for mid in ids.into_iter().take(take_n) {
+            if let Some(s) = schedule_map.get_mut(&mid) {
+                s.plan_date = spike_date.clone();
+            }
+        }
+    }
+
+    recompute_seq_no(schedule_map);
+}
+
+fn recompute_seq_no(schedule_map: &mut HashMap<String, ScheduledItem>) {
+    let mut items: Vec<(String, String, String)> = schedule_map
+        .iter()
+        .map(|(mid, s)| (s.machine_code.clone(), s.plan_date.clone(), mid.clone()))
+        .collect();
+
+    // Stable ordering: (machine_code, plan_date, material_id).
+    items.sort();
+
+    let mut seq_per_key: HashMap<(String, String), i32> = HashMap::new();
+    for (machine_code, plan_date, material_id) in items {
+        let seq = seq_per_key
+            .entry((machine_code.clone(), plan_date.clone()))
+            .or_insert(0);
+        *seq += 1;
+
+        if let Some(s) = schedule_map.get_mut(&material_id) {
+            s.seq_no = *seq;
+            s.machine_code = machine_code;
+            s.plan_date = plan_date;
+        }
+    }
 }
 
 fn mat_index(material_id: &str) -> i32 {
@@ -877,16 +1014,23 @@ fn refresh_decision_read_models(
     conn: Arc<Mutex<Connection>>,
     version_id: &str,
 ) -> Result<(), Box<dyn Error>> {
-    let order_failure_repo = OrderFailureRepository::new(conn.clone());
-    let cold_stock_repo = ColdStockRepository::new(conn.clone());
-    let roll_alert_repo = RollAlertRepository::new(conn.clone());
-    let capacity_opp_repo = CapacityOpportunityRepository::new(conn.clone());
+    let service = DecisionRefreshService::new(conn.clone());
+    let scope = RefreshScope {
+        version_id: version_id.to_string(),
+        is_full_refresh: true,
+        affected_machines: None,
+        affected_date_range: None,
+    };
 
-    // Only these use-cases are strictly dependent on read-model tables with no realtime fallback.
-    order_failure_repo.refresh_full(version_id)?;
-    cold_stock_repo.refresh_full(version_id)?;
-    roll_alert_repo.refresh_full(version_id)?;
-    capacity_opp_repo.refresh_full(version_id)?;
+    let refresh_id = service.refresh_all(
+        scope,
+        RefreshTrigger::ManualRefresh,
+        Some("reset_and_seed_full_scenario_db bin".to_string()),
+    )?;
+    eprintln!(
+        "Decision read models refreshed: version_id={}, refresh_id={}",
+        version_id, refresh_id
+    );
 
     Ok(())
 }
@@ -906,6 +1050,8 @@ fn print_quick_counts(conn: Arc<Mutex<Connection>>) -> Result<(), Box<dyn Error>
         "action_log",
         "import_batch",
         "import_conflict",
+        "decision_day_summary",
+        "decision_machine_bottleneck",
         "decision_order_failure_set",
         "decision_cold_stock_profile",
         "decision_roll_campaign_alert",
