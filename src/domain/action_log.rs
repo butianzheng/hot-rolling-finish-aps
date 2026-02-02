@@ -50,6 +50,9 @@ pub enum ActionType {
     CreateVersion,     // 创建版本
     ActivateVersion,   // 激活版本
     RollChange,        // 换辊
+    // ===== v0.4+ 路径规则相关 =====
+    PathOverrideConfirm, // 路径突破人工确认
+    RollCycleReset,      // 换辊周期重置（含锚点重置）
 }
 
 // ==========================================
@@ -139,6 +142,9 @@ impl ActionType {
             ActionType::CreateVersion => "CreateVersion",
             ActionType::ActivateVersion => "ActivateVersion",
             ActionType::RollChange => "RollChange",
+            // v0.4+ 路径规则相关
+            ActionType::PathOverrideConfirm => "PathOverrideConfirm",
+            ActionType::RollCycleReset => "RollCycleReset",
         }
     }
 
@@ -153,6 +159,9 @@ impl ActionType {
             "CreateVersion" => Some(ActionType::CreateVersion),
             "ActivateVersion" => Some(ActionType::ActivateVersion),
             "RollChange" => Some(ActionType::RollChange),
+            // v0.4+ 路径规则相关
+            "PathOverrideConfirm" => Some(ActionType::PathOverrideConfirm),
+            "RollCycleReset" => Some(ActionType::RollCycleReset),
             _ => None,
         }
     }

@@ -212,3 +212,120 @@ impl PlanVersionStatus {
 
 // TODO(P3-TD001): 实现 FromStr trait 便于配置解析
 // TODO(P3-TD002): 实现数据库映射 (sqlx derive)
+
+// ==========================================
+// 锚点来源 (Anchor Source) [v0.4+]
+// ==========================================
+// 依据: Engine_Specs 14.3 锚点来源枚举
+// 用于标识宽厚路径规则锚点的来源
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum AnchorSource {
+    FrozenLast,        // 冻结区最后一块材料
+    LockedLast,        // 锁定区最后一块材料
+    UserConfirmedLast, // 人工确认队列中最后一块
+    SeedS2,            // S2 种子策略生成
+    None,              // 无锚点（新周期起始或无候选）
+}
+
+impl fmt::Display for AnchorSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AnchorSource::FrozenLast => write!(f, "FROZEN_LAST"),
+            AnchorSource::LockedLast => write!(f, "LOCKED_LAST"),
+            AnchorSource::UserConfirmedLast => write!(f, "USER_CONFIRMED_LAST"),
+            AnchorSource::SeedS2 => write!(f, "SEED_S2"),
+            AnchorSource::None => write!(f, "NONE"),
+        }
+    }
+}
+
+impl AnchorSource {
+    /// 从字符串解析锚点来源
+    pub fn from_str(s: &str) -> Self {
+        match s.to_uppercase().as_str() {
+            "FROZEN_LAST" => AnchorSource::FrozenLast,
+            "LOCKED_LAST" => AnchorSource::LockedLast,
+            "USER_CONFIRMED_LAST" => AnchorSource::UserConfirmedLast,
+            "SEED_S2" => AnchorSource::SeedS2,
+            _ => AnchorSource::None,
+        }
+    }
+
+    /// 转换为数据库存储的字符串
+    pub fn to_db_str(&self) -> &'static str {
+        match self {
+            AnchorSource::FrozenLast => "FROZEN_LAST",
+            AnchorSource::LockedLast => "LOCKED_LAST",
+            AnchorSource::UserConfirmedLast => "USER_CONFIRMED_LAST",
+            AnchorSource::SeedS2 => "SEED_S2",
+            AnchorSource::None => "NONE",
+        }
+    }
+}
+
+// ==========================================
+// 路径违规类型 (Path Violation Type) [v0.4+]
+// ==========================================
+// 依据: Engine_Specs 15.5 PathViolationType 枚举
+// 用于标识宽厚路径规则的违规类型
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PathViolationType {
+    WidthExceeded,     // 宽度超限
+    ThicknessExceeded, // 厚度超限
+    BothExceeded,      // 宽度和厚度均超限
+}
+
+impl fmt::Display for PathViolationType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PathViolationType::WidthExceeded => write!(f, "WIDTH_EXCEEDED"),
+            PathViolationType::ThicknessExceeded => write!(f, "THICKNESS_EXCEEDED"),
+            PathViolationType::BothExceeded => write!(f, "BOTH_EXCEEDED"),
+        }
+    }
+}
+
+impl PathViolationType {
+    /// 从字符串解析路径违规类型
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_uppercase().as_str() {
+            "WIDTH_EXCEEDED" => Some(PathViolationType::WidthExceeded),
+            "THICKNESS_EXCEEDED" => Some(PathViolationType::ThicknessExceeded),
+            "BOTH_EXCEEDED" => Some(PathViolationType::BothExceeded),
+            _ => None,
+        }
+    }
+
+    /// 转换为数据库存储的字符串
+    pub fn to_db_str(&self) -> &'static str {
+        match self {
+            PathViolationType::WidthExceeded => "WIDTH_EXCEEDED",
+            PathViolationType::ThicknessExceeded => "THICKNESS_EXCEEDED",
+            PathViolationType::BothExceeded => "BOTH_EXCEEDED",
+        }
+    }
+}
+
+// ==========================================
+// 路径规则检查结果状态 (Path Rule Result Status) [v0.4+]
+// ==========================================
+// 依据: Engine_Specs 15.4 PathRuleResult
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PathRuleStatus {
+    Ok,               // 满足路径约束
+    HardViolation,    // 违反约束且不允许突破
+    OverrideRequired, // 违反约束但允许人工确认突破
+}
+
+impl fmt::Display for PathRuleStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PathRuleStatus::Ok => write!(f, "OK"),
+            PathRuleStatus::HardViolation => write!(f, "HARD_VIOLATION"),
+            PathRuleStatus::OverrideRequired => write!(f, "OVERRIDE_REQUIRED"),
+        }
+    }
+}

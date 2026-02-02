@@ -3,9 +3,10 @@
 // ==========================================
 // 依据: Claude_Dev_Master_Spec.md - PART B3 产能与换辊
 // 依据: Engine_Specs_v0.3_Integrated.md - 7. Roll Campaign Engine
+// 依据: Engine_Specs_v0.3_Integrated.md - 14. RollCycle State Model [v0.4+]
 // ==========================================
 
-use crate::domain::types::RollStatus;
+use crate::domain::types::{AnchorSource, RollStatus};
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
@@ -32,6 +33,13 @@ pub struct RollerCampaign {
 
     // ===== 状态 =====
     pub status: RollStatus,        // 换辊状态 (存储为字符串)
+
+    // ===== 路径锚点 [v0.4+] =====
+    // 依据: Engine_Specs 14.2 RollCycleState
+    pub path_anchor_material_id: Option<String>,  // 路径锚点材料ID
+    pub path_anchor_width_mm: Option<f64>,        // 锚点宽度 (mm)
+    pub path_anchor_thickness_mm: Option<f64>,    // 锚点厚度 (mm)
+    pub anchor_source: Option<AnchorSource>,      // 锚点来源类型
 }
 
 // ==========================================
@@ -139,6 +147,11 @@ impl RollerCampaign {
             suggest_threshold_t: suggest_threshold_t.unwrap_or(1500.0),
             hard_limit_t: hard_limit_t.unwrap_or(2500.0),
             status: RollStatus::Normal,
+            // 锚点字段初始化为 None [v0.4+]
+            path_anchor_material_id: None,
+            path_anchor_width_mm: None,
+            path_anchor_thickness_mm: None,
+            anchor_source: None,
         }
     }
 
@@ -165,5 +178,71 @@ impl RollerCampaign {
     /// 格式: "{version_id}_{machine_code}_{campaign_no}"
     pub fn get_id(&self) -> String {
         format!("{}_{}_C{}", self.version_id, self.machine_code, self.campaign_no)
+    }
+
+    // ==========================================
+    // 路径锚点相关方法 [v0.4+]
+    // ==========================================
+    // 依据: Engine_Specs 14. RollCycle State Model
+
+    /// 更新路径锚点
+    ///
+    /// # 参数
+    /// - `material_id`: 锚点材料ID（S2 种子策略时可为 None）
+    /// - `width_mm`: 锚点宽度 (mm)
+    /// - `thickness_mm`: 锚点厚度 (mm)
+    /// - `source`: 锚点来源类型
+    pub fn update_anchor(
+        &mut self,
+        material_id: Option<String>,
+        width_mm: f64,
+        thickness_mm: f64,
+        source: AnchorSource,
+    ) {
+        self.path_anchor_material_id = material_id;
+        self.path_anchor_width_mm = Some(width_mm);
+        self.path_anchor_thickness_mm = Some(thickness_mm);
+        self.anchor_source = Some(source);
+    }
+
+    /// 重置路径锚点（换辊时调用）
+    ///
+    /// 依据: Engine_Specs 14.4 周期切换行为
+    pub fn reset_anchor(&mut self) {
+        self.path_anchor_material_id = None;
+        self.path_anchor_width_mm = None;
+        self.path_anchor_thickness_mm = None;
+        self.anchor_source = Some(AnchorSource::None);
+    }
+
+    /// 判断是否有有效锚点
+    ///
+    /// # 返回
+    /// - `true`: 有有效锚点（宽度和厚度均不为空）
+    /// - `false`: 无有效锚点
+    pub fn has_valid_anchor(&self) -> bool {
+        self.path_anchor_width_mm.is_some() && self.path_anchor_thickness_mm.is_some()
+    }
+
+    /// 获取锚点宽度（带默认值）
+    ///
+    /// # 参数
+    /// - `default`: 默认值（无锚点时返回）
+    ///
+    /// # 返回
+    /// 锚点宽度或默认值
+    pub fn anchor_width_or(&self, default: f64) -> f64 {
+        self.path_anchor_width_mm.unwrap_or(default)
+    }
+
+    /// 获取锚点厚度（带默认值）
+    ///
+    /// # 参数
+    /// - `default`: 默认值（无锚点时返回）
+    ///
+    /// # 返回
+    /// 锚点厚度或默认值
+    pub fn anchor_thickness_or(&self, default: f64) -> f64 {
+        self.path_anchor_thickness_mm.unwrap_or(default)
     }
 }
