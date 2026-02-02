@@ -141,7 +141,9 @@ mod dashboard_api_e2e_test {
             .unwrap();
 
         // 4. 调用 DashboardAPI 简化版本（向后兼容 Tauri 命令）
-        let response = dashboard_api.get_most_risky_date(version_id).unwrap();
+        let response = dashboard_api
+            .get_most_risky_date(version_id, None, None, None, None)
+            .unwrap();
 
         // 5. 验证结果
         assert!(!response.items.is_empty(), "应该返回风险日期摘要");
@@ -388,7 +390,7 @@ mod dashboard_api_e2e_test {
         // 3. 验证结果
         assert_eq!(logs.len(), 1, "应该只返回 VERSION_001 的日志");
         assert_eq!(logs[0].action_id, "LOG_V1", "日志应该是 LOG_V1");
-        assert_eq!(logs[0].version_id, "VERSION_001", "版本ID 应该是 VERSION_001");
+        assert_eq!(logs[0].version_id.as_deref(), Some("VERSION_001"), "版本ID 应该是 VERSION_001");
     }
 
     // ==========================================
@@ -566,7 +568,7 @@ mod dashboard_api_e2e_test {
         let (_temp, _db_path, dashboard_api, _refresh_service) = setup_dashboard_test_env();
 
         // 1. 调用 DashboardAPI 方法，传入空版本ID
-        let result = dashboard_api.get_most_risky_date("");
+        let result = dashboard_api.get_most_risky_date("", None, None, None, None);
 
         // 2. 验证返回错误
         assert!(result.is_err(), "空版本ID 应该返回错误");

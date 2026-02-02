@@ -24,6 +24,7 @@ fn create_test_capacity_pool(
     limit: f64,
 ) -> CapacityPool {
     CapacityPool {
+        version_id: "V001".to_string(),
         machine_code: machine_code.to_string(),
         plan_date: NaiveDate::from_ymd_opt(2026, 1, 20).unwrap(),
         target_capacity_t: target,
@@ -127,6 +128,7 @@ fn test_risk_engine_green_level() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     println!("✓ 快照生成完成");
@@ -176,6 +178,7 @@ fn test_risk_engine_yellow_level_high_utilization() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     println!("✓ 快照生成完成");
@@ -230,6 +233,7 @@ fn test_risk_engine_yellow_level_l2_materials() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     println!("✓ 快照生成完成");
@@ -278,6 +282,7 @@ fn test_risk_engine_orange_level_overflow() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     println!("✓ 快照生成完成");
@@ -333,6 +338,7 @@ fn test_risk_engine_orange_level_many_l2_materials() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     println!("✓ 快照生成完成");
@@ -381,6 +387,7 @@ fn test_risk_engine_red_level_severe_overflow() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     println!("✓ 快照生成完成");
@@ -437,6 +444,7 @@ fn test_risk_engine_red_level_many_l3_materials() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     println!("✓ 快照生成完成");
@@ -480,6 +488,7 @@ fn test_risk_engine_red_level_roll_hard_stop() {
         &all_materials,
         &material_weights,
         Some("HARD_STOP"),
+        0.1,
     );
 
     println!("✓ 快照生成完成");
@@ -531,6 +540,7 @@ fn test_risk_engine_snapshot_fields_completeness() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     println!("✓ 快照生成完成");

@@ -184,14 +184,14 @@ const KPIBand: React.FC<KPIBandProps> = ({ loading, kpi, onOpenDrilldown, onGoWo
           <Space direction="vertical" size={4} style={{ width: '100%' }}>
             <Space size={8}>
               <Badge color={rollMeta.color} />
-              <Text type="secondary">换辊</Text>
+              <Text type="secondary">设备监控</Text>
             </Space>
             <Statistic value={rollMeta.label} valueStyle={{ color: rollMeta.color, fontWeight: 600 }} />
             <Text type="secondary" style={{ fontSize: 12 }}>
               {safe.rollCampaignProgress}t / {safe.rollChangeThreshold}t
             </Text>
             {onOpenDrilldown && (
-              <Text type="secondary" style={{ fontSize: 12 }}>点击查看换辊下钻</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>点击查看换辊监控</Text>
             )}
           </Space>
         </KPICardWrapper>

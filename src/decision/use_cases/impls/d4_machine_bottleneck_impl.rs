@@ -77,6 +77,7 @@ mod tests {
         conn.execute(
             r#"
             CREATE TABLE IF NOT EXISTS capacity_pool (
+                version_id TEXT NOT NULL,
                 machine_code TEXT NOT NULL,
                 plan_date TEXT NOT NULL,
                 target_capacity_t REAL NOT NULL,
@@ -86,7 +87,7 @@ mod tests {
                 frozen_capacity_t REAL NOT NULL DEFAULT 0.0,
                 accumulated_tonnage_t REAL NOT NULL DEFAULT 0.0,
                 roll_campaign_id TEXT,
-                PRIMARY KEY (machine_code, plan_date)
+                PRIMARY KEY (version_id, machine_code, plan_date)
             )
             "#,
             [],
@@ -180,11 +181,12 @@ mod tests {
         conn.execute(
             r#"
             INSERT INTO capacity_pool (
-                machine_code, plan_date, target_capacity_t, limit_capacity_t,
+                version_id, machine_code, plan_date, target_capacity_t, limit_capacity_t,
                 used_capacity_t, overflow_t, frozen_capacity_t, accumulated_tonnage_t, roll_campaign_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             [
+                "V001",
                 "H032",
                 "2026-01-24",
                 "1500.0",
@@ -201,11 +203,12 @@ mod tests {
         conn.execute(
             r#"
             INSERT INTO capacity_pool (
-                machine_code, plan_date, target_capacity_t, limit_capacity_t,
+                version_id, machine_code, plan_date, target_capacity_t, limit_capacity_t,
                 used_capacity_t, overflow_t, frozen_capacity_t, accumulated_tonnage_t, roll_campaign_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             [
+                "V001",
                 "H033",
                 "2026-01-24",
                 "1500.0",
@@ -222,11 +225,12 @@ mod tests {
         conn.execute(
             r#"
             INSERT INTO capacity_pool (
-                machine_code, plan_date, target_capacity_t, limit_capacity_t,
+                version_id, machine_code, plan_date, target_capacity_t, limit_capacity_t,
                 used_capacity_t, overflow_t, frozen_capacity_t, accumulated_tonnage_t, roll_campaign_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             [
+                "V001",
                 "H034",
                 "2026-01-24",
                 "1500.0",
@@ -446,10 +450,10 @@ mod tests {
             "2026-01-24",
         );
 
-        // 应该成功（capacity_pool 不按 version_id 过滤），但没有 plan_item 数据
+        // 应该成功（版本不存在时返回空列表）
         assert!(result.is_ok());
         let profiles = result.unwrap();
-        assert_eq!(profiles.len(), 3);
+        assert_eq!(profiles.len(), 0);
 
         // 所有 profile 的 pending_materials 应该为 0（因为没有 plan_item）
         for profile in &profiles {

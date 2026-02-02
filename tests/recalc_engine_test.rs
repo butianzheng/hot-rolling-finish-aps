@@ -13,6 +13,7 @@ mod test_helpers;
 
 use chrono::{NaiveDate, Utc};
 use hot_rolling_aps::domain::plan::{Plan, PlanItem, PlanVersion};
+use hot_rolling_aps::domain::types::PlanVersionStatus;
 use hot_rolling_aps::repository::{
     PlanItemRepository, PlanRepository, PlanVersionRepository,
 };
@@ -59,7 +60,7 @@ fn create_test_version(
         version_id: version_id.to_string(),
         plan_id: plan_id.to_string(),
         version_no,
-        status: "DRAFT".to_string(),
+        status: PlanVersionStatus::Draft,
         frozen_from_date: None,
         recalc_window_days: Some(30),
         config_snapshot_json: None,
@@ -160,17 +161,17 @@ fn test_plan_version_repository_crud() {
     // 2. 查询Version
     let found = version_repo.find_by_id("v001").expect("查询失败");
     assert!(found.is_some());
-    assert_eq!(found.as_ref().unwrap().status, "DRAFT");
+    assert_eq!(found.as_ref().unwrap().status, PlanVersionStatus::Draft);
     assert_eq!(found.as_ref().unwrap().revision, 0);
 
     // 3. 更新Version
     let mut updated_version = found.unwrap();
-    updated_version.status = "ACTIVE".to_string();
+    updated_version.status = PlanVersionStatus::Active;
     version_repo.update(&updated_version).expect("更新失败");
 
     let found_again = version_repo.find_by_id("v001").expect("再次查询失败");
     let found_version = found_again.unwrap();
-    assert_eq!(found_version.status, "ACTIVE");
+    assert_eq!(found_version.status, PlanVersionStatus::Active);
     assert_eq!(found_version.revision, 1); // revision应该自增
 }
 
@@ -228,24 +229,24 @@ fn test_plan_version_activate() {
 
     // 检查v2是ACTIVE
     let v2 = version_repo.find_by_id("v002").expect("查询失败");
-    assert_eq!(v2.unwrap().status, "ACTIVE");
+    assert_eq!(v2.unwrap().status, PlanVersionStatus::Active);
 
     // 检查v1和v3不是ACTIVE
     let v1 = version_repo.find_by_id("v001").expect("查询失败");
-    assert_ne!(v1.unwrap().status, "ACTIVE");
+    assert_ne!(v1.unwrap().status, PlanVersionStatus::Active);
 
     let v3 = version_repo.find_by_id("v003").expect("查询失败");
-    assert_ne!(v3.unwrap().status, "ACTIVE");
+    assert_ne!(v3.unwrap().status, PlanVersionStatus::Active);
 
     // 再激活v3
     version_repo.activate_version("v003").expect("激活失败");
 
     // 检查v3是ACTIVE，v2应该被归档
     let v3_active = version_repo.find_by_id("v003").expect("查询失败");
-    assert_eq!(v3_active.unwrap().status, "ACTIVE");
+    assert_eq!(v3_active.unwrap().status, PlanVersionStatus::Active);
 
     let v2_archived = version_repo.find_by_id("v002").expect("查询失败");
-    assert_eq!(v2_archived.unwrap().status, "ARCHIVED");
+    assert_eq!(v2_archived.unwrap().status, PlanVersionStatus::Archived);
 }
 
 #[test]
@@ -293,14 +294,14 @@ fn test_optimistic_lock_success() {
     assert_eq!(fetched.revision, 0);
 
     // 修改并更新（revision=0 -> 1）
-    fetched.status = "ACTIVE".to_string();
+    fetched.status = PlanVersionStatus::Active;
     let result = version_repo.update(&fetched);
     assert!(result.is_ok(), "更新应该成功");
 
     // 再次查询，revision应该是1
     let updated = version_repo.find_by_id("v001").expect("查询失败").unwrap();
     assert_eq!(updated.revision, 1);
-    assert_eq!(updated.status, "ACTIVE");
+    assert_eq!(updated.status, PlanVersionStatus::Active);
 }
 
 #[test]
@@ -322,12 +323,12 @@ fn test_optimistic_lock_conflict() {
     assert_eq!(user_b_version.revision, 0);
 
     // 用户A先更新成功（revision=0 -> 1）
-    user_a_version.status = "ACTIVE".to_string();
+    user_a_version.status = PlanVersionStatus::Active;
     let result_a = version_repo.update(&user_a_version);
     assert!(result_a.is_ok(), "用户A更新应该成功");
 
     // 用户B尝试更新（revision=0，但数据库已是1，应该失败）
-    user_b_version.status = "ARCHIVED".to_string();
+    user_b_version.status = PlanVersionStatus::Archived;
     let result_b = version_repo.update(&user_b_version);
 
     // 检查是否返回乐观锁冲突错误
@@ -352,7 +353,7 @@ fn test_optimistic_lock_multiple_updates() {
 
     // 第1次更新：revision 0 -> 1
     let mut v1 = version_repo.find_by_id("v001").expect("查询失败").unwrap();
-    v1.status = "ACTIVE".to_string();
+    v1.status = PlanVersionStatus::Active;
     version_repo.update(&v1).expect("第1次更新失败");
 
     // 第2次更新：revision 1 -> 2
@@ -364,13 +365,13 @@ fn test_optimistic_lock_multiple_updates() {
     // 第3次更新：revision 2 -> 3
     let mut v3 = version_repo.find_by_id("v001").expect("查询失败").unwrap();
     assert_eq!(v3.revision, 2);
-    v3.status = "ARCHIVED".to_string();
+    v3.status = PlanVersionStatus::Archived;
     version_repo.update(&v3).expect("第3次更新失败");
 
     // 最终检查
     let final_version = version_repo.find_by_id("v001").expect("查询失败").unwrap();
     assert_eq!(final_version.revision, 3);
-    assert_eq!(final_version.status, "ARCHIVED");
+    assert_eq!(final_version.status, PlanVersionStatus::Archived);
 }
 
 // ==========================================
@@ -542,7 +543,7 @@ fn test_plan_version_update_not_found() {
         version_id: "non_existent_version".to_string(),
         plan_id: "fake_plan".to_string(),
         version_no: 1,
-        status: "DRAFT".to_string(),
+        status: PlanVersionStatus::Draft,
         frozen_from_date: None,
         recalc_window_days: Some(30),
         config_snapshot_json: None,
@@ -601,7 +602,7 @@ fn test_plan_version_unique_constraint() {
         version_id: "v002".to_string(), // 不同的version_id
         plan_id: "plan_001".to_string(),
         version_no: 1, // 相同的version_no
-        status: "DRAFT".to_string(),
+        status: PlanVersionStatus::Draft,
         frozen_from_date: None,
         recalc_window_days: Some(30),
         config_snapshot_json: None,

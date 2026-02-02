@@ -8,7 +8,7 @@
 use std::sync::{Arc, Mutex};
 use rusqlite::Connection;
 
-use crate::api::{MaterialApi, PlanApi, DashboardApi, ConfigApi, RollerApi, ManualOperationValidator, ImportApi};
+use crate::api::{MaterialApi, PlanApi, DashboardApi, ConfigApi, RollerApi, RhythmApi, ManualOperationValidator, ImportApi};
 use crate::decision::api::DecisionApiImpl;
 use crate::decision::repository::{
     DaySummaryRepository, BottleneckRepository,
@@ -32,6 +32,8 @@ use crate::repository::{
     risk_repo::RiskSnapshotRepository,
     capacity_repo::CapacityPoolRepository,
     roller_repo::RollerCampaignRepository,
+    roll_campaign_plan_repo::RollCampaignPlanRepository,
+    plan_rhythm_repo::PlanRhythmRepository,
     strategy_draft_repo::StrategyDraftRepository,
     decision_refresh_repo::DecisionRefreshRepository,
 };
@@ -67,6 +69,9 @@ pub struct AppState {
 
     /// 换辊管理API
     pub roller_api: Arc<RollerApi>,
+
+    /// 每日生产节奏API
+    pub rhythm_api: Arc<RhythmApi>,
 
     /// 决策支持API
     pub decision_api: Arc<DecisionApiImpl>,
@@ -146,6 +151,16 @@ impl AppState {
         let roller_campaign_repo = Arc::new(
             RollerCampaignRepository::new(&db_path)
                 .map_err(|e| format!("无法创建RollerCampaignRepository: {}", e))?
+        );
+
+        let roll_campaign_plan_repo = Arc::new(
+            RollCampaignPlanRepository::new(&db_path)
+                .map_err(|e| format!("无法创建RollCampaignPlanRepository: {}", e))?
+        );
+
+        let plan_rhythm_repo = Arc::new(
+            PlanRhythmRepository::new(&db_path)
+                .map_err(|e| format!("无法创建PlanRhythmRepository: {}", e))?
         );
 
         // 决策层Repository (D1-D6)
@@ -272,6 +287,13 @@ impl AppState {
             }
         };
 
+        // 每日生产节奏 API（用于工作台的节奏窗口）
+        let rhythm_api = Arc::new(RhythmApi::new(
+            plan_rhythm_repo,
+            action_log_repo.clone(),
+            config_manager.clone(),
+        ));
+
         // 重算引擎（需要所有依赖）
         // 使用事件发布器而非直接依赖 RefreshQueue，实现依赖倒置
         let recalc_engine = Arc::new(RecalcEngine::with_default_config(
@@ -367,7 +389,9 @@ impl AppState {
         // 换辊管理API
         let roller_api = Arc::new(RollerApi::new(
             roller_campaign_repo,
+            roll_campaign_plan_repo,
             action_log_repo.clone(),
+            config_manager.clone(),
         ));
 
         // 材料导入API
@@ -382,6 +406,7 @@ impl AppState {
             dashboard_api,
             config_api,
             roller_api,
+            rhythm_api,
             decision_api,
             import_api,
             capacity_pool_repo,

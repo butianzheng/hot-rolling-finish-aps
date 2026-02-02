@@ -117,13 +117,17 @@ fn test_batch_update_configs_成功() {
     let configs = vec![
         ConfigItem {
             scope_id: "global".to_string(),
+            scope_type: "GLOBAL".to_string(),
             key: "key1".to_string(),
             value: "value1".to_string(),
+            updated_at: None,
         },
         ConfigItem {
             scope_id: "global".to_string(),
+            scope_type: "GLOBAL".to_string(),
             key: "key2".to_string(),
             value: "value2".to_string(),
+            updated_at: None,
         },
     ];
 

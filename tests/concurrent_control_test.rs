@@ -12,6 +12,7 @@ mod concurrent_control_test {
     use chrono::NaiveDate;
     use hot_rolling_aps::api::PlanApi;
     use hot_rolling_aps::config::config_manager::ConfigManager;
+    use hot_rolling_aps::domain::types::PlanVersionStatus;
     use hot_rolling_aps::engine::{
         CapacityFiller, EligibilityEngine, PrioritySorter, RecalcEngine, RiskEngine, UrgencyEngine,
     };
@@ -69,10 +70,12 @@ mod concurrent_control_test {
             material_master_repo.clone(),
             capacity_pool_repo.clone(),
             action_log_repo.clone(),
+            risk_snapshot_repo.clone(),
             eligibility_engine.clone(),
             urgency_engine.clone(),
             priority_sorter.clone(),
             capacity_filler.clone(),
+            risk_engine.clone(),
             config_manager.clone(),
             None, // 测试环境不需要事件发布
         ));
@@ -83,6 +86,7 @@ mod concurrent_control_test {
             plan_item_repo,
             material_state_repo,
             material_master_repo,
+            capacity_pool_repo,
             strategy_draft_repo,
             action_log_repo,
             risk_snapshot_repo,
@@ -124,13 +128,13 @@ mod concurrent_control_test {
 
         // 3. 线程1更新版本(应该成功)
         let mut updated_version1 = version1.clone();
-        updated_version1.status = "ACTIVE".to_string();
+        updated_version1.status = PlanVersionStatus::Active;
         let result1 = plan_version_repo.update(&updated_version1);
         assert!(result1.is_ok(), "第一次更新应该成功");
 
         // 4. 线程2尝试更新版本(应该失败,因为revision已变化)
         let mut updated_version2 = version2.clone();
-        updated_version2.status = "ARCHIVED".to_string();
+        updated_version2.status = PlanVersionStatus::Archived;
         let result2 = plan_version_repo.update(&updated_version2);
 
         assert!(result2.is_err(), "第二次更新应该失败(乐观锁冲突)");
@@ -186,7 +190,11 @@ mod concurrent_control_test {
 
                 // 尝试更新
                 let mut updated_version = version.clone();
-                updated_version.status = format!("STATUS_{}", i);
+                updated_version.status = if i % 2 == 0 {
+                    PlanVersionStatus::Active
+                } else {
+                    PlanVersionStatus::Archived
+                };
 
                 plan_version_repo_clone.update(&updated_version)
                     .map_err(|e| e.to_string())
@@ -381,7 +389,7 @@ mod concurrent_control_test {
 
             // 尝试更新
             let mut updated_version = version.clone();
-            updated_version.status = "ACTIVE".to_string();
+            updated_version.status = PlanVersionStatus::Active;
 
             match plan_version_repo.update(&updated_version) {
                 Ok(_) => {

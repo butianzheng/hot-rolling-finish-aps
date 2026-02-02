@@ -203,7 +203,7 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
         detail: top
           ? `${top.machineCode} ${top.planDate} 分数 ${top.bottleneckScore.toFixed(0)} | 利用率 ${top.capacityUtilPct.toFixed(1)}%`
           : undefined,
-        impact: top ? `待排 ${top.pendingMaterialCount} 件 · ${formatTonnage(top.pendingWeightT)}` : undefined,
+        impact: top ? `缺口 ${top.pendingMaterialCount} 件 · ${formatTonnage(top.pendingWeightT)}` : undefined,
         timeHint: topReason ? `首因：${topReason}` : undefined,
         drilldown: top ? { kind: 'bottleneck', machineCode: top.machineCode, planDate: top.planDate } : { kind: 'bottleneck' },
         workbenchTab: 'capacity',
@@ -239,11 +239,14 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
       out.push({
         id: 'roll-campaign-alerts',
         severity: rollSeverity,
-        title: '换辊预警',
+        title: '设备监控：换辊',
         count: nearHardStopCount > 0 ? nearHardStopCount : activeAlerts.length,
         detail: top ? `最紧急：${top.machineCode} 剩余 ${formatTonnage(top.remainingTonnageT)}` : undefined,
         impact: top ? `当前 ${formatTonnage(top.currentTonnageT)} / 硬限 ${formatTonnage(top.hardLimitT)}` : undefined,
-        timeHint: top?.estimatedHardStopDate ? `预计硬停止：${top.estimatedHardStopDate}` : undefined,
+        timeHint:
+          top?.estimatedHardReachAt || top?.estimatedHardStopDate
+            ? `预计触达硬限制：${top.estimatedHardReachAt || top.estimatedHardStopDate}`
+            : undefined,
         drilldown: { kind: 'roll' },
         workbenchTab: 'visualization',
         workbenchMachineCode: top?.machineCode ?? null,

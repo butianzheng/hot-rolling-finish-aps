@@ -1,7 +1,7 @@
 // ==========================================
-// D5决策：轧制活动警报页面
+// D5：设备监控 - 换辊时间监控页面
 // ==========================================
-// 职责: 展示各机组换辊状态，监控换辊警报，提供换辊建议
+// 职责: 展示各机组换辊监控状态（不作为排程约束），用于设备状态与生产效能监控
 // ==========================================
 
 import React, { useMemo } from 'react';
@@ -108,6 +108,20 @@ export const D5RollCampaign: React.FC<D5RollCampaignProps> = ({ embedded, onOpen
       render: (code: string) => <Tag color="blue">{code}</Tag>,
     },
     {
+      title: '周期起点',
+      dataIndex: 'campaignStartAt',
+      key: 'campaignStartAt',
+      width: 170,
+      render: (v: string | undefined) => v || '-',
+    },
+    {
+      title: '计划换辊时刻',
+      dataIndex: 'plannedChangeAt',
+      key: 'plannedChangeAt',
+      width: 170,
+      render: (v: string | null | undefined) => v || '-',
+    },
+    {
       title: '警报等级',
       dataIndex: 'alertLevel',
       key: 'alertLevel',
@@ -208,11 +222,21 @@ export const D5RollCampaign: React.FC<D5RollCampaignProps> = ({ embedded, onOpen
       sorter: (a, b) => a.remainingTonnageT - b.remainingTonnageT,
     },
     {
-      title: '预计硬停止日期',
-      dataIndex: 'estimatedHardStopDate',
-      key: 'estimatedHardStopDate',
+      title: '预计触达软/硬',
+      key: 'estimatedReach',
+      width: 240,
+      render: (_, record) => (
+        <span>
+          {record.estimatedSoftReachAt || '-'} / {record.estimatedHardReachAt || record.estimatedHardStopDate || '-'}
+        </span>
+      ),
+    },
+    {
+      title: '停机时长(分钟)',
+      dataIndex: 'plannedDowntimeMinutes',
+      key: 'plannedDowntimeMinutes',
       width: 140,
-      render: (date: string | null) => date || '-',
+      render: (m: number | undefined) => (typeof m === 'number' ? m : '-'),
     },
     {
       title: '警报消息',
@@ -275,10 +299,10 @@ export const D5RollCampaign: React.FC<D5RollCampaignProps> = ({ embedded, onOpen
         <div style={{ marginBottom: 24 }}>
           <h2>
             <ToolOutlined style={{ marginRight: 8 }} />
-            D5决策：轧制活动警报
+            设备监控：换辊时间监控
           </h2>
           <p style={{ color: '#8c8c8c', marginBottom: 16 }}>
-            监控各机组轧辊累积吨位，及时发现换辊需求，避免生产中断
+            基于版本计划项时间线估算累积吨位，并推算触达软/硬阈值的日期时间；可在「设置中心-换辊管理」进行计划换辊时刻与停机时长微调。
           </p>
         </div>
       ) : null}
@@ -407,7 +431,7 @@ export const D5RollCampaign: React.FC<D5RollCampaignProps> = ({ embedded, onOpen
             showSizeChanger: true,
             showQuickJumper: true,
           }}
-          scroll={{ x: 1400 }}
+          scroll={{ x: 1750 }}
           onRow={
             openWithDrawer
               ? (record) => ({
@@ -466,6 +490,9 @@ const SevereAlertCard: React.FC<SevereAlertCardProps> = ({ alert }) => {
           <Descriptions.Item label="硬限制">
             {alert.hardLimitT.toFixed(0)}吨
           </Descriptions.Item>
+          <Descriptions.Item label="计划换辊">
+            {alert.plannedChangeAt || '-'}
+          </Descriptions.Item>
         </Descriptions>
 
         {/* 利用率进度条 */}
@@ -487,12 +514,12 @@ const SevereAlertCard: React.FC<SevereAlertCardProps> = ({ alert }) => {
           </div>
         )}
 
-        {/* 预计硬停止日期 */}
-        {alert.estimatedHardStopDate && (
+        {/* 预计触达软/硬 */}
+        {alert.estimatedSoftReachAt || alert.estimatedHardReachAt || alert.estimatedHardStopDate ? (
           <div style={{ fontSize: '12px', color: '#1677ff' }}>
-            预计硬停止: {alert.estimatedHardStopDate}
+            预计触达：软 {alert.estimatedSoftReachAt || '-'} / 硬 {alert.estimatedHardReachAt || alert.estimatedHardStopDate || '-'}
           </div>
-        )}
+        ) : null}
       </Space>
     </Card>
   );

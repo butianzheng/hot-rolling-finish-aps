@@ -18,6 +18,8 @@ pub mod material_repo;
 pub mod plan_repo;
 pub mod risk_repo;
 pub mod roller_repo;
+pub mod roll_campaign_plan_repo;
+pub mod plan_rhythm_repo;
 pub mod strategy_draft_repo;
 
 // 重导出核心仓储
@@ -34,6 +36,8 @@ pub use material_repo::{MaterialMasterRepository, MaterialStateRepository};
 pub use plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository};
 pub use risk_repo::RiskSnapshotRepository;
 pub use roller_repo::RollerCampaignRepository;
+pub use roll_campaign_plan_repo::{RollCampaignPlanEntity, RollCampaignPlanRepository};
+pub use plan_rhythm_repo::{PlanRhythmPresetEntity, PlanRhythmRepository, PlanRhythmTargetEntity};
 pub use strategy_draft_repo::{StrategyDraftEntity, StrategyDraftRepository, StrategyDraftStatus};
 
 // TODO: 添加数据库连接池管理模块

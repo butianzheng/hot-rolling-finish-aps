@@ -433,6 +433,21 @@ pub struct RollAlertDto {
     pub alert_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub estimated_hard_stop_date: Option<String>,
+    /// 当前周期起点（YYYY-MM-DD HH:MM:SS，供监控展示）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub campaign_start_at: Option<String>,
+    /// 计划换辊时刻（YYYY-MM-DD HH:MM:SS，可人工微调）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub planned_change_at: Option<String>,
+    /// 计划停机时长（分钟）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub planned_downtime_minutes: Option<i32>,
+    /// 预计触达软限制日期时间（YYYY-MM-DD HH:MM:SS）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub estimated_soft_reach_at: Option<String>,
+    /// 预计触达硬限制日期时间（YYYY-MM-DD HH:MM:SS）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub estimated_hard_reach_at: Option<String>,
     pub alert_message: String,
     pub impact_description: String,
     pub recommended_actions: Vec<String>,

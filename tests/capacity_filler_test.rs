@@ -22,6 +22,7 @@ fn create_test_capacity_pool(
     limit_capacity: f64,
 ) -> CapacityPool {
     CapacityPool {
+        version_id: "V001".to_string(),
         machine_code: "H032".to_string(),
         plan_date: NaiveDate::from_ymd_opt(2026, 1, 20).unwrap(),
         target_capacity_t: target_capacity,

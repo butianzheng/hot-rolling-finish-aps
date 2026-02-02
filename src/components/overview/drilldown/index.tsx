@@ -59,8 +59,8 @@ const FIELD_LABEL_MAP: Record<string, string> = {
   bottleneckLevel: '堵塞等级',
   bottleneckTypes: '堵塞类型',
   capacityUtilPct: '容量利用率',
-  pendingMaterialCount: '待排材料数',
-  pendingWeightT: '待排重量(吨)',
+  pendingMaterialCount: '缺口材料数(≤当日)',
+  pendingWeightT: '缺口重量(吨, ≤当日)',
   scheduledMaterialCount: '已排材料数',
   // scheduledWeightT 在 OrderFailure 部分已定义
 

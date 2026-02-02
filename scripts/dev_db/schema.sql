@@ -71,7 +71,9 @@ CREATE TABLE material_master (
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   contract_nature TEXT,
   weekly_delivery_flag TEXT,
-  export_flag TEXT
+  export_flag TEXT,
+  -- 品种大类（用于每日生产节奏管理；可为空，后续可由映射/导入补齐）
+  product_category TEXT
 );
 
 CREATE INDEX idx_material_machine ON material_master(current_machine_code);
@@ -182,6 +184,38 @@ CREATE TABLE plan_item (
 CREATE INDEX idx_item_version_machine_date ON plan_item(version_id, machine_code, plan_date, seq_no);
 
 -- ==========================================
+-- Plan rhythm (daily production rhythm targets)
+-- ==========================================
+
+-- 预设节奏模板（多套可选比例）
+CREATE TABLE plan_rhythm_preset (
+  preset_id TEXT PRIMARY KEY,
+  preset_name TEXT NOT NULL,
+  dimension TEXT NOT NULL, -- e.g. PRODUCT_CATEGORY
+  target_json TEXT NOT NULL, -- JSON object: {category: ratio}
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_by TEXT
+);
+
+-- 每日节奏目标（按版本 + 机组 + 日期，一天一套）
+CREATE TABLE plan_rhythm_target (
+  version_id TEXT NOT NULL REFERENCES plan_version(version_id) ON DELETE CASCADE,
+  machine_code TEXT NOT NULL REFERENCES machine_master(machine_code),
+  plan_date TEXT NOT NULL, -- YYYY-MM-DD
+  dimension TEXT NOT NULL, -- e.g. PRODUCT_CATEGORY
+  target_json TEXT NOT NULL, -- JSON object: {category: ratio}
+  preset_id TEXT REFERENCES plan_rhythm_preset(preset_id),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_by TEXT,
+  PRIMARY KEY (version_id, machine_code, plan_date, dimension)
+);
+
+CREATE INDEX idx_rhythm_target_version_machine_date
+  ON plan_rhythm_target(version_id, machine_code, plan_date);
+
+-- ==========================================
 -- Capacity / risk / roll
 -- ==========================================
 
@@ -238,6 +272,21 @@ CREATE TABLE roller_campaign (
 );
 
 CREATE INDEX idx_campaign_version_machine ON roller_campaign(version_id, machine_code);
+
+-- roll_campaign_plan: 换辊时间监控/微调（按版本+机组）
+CREATE TABLE roll_campaign_plan (
+  version_id TEXT NOT NULL REFERENCES plan_version(version_id) ON DELETE CASCADE,
+  machine_code TEXT NOT NULL REFERENCES machine_master(machine_code),
+  initial_start_at TEXT NOT NULL, -- 换辊周期起点 (YYYY-MM-DD HH:MM:SS)
+  next_change_at TEXT, -- 计划换辊时刻 (可选)
+  downtime_minutes INTEGER, -- 计划停机时长（分钟）
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_by TEXT,
+  PRIMARY KEY (version_id, machine_code)
+);
+
+CREATE INDEX idx_roll_campaign_plan_version_machine
+  ON roll_campaign_plan(version_id, machine_code);
 
 -- ==========================================
 -- Action log (audit)
@@ -489,6 +538,11 @@ CREATE TABLE decision_roll_campaign_alert (
   estimated_change_date TEXT,
   needs_immediate_change INTEGER NOT NULL DEFAULT 0,
   suggested_actions TEXT,
+  campaign_start_at TEXT,
+  planned_change_at TEXT,
+  planned_downtime_minutes INTEGER,
+  estimated_soft_reach_at TEXT,
+  estimated_hard_reach_at TEXT,
   refreshed_at TEXT NOT NULL DEFAULT (datetime('now')),
   PRIMARY KEY (version_id, machine_code, campaign_no)
 );

@@ -83,6 +83,7 @@ fn create_test_capacity_pool(
     used_capacity_t: f64,
 ) -> CapacityPool {
     CapacityPool {
+        version_id: "test_v1".to_string(),
         machine_code: machine_code.to_string(),
         plan_date,
         target_capacity_t,

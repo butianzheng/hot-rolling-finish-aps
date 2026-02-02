@@ -675,8 +675,12 @@ fn convert_roll_alert_to_dto(
     };
 
     // 前端/Schema 约束: campaign_start_date 必须是 YYYY-MM-DD。
-    // 领域对象暂未提供换辊窗口起始日期，这里用“当前日期”作为可用兜底，避免 UI 因校验失败而无法展示。
-    let campaign_start_date = chrono::Utc::now().date_naive().to_string();
+    // 新口径: 优先使用读模型提供的 campaign_start_at；若缺失则兜底为当前日期。
+    let campaign_start_date = alert
+        .campaign_start_at
+        .as_deref()
+        .and_then(normalize_date_ymd)
+        .unwrap_or_else(|| chrono::Utc::now().date_naive().to_string());
     let estimated_hard_stop_date = alert
         .estimated_change_date
         .as_deref()
@@ -693,6 +697,11 @@ fn convert_roll_alert_to_dto(
         alert_level: alert.alert_level.clone(),
         alert_type: alert_type.to_string(),
         estimated_hard_stop_date,
+        campaign_start_at: alert.campaign_start_at.clone(),
+        planned_change_at: alert.planned_change_at.clone(),
+        planned_downtime_minutes: alert.planned_downtime_minutes,
+        estimated_soft_reach_at: alert.estimated_soft_reach_at.clone(),
+        estimated_hard_reach_at: alert.estimated_hard_reach_at.clone(),
         alert_message: alert.reason.clone().unwrap_or_else(|| "无预警信息".to_string()),
         impact_description: format!(
             "已使用 {:.1}%, 剩余 {:.1} 吨",
@@ -876,6 +885,7 @@ mod tests {
             c.execute(
                 r#"
                 CREATE TABLE IF NOT EXISTS capacity_pool (
+                    version_id TEXT NOT NULL,
                     machine_code TEXT NOT NULL,
                     plan_date TEXT NOT NULL,
                     target_capacity_t REAL NOT NULL,
@@ -885,7 +895,7 @@ mod tests {
                     frozen_capacity_t REAL NOT NULL DEFAULT 0.0,
                     accumulated_tonnage_t REAL NOT NULL DEFAULT 0.0,
                     roll_campaign_id TEXT,
-                    PRIMARY KEY (machine_code, plan_date)
+                    PRIMARY KEY (version_id, machine_code, plan_date)
                 )
                 "#,
                 [],
@@ -943,7 +953,7 @@ mod tests {
             c.execute(
                 r#"
                 INSERT INTO capacity_pool VALUES (
-                    'H032', '2026-01-24', 1500.0, 2000.0, 1950.0, 0.0, 100.0, 15000.0, 'RC001'
+                    'V001', 'H032', '2026-01-24', 1500.0, 2000.0, 1950.0, 0.0, 100.0, 15000.0, 'RC001'
                 )
                 "#,
                 [],

@@ -33,6 +33,7 @@ impl RefreshQueueAdapter {
             ScheduleEventType::MaterialStateChanged => RefreshTrigger::MaterialStateChanged,
             ScheduleEventType::CapacityPoolChanged => RefreshTrigger::CapacityPoolChanged,
             ScheduleEventType::RollCampaignChanged => RefreshTrigger::RollCampaignChanged,
+            ScheduleEventType::RhythmTargetChanged => RefreshTrigger::RhythmTargetChanged,
             ScheduleEventType::VersionCreated => RefreshTrigger::VersionCreated,
             ScheduleEventType::ManualTrigger => RefreshTrigger::ManualRefresh,
         }

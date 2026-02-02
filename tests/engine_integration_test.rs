@@ -89,6 +89,7 @@ fn create_test_capacity_pool(
     limit_capacity_t: f64,
 ) -> CapacityPool {
     CapacityPool {
+        version_id: "test_v1".to_string(),
         machine_code: machine_code.to_string(),
         plan_date,
         target_capacity_t,
@@ -162,6 +163,7 @@ fn test_integration_normal_fill_green_risk() {
         &all_materials,
         &material_weights,
         None, // roll_status
+        0.1,  // overflow_red_threshold_pct
     );
 
     // 验证RiskEngine输出
@@ -228,6 +230,7 @@ fn test_integration_high_utilization_yellow_risk() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     // 验证风险等级: 95%利用率应该触发YELLOW
@@ -331,6 +334,7 @@ fn test_integration_overflow_orange_risk() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     // 验证风险等级: 超限应该触发ORANGE或RED
@@ -395,6 +399,7 @@ fn test_integration_many_l2_materials_yellow_risk() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     // 验证风险等级: 6个L2材料应该触发YELLOW风险
@@ -458,6 +463,7 @@ fn test_integration_l3_critical_materials_red_risk() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     // 验证风险等级: 5个L3材料应该触发RED风险
@@ -553,6 +559,7 @@ fn test_integration_frozen_zone_priority_with_risk() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     // 验证风险评估正确反映冻结区影响
@@ -627,6 +634,7 @@ fn test_integration_comprehensive_scenario() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     // 验证综合风险评估
@@ -690,6 +698,7 @@ fn test_integration_data_flow_integrity() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     // 验证数据流转完整性

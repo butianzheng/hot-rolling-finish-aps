@@ -63,8 +63,8 @@ export const BottleneckContent: React.FC<BottleneckContentProps> = ({
       width: 100,
       render: (v: number) => `${Number(v || 0).toFixed(1)}%`,
     },
-    { title: '待排数', dataIndex: 'pendingMaterialCount', key: 'pendingMaterialCount', width: 90 },
-    { title: '待排(吨)', dataIndex: 'pendingWeightT', key: 'pendingWeightT', width: 100 },
+    { title: '缺口数', dataIndex: 'pendingMaterialCount', key: 'pendingMaterialCount', width: 90 },
+    { title: '缺口(吨)', dataIndex: 'pendingWeightT', key: 'pendingWeightT', width: 100 },
     {
       title: '操作',
       key: 'action',
@@ -113,8 +113,8 @@ export const BottleneckContent: React.FC<BottleneckContentProps> = ({
           <Descriptions column={4} bordered size="small">
             <Descriptions.Item label="堵塞分数">{selectedPoint.bottleneckScore.toFixed(1)}</Descriptions.Item>
             <Descriptions.Item label="容量利用率">{selectedPoint.capacityUtilPct.toFixed(1)}%</Descriptions.Item>
-            <Descriptions.Item label="待排材料数">{selectedPoint.pendingMaterialCount}</Descriptions.Item>
-            <Descriptions.Item label="待排重量">{selectedPoint.pendingWeightT.toFixed(1)}t</Descriptions.Item>
+            <Descriptions.Item label="缺口材料数(≤当日)">{selectedPoint.pendingMaterialCount}</Descriptions.Item>
+            <Descriptions.Item label="缺口重量(≤当日)">{selectedPoint.pendingWeightT.toFixed(1)}t</Descriptions.Item>
           </Descriptions>
 
           {Array.isArray(selectedPoint.bottleneckTypes) && selectedPoint.bottleneckTypes.length > 0 ? (

@@ -115,9 +115,9 @@ impl MaterialStateDerivationService {
         );
 
         // === 步骤 7: 获取紧急判定阈值 ===
-        let n1_days = config.get_min_temp_days_winter().await?; // 临时：使用 min_temp_days_winter 作为 N1
-        let n2_days = config.get_min_temp_days_summer().await?; // 临时：使用 min_temp_days_summer 作为 N2
-        // TODO: 添加 config.get_urgent_n1_days() / get_urgent_n2_days()
+        // 说明：N1/N2 为紧急等级阈值配置，不应复用适温阈值（min_temp_days_*）。
+        let n1_days = config.get_n1_threshold_days().await?;
+        let n2_days = config.get_n2_threshold_days().await?;
 
         // === 步骤 8: 计算 urgent_level（7层判定）===
         let (urgent_level, urgent_reasons) = EligibilityCore::calculate_urgent_level(

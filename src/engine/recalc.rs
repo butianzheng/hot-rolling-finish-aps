@@ -18,7 +18,7 @@ use crate::engine::events::{OptionalEventPublisher, ScheduleEvent, ScheduleEvent
 use crate::engine::orchestrator::ScheduleOrchestrator;
 use crate::engine::{CapacityFiller, EligibilityEngine, PrioritySorter, UrgencyEngine};
 use crate::engine::strategy::ScheduleStrategy;
-use crate::config::ConfigManager;
+use crate::config::{config_keys, ConfigManager};
 use crate::config::strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
 use crate::repository::{
     ActionLogRepository, CapacityPoolRepository, MaterialMasterRepository,
@@ -1135,6 +1135,17 @@ impl RecalcEngine {
     ) -> Result<usize, Box<dyn Error>> {
         use std::collections::HashMap;
 
+        // 超限严重阈值（默认 10%）；兼容用户按百分比输入（如 5 表示 5%）
+        let overflow_red_threshold_pct = self
+            .config_manager
+            .get_global_config_value(config_keys::OVERFLOW_PCT)
+            .ok()
+            .flatten()
+            .and_then(|v| v.trim().parse::<f64>().ok())
+            .map(|v| if v > 1.0 && v <= 100.0 { v / 100.0 } else { v })
+            .filter(|v| *v > 0.0 && *v <= 1.0)
+            .unwrap_or(0.1);
+
         // 1. 查询版本的所有 plan_item（已排产材料）
         let all_plan_items = self.item_repo.find_by_version(version_id)?;
 
@@ -1201,6 +1212,7 @@ impl RecalcEngine {
                     &material_states,
                     &material_weights,
                     None,
+                    overflow_red_threshold_pct,
                 );
 
                 snapshots.push(snapshot);

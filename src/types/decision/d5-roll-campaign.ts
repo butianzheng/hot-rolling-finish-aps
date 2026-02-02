@@ -83,6 +83,21 @@ export interface RollCampaignAlert {
   /** 预计达到硬限制的日期 */
   estimatedHardStopDate: string | null;
 
+  /** 当前周期起点（YYYY-MM-DD HH:MM:SS） */
+  campaignStartAt?: string;
+
+  /** 计划换辊时刻（YYYY-MM-DD HH:MM:SS，可人工微调） */
+  plannedChangeAt?: string | null;
+
+  /** 计划停机时长（分钟） */
+  plannedDowntimeMinutes?: number;
+
+  /** 预计触达软限制日期时间（YYYY-MM-DD HH:MM:SS） */
+  estimatedSoftReachAt?: string | null;
+
+  /** 预计触达硬限制日期时间（YYYY-MM-DD HH:MM:SS） */
+  estimatedHardReachAt?: string | null;
+
   /** 警报消息 */
   alertMessage: string;
 

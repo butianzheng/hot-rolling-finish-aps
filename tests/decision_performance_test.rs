@@ -135,12 +135,13 @@ fn setup_large_dataset(
             conn.execute(
                 r#"
                 INSERT OR REPLACE INTO capacity_pool (
-                    machine_code, plan_date, target_capacity_t, limit_capacity_t,
+                    version_id, machine_code, plan_date, target_capacity_t, limit_capacity_t,
                     used_capacity_t, overflow_t, frozen_capacity_t,
                     accumulated_tonnage_t, roll_campaign_id
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
                 "#,
                 rusqlite::params![
+                    version_id,
                     machine_code,
                     date_str,
                     target_capacity,

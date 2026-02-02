@@ -472,7 +472,12 @@ impl ImportApi {
         let field_mapper = Box::new(FieldMapperImpl);
         let data_cleaner = Box::new(DataCleanerImpl);
         let derivation_service = Box::new(DerivationServiceImpl);
-        let dq_validator = Box::new(DqValidatorImpl::new(100.0));
+        let weight_threshold = config
+            .get_global_config_value("weight_anomaly_threshold")?
+            .and_then(|v| v.trim().parse::<f64>().ok())
+            .filter(|v| *v > 0.0)
+            .unwrap_or(100.0);
+        let dq_validator = Box::new(DqValidatorImpl::new(weight_threshold));
         let conflict_handler = Box::new(ConflictHandler);
         let state_derivation_service = MaterialStateDerivationService::new();
 

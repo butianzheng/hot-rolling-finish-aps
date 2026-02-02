@@ -19,6 +19,7 @@ use hot_rolling_aps::repository::{
     risk_repo::RiskSnapshotRepository,
     capacity_repo::CapacityPoolRepository,
     roller_repo::RollerCampaignRepository,
+    roll_campaign_plan_repo::RollCampaignPlanRepository,
     strategy_draft_repo::StrategyDraftRepository,
     decision_refresh_repo::DecisionRefreshRepository,
 };
@@ -155,10 +156,12 @@ impl ApiTestEnv {
             material_master_repo.clone(),
             capacity_pool_repo.clone(),
             action_log_repo.clone(),
+            risk_snapshot_repo.clone(),
             eligibility_engine.clone(),
             urgency_engine.clone(),
             priority_sorter.clone(),
             capacity_filler.clone(),
+            risk_engine.clone(),
             config_manager.clone(),
             event_publisher.clone(),
         ));
@@ -189,6 +192,7 @@ impl ApiTestEnv {
             plan_item_repo.clone(),
             material_state_repo.clone(),
             material_master_repo.clone(),
+            capacity_pool_repo.clone(),
             strategy_draft_repo.clone(),
             action_log_repo.clone(),
             risk_snapshot_repo.clone(),
@@ -238,9 +242,12 @@ impl ApiTestEnv {
 
         // RollerApi
         let roller_repo = Arc::new(RollerCampaignRepository::from_connection(conn.clone()));
+        let roll_plan_repo = Arc::new(RollCampaignPlanRepository::from_connection(conn.clone()));
         let roller_api = Arc::new(RollerApi::new(
             roller_repo,
+            roll_plan_repo,
             action_log_repo.clone(),
+            config_manager.clone(),
         ));
 
         Ok(Self {

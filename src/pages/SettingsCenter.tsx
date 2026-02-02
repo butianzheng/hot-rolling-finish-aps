@@ -10,8 +10,14 @@ const ActionLogQuery = React.lazy(() => import('../components/ActionLogQuery'));
 const CapacityPoolManagement = React.lazy(() => import('../components/CapacityPoolManagement'));
 const MaterialManagement = React.lazy(() => import('../components/MaterialManagement'));
 const StrategyProfilesPanel = React.lazy(() => import('../components/settings/StrategyProfilesPanel'));
+const RollCampaignManagementPanel = React.lazy(
+  () => import('../components/settings/RollCampaignManagementPanel')
+);
+const RhythmPresetManagementPanel = React.lazy(
+  () => import('../components/settings/RhythmPresetManagementPanel')
+);
 
-const TAB_KEYS = ['system', 'machine', 'materials', 'strategy', 'logs', 'preferences'] as const;
+const TAB_KEYS = ['system', 'machine', 'materials', 'roll', 'rhythm', 'strategy', 'logs', 'preferences'] as const;
 type TabKey = (typeof TAB_KEYS)[number];
 
 function normalizeTabKey(value: string | null): TabKey {
@@ -60,6 +66,24 @@ const SettingsCenter: React.FC = () => {
             children: (
               <React.Suspense fallback={<PageSkeleton />}>
                 <MaterialManagement />
+              </React.Suspense>
+            ),
+          },
+          {
+            key: 'roll',
+            label: '换辊管理',
+            children: (
+              <React.Suspense fallback={<PageSkeleton />}>
+                <RollCampaignManagementPanel />
+              </React.Suspense>
+            ),
+          },
+          {
+            key: 'rhythm',
+            label: '节奏模板',
+            children: (
+              <React.Suspense fallback={<PageSkeleton />}>
+                <RhythmPresetManagementPanel />
               </React.Suspense>
             ),
           },

@@ -300,10 +300,10 @@ export const D4Bottleneck: React.FC<D4BottleneckProps> = ({ embedded, onOpenDril
             <Descriptions.Item label="已排重量">
               {(selectedPointData.scheduledWeightT ?? 0).toFixed(1)} 吨
             </Descriptions.Item>
-            <Descriptions.Item label="待排材料数">
+            <Descriptions.Item label="缺口材料数(≤当日)">
               {selectedPointData.pendingMaterialCount}
             </Descriptions.Item>
-            <Descriptions.Item label="待排重量">
+            <Descriptions.Item label="缺口重量(≤当日)">
               {selectedPointData.pendingWeightT.toFixed(1)} 吨
             </Descriptions.Item>
           </Descriptions>

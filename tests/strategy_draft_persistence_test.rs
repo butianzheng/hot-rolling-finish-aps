@@ -63,12 +63,14 @@ mod strategy_draft_persistence_test {
             plan_item_repo.clone(),
             material_state_repo.clone(),
             material_master_repo.clone(),
-            capacity_pool_repo,
+            capacity_pool_repo.clone(),
             action_log_repo.clone(),
+            risk_snapshot_repo.clone(),
             eligibility_engine,
             urgency_engine,
             priority_sorter,
             capacity_filler,
+            risk_engine.clone(),
             config_manager.clone(),
             None, // 测试环境不需要事件发布
         ));
@@ -79,6 +81,7 @@ mod strategy_draft_persistence_test {
             plan_item_repo,
             material_state_repo,
             material_master_repo,
+            capacity_pool_repo,
             strategy_draft_repo,
             action_log_repo,
             risk_snapshot_repo,

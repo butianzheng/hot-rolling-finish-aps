@@ -294,6 +294,7 @@ impl RefreshQueue {
                         "MaterialStateChanged" => RefreshTrigger::MaterialStateChanged,
                         "CapacityPoolChanged" => RefreshTrigger::CapacityPoolChanged,
                         "RollCampaignChanged" => RefreshTrigger::RollCampaignChanged,
+                        "RhythmTargetChanged" => RefreshTrigger::RhythmTargetChanged,
                         "VersionCreated" => RefreshTrigger::VersionCreated,
                         _ => RefreshTrigger::ManualRefresh,
                     };
@@ -502,6 +503,7 @@ impl RefreshQueue {
                         "MaterialStateChanged" => RefreshTrigger::MaterialStateChanged,
                         "CapacityPoolChanged" => RefreshTrigger::CapacityPoolChanged,
                         "RollCampaignChanged" => RefreshTrigger::RollCampaignChanged,
+                        "RhythmTargetChanged" => RefreshTrigger::RhythmTargetChanged,
                         "VersionCreated" => RefreshTrigger::VersionCreated,
                         _ => RefreshTrigger::ManualRefresh,
                     };
@@ -738,19 +740,26 @@ mod tests {
 
             CREATE TABLE decision_roll_campaign_alert (
                 version_id TEXT NOT NULL,
-                campaign_id TEXT NOT NULL,
                 machine_code TEXT NOT NULL,
+                campaign_no INTEGER NOT NULL,
                 cum_weight_t REAL NOT NULL,
-                hard_limit_t REAL NOT NULL,
                 suggest_threshold_t REAL NOT NULL,
-                utilization_rate REAL NOT NULL,
+                hard_limit_t REAL NOT NULL,
                 alert_level TEXT NOT NULL,
+                reason TEXT,
+                distance_to_suggest REAL NOT NULL,
+                distance_to_hard REAL NOT NULL,
+                utilization_rate REAL NOT NULL,
+                estimated_change_date TEXT,
                 needs_immediate_change INTEGER NOT NULL DEFAULT 0,
-                remaining_capacity_t REAL NOT NULL,
-                estimated_exhaustion_date TEXT,
                 suggested_actions TEXT,
+                campaign_start_at TEXT,
+                planned_change_at TEXT,
+                planned_downtime_minutes INTEGER,
+                estimated_soft_reach_at TEXT,
+                estimated_hard_reach_at TEXT,
                 refreshed_at TEXT NOT NULL DEFAULT (datetime('now')),
-                PRIMARY KEY (version_id, campaign_id)
+                PRIMARY KEY (version_id, machine_code, campaign_no)
             );
 
             CREATE TABLE decision_capacity_opportunity (

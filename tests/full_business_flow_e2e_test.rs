@@ -95,10 +95,12 @@ mod full_business_flow_e2e_test {
             material_master_repo.clone(),
             capacity_pool_repo.clone(),
             action_log_repo.clone(),
+            risk_snapshot_repo.clone(),
             eligibility_engine.clone(),
             urgency_engine.clone(),
             priority_sorter.clone(),
             capacity_filler.clone(),
+            risk_engine.clone(),
             config_manager.clone(),
             None, // refresh_queue (not needed in tests)
         ));
@@ -149,6 +151,7 @@ mod full_business_flow_e2e_test {
             plan_item_repo.clone(),
             material_state_repo.clone(),
             material_master_repo,
+            capacity_pool_repo.clone(),
             strategy_draft_repo,
             action_log_repo.clone(),
             risk_snapshot_repo,
@@ -198,6 +201,7 @@ mod full_business_flow_e2e_test {
     /// 准备测试产能池数据
     fn prepare_capacity_pools(
         capacity_repo: &CapacityPoolRepository,
+        version_id: &str,
         machine_codes: Vec<&str>,
         base_date: NaiveDate,
         days: i64,
@@ -206,6 +210,7 @@ mod full_business_flow_e2e_test {
             for day_offset in 0..days {
                 let plan_date = base_date + Duration::days(day_offset);
                 let pool = CapacityPool {
+                    version_id: version_id.to_string(),
                     machine_code: machine.to_string(),
                     plan_date,
                     target_capacity_t: 800.0,
@@ -304,6 +309,7 @@ mod full_business_flow_e2e_test {
         let base_date = chrono::Local::now().date_naive();
         prepare_capacity_pools(
             &capacity_repo,
+            &version_id,
             vec!["H032", "H033", "H034"],
             base_date,
             7,
@@ -437,7 +443,7 @@ mod full_business_flow_e2e_test {
             .expect("创建版本失败");
 
         let base_date = chrono::Local::now().date_naive();
-        prepare_capacity_pools(&capacity_repo, vec!["H032", "H033"], base_date, 7)
+        prepare_capacity_pools(&capacity_repo, &version_id, vec!["H032", "H033"], base_date, 7)
             .expect("准备产能池失败");
         println!("✓ 步骤 3: 方案和产能池已准备");
 

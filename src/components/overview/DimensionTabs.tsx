@@ -128,7 +128,7 @@ const DimensionTabs: React.FC<DimensionTabsProps> = ({
         },
         {
           key: 'roll',
-          label: makeLabel('roll', <ToolOutlined />, '换辊维度'),
+          label: makeLabel('roll', <ToolOutlined />, '设备监控'),
           children: (
             <React.Suspense fallback={<PageSkeleton />}>
               <D5RollCampaign embedded onOpenDrilldown={onOpenDrilldown} />

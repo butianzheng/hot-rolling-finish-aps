@@ -94,6 +94,7 @@ fn create_capacity_pool(
     limit_capacity_t: f64,
 ) -> CapacityPool {
     CapacityPool {
+        version_id: "test_v1".to_string(),
         machine_code: machine_code.to_string(),
         plan_date,
         target_capacity_t,
@@ -194,6 +195,7 @@ fn test_e2e_basic_scheduling_flow() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     // 验证风险评估
@@ -300,6 +302,7 @@ fn test_e2e_scheduling_with_frozen_zone() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     // 验证风险评估包含冻结区影响
@@ -379,6 +382,7 @@ fn test_e2e_scheduling_high_load_scenario() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     // 验证高负荷风险
@@ -447,6 +451,7 @@ fn test_e2e_scheduling_with_impact_analysis() {
         &all_materials_before,
         &material_weights,
         None,
+        0.1,
     );
 
     // Step 2: 准备调整后排产 (after) - 增加一个L3紧急材料
@@ -479,6 +484,7 @@ fn test_e2e_scheduling_with_impact_analysis() {
         &all_materials_after,
         &material_weights_after,
         None,
+        0.1,
     );
 
     // Step 3: 生成影响摘要
@@ -580,6 +586,7 @@ fn test_e2e_multi_day_scheduling() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     let risk_day2 = risk_engine.generate_snapshot(
@@ -591,6 +598,7 @@ fn test_e2e_multi_day_scheduling() {
         &all_materials,
         &material_weights,
         None,
+        0.1,
     );
 
     println!("✅ 多日排产流程测试通过");

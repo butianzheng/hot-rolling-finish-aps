@@ -24,7 +24,47 @@ pub struct RollAlertRepository {
 impl RollAlertRepository {
     /// 创建新的换辊预警仓储
     pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
-        Self { conn }
+        let repo = Self { conn };
+        let _ = repo.ensure_schema();
+        repo
+    }
+
+    fn ensure_schema(&self) -> SqlResult<()> {
+        let conn = self.conn.lock().expect("锁获取失败");
+
+        // Ensure extension columns exist so old DBs remain queryable.
+        conn.execute_batch(
+            r#"
+            ALTER TABLE decision_roll_campaign_alert ADD COLUMN campaign_start_at TEXT;
+            "#,
+        )
+        .ok();
+        conn.execute_batch(
+            r#"
+            ALTER TABLE decision_roll_campaign_alert ADD COLUMN planned_change_at TEXT;
+            "#,
+        )
+        .ok();
+        conn.execute_batch(
+            r#"
+            ALTER TABLE decision_roll_campaign_alert ADD COLUMN planned_downtime_minutes INTEGER;
+            "#,
+        )
+        .ok();
+        conn.execute_batch(
+            r#"
+            ALTER TABLE decision_roll_campaign_alert ADD COLUMN estimated_soft_reach_at TEXT;
+            "#,
+        )
+        .ok();
+        conn.execute_batch(
+            r#"
+            ALTER TABLE decision_roll_campaign_alert ADD COLUMN estimated_hard_reach_at TEXT;
+            "#,
+        )
+        .ok();
+
+        Ok(())
     }
 
     /// 查询换辊预警列表
@@ -57,7 +97,12 @@ impl RollAlertRepository {
                 utilization_rate,
                 estimated_change_date,
                 needs_immediate_change,
-                suggested_actions
+                suggested_actions,
+                campaign_start_at,
+                planned_change_at,
+                planned_downtime_minutes,
+                estimated_soft_reach_at,
+                estimated_hard_reach_at
             FROM decision_roll_campaign_alert
             WHERE version_id = ?
         "#;
@@ -91,6 +136,11 @@ impl RollAlertRepository {
                 distance_to_hard: row.get(9)?,
                 utilization_rate: row.get(10)?,
                 estimated_change_date,
+                campaign_start_at: row.get(14)?,
+                planned_change_at: row.get(15)?,
+                planned_downtime_minutes: row.get(16)?,
+                estimated_soft_reach_at: row.get(17)?,
+                estimated_hard_reach_at: row.get(18)?,
                 needs_immediate_change: needs_immediate_change != 0,
                 suggested_actions,
             })
@@ -129,7 +179,12 @@ impl RollAlertRepository {
                 utilization_rate,
                 estimated_change_date,
                 needs_immediate_change,
-                suggested_actions
+                suggested_actions,
+                campaign_start_at,
+                planned_change_at,
+                planned_downtime_minutes,
+                estimated_soft_reach_at,
+                estimated_hard_reach_at
             FROM decision_roll_campaign_alert
             WHERE version_id = ? AND machine_code = ?
             ORDER BY campaign_no DESC
@@ -158,6 +213,11 @@ impl RollAlertRepository {
                 distance_to_hard: row.get(9)?,
                 utilization_rate: row.get(10)?,
                 estimated_change_date,
+                campaign_start_at: row.get(14)?,
+                planned_change_at: row.get(15)?,
+                planned_downtime_minutes: row.get(16)?,
+                estimated_soft_reach_at: row.get(17)?,
+                estimated_hard_reach_at: row.get(18)?,
                 needs_immediate_change: needs_immediate_change != 0,
                 suggested_actions,
             })

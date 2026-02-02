@@ -328,6 +328,27 @@ export const RollCampaignAlertSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable()
     .optional(),
+  // New monitoring fields (optional): datetime strings in SQLite format.
+  campaign_start_at: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+    .optional(),
+  planned_change_at: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+    .nullable()
+    .optional(),
+  planned_downtime_minutes: z.number().int().positive().optional(),
+  estimated_soft_reach_at: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+    .nullable()
+    .optional(),
+  estimated_hard_reach_at: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+    .nullable()
+    .optional(),
   alert_message: z.string(),
   impact_description: z.string(),
   recommended_actions: z.array(z.string()),

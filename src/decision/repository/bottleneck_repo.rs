@@ -13,7 +13,7 @@ use crate::decision::use_cases::d4_machine_bottleneck::{
     BottleneckHeatmap, MachineBottleneckProfile,
 };
 use rusqlite::{params, Connection};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 
@@ -290,35 +290,36 @@ impl BottleneckRepository {
             }
         }
 
-        // 2) pending: 来自 material_state + material_master (按机组聚合)
-        let mut pending_map: HashMap<String, (i32, f64)> = HashMap::new();
-        {
-            let mut stmt = conn.prepare(
-                r#"
-                SELECT
-                    mm.next_machine_code AS machine_code,
-                    COUNT(*) AS pending_count,
-                    COALESCE(SUM(mm.weight_t), 0) AS pending_weight_t
-                FROM material_state ms
-                INNER JOIN material_master mm ON ms.material_id = mm.material_id
-                WHERE ms.sched_state IN ('READY', 'FORCE_RELEASE')
-                  AND mm.next_machine_code IS NOT NULL
-                  AND mm.next_machine_code != ''
-                GROUP BY mm.next_machine_code
-                "#,
-            )?;
-            let rows = stmt.query_map([], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, i32>(1)?,
-                    row.get::<_, f64>(2)?,
-                ))
-            })?;
-            for row in rows {
-                let (machine_code, count, weight_t) = row?;
-                pending_map.insert(machine_code, (count, weight_t));
-            }
+        // 2) pending: 口径调整为“缺口（到当日仍未排入 <= 当日 的量）”
+        //    缺口随日期变化：gap(D) = max(0, demand_ready_cum(<=D) - scheduled_cum(<=D))
+        //    demand_ready_cum 按 effective_earliest_date 累计（FORCE_RELEASE 视为 start_date）。
+        //    注：由于 capacity_pool 不是按 version_id 隔离，读模型也可能不全字段，这里在仓储层统一补齐。
+        let machine_codes: Vec<String> = {
+            let mut list: Vec<String> = profiles.iter().map(|p| p.machine_code.clone()).collect();
+            list.sort();
+            list.dedup();
+            list
+        };
+
+        let mut profile_dates: HashMap<String, BTreeSet<String>> = HashMap::new();
+        for p in profiles.iter() {
+            profile_dates
+                .entry(p.machine_code.clone())
+                .or_default()
+                .insert(p.plan_date.clone());
         }
+
+        let scheduled_before_map =
+            Self::query_scheduled_before_date(conn, version_id, &machine_codes, start_date)?;
+        let demand_incr_map =
+            Self::query_ready_demand_increments(conn, version_id, &machine_codes, start_date, end_date)?;
+        let gap_map = Self::compute_gap_map(
+            &machine_codes,
+            &profile_dates,
+            &scheduled_before_map,
+            &scheduled_map,
+            &demand_incr_map,
+        );
 
         // 3) 写回 profiles
         for profile in profiles.iter_mut() {
@@ -333,7 +334,9 @@ impl BottleneckRepository {
                 profile.scheduled_weight_t = 0.0;
             }
 
-            if let Some((count, weight_t)) = pending_map.get(&profile.machine_code) {
+            if let Some((count, weight_t)) =
+                gap_map.get(&(profile.machine_code.clone(), profile.plan_date.clone()))
+            {
                 profile.pending_materials = *count;
                 profile.pending_weight_t = *weight_t;
             } else {
@@ -343,6 +346,300 @@ impl BottleneckRepository {
         }
 
         Ok(())
+    }
+
+    fn query_scheduled_before_date(
+        conn: &Connection,
+        version_id: &str,
+        machine_codes: &[String],
+        start_date: &str,
+    ) -> Result<HashMap<String, (i32, f64)>, Box<dyn Error>> {
+        if machine_codes.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let placeholders = vec!["?"; machine_codes.len()].join(", ");
+        let sql = format!(
+            r#"
+            SELECT
+                machine_code,
+                COUNT(*) AS material_count,
+                COALESCE(SUM(weight_t), 0) AS total_weight_t
+            FROM plan_item
+            WHERE version_id = ?
+              AND plan_date < ?
+              AND machine_code IN ({})
+            GROUP BY machine_code
+            "#,
+            placeholders
+        );
+
+        let mut params: Vec<String> = Vec::with_capacity(2 + machine_codes.len());
+        params.push(version_id.to_string());
+        params.push(start_date.to_string());
+        params.extend(machine_codes.iter().cloned());
+        let params_refs: Vec<&str> = params.iter().map(|s| s.as_str()).collect();
+
+        let mut map: HashMap<String, (i32, f64)> = HashMap::new();
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(params_refs.iter()), |row| {
+            Ok((
+                row.get::<_, String>(0)?, // machine_code
+                row.get::<_, i32>(1)?,    // material_count
+                row.get::<_, f64>(2)?,    // total_weight_t
+            ))
+        })?;
+        for row in rows {
+            let (machine_code, count, weight_t) = row?;
+            map.insert(machine_code, (count, weight_t));
+        }
+
+        Ok(map)
+    }
+
+    fn query_ready_demand_increments(
+        conn: &Connection,
+        version_id: &str,
+        machine_codes: &[String],
+        start_date: &str,
+        end_date: &str,
+    ) -> Result<HashMap<(String, String), (i32, f64)>, Box<dyn Error>> {
+        if machine_codes.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let has_force_release_flag = Self::table_has_column(conn, "material_state", "force_release_flag")?;
+        let has_earliest_sched_date = Self::table_has_column(conn, "material_state", "earliest_sched_date")?;
+
+        let placeholders = vec!["?"; machine_codes.len()].join(", ");
+
+        let force_release_flag_clause = if has_force_release_flag {
+            "OR COALESCE(ms.force_release_flag, 0) != 0"
+        } else {
+            ""
+        };
+
+        let effective_earliest_expr = if has_earliest_sched_date {
+            format!(
+                r#"
+                CASE
+                    WHEN c.force_release_in_plan != 0
+                      OR COALESCE(ms.sched_state, '') = 'FORCE_RELEASE'
+                      {force_release_flag_clause}
+                    THEN ?
+                    WHEN ms.earliest_sched_date IS NULL
+                      OR TRIM(ms.earliest_sched_date) = ''
+                      OR ms.earliest_sched_date < ?
+                    THEN ?
+                    ELSE ms.earliest_sched_date
+                END AS effective_earliest_date
+                "#,
+                force_release_flag_clause = force_release_flag_clause
+            )
+        } else {
+            // 兼容旧 schema：缺少 earliest_sched_date 时，视为全部从 start_date 起可排
+            format!(
+                r#"
+                CASE
+                    WHEN c.force_release_in_plan != 0
+                      OR COALESCE(ms.sched_state, '') = 'FORCE_RELEASE'
+                      {force_release_flag_clause}
+                    THEN ?
+                    ELSE ?
+                END AS effective_earliest_date
+                "#,
+                force_release_flag_clause = force_release_flag_clause
+            )
+        };
+
+        let sql = format!(
+            r#"
+            WITH candidates_raw AS (
+                -- 1) 版本内已排（无论 material_state 当前是什么状态，都应纳入“需求池”）
+                SELECT
+                    pi.material_id AS material_id,
+                    pi.machine_code AS machine_code,
+                    MAX(pi.force_release_in_plan) AS force_release_in_plan
+                FROM plan_item pi
+                WHERE pi.version_id = ?
+                  AND pi.machine_code IN ({machines})
+                GROUP BY pi.material_id, pi.machine_code
+
+                UNION ALL
+
+                -- 2) 当前未排且可排（READY/FORCE_RELEASE/LOCKED）
+                SELECT
+                    ms.material_id AS material_id,
+                    mm.next_machine_code AS machine_code,
+                    0 AS force_release_in_plan
+                FROM material_state ms
+                INNER JOIN material_master mm ON ms.material_id = mm.material_id
+                WHERE ms.sched_state IN ('READY', 'FORCE_RELEASE', 'LOCKED')
+                  AND mm.next_machine_code IN ({machines})
+                  AND mm.next_machine_code IS NOT NULL
+                  AND mm.next_machine_code != ''
+            ),
+            candidates AS (
+                SELECT
+                    material_id,
+                    machine_code,
+                    MAX(force_release_in_plan) AS force_release_in_plan
+                FROM candidates_raw
+                GROUP BY material_id, machine_code
+            ),
+            normalized AS (
+                SELECT
+                    c.machine_code AS machine_code,
+                    c.material_id AS material_id,
+                    COALESCE(mm.weight_t, 0) AS weight_t,
+                    {effective_earliest_expr}
+                FROM candidates c
+                INNER JOIN material_master mm ON c.material_id = mm.material_id
+                LEFT JOIN material_state ms ON c.material_id = ms.material_id
+            )
+            SELECT
+                machine_code,
+                effective_earliest_date,
+                COUNT(*) AS material_count,
+                COALESCE(SUM(weight_t), 0) AS total_weight_t
+            FROM normalized
+            WHERE machine_code IS NOT NULL
+              AND machine_code != ''
+              AND effective_earliest_date <= ?
+            GROUP BY machine_code, effective_earliest_date
+            "#,
+            machines = placeholders
+            ,
+            effective_earliest_expr = effective_earliest_expr
+        );
+
+        // 参数顺序：
+        // - plan_item: version_id, machine_codes...
+        // - material_state: machine_codes...
+        // - normalized:
+        //   - 有 earliest_sched_date：start_date, start_date, start_date
+        //   - 无 earliest_sched_date：start_date, start_date
+        // - filter: end_date
+        let normalized_params_len = if has_earliest_sched_date { 3 } else { 2 };
+        let mut params: Vec<String> =
+            Vec::with_capacity(1 + machine_codes.len() * 2 + normalized_params_len + 1);
+        params.push(version_id.to_string());
+        params.extend(machine_codes.iter().cloned());
+        params.extend(machine_codes.iter().cloned());
+        params.push(start_date.to_string());
+        if has_earliest_sched_date {
+            params.push(start_date.to_string());
+            params.push(start_date.to_string());
+        } else {
+            params.push(start_date.to_string());
+        }
+        params.push(end_date.to_string());
+        let params_refs: Vec<&str> = params.iter().map(|s| s.as_str()).collect();
+
+        let mut map: HashMap<(String, String), (i32, f64)> = HashMap::new();
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(params_refs.iter()), |row| {
+            Ok((
+                row.get::<_, String>(0)?, // machine_code
+                row.get::<_, String>(1)?, // effective_earliest_date
+                row.get::<_, i32>(2)?,    // material_count
+                row.get::<_, f64>(3)?,    // total_weight_t
+            ))
+        })?;
+        for row in rows {
+            let (machine_code, effective_date, count, weight_t) = row?;
+            map.insert((machine_code, effective_date), (count, weight_t));
+        }
+
+        Ok(map)
+    }
+
+    fn table_has_column(
+        conn: &Connection,
+        table: &str,
+        column: &str,
+    ) -> Result<bool, Box<dyn Error>> {
+        let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", table))?;
+        let mut rows = stmt.query([])?;
+        while let Some(row) = rows.next()? {
+            let name: String = row.get(1)?;
+            if name == column {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    fn compute_gap_map(
+        machine_codes: &[String],
+        profile_dates: &HashMap<String, BTreeSet<String>>,
+        scheduled_before_map: &HashMap<String, (i32, f64)>,
+        scheduled_daily_map: &HashMap<(String, String), (i32, f64)>,
+        demand_incr_map: &HashMap<(String, String), (i32, f64)>,
+    ) -> HashMap<(String, String), (i32, f64)> {
+        if machine_codes.is_empty() {
+            return HashMap::new();
+        }
+
+        // 组装每个机组需要参与前缀累计的日期集合：
+        // - profiles 中出现的日期（用于最终回填）
+        // - scheduled/demand 的发生日期（即使该日无 capacity_pool，也会影响后续累计）
+        let mut dates_by_machine: HashMap<String, BTreeSet<String>> = profile_dates.clone();
+        for ((machine_code, plan_date), _) in scheduled_daily_map.iter() {
+            dates_by_machine
+                .entry(machine_code.clone())
+                .or_default()
+                .insert(plan_date.clone());
+        }
+        for ((machine_code, effective_date), _) in demand_incr_map.iter() {
+            dates_by_machine
+                .entry(machine_code.clone())
+                .or_default()
+                .insert(effective_date.clone());
+        }
+
+        let mut gap_map: HashMap<(String, String), (i32, f64)> = HashMap::new();
+
+        for machine_code in machine_codes {
+            let (before_cnt, before_weight) = scheduled_before_map
+                .get(machine_code)
+                .copied()
+                .unwrap_or((0, 0.0));
+
+            let mut scheduled_cnt_cum: i64 = before_cnt as i64;
+            let mut scheduled_weight_cum: f64 = before_weight;
+            let mut demand_cnt_cum: i64 = 0;
+            let mut demand_weight_cum: f64 = 0.0;
+
+            let Some(dates) = dates_by_machine.get(machine_code) else {
+                continue;
+            };
+
+            for date in dates {
+                if let Some((cnt, w)) =
+                    demand_incr_map.get(&(machine_code.clone(), date.clone()))
+                {
+                    demand_cnt_cum += *cnt as i64;
+                    demand_weight_cum += *w;
+                }
+                if let Some((cnt, w)) =
+                    scheduled_daily_map.get(&(machine_code.clone(), date.clone()))
+                {
+                    scheduled_cnt_cum += *cnt as i64;
+                    scheduled_weight_cum += *w;
+                }
+
+                let gap_cnt = (demand_cnt_cum - scheduled_cnt_cum).max(0) as i32;
+                let mut gap_weight = (demand_weight_cum - scheduled_weight_cum).max(0.0);
+                if gap_weight.abs() < 1e-9 {
+                    gap_weight = 0.0;
+                }
+
+                gap_map.insert((machine_code.clone(), date.clone()), (gap_cnt, gap_weight));
+            }
+        }
+
+        gap_map
     }
 
     /// 从 capacity_pool/plan_item 表实时计算（P1 回退路径）
@@ -361,16 +658,16 @@ impl BottleneckRepository {
 
         // 根据是否指定 machine_code 选择不同的查询路径
         if let Some(mc) = machine_code {
-            self.query_capacity_for_machine(&conn, mc, start_date, end_date, &mut bottleneck_map)?;
+            self.query_capacity_for_machine(&conn, version_id, mc, start_date, end_date, &mut bottleneck_map)?;
         } else {
-            self.query_capacity_for_all(&conn, start_date, end_date, &mut bottleneck_map)?;
+            self.query_capacity_for_all(&conn, version_id, start_date, end_date, &mut bottleneck_map)?;
         }
 
         // 查询 plan_item 表以获取已排材料数据
         self.enrich_with_plan_items(&conn, version_id, start_date, end_date, &mut bottleneck_map)?;
 
         // 查询 material_state 表以获取真实的待排材料数据
-        self.enrich_with_pending_materials(&conn, &mut bottleneck_map)?;
+        self.enrich_with_pending_materials(&conn, version_id, start_date, end_date, &mut bottleneck_map)?;
 
         // 转换为 MachineBottleneckProfile 并排序
         let mut profiles: Vec<MachineBottleneckProfile> = bottleneck_map
@@ -392,6 +689,7 @@ impl BottleneckRepository {
     fn query_capacity_for_machine(
         &self,
         conn: &Connection,
+        version_id: &str,
         machine_code: &str,
         start_date: &str,
         end_date: &str,
@@ -410,13 +708,14 @@ impl BottleneckRepository {
                 accumulated_tonnage_t,
                 roll_campaign_id
             FROM capacity_pool
-            WHERE machine_code = ?1
-              AND plan_date BETWEEN ?2 AND ?3
+            WHERE version_id = ?1
+              AND machine_code = ?2
+              AND plan_date BETWEEN ?3 AND ?4
             ORDER BY plan_date ASC
             "#,
         )?;
 
-        let rows = stmt.query_map(params![machine_code, start_date, end_date], |row| {
+        let rows = stmt.query_map(params![version_id, machine_code, start_date, end_date], |row| {
             Ok((
                 row.get::<_, String>(0)?, // machine_code
                 row.get::<_, String>(1)?, // plan_date
@@ -438,6 +737,7 @@ impl BottleneckRepository {
     fn query_capacity_for_all(
         &self,
         conn: &Connection,
+        version_id: &str,
         start_date: &str,
         end_date: &str,
         bottleneck_map: &mut HashMap<(String, String), MachineBottleneckAggregateData>,
@@ -455,12 +755,13 @@ impl BottleneckRepository {
                 accumulated_tonnage_t,
                 roll_campaign_id
             FROM capacity_pool
-            WHERE plan_date BETWEEN ?1 AND ?2
+            WHERE version_id = ?1
+              AND plan_date BETWEEN ?2 AND ?3
             ORDER BY machine_code ASC, plan_date ASC
             "#,
         )?;
 
-        let rows = stmt.query_map(params![start_date, end_date], |row| {
+        let rows = stmt.query_map(params![version_id, start_date, end_date], |row| {
             Ok((
                 row.get::<_, String>(0)?, // machine_code
                 row.get::<_, String>(1)?, // plan_date
@@ -570,62 +871,125 @@ impl BottleneckRepository {
         Ok(())
     }
 
-    /// 从 material_state 表查询真实的待排材料数据并填充到聚合数据中
+    /// 计算“缺口（到当日仍未排入 <= 当日 的量）”并填充到聚合数据中
     ///
     /// # 说明
-    /// - 查询 sched_state IN ('READY', 'FORCE_RELEASE') 的材料（真正的待排状态）
-    /// - 通过 JOIN material_master 获取机组代码和材料重量
-    /// - 按机组聚合统计，将结果填充到每个(机组, 日期)的 pending_materials 和 pending_weight_t
+    /// - gap(D) = max(0, demand_ready_cum(<=D) - scheduled_cum(<=D))
+    /// - demand_ready_cum：按 effective_earliest_date 累计（FORCE_RELEASE 视为 start_date）
+    /// - scheduled_cum：来自 plan_item（按 version_id 累计）
     ///
     /// # 业务含义
-    /// - 待排材料是按机组级别统计的，不分日期（因为还未排入具体日期）
-    /// - 因此，同一机组的所有日期点将显示相同的待排材料数量和重量
+    /// - 缺口是按机组×日期统计的，会随日期推进逐步收敛（若后续日期排入足够材料）
     fn enrich_with_pending_materials(
         &self,
         conn: &Connection,
+        version_id: &str,
+        start_date: &str,
+        end_date: &str,
         bottleneck_map: &mut HashMap<(String, String), MachineBottleneckAggregateData>,
     ) -> Result<(), Box<dyn Error>> {
-        // 查询待排材料：从 material_state 中筛选 READY/FORCE_RELEASE 状态的材料
-        // JOIN material_master 获取机组代码和重量
-        let mut stmt = conn.prepare(
-            r#"
-            SELECT
-                mm.next_machine_code as machine_code,
-                COUNT(*) as pending_count,
-                SUM(mm.weight_t) as pending_weight_t
-            FROM material_state ms
-            INNER JOIN material_master mm ON ms.material_id = mm.material_id
-            WHERE ms.sched_state IN ('READY', 'FORCE_RELEASE')
-              AND mm.next_machine_code IS NOT NULL
-              AND mm.next_machine_code != ''
-            GROUP BY mm.next_machine_code
-            "#,
-        )?;
-
-        let rows = stmt.query_map([], |row| {
-            Ok((
-                row.get::<_, String>(0)?,  // machine_code
-                row.get::<_, i32>(1)?,     // pending_count
-                row.get::<_, f64>(2)?,     // pending_weight_t
-            ))
-        })?;
-
-        // 构建机组 -> (待排数, 待排重量) 的映射
-        let mut machine_pending_map: HashMap<String, (i32, f64)> = HashMap::new();
-        for row_result in rows {
-            let (machine_code, pending_count, pending_weight) = row_result?;
-            machine_pending_map.insert(machine_code, (pending_count, pending_weight));
+        let machine_codes: Vec<String> = {
+            let mut list: Vec<String> = bottleneck_map.keys().map(|(mc, _)| mc.clone()).collect();
+            list.sort();
+            list.dedup();
+            list
+        };
+        if machine_codes.is_empty() {
+            return Ok(());
         }
 
-        // 将待排数据填充到每个(机组, 日期)的聚合数据中
-        for ((machine_code, _plan_date), entry) in bottleneck_map.iter_mut() {
-            if let Some((pending_count, pending_weight)) = machine_pending_map.get(machine_code) {
-                entry.pending_materials = *pending_count;
-                entry.pending_weight_t = *pending_weight;
+        let mut profile_dates: HashMap<String, BTreeSet<String>> = HashMap::new();
+        for ((mc, plan_date), _) in bottleneck_map.iter() {
+            profile_dates
+                .entry(mc.clone())
+                .or_default()
+                .insert(plan_date.clone());
+        }
+
+        // scheduled: plan_item（按机组×日期聚合，用于 prefix sum）
+        let scheduled_daily_map =
+            Self::query_scheduled_by_machine_date(conn, version_id, &machine_codes, start_date, end_date)?;
+        let scheduled_before_map =
+            Self::query_scheduled_before_date(conn, version_id, &machine_codes, start_date)?;
+
+        // demand increments: READY/FORCE_RELEASE/LOCKED + 本版本 plan_item 的 union
+        let demand_incr_map =
+            Self::query_ready_demand_increments(conn, version_id, &machine_codes, start_date, end_date)?;
+
+        let gap_map = Self::compute_gap_map(
+            &machine_codes,
+            &profile_dates,
+            &scheduled_before_map,
+            &scheduled_daily_map,
+            &demand_incr_map,
+        );
+
+        for ((machine_code, plan_date), entry) in bottleneck_map.iter_mut() {
+            if let Some((gap_cnt, gap_weight)) =
+                gap_map.get(&(machine_code.clone(), plan_date.clone()))
+            {
+                entry.pending_materials = *gap_cnt;
+                entry.pending_weight_t = *gap_weight;
+            } else {
+                entry.pending_materials = 0;
+                entry.pending_weight_t = 0.0;
             }
         }
 
         Ok(())
+    }
+
+    fn query_scheduled_by_machine_date(
+        conn: &Connection,
+        version_id: &str,
+        machine_codes: &[String],
+        start_date: &str,
+        end_date: &str,
+    ) -> Result<HashMap<(String, String), (i32, f64)>, Box<dyn Error>> {
+        if machine_codes.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let placeholders = vec!["?"; machine_codes.len()].join(", ");
+        let sql = format!(
+            r#"
+            SELECT
+                machine_code,
+                plan_date,
+                COUNT(*) AS material_count,
+                COALESCE(SUM(weight_t), 0) AS total_weight_t
+            FROM plan_item
+            WHERE version_id = ?
+              AND plan_date BETWEEN ? AND ?
+              AND machine_code IN ({})
+            GROUP BY machine_code, plan_date
+            "#,
+            placeholders
+        );
+
+        let mut params: Vec<String> = Vec::with_capacity(3 + machine_codes.len());
+        params.push(version_id.to_string());
+        params.push(start_date.to_string());
+        params.push(end_date.to_string());
+        params.extend(machine_codes.iter().cloned());
+        let params_refs: Vec<&str> = params.iter().map(|s| s.as_str()).collect();
+
+        let mut map: HashMap<(String, String), (i32, f64)> = HashMap::new();
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(params_refs.iter()), |row| {
+            Ok((
+                row.get::<_, String>(0)?, // machine_code
+                row.get::<_, String>(1)?, // plan_date
+                row.get::<_, i32>(2)?,    // material_count
+                row.get::<_, f64>(3)?,    // total_weight_t
+            ))
+        })?;
+        for row in rows {
+            let (machine_code, plan_date, count, weight_t) = row?;
+            map.insert((machine_code, plan_date), (count, weight_t));
+        }
+
+        Ok(map)
     }
 
     /// 查询最堵塞的 N 个机组-日组合
@@ -825,7 +1189,7 @@ impl MachineBottleneckAggregateData {
         if self.pending_materials > 20 {
             profile.add_reason(
                 "HIGH_PENDING_COUNT".to_string(),
-                format!("待排产材料数量较多 {} 个", self.pending_materials),
+                format!("缺口材料数量较多 {} 个（到当日仍未排入≤当日）", self.pending_materials),
                 0.5,
                 self.pending_materials,
             );
@@ -835,7 +1199,7 @@ impl MachineBottleneckAggregateData {
             profile.add_reason(
                 "LOW_REMAINING_CAPACITY".to_string(),
                 format!(
-                    "剩余产能不足 {:.1}t，待排产 {:.1}t",
+                    "剩余产能不足 {:.1}t，缺口 {:.1}t（到当日仍未排入≤当日）",
                     remaining_capacity_t, self.pending_weight_t
                 ),
                 0.6,
@@ -852,7 +1216,7 @@ impl MachineBottleneckAggregateData {
                 profile.add_suggested_action("优先处理结构冲突材料".to_string());
             }
             if self.pending_materials > 20 {
-                profile.add_suggested_action("将部分材料转移至其他机组".to_string());
+                profile.add_suggested_action("将部分材料转移至其他机组或延后至后续日期".to_string());
             }
         }
 
@@ -872,6 +1236,7 @@ mod tests {
         conn.execute(
             r#"
             CREATE TABLE IF NOT EXISTS capacity_pool (
+                version_id TEXT NOT NULL,
                 machine_code TEXT NOT NULL,
                 plan_date TEXT NOT NULL,
                 target_capacity_t REAL NOT NULL,
@@ -881,7 +1246,7 @@ mod tests {
                 frozen_capacity_t REAL NOT NULL DEFAULT 0.0,
                 accumulated_tonnage_t REAL NOT NULL DEFAULT 0.0,
                 roll_campaign_id TEXT,
-                PRIMARY KEY (machine_code, plan_date)
+                PRIMARY KEY (version_id, machine_code, plan_date)
             )
             "#,
             [],
@@ -979,11 +1344,12 @@ mod tests {
         conn.execute(
             r#"
             INSERT INTO capacity_pool (
-                machine_code, plan_date, target_capacity_t, limit_capacity_t,
+                version_id, machine_code, plan_date, target_capacity_t, limit_capacity_t,
                 used_capacity_t, overflow_t, frozen_capacity_t, accumulated_tonnage_t, roll_campaign_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             params![
+                "V001",
                 "H032",
                 "2026-01-24",
                 1500.0,
@@ -1001,11 +1367,12 @@ mod tests {
         conn.execute(
             r#"
             INSERT INTO capacity_pool (
-                machine_code, plan_date, target_capacity_t, limit_capacity_t,
+                version_id, machine_code, plan_date, target_capacity_t, limit_capacity_t,
                 used_capacity_t, overflow_t, frozen_capacity_t, accumulated_tonnage_t, roll_campaign_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             params![
+                "V001",
                 "H033",
                 "2026-01-24",
                 1500.0,
@@ -1275,7 +1642,7 @@ mod tests {
         assert_eq!(h033.machine_code, "H033");
         assert!(h033.bottleneck_score > 0.0);
         assert!(h033.is_severe());
-        // pending_materials 来自 material_state（READY 状态），H033 有 5 个待排
+        // pending_materials 口径：缺口（到当日仍未排入≤当日）
         assert_eq!(h033.pending_materials, 5);
         assert_eq!(h033.structure_violations, 5);
         // scheduled_materials 来自 plan_item
@@ -1285,7 +1652,7 @@ mod tests {
         let h032 = &profiles[1];
         assert_eq!(h032.machine_code, "H032");
         assert!(h032.bottleneck_score > 0.0);
-        // pending_materials 来自 material_state（READY 状态），H032 有 3 个待排
+        // pending_materials 口径：缺口（到当日仍未排入≤当日）
         assert_eq!(h032.pending_materials, 3);
         assert_eq!(h032.structure_violations, 2);
         // scheduled_materials 来自 plan_item
@@ -1362,38 +1729,117 @@ mod tests {
     }
 
     #[test]
-    fn test_pending_materials_from_material_state() {
-        // 新测试：验证待排材料正确地从 material_state 查询
+    fn test_pending_materials_gap_by_date() {
+        // 新测试：验证缺口（到当日仍未排入≤当日）按日期随排产累计收敛
         let conn_arc = setup_test_db();
         {
             let conn = conn_arc.lock().expect("锁获取失败");
-            insert_test_capacity_data(&conn);
-            insert_test_plan_items(&conn);
-            insert_test_material_master(&conn);
-            insert_test_material_state(&conn);
+            // capacity_pool: H032 两天
+            conn.execute(
+                r#"
+                INSERT INTO capacity_pool (
+                    version_id, machine_code, plan_date, target_capacity_t, limit_capacity_t,
+                    used_capacity_t, overflow_t, frozen_capacity_t, accumulated_tonnage_t, roll_campaign_id
+                ) VALUES
+                    ('V001', 'H032', '2026-01-24', 1500.0, 2000.0, 1500.0, 0.0, 0.0, 0.0, NULL),
+                    ('V001', 'H032', '2026-01-25', 1500.0, 2000.0, 1500.0, 0.0, 0.0, 0.0, NULL)
+                "#,
+                [],
+            )
+            .unwrap();
+
+            // material_master: 4 件需求（其中 1 件未排）
+            for i in 1..=4 {
+                conn.execute(
+                    r#"
+                    INSERT INTO material_master (
+                        material_id, current_machine_code, next_machine_code, weight_t,
+                        manufacturing_order_id, contract_no, due_date,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    "#,
+                    params![
+                        format!("MAT{:03}", i),
+                        "H031",
+                        "H032",
+                        100.0,
+                        format!("MO{:03}", i),
+                        format!("C{:03}", i),
+                        "2026-02-01",
+                        "2026-01-01T00:00:00Z",
+                        "2026-01-01T00:00:00Z"
+                    ],
+                )
+                .unwrap();
+            }
+
+            // material_state: 3 件 2026-01-24 起可排，1 件 2026-01-25 起可排
+            for i in 1..=4 {
+                let earliest = if i == 3 { "2026-01-25" } else { "2026-01-24" };
+                let sched_state = if i == 1 { "SCHEDULED" } else { "READY" };
+                conn.execute(
+                    r#"
+                    INSERT INTO material_state (
+                        material_id, sched_state, lock_flag, force_release_flag,
+                        urgent_level, earliest_sched_date,
+                        updated_at, updated_by
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    "#,
+                    params![
+                        format!("MAT{:03}", i),
+                        sched_state,
+                        0,
+                        0,
+                        "L0",
+                        earliest,
+                        "2026-01-01T00:00:00Z",
+                        "SYSTEM"
+                    ],
+                )
+                .unwrap();
+            }
+
+            // plan_item: 2026-01-24 排 1 件；2026-01-25 排 2 件（第 4 件不排）
+            conn.execute(
+                r#"
+                INSERT INTO plan_item (
+                    version_id, material_id, machine_code, plan_date, seq_no, weight_t,
+                    source_type, locked_in_plan, force_release_in_plan, violation_flags
+                ) VALUES
+                    ('V001', 'MAT001', 'H032', '2026-01-24', 1, 100.0, 'AUTO', 0, 0, ''),
+                    ('V001', 'MAT002', 'H032', '2026-01-25', 1, 100.0, 'AUTO', 0, 0, ''),
+                    ('V001', 'MAT003', 'H032', '2026-01-25', 2, 100.0, 'AUTO', 0, 0, '')
+                "#,
+                [],
+            )
+            .unwrap();
         }
 
         let repo = BottleneckRepository::new(conn_arc);
         let profiles = repo
-            .get_bottleneck_profile("V001", None, "2026-01-24", "2026-01-24")
+            .get_bottleneck_profile("V001", Some("H032"), "2026-01-24", "2026-01-25")
             .unwrap();
 
-        // 验证 pending 和 scheduled 不相等（之前的 bug）
-        for profile in profiles {
-            if profile.machine_code == "H032" {
-                // 待排：3 个，已排：10 个
-                assert_eq!(profile.pending_materials, 3);
-                assert_eq!(profile.scheduled_materials, 10);
-                assert_eq!(profile.pending_weight_t, 3.0 * 120.0);  // 3 个 × 120t
-                assert_eq!(profile.scheduled_weight_t, 10.0 * 150.0);  // 10 个 × 150t
-            } else if profile.machine_code == "H033" {
-                // 待排：5 个，已排：25 个
-                assert_eq!(profile.pending_materials, 5);
-                assert_eq!(profile.scheduled_materials, 25);
-                assert_eq!(profile.pending_weight_t, 5.0 * 80.0);  // 5 个 × 80t
-                assert_eq!(profile.scheduled_weight_t, 25.0 * 100.0);  // 25 个 × 100t
-            }
+        assert_eq!(profiles.len(), 2);
+
+        let mut by_date: HashMap<String, MachineBottleneckProfile> = HashMap::new();
+        for p in profiles {
+            by_date.insert(p.plan_date.clone(), p);
         }
+
+        let p_24 = by_date.get("2026-01-24").expect("missing 2026-01-24");
+        // 2026-01-24：需求 3（MAT001/MAT002/MAT004），已排 1（MAT001）→ 缺口 2
+        assert_eq!(p_24.pending_materials, 2);
+        assert_eq!(p_24.pending_weight_t, 200.0);
+        assert_eq!(p_24.scheduled_materials, 1);
+        assert_eq!(p_24.scheduled_weight_t, 100.0);
+
+        let p_25 = by_date.get("2026-01-25").expect("missing 2026-01-25");
+        // 2026-01-25：需求 4（+MAT003），已排累计 3（+MAT002/MAT003）→ 缺口 1（MAT004）
+        assert_eq!(p_25.pending_materials, 1);
+        assert_eq!(p_25.pending_weight_t, 100.0);
+        assert_eq!(p_25.scheduled_materials, 2);
+        assert_eq!(p_25.scheduled_weight_t, 200.0);
     }
 
     #[test]
@@ -1406,11 +1852,12 @@ mod tests {
             conn.execute(
                 r#"
                 INSERT INTO capacity_pool (
-                    machine_code, plan_date, target_capacity_t, limit_capacity_t,
+                    version_id, machine_code, plan_date, target_capacity_t, limit_capacity_t,
                     used_capacity_t, overflow_t, frozen_capacity_t, accumulated_tonnage_t, roll_campaign_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 "#,
                 params![
+                    "V001",
                     "H034",
                     "2026-01-25",
                     1500.0,
@@ -1495,6 +1942,29 @@ mod tests {
 
             // 插入 plan_item（已排 2 件，共 200t）
             for i in 1..=2 {
+                // 对齐真实 schema：plan_item.material_id 通常引用 material_master.material_id
+                conn.execute(
+                    r#"
+                    INSERT INTO material_master (
+                        material_id, current_machine_code, next_machine_code, weight_t,
+                        manufacturing_order_id, contract_no, due_date,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    "#,
+                    params![
+                        format!("PM{:03}", i),
+                        "H031",
+                        "H034",
+                        100.0,
+                        format!("MO_PM{:03}", i),
+                        format!("C_PM{:03}", i),
+                        "2026-02-01",
+                        "2026-01-01T00:00:00Z",
+                        "2026-01-01T00:00:00Z"
+                    ],
+                )
+                .unwrap();
+
                 conn.execute(
                     r#"
                     INSERT INTO plan_item (

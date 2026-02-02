@@ -151,10 +151,12 @@ mod system_performance_test {
             material_master_repo.clone(),
             capacity_pool_repo.clone(),
             action_log_repo.clone(),
+            risk_snapshot_repo.clone(),
             eligibility_engine.clone(),
             urgency_engine.clone(),
             priority_sorter.clone(),
             capacity_filler.clone(),
+            risk_engine.clone(),
             config_manager.clone(),
             None, // 测试环境不需要事件发布
         ));
@@ -165,6 +167,7 @@ mod system_performance_test {
             plan_item_repo,
             material_state_repo.clone(),
             material_master_repo.clone(),
+            capacity_pool_repo,
             strategy_draft_repo,
             action_log_repo,
             risk_snapshot_repo,

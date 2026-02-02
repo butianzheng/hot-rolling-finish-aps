@@ -53,6 +53,7 @@ export const configKeyLabels: Record<string, string> = {
   // 换辊配置
   roll_suggest_threshold_t: '换辊建议阈值',
   roll_hard_limit_t: '换辊强制限制',
+  roll_change_downtime_minutes: '换辊停机时长',
 
   // 产能配置
   overflow_pct: '产能溢出比例',
@@ -64,6 +65,7 @@ export const configKeyLabels: Record<string, string> = {
   // 结构校正配置
   target_ratio: '目标钢种配比',
   deviation_threshold: '结构偏差阈值',
+  rhythm_deviation_threshold: '节奏偏差阈值',
 
   // 数据质量配置
   weight_anomaly_threshold: '重量异常阈值',
@@ -90,6 +92,7 @@ export const configDescriptions: Record<string, string> = {
   // 换辊配置
   roll_suggest_threshold_t: '换辊建议阈值（单位：吨，默认1500吨）',
   roll_hard_limit_t: '换辊强制限制（单位：吨，默认2500吨）',
+  roll_change_downtime_minutes: '换辊停机时长（单位：分钟，典型30~60分钟，默认45分钟）',
 
   // 产能配置
   overflow_pct: '产能溢出百分比（允许超出目标产能的比例，默认0.05即5%）',
@@ -101,6 +104,7 @@ export const configDescriptions: Record<string, string> = {
   // 结构校正配置
   target_ratio: '目标钢种配比（JSON格式，如：{"钢种A":0.3,"钢种B":0.5}，空对象{}表示不启用）',
   deviation_threshold: '结构偏差阈值（允许的目标配比偏差，默认0.1即10%）',
+  rhythm_deviation_threshold: '每日生产节奏偏差阈值（用于节奏监控的最大偏差阈值，默认0.1即10%）',
 
   // 数据质量配置
   weight_anomaly_threshold: '重量异常阈值（单位：吨，超过此值视为异常，默认100.0吨）',

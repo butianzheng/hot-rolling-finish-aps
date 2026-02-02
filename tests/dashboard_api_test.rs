@@ -101,7 +101,7 @@ fn test_get_most_risky_date_无风险() {
 
     // 测试: 查询最危险日期
     let result = env.dashboard_api
-        .get_most_risky_date(&version_id)
+        .get_most_risky_date(&version_id, None, None, None, None)
         .expect("查询失败");
 
     assert!(result.items.is_empty(), "无风险快照时应该返回空列表");
@@ -145,7 +145,7 @@ fn test_get_unsatisfied_urgent_materials_无紧急单() {
 
     // 测试: 查询未满足的紧急单（需要版本ID）
     let result = env.dashboard_api
-        .get_unsatisfied_urgent_materials(Some(&version_id))
+        .get_unsatisfied_urgent_materials(&version_id, None, None, None)
         .expect("查询失败");
 
     assert_eq!(result.items.len(), 0, "没有紧急单时应该返回空列表");
@@ -190,7 +190,7 @@ fn test_get_unsatisfied_urgent_materials_有紧急单未排产() {
 
     // 测试: 查询未满足的紧急单
     let result = env.dashboard_api
-        .get_unsatisfied_urgent_materials(Some(&version_id))
+        .get_unsatisfied_urgent_materials(&version_id, None, None, None)
         .expect("查询失败");
 
     // 注意: D2 查询的是 decision_order_failure_set 表，需要先刷新决策视图

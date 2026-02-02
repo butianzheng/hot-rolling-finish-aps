@@ -219,6 +219,7 @@ impl MaterialStateBuilder {
 // ==========================================
 
 pub struct CapacityPoolBuilder {
+    version_id: String,
     machine_code: String,
     plan_date: NaiveDate,
     target_capacity_t: f64,
@@ -233,6 +234,7 @@ pub struct CapacityPoolBuilder {
 impl CapacityPoolBuilder {
     pub fn new(machine_code: &str, plan_date: NaiveDate) -> Self {
         Self {
+            version_id: "v1".to_string(),
             machine_code: machine_code.to_string(),
             plan_date,
             target_capacity_t: 800.0,
@@ -243,6 +245,11 @@ impl CapacityPoolBuilder {
             accumulated_tonnage_t: 0.0,
             roll_campaign_id: None,
         }
+    }
+
+    pub fn version_id(mut self, version_id: &str) -> Self {
+        self.version_id = version_id.to_string();
+        self
     }
 
     pub fn target(mut self, target: f64) -> Self {
@@ -267,6 +274,7 @@ impl CapacityPoolBuilder {
 
     pub fn build(self) -> CapacityPool {
         CapacityPool {
+            version_id: self.version_id,
             machine_code: self.machine_code,
             plan_date: self.plan_date,
             target_capacity_t: self.target_capacity_t,

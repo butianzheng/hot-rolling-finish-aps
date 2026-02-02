@@ -85,10 +85,12 @@ mod api_integration_e2e_test {
             material_master_repo.clone(),
             capacity_pool_repo.clone(),
             action_log_repo.clone(),
+            risk_snapshot_repo.clone(),
             eligibility_engine.clone(),
             urgency_engine.clone(),
             priority_sorter.clone(),
             capacity_filler.clone(),
+            risk_engine.clone(),
             config_manager.clone(),
             None,
         ));
@@ -139,6 +141,7 @@ mod api_integration_e2e_test {
             plan_item_repo,
             material_state_repo,
             material_master_repo,
+            capacity_pool_repo.clone(),
             strategy_draft_repo,
             action_log_repo.clone(),
             risk_snapshot_repo,
@@ -216,6 +219,7 @@ mod api_integration_e2e_test {
         for day_offset in 0..7 {
             for machine in &["H032", "H033", "H034"] {
                 let pool = CapacityPool {
+                    version_id: version_id.clone(),
                     machine_code: machine.to_string(),
                     plan_date: base_date + Duration::days(day_offset),
                     target_capacity_t: 800.0,
@@ -296,6 +300,7 @@ mod api_integration_e2e_test {
         for day_offset in 0..7 {
             for machine in &["H032", "H033"] {
                 let pool = CapacityPool {
+                    version_id: version_id.clone(),
                     machine_code: machine.to_string(),
                     plan_date: base_date + Duration::days(day_offset),
                     target_capacity_t: 800.0,

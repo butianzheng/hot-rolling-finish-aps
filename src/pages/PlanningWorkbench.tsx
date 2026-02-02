@@ -42,6 +42,7 @@ import ScheduleCardView from '../components/workbench/ScheduleCardView';
 import ScheduleGanttView from '../components/workbench/ScheduleGanttView';
 import BatchOperationToolbar from '../components/workbench/BatchOperationToolbar';
 import OneClickOptimizeMenu from '../components/workbench/OneClickOptimizeMenu';
+import DailyRhythmManagerModal from '../components/workbench/DailyRhythmManagerModal';
 import { CapacityTimelineContainer } from '../components/CapacityTimelineContainer';
 import { MaterialInspector } from '../components/MaterialInspector';
 import { RedLineGuard, createFrozenZoneViolation, createMaturityViolation } from '../components/guards/RedLineGuard';
@@ -155,6 +156,7 @@ const PlanningWorkbench: React.FC = () => {
     maxUtilPct: number;
   } | null>(null);
   const [autoRecommendOnOpen, setAutoRecommendOnOpen] = useState(false);
+  const [rhythmModalOpen, setRhythmModalOpen] = useState(false);
 
   // 深链接：从“策略对比/变更明细”等页面跳转到工作台时，可携带 material_id 自动打开详情侧栏
   React.useEffect(() => {
@@ -1421,6 +1423,7 @@ const PlanningWorkbench: React.FC = () => {
             <Space wrap>
               <Button onClick={() => navigate('/comparison')}>版本管理</Button>
               <Button onClick={() => navigate('/comparison?tab=draft')}>生成策略对比方案</Button>
+              <Button onClick={() => setRhythmModalOpen(true)}>每日节奏</Button>
               <BatchOperationToolbar
                 disabled={selectedMaterialIds.length === 0}
                 onLock={() => runMaterialOperation(selectedMaterialIds, 'lock')}
@@ -1469,6 +1472,16 @@ const PlanningWorkbench: React.FC = () => {
             </Space>
           </Space>
         </Card>
+
+        <DailyRhythmManagerModal
+          open={rhythmModalOpen}
+          onClose={() => setRhythmModalOpen(false)}
+          versionId={activeVersionId}
+          machineOptions={machineOptions}
+          defaultMachineCode={scheduleFocus?.machine || poolSelection.machineCode || machineOptions[0] || null}
+          defaultPlanDate={scheduleFocus?.date || formatDate(dayjs())}
+          operator={currentUser || 'system'}
+        />
 
         {!materialsQuery.isLoading && !materialsQuery.error && materials.length === 0 ? (
           <Alert

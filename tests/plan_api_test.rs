@@ -17,7 +17,7 @@ use chrono::NaiveDate;
 use helpers::api_test_helper::*;
 use helpers::test_data_builder::{CapacityPoolBuilder, MaterialBuilder, MaterialStateBuilder, PlanItemBuilder};
 use hot_rolling_aps::api::ApiError;
-use hot_rolling_aps::domain::types::SchedState;
+use hot_rolling_aps::domain::types::{PlanVersionStatus, SchedState};
 
 // ==========================================
 // 方案管理测试
@@ -200,7 +200,7 @@ fn test_activate_version_激活版本() {
         .expect("查询失败")
         .expect("版本不存在");
 
-    assert_eq!(version.status, "ACTIVE");
+    assert_eq!(version.status, PlanVersionStatus::Active);
 }
 
 // ==========================================
@@ -234,21 +234,6 @@ fn test_recalc_full_基本场景() {
 
     env.prepare_materials(materials, states).unwrap();
 
-    // 准备产能池
-    let base_date = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
-    let pools = vec![
-        CapacityPoolBuilder::new("M1", base_date)
-            .target(800.0)
-            .limit(900.0)
-            .build(),
-        CapacityPoolBuilder::new("M1", base_date + chrono::Duration::days(1))
-            .target(800.0)
-            .limit(900.0)
-            .build(),
-    ];
-
-    env.prepare_capacity_pools(pools).unwrap();
-
     // 创建方案和版本
     let plan_id = env.plan_api
         .create_plan("测试方案".to_string(), "admin".to_string())
@@ -263,6 +248,23 @@ fn test_recalc_full_基本场景() {
             "admin".to_string(),
         )
         .expect("创建失败");
+
+    // 准备产能池（产能池已版本化，需要绑定到版本ID）
+    let base_date = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
+    let pools = vec![
+        CapacityPoolBuilder::new("M1", base_date)
+            .version_id(&version_id)
+            .target(800.0)
+            .limit(900.0)
+            .build(),
+        CapacityPoolBuilder::new("M1", base_date + chrono::Duration::days(1))
+            .version_id(&version_id)
+            .target(800.0)
+            .limit(900.0)
+            .build(),
+    ];
+
+    env.prepare_capacity_pools(pools).unwrap();
 
     // 测试: 一键重算
     let result = env.plan_api

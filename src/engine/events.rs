@@ -31,6 +31,8 @@ pub enum ScheduleEventType {
     CapacityPoolChanged,
     /// 换辊活动变更
     RollCampaignChanged,
+    /// 每日生产节奏目标变更
+    RhythmTargetChanged,
     /// 版本创建
     VersionCreated,
     /// 手动触发
@@ -46,6 +48,7 @@ impl ScheduleEventType {
             ScheduleEventType::MaterialStateChanged => "MaterialStateChanged",
             ScheduleEventType::CapacityPoolChanged => "CapacityPoolChanged",
             ScheduleEventType::RollCampaignChanged => "RollCampaignChanged",
+            ScheduleEventType::RhythmTargetChanged => "RhythmTargetChanged",
             ScheduleEventType::VersionCreated => "VersionCreated",
             ScheduleEventType::ManualTrigger => "ManualTrigger",
         }

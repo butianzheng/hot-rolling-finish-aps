@@ -137,8 +137,9 @@ where
         );
 
         // === 步骤 9: 计算 urgent_level ===
-        let n1_days = self.config.get_min_temp_days_winter().await?;
-        let n2_days = self.config.get_min_temp_days_summer().await?;
+        // 说明：N1/N2 为紧急等级阈值配置，不应复用适温阈值（min_temp_days_*）。
+        let n1_days = self.config.get_n1_threshold_days().await?;
+        let n2_days = self.config.get_n2_threshold_days().await?;
 
         let (urgent_level, urgent_reasons) = EligibilityCore::calculate_urgent_level(
             material.due_date,

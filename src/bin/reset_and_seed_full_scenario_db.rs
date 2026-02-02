@@ -156,6 +156,10 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
         "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','roll_hard_limit_t','2500',?1)",
         params![now_sql_dt],
     )?;
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','roll_change_downtime_minutes','45',?1)",
+        params![now_sql_dt],
+    )?;
 
     // 产能配置
     tx.execute(
@@ -180,6 +184,12 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
     )?;
     tx.execute(
         "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','deviation_threshold','0.1',?1)",
+        params![now_sql_dt],
+    )?;
+
+    // 每日节奏偏差阈值（与结构偏差阈值解耦）
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','rhythm_deviation_threshold','0.1',?1)",
         params![now_sql_dt],
     )?;
 
@@ -246,6 +256,84 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
         ],
     )?;
 
+    // ==========================================
+    // 每日生产节奏（品种大类）- 预设 + 目标（按版本×机组×日期）
+    // ==========================================
+
+    // Presets (deterministic IDs for easy testing)
+    let rhythm_presets: [(&str, &str, &str); 4] = [
+        (
+            "RP_BALANCED",
+            "均衡（普/汽/家/管 各25%）",
+            r#"{"普板":0.25,"汽车板":0.25,"家电板":0.25,"管线钢":0.25}"#,
+        ),
+        (
+            "RP_AUTO_HEAVY",
+            "汽车优先（40%）",
+            r#"{"汽车板":0.40,"家电板":0.25,"管线钢":0.20,"普板":0.15}"#,
+        ),
+        (
+            "RP_APPLIANCE_HEAVY",
+            "家电集中（45%）",
+            r#"{"家电板":0.45,"汽车板":0.20,"管线钢":0.15,"普板":0.20}"#,
+        ),
+        (
+            "RP_PIPELINE_HEAVY",
+            "管线集中（50%）",
+            r#"{"管线钢":0.50,"普板":0.25,"汽车板":0.15,"家电板":0.10}"#,
+        ),
+    ];
+
+    for (preset_id, preset_name, target_json) in rhythm_presets.iter().copied() {
+        tx.execute(
+            r#"
+            INSERT INTO plan_rhythm_preset (
+                preset_id, preset_name, dimension, target_json,
+                is_active, created_at, updated_at, updated_by
+            ) VALUES (?1, ?2, 'PRODUCT_CATEGORY', ?3, 1, ?4, ?5, 'seed')
+            "#,
+            params![preset_id, preset_name, target_json, now_sql_dt, now_sql_dt],
+        )?;
+    }
+
+    let rhythm_by_machine: HashMap<&str, &str> = HashMap::from([
+        ("H031", "RP_BALANCED"),
+        ("H032", "RP_AUTO_HEAVY"),
+        ("H033", "RP_PIPELINE_HEAVY"),
+        ("H034", "RP_APPLIANCE_HEAVY"),
+    ]);
+
+    for version_id in [ACTIVE_VERSION_ID, DRAFT_VERSION_ID] {
+        for day in 0..HORIZON_DAYS {
+            let plan_date = (base_date + Duration::days(day)).to_string();
+            for (machine_code, preset_id) in &rhythm_by_machine {
+                let target_json = rhythm_presets
+                    .iter()
+                    .copied()
+                    .find(|(id, _, _)| *id == *preset_id)
+                    .map(|(_, _, json)| json)
+                    .unwrap_or(r#"{}"#);
+
+                tx.execute(
+                    r#"
+                    INSERT OR REPLACE INTO plan_rhythm_target (
+                        version_id, machine_code, plan_date, dimension,
+                        target_json, preset_id, updated_at, updated_by
+                    ) VALUES (?1, ?2, ?3, 'PRODUCT_CATEGORY', ?4, ?5, ?6, 'seed')
+                    "#,
+                    params![
+                        version_id,
+                        *machine_code,
+                        plan_date,
+                        target_json,
+                        *preset_id,
+                        now_sql_dt
+                    ],
+                )?;
+            }
+        }
+    }
+
     // Materials (material_master + material_state)
     for i in 1..=material_count {
         let material_id = format!("MAT{:04}", i);
@@ -283,6 +371,15 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
             Some("Q345B".to_string())
         };
 
+        // 品种大类：用于“每日生产节奏管理”（先做大类，不引入规格系数）
+        let product_category: Option<String> = match i % 5 {
+            0 => Some("普板".to_string()),
+            1 => Some("汽车板".to_string()),
+            2 => Some("家电板".to_string()),
+            3 => Some("管线钢".to_string()),
+            _ => Some("工程机械".to_string()),
+        };
+
         let stock_age_days = if (101..=130).contains(&i) {
             40
         } else {
@@ -299,6 +396,7 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
                 steel_mark, slab_id, material_status_code_src,
                 status_updated_at, output_age_days_raw, stock_age_days,
                 contract_nature, weekly_delivery_flag, export_flag,
+                product_category,
                 created_at, updated_at
             ) VALUES (
                 ?1, ?2,
@@ -308,7 +406,8 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
                 ?13, ?14, ?15,
                 ?16, ?17, ?18,
                 ?19, ?20, ?21,
-                ?22, ?23
+                ?22,
+                ?23, ?24
             )
             "#,
             params![
@@ -333,6 +432,7 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
                 if i % 9 == 0 { "RUSH" } else { "NORMAL" },
                 if i % 7 == 0 { "Y" } else { "N" },
                 if i % 11 == 0 { "1" } else { "0" },
+                product_category,
                 now_rfc3339,
                 now_rfc3339,
             ],

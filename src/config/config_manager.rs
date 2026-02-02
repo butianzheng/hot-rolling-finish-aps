@@ -372,6 +372,7 @@ pub mod config_keys {
     // 换辊
     pub const ROLL_SUGGEST_THRESHOLD_T: &str = "roll_suggest_threshold_t";
     pub const ROLL_HARD_LIMIT_T: &str = "roll_hard_limit_t";
+    pub const ROLL_CHANGE_DOWNTIME_MINUTES: &str = "roll_change_downtime_minutes";
 
     // 产能
     pub const OVERFLOW_PCT: &str = "overflow_pct";
@@ -383,6 +384,10 @@ pub mod config_keys {
     // 结构校正
     pub const TARGET_RATIO: &str = "target_ratio";           // 目标钢种配比 (JSON)
     pub const DEVIATION_THRESHOLD: &str = "deviation_threshold"; // 偏差阈值
+
+    // 每日生产节奏（品种大类等）
+    // 说明：与结构校正的 deviation_threshold 口径解耦，避免相互影响。
+    pub const RHYTHM_DEVIATION_THRESHOLD: &str = "rhythm_deviation_threshold";
 }
 
 // TODO: 实现错误处理

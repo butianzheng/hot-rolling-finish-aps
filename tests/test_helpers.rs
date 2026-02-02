@@ -271,7 +271,8 @@ fn init_schema(conn: &Connection) -> Result<(), Box<dyn Error>> {
         r#"
         CREATE TABLE IF NOT EXISTS action_log (
             action_id TEXT PRIMARY KEY,
-            version_id TEXT NOT NULL,
+            -- version_id 可空：部分操作（如创建方案/导入等）可能不绑定具体版本
+            version_id TEXT,
             action_type TEXT NOT NULL,
             action_ts TEXT NOT NULL,
             actor TEXT NOT NULL,
@@ -353,6 +354,7 @@ fn init_schema(conn: &Connection) -> Result<(), Box<dyn Error>> {
     conn.execute(
         r#"
         CREATE TABLE IF NOT EXISTS capacity_pool (
+            version_id TEXT NOT NULL,
             machine_code TEXT NOT NULL,
             plan_date TEXT NOT NULL,
             target_capacity_t REAL NOT NULL,
@@ -362,7 +364,7 @@ fn init_schema(conn: &Connection) -> Result<(), Box<dyn Error>> {
             frozen_capacity_t REAL NOT NULL DEFAULT 0.0,
             accumulated_tonnage_t REAL NOT NULL DEFAULT 0.0,
             roll_campaign_id TEXT,
-            PRIMARY KEY (machine_code, plan_date)
+            PRIMARY KEY (version_id, machine_code, plan_date)
         )
         "#,
         [],

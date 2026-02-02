@@ -69,6 +69,7 @@ impl RiskEngine {
         all_materials: &[MaterialState],
         material_weights: &std::collections::HashMap<String, f64>,
         roll_status: Option<&str>,
+        overflow_red_threshold_pct: f64,
     ) -> RiskSnapshot {
         // 1. 计算产能指标
         let (used_capacity_t, overflow_t) = self.calculate_capacity_metrics(pool, scheduled_items);
@@ -92,6 +93,7 @@ impl RiskEngine {
             mature_backlog_t,
             immature_backlog_t,
             roll_status,
+            overflow_red_threshold_pct,
         );
 
         // 5. 生成换辊风险提示
@@ -282,26 +284,36 @@ impl RiskEngine {
         mature_backlog_t: f64,
         _immature_backlog_t: f64,
         roll_status: Option<&str>,
+        overflow_red_threshold_pct: f64,
     ) -> (RiskLevel, String) {
-        let mut reasons = Vec::new();
+        let mut reasons: Vec<String> = Vec::new();
+        let threshold_pct = if overflow_red_threshold_pct > 0.0 && overflow_red_threshold_pct <= 1.0 {
+            overflow_red_threshold_pct
+        } else if overflow_red_threshold_pct > 1.0 && overflow_red_threshold_pct <= 100.0 {
+            // 兼容用户误填百分比（如 5 表示 5%）
+            overflow_red_threshold_pct / 100.0
+        } else {
+            0.1
+        };
 
         // RED 级别判定
-        if overflow_t > pool.limit_capacity_t * 0.1 {
-            reasons.push("超限严重(>10%)");
+        if overflow_t > pool.limit_capacity_t * threshold_pct {
+            reasons.push(format!("超限严重(>{:.1}%)", threshold_pct * 100.0));
             return (
                 RiskLevel::Red,
                 json!({
                     "level": "RED",
                     "reasons": reasons,
                     "overflow_t": overflow_t,
-                    "overflow_pct": (overflow_t / pool.limit_capacity_t * 100.0)
+                    "overflow_pct": (overflow_t / pool.limit_capacity_t * 100.0),
+                    "threshold_pct": threshold_pct * 100.0
                 })
                 .to_string(),
             );
         }
 
         if l3_count >= 5 {
-            reasons.push("L3红线材料过多(>=5)");
+            reasons.push("L3红线材料过多(>=5)".to_string());
             return (
                 RiskLevel::Red,
                 json!({
@@ -314,7 +326,7 @@ impl RiskEngine {
         }
 
         if roll_status == Some("HARD_STOP") {
-            reasons.push("换辊硬停止");
+            reasons.push("换辊硬停止".to_string());
             return (
                 RiskLevel::Red,
                 json!({
@@ -328,15 +340,15 @@ impl RiskEngine {
 
         // ORANGE 级别判定
         if overflow_t > 0.0 {
-            reasons.push("超限轻微");
+            reasons.push("超限轻微".to_string());
         }
 
         if l2_count >= 10 {
-            reasons.push("L2紧急材料过多(>=10)");
+            reasons.push("L2紧急材料过多(>=10)".to_string());
         }
 
         if mature_backlog_t > pool.target_capacity_t * 2.0 {
-            reasons.push("冷料压库严重(>2倍目标产能)");
+            reasons.push("冷料压库严重(>2倍目标产能)".to_string());
         }
 
         if !reasons.is_empty() {
@@ -356,15 +368,15 @@ impl RiskEngine {
         // YELLOW 级别判定
         let utilization = used_capacity_t / pool.target_capacity_t;
         if utilization > 0.9 {
-            reasons.push("接近目标产能(>90%)");
+            reasons.push("接近目标产能(>90%)".to_string());
         }
 
         if l2_count >= 5 {
-            reasons.push("L2紧急材料较多(>=5)");
+            reasons.push("L2紧急材料较多(>=5)".to_string());
         }
 
         if mature_backlog_t > pool.target_capacity_t {
-            reasons.push("冷料压库(>目标产能)");
+            reasons.push("冷料压库(>目标产能)".to_string());
         }
 
         if !reasons.is_empty() {
@@ -635,6 +647,7 @@ mod tests {
             100.0,  // mature_backlog_t
             50.0,   // immature_backlog_t
             None,   // roll_status
+            0.1,    // overflow_red_threshold_pct
         );
 
         assert_eq!(risk_level, RiskLevel::Green);
@@ -655,6 +668,7 @@ mod tests {
             100.0,  // mature_backlog_t
             50.0,   // immature_backlog_t
             None,   // roll_status
+            0.1,    // overflow_red_threshold_pct
         );
 
         assert_eq!(risk_level, RiskLevel::Yellow);
@@ -675,6 +689,7 @@ mod tests {
             100.0,  // mature_backlog_t
             50.0,   // immature_backlog_t
             None,   // roll_status
+            0.1,    // overflow_red_threshold_pct
         );
 
         assert_eq!(risk_level, RiskLevel::Orange);
@@ -695,6 +710,7 @@ mod tests {
             100.0,  // mature_backlog_t
             50.0,   // immature_backlog_t
             None,   // roll_status
+            0.1,    // overflow_red_threshold_pct
         );
 
         assert_eq!(risk_level, RiskLevel::Red);
@@ -715,6 +731,7 @@ mod tests {
             100.0,  // mature_backlog_t
             50.0,   // immature_backlog_t
             None,   // roll_status
+            0.1,    // overflow_red_threshold_pct
         );
 
         assert_eq!(risk_level, RiskLevel::Red);
@@ -735,6 +752,7 @@ mod tests {
             100.0,  // mature_backlog_t
             50.0,   // immature_backlog_t
             Some("HARD_STOP"), // roll_status
+            0.1,    // overflow_red_threshold_pct
         );
 
         assert_eq!(risk_level, RiskLevel::Red);
@@ -773,6 +791,7 @@ mod tests {
             &materials,
             &weights,
             None,
+            0.1,
         );
 
         assert_eq!(snapshot.version_id, "v1");

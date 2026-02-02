@@ -70,6 +70,21 @@ pub struct RollAlert {
     /// 预计换辊日期 (YYYY-MM-DD)
     pub estimated_change_date: Option<String>,
 
+    /// 当前换辊周期起点（YYYY-MM-DD HH:MM:SS，估算/人工微调）
+    pub campaign_start_at: Option<String>,
+
+    /// 计划换辊时刻（YYYY-MM-DD HH:MM:SS，可人工微调）
+    pub planned_change_at: Option<String>,
+
+    /// 计划停机时长（分钟）
+    pub planned_downtime_minutes: Option<i32>,
+
+    /// 预计达到软限制的日期时间（YYYY-MM-DD HH:MM:SS）
+    pub estimated_soft_reach_at: Option<String>,
+
+    /// 预计达到硬限制的日期时间（YYYY-MM-DD HH:MM:SS）
+    pub estimated_hard_reach_at: Option<String>,
+
     /// 是否需要立即换辊
     pub needs_immediate_change: bool,
 
@@ -152,6 +167,11 @@ impl RollAlert {
             distance_to_hard,
             utilization_rate,
             estimated_change_date: None,
+            campaign_start_at: None,
+            planned_change_at: None,
+            planned_downtime_minutes: None,
+            estimated_soft_reach_at: None,
+            estimated_hard_reach_at: None,
             needs_immediate_change: false,
             suggested_actions: Vec::new(),
         };

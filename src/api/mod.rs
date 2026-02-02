@@ -10,6 +10,7 @@ pub mod material_api;
 pub mod plan_api;
 pub mod config_api;
 pub mod roller_api;
+pub mod rhythm_api;
 pub mod validator;
 pub mod import_api;
 
@@ -20,6 +21,7 @@ pub use material_api::MaterialApi;
 pub use plan_api::PlanApi;
 pub use config_api::ConfigApi;
 pub use roller_api::RollerApi;
+pub use rhythm_api::RhythmApi;
 pub use validator::{ValidationMode, ManualOperationValidator};
 pub use import_api::{ImportApi, ImportApiResponse};
 

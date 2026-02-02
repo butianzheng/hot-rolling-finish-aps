@@ -242,21 +242,21 @@ mod decision_e2e_test {
         // 2. 创建产能池数据（2 个机组）
         // M01: 95% 利用率 - 高堵塞
         conn.execute(
-            "INSERT INTO capacity_pool (machine_code, plan_date,
+            "INSERT INTO capacity_pool (version_id, machine_code, plan_date,
              target_capacity_t, limit_capacity_t, used_capacity_t,
              overflow_t, frozen_capacity_t, accumulated_tonnage_t)
-             VALUES (?1, ?2, 1000.0, 1000.0, 950.0, 0.0, 0.0, 950.0)",
-            rusqlite::params!["M01", date.to_string()],
+             VALUES (?1, ?2, ?3, 1000.0, 1000.0, 950.0, 0.0, 0.0, 950.0)",
+            rusqlite::params![version_id, "M01", date.to_string()],
         )
         .unwrap();
 
         // M02: 60% 利用率 - 正常
         conn.execute(
-            "INSERT INTO capacity_pool (machine_code, plan_date,
+            "INSERT INTO capacity_pool (version_id, machine_code, plan_date,
              target_capacity_t, limit_capacity_t, used_capacity_t,
              overflow_t, frozen_capacity_t, accumulated_tonnage_t)
-             VALUES (?1, ?2, 1000.0, 1000.0, 600.0, 0.0, 0.0, 600.0)",
-            rusqlite::params!["M02", date.to_string()],
+             VALUES (?1, ?2, ?3, 1000.0, 1000.0, 600.0, 0.0, 0.0, 600.0)",
+            rusqlite::params![version_id, "M02", date.to_string()],
         )
         .unwrap();
 
@@ -613,6 +613,23 @@ mod decision_e2e_test {
         )
         .unwrap();
 
+        // 换辊阈值改由配置管理统一维护（本测试显式写入全局配置，确保口径可控）
+        conn.execute(
+            "INSERT OR REPLACE INTO config_kv (scope_id, key, value) VALUES ('global', 'roll_suggest_threshold_t', '10000')",
+            rusqlite::params![],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO config_kv (scope_id, key, value) VALUES ('global', 'roll_hard_limit_t', '12000')",
+            rusqlite::params![],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO config_kv (scope_id, key, value) VALUES ('global', 'roll_change_downtime_minutes', '45')",
+            rusqlite::params![],
+        )
+        .unwrap();
+
         // 2. 创建换辊活动数据 (roller_campaign) + 计划项 (plan_item 用于累计重量)
         //
         // 活动 1: 累计重量接近建议阈值 (90%) -> WARNING
@@ -699,15 +716,19 @@ mod decision_e2e_test {
         let has_emergency = response.items.iter().any(|item| item.alert_level == "EMERGENCY");
         assert!(has_emergency, "应该包含 EMERGENCY 级别预警");
 
-        // 验证超过硬限制的活动（campaign_no=2 -> campaign_id=C002）
-        let alert = response
+        // 验证 WARNING 级别预警（接近建议阈值）
+        let has_warning = response.items.iter().any(|item| item.machine_code == "M01" && item.alert_level == "WARNING");
+        assert!(has_warning, "应该包含 M01 的 WARNING 级别预警");
+
+        // 验证超过硬限制的机组（M02）
+        let alert_m02 = response
             .items
             .iter()
-            .find(|item| item.campaign_id == "C002")
-            .expect("应该存在 campaign_no=2 的换辊预警记录");
+            .find(|item| item.machine_code == "M02")
+            .expect("应该存在 M02 的换辊预警记录");
         assert!(
-            alert.current_tonnage_t >= alert.hard_limit_t,
-            "C002 应该超过硬限制"
+            alert_m02.current_tonnage_t >= alert_m02.hard_limit_t,
+            "M02 应该超过硬限制"
         );
     }
 
@@ -740,31 +761,31 @@ mod decision_e2e_test {
         // 2. 创建产能池数据 - 低利用率场景
         // M01: 40% 利用率 - 高优化空间
         conn.execute(
-            "INSERT INTO capacity_pool (machine_code, plan_date,
+            "INSERT INTO capacity_pool (version_id, machine_code, plan_date,
              target_capacity_t, limit_capacity_t, used_capacity_t,
              overflow_t, frozen_capacity_t, accumulated_tonnage_t)
-             VALUES (?1, ?2, 1000.0, 1000.0, 400.0, 0.0, 0.0, 400.0)",
-            rusqlite::params!["M01", date.to_string()],
+             VALUES (?1, ?2, ?3, 1000.0, 1000.0, 400.0, 0.0, 0.0, 400.0)",
+            rusqlite::params![version_id, "M01", date.to_string()],
         )
         .unwrap();
 
         // M02: 65% 利用率 - 中等优化空间
         conn.execute(
-            "INSERT INTO capacity_pool (machine_code, plan_date,
+            "INSERT INTO capacity_pool (version_id, machine_code, plan_date,
              target_capacity_t, limit_capacity_t, used_capacity_t,
              overflow_t, frozen_capacity_t, accumulated_tonnage_t)
-             VALUES (?1, ?2, 1000.0, 1000.0, 650.0, 0.0, 0.0, 650.0)",
-            rusqlite::params!["M02", date.to_string()],
+             VALUES (?1, ?2, ?3, 1000.0, 1000.0, 650.0, 0.0, 0.0, 650.0)",
+            rusqlite::params![version_id, "M02", date.to_string()],
         )
         .unwrap();
 
         // M03: 95% 利用率 - 无优化空间
         conn.execute(
-            "INSERT INTO capacity_pool (machine_code, plan_date,
+            "INSERT INTO capacity_pool (version_id, machine_code, plan_date,
              target_capacity_t, limit_capacity_t, used_capacity_t,
              overflow_t, frozen_capacity_t, accumulated_tonnage_t)
-             VALUES (?1, ?2, 1000.0, 1000.0, 950.0, 0.0, 0.0, 950.0)",
-            rusqlite::params!["M03", date.to_string()],
+             VALUES (?1, ?2, ?3, 1000.0, 1000.0, 950.0, 0.0, 0.0, 950.0)",
+            rusqlite::params![version_id, "M03", date.to_string()],
         )
         .unwrap();
 

@@ -115,13 +115,26 @@ fn main() {
             list_custom_strategies,
 
             // ==========================================
-            // 换辊管理相关命令 (5个)
+            // 换辊管理相关命令 (7个)
             // ==========================================
             list_roll_campaigns,
+            list_roll_campaign_plans,
             get_active_roll_campaign,
             list_needs_roll_change,
             create_roll_campaign,
             close_roll_campaign,
+            upsert_roll_campaign_plan,
+
+            // ==========================================
+            // 每日生产节奏管理相关命令 (7个)
+            // ==========================================
+            list_rhythm_presets,
+            upsert_rhythm_preset,
+            set_rhythm_preset_active,
+            list_rhythm_targets,
+            upsert_rhythm_target,
+            apply_rhythm_preset,
+            get_daily_rhythm_profile,
 
             // ==========================================
             // 决策支持相关命令 (6个)
