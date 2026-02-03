@@ -3,13 +3,11 @@ import {
   Alert,
   Button,
   Card,
-  Dropdown,
   Space,
   Tag,
-  Typography,
   message,
 } from 'antd';
-import { DownOutlined, InfoCircleOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
+import { InfoCircleOutlined, SettingOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -28,11 +26,11 @@ import type { PlanItemStatusFilter } from '../utils/planItemStatus';
 import MaterialPool, { type MaterialPoolSelection } from '../components/workbench/MaterialPool';
 import ScheduleCardView from '../components/workbench/ScheduleCardView';
 import ScheduleGanttView from '../components/workbench/ScheduleGanttView';
-import BatchOperationToolbar from '../components/workbench/BatchOperationToolbar';
-import OneClickOptimizeMenu from '../components/workbench/OneClickOptimizeMenu';
 import DailyRhythmManagerModal from '../components/workbench/DailyRhythmManagerModal';
 import ConditionalSelectModal from '../components/workbench/ConditionalSelectModal';
 import WorkbenchScheduleViewToolbar from '../components/workbench/WorkbenchScheduleViewToolbar';
+import WorkbenchTopToolbar from '../components/workbench/WorkbenchTopToolbar';
+import WorkbenchStatusBar from '../components/workbench/WorkbenchStatusBar';
 import PathOverrideConfirmModal from '../components/path-override-confirm/PathOverrideConfirmModal';
 import PathOverridePendingCenterModal from '../components/path-override-confirm/PathOverridePendingCenterModal';
 import RollCycleAnchorCard from '../components/roll-cycle-anchor/RollCycleAnchorCard';
@@ -266,74 +264,29 @@ const PlanningWorkbench: React.FC = () => {
           }}
         />
 
-        {/* 工具栏 */}
-        <Card size="small">
-          <Space
-            wrap
-            align="center"
-            style={{ width: '100%', justifyContent: 'space-between' }}
-          >
-            <Space wrap>
-              <Typography.Text type="secondary">当前版本</Typography.Text>
-              <Typography.Text code>{activeVersionId || '-'}</Typography.Text>
-              <Button
-                size="small"
-                icon={<ReloadOutlined />}
-                onClick={() => {
-                  setRefreshSignal((v) => v + 1);
-                  materialsQuery.refetch();
-                }}
-              >
-                刷新
-              </Button>
-            </Space>
-
-            <Space wrap>
-              <Button onClick={() => navigate('/comparison')}>版本管理</Button>
-              <Button onClick={() => navigate('/comparison?tab=draft')}>生成策略对比方案</Button>
-              <Button onClick={() => setRhythmModalOpen(true)}>每日节奏</Button>
-              <BatchOperationToolbar
-                disabled={selectedMaterialIds.length === 0}
-                onLock={() => runMaterialOperation(selectedMaterialIds, 'lock')}
-                onUnlock={() => runMaterialOperation(selectedMaterialIds, 'unlock')}
-                onSetUrgent={() => runMaterialOperation(selectedMaterialIds, 'urgent_on')}
-                onClearUrgent={() => runMaterialOperation(selectedMaterialIds, 'urgent_off')}
-                onForceRelease={() => runForceReleaseOperation(selectedMaterialIds)}
-                onMove={openMoveModal}
-                onConditional={() => setConditionalSelectOpen(true)}
-                onClear={() => setSelectedMaterialIds([])}
-              />
-              <Dropdown
-                menu={{
-                  onClick: ({ key }) => navigate(`/settings?tab=${key}`),
-                  items: [
-                    { key: 'materials', label: '物料管理（表格）' },
-                    { key: 'machine', label: '机组配置（产能池）' },
-                    { type: 'divider' },
-                    { key: 'system', label: '系统配置' },
-                    { key: 'path_rule', label: '路径规则（v0.6）' },
-                    { key: 'logs', label: '操作日志' },
-                  ],
-                }}
-              >
-                <Button icon={<SettingOutlined />}>
-                  设置/工具 <DownOutlined />
-                </Button>
-              </Dropdown>
-              <OneClickOptimizeMenu
-                activeVersionId={activeVersionId}
-                operator={currentUser}
-                onBeforeExecute={() => setRecalculating(true)}
-                onAfterExecute={() => {
-                  setRecalculating(false);
-                  setRefreshSignal((v) => v + 1);
-                  materialsQuery.refetch();
-                  planItemsQuery.refetch();
-                }}
-              />
-            </Space>
-          </Space>
-        </Card>
+	        {/* 工具栏 */}
+	        <WorkbenchTopToolbar
+	          activeVersionId={activeVersionId}
+	          currentUser={currentUser}
+	          selectedMaterialIds={selectedMaterialIds}
+	          onRefresh={() => {
+	            setRefreshSignal((v) => v + 1);
+	            materialsQuery.refetch();
+	          }}
+	          onOpenRhythmModal={() => setRhythmModalOpen(true)}
+	          onOpenConditionalSelect={() => setConditionalSelectOpen(true)}
+	          onClearSelection={() => setSelectedMaterialIds([])}
+	          openMoveModal={openMoveModal}
+	          runMaterialOperation={runMaterialOperation}
+	          runForceReleaseOperation={runForceReleaseOperation}
+	          onBeforeOptimize={() => setRecalculating(true)}
+	          onAfterOptimize={() => {
+	            setRecalculating(false);
+	            setRefreshSignal((v) => v + 1);
+	            materialsQuery.refetch();
+	            planItemsQuery.refetch();
+	          }}
+	        />
 
         <DailyRhythmManagerModal
           open={rhythmModalOpen}
@@ -627,64 +580,20 @@ const PlanningWorkbench: React.FC = () => {
           </div>
         </div>
 
-        {/* 状态栏 */}
-        <Card size="small">
-          <Space wrap align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
-            <Space wrap>
-              <Typography.Text>
-                已选: {selectedMaterialIds.length} 个物料
-              </Typography.Text>
-              <Typography.Text type="secondary">
-                总重: {selectedTotalWeight.toFixed(2)}t
-              </Typography.Text>
-            </Space>
-
-            <Space wrap>
-              <Button
-                disabled={selectedMaterialIds.length === 0}
-                onClick={() => runMaterialOperation(selectedMaterialIds, 'lock')}
-              >
-                锁定
-              </Button>
-              <Button
-                disabled={selectedMaterialIds.length === 0}
-                onClick={() => runMaterialOperation(selectedMaterialIds, 'unlock')}
-              >
-                解锁
-              </Button>
-              <Button
-                type="primary"
-                danger
-                disabled={selectedMaterialIds.length === 0}
-                onClick={() => runMaterialOperation(selectedMaterialIds, 'urgent_on')}
-              >
-                设为紧急
-              </Button>
-              <Button
-                disabled={selectedMaterialIds.length === 0}
-                onClick={() => runMaterialOperation(selectedMaterialIds, 'urgent_off')}
-              >
-                取消紧急
-              </Button>
-              <Button
-                danger
-                disabled={selectedMaterialIds.length === 0}
-                onClick={() => runForceReleaseOperation(selectedMaterialIds)}
-              >
-                强制放行
-              </Button>
-              <Button disabled={selectedMaterialIds.length === 0} onClick={openMoveModalWithRecommend}>
-                最近可行
-              </Button>
-              <Button disabled={selectedMaterialIds.length === 0} onClick={openMoveModal}>
-                移动到...
-              </Button>
-              <Button disabled={selectedMaterialIds.length === 0} onClick={() => setSelectedMaterialIds([])}>
-                清空选择
-              </Button>
-            </Space>
-          </Space>
-        </Card>
+	        {/* 状态栏 */}
+	        <WorkbenchStatusBar
+	          selectedMaterialCount={selectedMaterialIds.length}
+	          selectedTotalWeight={selectedTotalWeight}
+	          disabled={selectedMaterialIds.length === 0}
+	          onLock={() => runMaterialOperation(selectedMaterialIds, 'lock')}
+	          onUnlock={() => runMaterialOperation(selectedMaterialIds, 'unlock')}
+	          onSetUrgent={() => runMaterialOperation(selectedMaterialIds, 'urgent_on')}
+	          onClearUrgent={() => runMaterialOperation(selectedMaterialIds, 'urgent_off')}
+	          onForceRelease={() => runForceReleaseOperation(selectedMaterialIds)}
+	          onOpenMoveRecommend={openMoveModalWithRecommend}
+	          onOpenMoveModal={openMoveModal}
+	          onClearSelection={() => setSelectedMaterialIds([])}
+	        />
 
         <ConditionalSelectModal
           open={conditionalSelectOpen}
