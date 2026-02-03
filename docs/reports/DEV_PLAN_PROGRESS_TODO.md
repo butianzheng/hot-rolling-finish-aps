@@ -50,12 +50,13 @@
 
 - [x] M0-1 统一 refreshAll/retry*（`d111c62`）
 - [x] M0-2 Move 关键链路一致性 + 单测护栏（`1cc4a28`/`26ff8e1`/`6141330`/`5ec4369`）
-- [x] M0-3 统一 Workbench "刷新策略"口径（refreshSignal vs invalidateQueries）（2026-02-03）
+- [x] M0-3 统一 Workbench "刷新策略"口径（refreshSignal vs invalidateQueries）（2026-02-03 → 2026-02-04 Phase 1）
   - DoD：明确并固化一种主路径（保留另一种仅作为兼容/过渡），避免"各处各刷"的漂移
   - 回归：`npm test -- --run` ✓ + `npm run build` ✓
   - **主路径**：React Query `invalidateQueries` + `workbenchQueryKeys`
-  - **过渡兼容**：保留 `legacyRefreshSignal` 给未迁移组件（RollCycleAnchorCard, PlanItemVisualization）
-  - **M1 遗留**：将上述遗留组件迁移到 React Query
+  - **Phase 1 完成**（2026-02-04）：RollCycleAnchorCard 迁移
+  - **过渡兼容**：保留 `legacyRefreshSignal` 给 ScheduleCardView, PlanItemVisualization
+  - **M1 遗留**：将 ScheduleCardView, PlanItemVisualization 迁移到 React Query
 
 ### M1（P1）Workbench：类型与 UI 编排收敛（降耦合）
 
@@ -102,11 +103,20 @@
 - [x] A-2 Move：ImpactPreview 与 Recommend/Submit 口径对齐（`26ff8e1`）
 - [x] A-3 Move：machine-date key 统一（`6141330`）
 - [x] A-4 Move：Recommend 关键边界单测补齐（`5ec4369`）
-- [x] A-5 统一 Workbench 刷新策略（2026-02-03）
+- [x] A-5 统一 Workbench 刷新策略（2026-02-03 → 2026-02-04 Phase 1）
   - **主路径**：使用 React Query 的 invalidateQueries + workbenchQueryKeys
   - **改造范围**：useWorkbenchPlanItems, useWorkbenchMaterials, useWorkbenchPathOverride, useWorkbenchMoveSubmit, useWorkbenchBatchOperations
-  - **遗留兼容**：保留 legacyRefreshSignal 给 RollCycleAnchorCard, PlanItemVisualization
-  - **M1 待办**：迁移遗留组件到 React Query
+  - **Phase 1 完成**（2026-02-04）：RollCycleAnchorCard 迁移到 React Query
+    - 修改文件：
+      - `src/pages/workbench/queryKeys.ts`：新增 rollCycleAnchor queryKey
+      - `src/pages/workbench/hooks/useWorkbenchRefreshActions.ts`：新增 refreshRollCycleAnchor
+      - `src/components/roll-cycle-anchor/RollCycleAnchorCard.tsx`：useQuery 替代手动 fetch + useEffect
+      - `src/components/workbench/WorkbenchMainLayout.tsx`：移除 refreshSignal prop
+      - `src/pages/PlanningWorkbench.tsx`：更新 TODO 注释
+    - 效果：RollCycleAnchorCard 完全使用 React Query，自动参与 refreshAll 刷新
+    - 回归测试：✓ 60 frontend tests + ✓ build success
+  - **遗留兼容**：保留 legacyRefreshSignal 给 ScheduleCardView, PlanItemVisualization
+  - **Phase 2 待办**：迁移 ScheduleCardView, PlanItemVisualization 到 React Query，移除 legacyRefreshSignal
 - [x] A-6 抽离告警与弹窗编排（P1）（Phase 1+2 完成：2026-02-04）
   - 建议落点：新增 `src/pages/workbench/hooks/useWorkbenchUiOrchestrator.ts`（或拆多个 hook）
   - 目标：减少 `PlanningWorkbench.tsx`/`WorkbenchModals.tsx` 的 prop drilling
@@ -128,12 +138,25 @@
     - `src/pages/PlanningWorkbench.tsx`：应用新 hooks
   - **Phase 3 待办**（可选）：迁移遗留组件到 React Query，移除 legacyRefreshSignal
   - 回归测试：✓ 60 frontend tests + ✓ build success
-- [ ] A-7 统一 `ScheduleFocus/PathOverride/DeepLink` 类型（P1）
+- [x] A-7 统一 `ScheduleFocus/PathOverride/DeepLink` 类型（P1）（2026-02-04）
   - 目标：消除多处重复 type 定义；统一 export/re-export
-- [ ] A-8 继续瘦身 Move hooks（P1）
-  - `src/pages/workbench/hooks/useWorkbenchMoveRecommend.ts:1`
-  - `src/pages/workbench/hooks/useWorkbenchMoveSubmit.tsx:1`
-  - `src/pages/workbench/hooks/useWorkbenchMoveModal.tsx:1`
+  - **探索结果**：ScheduleFocus/PathOverride 已在 `types.ts` 集中定义，无重复
+  - **执行修改**：将 `WorkbenchDeepLinkContext` 从 `useWorkbenchDeepLink.ts` 集中到 `types.ts`
+  - **修改文件**：
+    - `src/pages/workbench/types.ts`：新增 WorkbenchDeepLinkContext 定义
+    - `src/pages/workbench/hooks/useWorkbenchDeepLink.ts`：改为从 types.ts 导入并 re-export
+    - `src/pages/workbench/hooks/useWorkbenchScheduleNavigation.ts`：改为从 types.ts 导入
+  - 回归测试：✓ 60 frontend tests + ✓ build success
+- [x] A-8 继续瘦身 Move hooks（P1）（2026-02-04）
+  - 目标：移除 A-6 Phase 2 后不再需要的向后兼容散列导出
+  - **修改文件**：`src/pages/workbench/hooks/useWorkbenchMoveModal.tsx`
+  - **瘦身成果**：
+    - 返回值类型：30+ 字段 → 5 字段（-83%）
+    - 代码行数：345 → 303（-42 行，-12%）
+    - 保留字段：moveModalState, moveModalActions, openMoveModal, openMoveModalAt, openMoveModalWithRecommend
+    - 移除字段：25+ 个散列导出（moveModalOpen, setMoveModalOpen, moveTargetMachine 等）
+  - **效果**：接口清晰，完全基于聚合对象，无冗余导出
+  - 回归测试：✓ 60 frontend tests + ✓ build success
 
 ### B. PathRule（体验增强/运营工具）
 
@@ -252,6 +275,63 @@
     - 消除 v0.6 执行顺序歧义
     - 清晰的权威来源：新建库用 scripts/dev_db/schema.sql，升级用 migrations/*.sql
     - 完整的迁移文档：包括文件清单、依赖关系、执行顺序、幂等性说明、回滚策略
+
+- 🎯 **A-8 完成**：继续瘦身 Move hooks - 移除向后兼容散列导出（2026-02-04）
+  - **背景**：A-6 Phase 2 完成后，所有调用方已迁移到聚合对象，散列导出已无外部使用
+  - **修改文件**：`src/pages/workbench/hooks/useWorkbenchMoveModal.tsx`
+  - **瘦身成果**：
+    - 返回值类型：30+ 字段 → 5 字段（-83%）
+    - 代码行数：345 → 303（-42 行，-12%）
+    - 保留字段：moveModalState, moveModalActions, openMoveModal, openMoveModalAt, openMoveModalWithRecommend
+    - 移除字段：25+ 个散列导出（moveModalOpen, setMoveModalOpen, moveTargetMachine, setMoveTargetMachine, moveReason, setMoveReason, submitMove, recommendMoveTarget 等）
+  - **回归测试**：
+    - ✓ 前端：60 tests passed (495ms)
+    - ✓ 构建：成功 (6.47s)
+  - **效果**：接口清晰，完全基于聚合对象，无冗余导出
+
+- 🎯 **A-5 Phase 1 完成**：RollCycleAnchorCard 迁移到 React Query（2026-02-04）
+  - **背景**：M0-3 完成后，RollCycleAnchorCard 仍使用手动 fetch + refreshSignal 模式
+  - **修改文件**（5 个）：
+    - `src/pages/workbench/queryKeys.ts`：新增 rollCycleAnchor queryKey 层级
+      - 新增 `rollCycleAnchor.all` 和 `rollCycleAnchor.byMachine(versionId, machineCode)`
+    - `src/pages/workbench/hooks/useWorkbenchRefreshActions.ts`：新增 refreshRollCycleAnchor 方法
+      - 返回类型添加 `refreshRollCycleAnchor: () => Promise<void>`
+      - 实现 invalidateQueries 调用
+    - `src/components/roll-cycle-anchor/RollCycleAnchorCard.tsx`：全面重构
+      - 移除 `refreshSignal` prop（Props 类型清理）
+      - 移除手动 `loadAnchor()` 函数和 `useEffect` 监听
+      - 使用 React Query `useQuery`：自动缓存 + 自动参与 refreshAll
+      - 添加 `handleRefresh` 包装 refetch（修复类型问题）
+    - `src/components/workbench/WorkbenchMainLayout.tsx`：移除 refreshSignal 传递
+      - 从 `<RollCycleAnchorCard refreshSignal={...}>` 移除 prop
+    - `src/pages/PlanningWorkbench.tsx`：更新 TODO 注释
+      - 移除 RollCycleAnchorCard 引用，仅剩 ScheduleCardView, PlanItemVisualization
+  - **效果**：
+    - RollCycleAnchorCard 完全迁移到 React Query
+    - 自动参与 `refreshAll()` 刷新（通过 `invalidateQueries({ queryKey: workbenchQueryKeys.all })`）
+    - 30s 自动缓存，减少不必要的 API 调用
+    - refreshSignal 依赖减少 1/3（3 → 2）
+  - **回归测试**：
+    - ✓ 前端：60 tests passed (498ms)
+    - ✓ 构建：成功 (6.39s)
+  - **Phase 2 待办**：迁移 ScheduleCardView, PlanItemVisualization，完全移除 legacyRefreshSignal
+
+- 🎯 **A-7 完成**：统一 ScheduleFocus/PathOverride/DeepLink 类型定义（2026-02-04）
+  - **探索结果**：
+    - ScheduleFocus/PathOverride 类型已在 `types.ts` 集中定义，无重复问题
+    - DeepLinkContext 在 `useWorkbenchDeepLink.ts` 中定义，与其他核心类型位置不一致
+  - **修复方案**：将 `WorkbenchDeepLinkContext` 集中到 `types.ts`，保持与 ScheduleFocus/PathOverride 一致
+  - **修改文件**（3 个）：
+    - `src/pages/workbench/types.ts`：新增 WorkbenchDeepLinkContext 定义（添加到 "deep link context" 区块）
+    - `src/pages/workbench/hooks/useWorkbenchDeepLink.ts`：删除类型定义，改为从 `../types` 导入并 re-export（保持向后兼容）
+    - `src/pages/workbench/hooks/useWorkbenchScheduleNavigation.ts`：改为从 `../types` 导入（统一导入路径）
+  - **回归测试**：
+    - ✓ 前端：60 tests passed (499ms)
+    - ✓ 构建：成功 (6.46s)
+  - **效果**：
+    - Workbench 核心类型定义完全集中在 `types.ts`
+    - 所有 hooks 从同一来源导入类型，消除导入路径不一致
+    - 符合单一事实来源（Single Source of Truth）原则
 
 - 🎯 **C-1 完成**：统一 Decision/Plan schema 来源（消除重复定义）
   - **问题发现**：TypeCount 在 3 个文件中重复定义（d2/d5/d6），UrgencyLevel 在 2 个文件中重复定义（d2/组件）
