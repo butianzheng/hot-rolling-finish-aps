@@ -4,8 +4,6 @@ import {
   Button,
   Card,
   Dropdown,
-  Segmented,
-  Select,
   Space,
   Tag,
   Typography,
@@ -24,7 +22,6 @@ import {
   useGlobalActions,
   useGlobalStore,
   useUserPreferences,
-  type WorkbenchViewMode,
 } from '../stores/use-global-store';
 import { formatDate } from '../utils/formatters';
 import type { PlanItemStatusFilter } from '../utils/planItemStatus';
@@ -35,6 +32,7 @@ import BatchOperationToolbar from '../components/workbench/BatchOperationToolbar
 import OneClickOptimizeMenu from '../components/workbench/OneClickOptimizeMenu';
 import DailyRhythmManagerModal from '../components/workbench/DailyRhythmManagerModal';
 import ConditionalSelectModal from '../components/workbench/ConditionalSelectModal';
+import WorkbenchScheduleViewToolbar from '../components/workbench/WorkbenchScheduleViewToolbar';
 import PathOverrideConfirmModal from '../components/path-override-confirm/PathOverrideConfirmModal';
 import PathOverridePendingCenterModal from '../components/path-override-confirm/PathOverridePendingCenterModal';
 import RollCycleAnchorCard from '../components/roll-cycle-anchor/RollCycleAnchorCard';
@@ -49,6 +47,7 @@ import { useWorkbenchMaterials } from './workbench/hooks/useWorkbenchMaterials';
 import { useWorkbenchMoveModal } from './workbench/hooks/useWorkbenchMoveModal';
 import { useWorkbenchPlanItems } from './workbench/hooks/useWorkbenchPlanItems';
 import { useWorkbenchPathOverride } from './workbench/hooks/useWorkbenchPathOverride';
+import { useWorkbenchScheduleNavigation } from './workbench/hooks/useWorkbenchScheduleNavigation';
 import MoveMaterialsModal from '../components/workbench/MoveMaterialsModal';
 import type { WorkbenchDateRangeMode } from './workbench/types';
 
@@ -74,18 +73,8 @@ const PlanningWorkbench: React.FC = () => {
     machineCode: workbenchFilters.machineCode,
     schedState: null,
   }));
-  const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
-  const [scheduleStatusFilter, setScheduleStatusFilter] = useState<PlanItemStatusFilter>('ALL');
-  const [scheduleFocus, setScheduleFocus] = useState<{
-    machine?: string;
-    date: string;
-    source?: string;
-  } | null>(null);
-  const [matrixFocusRequest, setMatrixFocusRequest] = useState<{
-    machine?: string;
-    date: string;
-    nonce: number;
-  } | null>(null);
+	  const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
+	  const [scheduleStatusFilter, setScheduleStatusFilter] = useState<PlanItemStatusFilter>('ALL');
 
   const [dateRangeMode, setDateRangeMode] = useState<WorkbenchDateRangeMode>(() => {
     const d = searchParams.get('date');
@@ -110,19 +99,33 @@ const PlanningWorkbench: React.FC = () => {
   const { inspectorOpen, setInspectorOpen, setInspectedMaterialId, inspectedMaterial, openInspector } =
     useWorkbenchInspector({ materials });
 
-  const { deepLinkContext, deepLinkContextLabel } = useWorkbenchDeepLink({
-    searchParams,
-    globalMachineCode: workbenchFilters.machineCode,
+	  const { deepLinkContext, deepLinkContextLabel } = useWorkbenchDeepLink({
+	    searchParams,
+	    globalMachineCode: workbenchFilters.machineCode,
     setPoolSelection,
     setWorkbenchFilters,
     setWorkbenchViewMode,
     setDateRangeMode,
     setWorkbenchDateRange,
-    setInspectorOpen,
-    setInspectedMaterialId,
-  });
+	    setInspectorOpen,
+	    setInspectedMaterialId,
+	  });
 
-  const { planItemsQuery, planItems } = useWorkbenchPlanItems({ activeVersionId, refreshSignal });
+	  const {
+	    scheduleFocus,
+	    setScheduleFocus,
+	    matrixFocusRequest,
+	    focusedDate: ganttFocusedDate,
+	    autoOpenCell: ganttAutoOpenCell,
+	    openGanttCellDetail,
+	    navigateToMatrix,
+	  } = useWorkbenchScheduleNavigation({
+	    deepLinkContext,
+	    poolMachineCode: poolSelection.machineCode,
+	    setWorkbenchViewMode,
+	  });
+
+	  const { planItemsQuery, planItems } = useWorkbenchPlanItems({ activeVersionId, refreshSignal });
 
   // AUTO 日期范围（基于当前机组的排程数据）
   const { autoDateRange, applyWorkbenchDateRange, resetWorkbenchDateRangeToAuto } = useWorkbenchAutoDateRange({
@@ -146,39 +149,13 @@ const PlanningWorkbench: React.FC = () => {
     materialsRefetch: materialsQuery.refetch,
   });
 
-  const applyWorkbenchMachineCode = (machineCode: string | null) => {
-    setPoolSelection((prev) => {
-      if (prev.machineCode === machineCode) return prev;
-      return { machineCode, schedState: null };
-    });
-    setWorkbenchFilters({ machineCode });
-  };
-
-  const ganttFocusedDate = deepLinkContext?.date || null;
-  const ganttAutoOpenCell = useMemo(() => {
-    if (!deepLinkContext?.openCell) return null;
-    const machine = String(deepLinkContext.machine || poolSelection.machineCode || '').trim();
-    const date = String(deepLinkContext.date || '').trim();
-    if (!machine || !date) return null;
-    return { machine, date };
-  }, [deepLinkContext?.date, deepLinkContext?.machine, deepLinkContext?.openCell, poolSelection.machineCode]);
-
-  const [ganttOpenCellRequest, setGanttOpenCellRequest] = useState<{
-    machine: string;
-    date: string;
-    nonce: number;
-    source?: string;
-  } | null>(null);
-
-  const openGanttCellDetail = (machine: string, date: string, source: string) => {
-    const machineCode = String(machine || '').trim();
-    const d = dayjs(date);
-    if (!machineCode || !d.isValid()) return;
-    const dateKey = formatDate(d);
-    setWorkbenchViewMode('GANTT');
-    setGanttOpenCellRequest({ machine: machineCode, date: dateKey, nonce: Date.now(), source });
-    setScheduleFocus({ machine: machineCode, date: dateKey, source });
-  };
+	  const applyWorkbenchMachineCode = (machineCode: string | null) => {
+	    setPoolSelection((prev) => {
+	      if (prev.machineCode === machineCode) return prev;
+	      return { machineCode, schedState: null };
+	    });
+	    setWorkbenchFilters({ machineCode });
+	  };
 
   const selectedMaterials = useMemo(() => {
     const set = new Set(selectedMaterialIds);
@@ -570,56 +547,26 @@ const PlanningWorkbench: React.FC = () => {
               </div>
             </Card>
 
-            <Card
-              size="small"
-              title="排程视图"
-              extra={
-                <Space wrap size={8}>
-                  <Select
-                    size="small"
-                    style={{ width: 148 }}
-                    value={poolSelection.machineCode ?? 'all'}
-                    onChange={(value) => applyWorkbenchMachineCode(value === 'all' ? null : (value as string))}
-                    options={[
-                      { label: '全部机组', value: 'all' },
-                      ...machineOptions.map((code) => ({ label: code, value: code })),
-                    ]}
-                  />
-                  {scheduleFocus?.date ? (
-                    <Tag color="blue">
-                      聚焦：
-                      {String(scheduleFocus.machine || '').trim()
-                        ? `${scheduleFocus.machine} / ${formatDate(scheduleFocus.date)}`
-                        : poolSelection.machineCode && poolSelection.machineCode !== 'all'
-                        ? `${poolSelection.machineCode} / ${formatDate(scheduleFocus.date)}`
-                        : formatDate(scheduleFocus.date)}
-                    </Tag>
-                  ) : null}
-                  <Button
-                    size="small"
-                    icon={<InfoCircleOutlined />}
-                    type={pathOverride.pendingCount > 0 ? 'primary' : 'default'}
-                    danger={pathOverride.pendingCount > 0}
-                    disabled={!pathOverride.context.machineCode}
-                    loading={pathOverride.pendingIsFetching}
-                    onClick={() => setPathOverrideModalOpen(true)}
-                  >
-                    路径待确认{pathOverride.pendingCount > 0 ? ` ${pathOverride.pendingCount}` : ''}
-                  </Button>
-                  <Segmented
-                    value={workbenchViewMode}
-                    options={[
-                      { label: '矩阵', value: 'MATRIX' },
-                      { label: '甘特图', value: 'GANTT' },
-                      { label: '卡片', value: 'CARD' },
-                    ]}
-                    onChange={(value) => setWorkbenchViewMode(value as WorkbenchViewMode)}
-                  />
-                </Space>
-              }
-              style={{ flex: 1, minHeight: 0 }}
-              bodyStyle={{
-                height: '100%',
+	            <Card
+	              size="small"
+	              title="排程视图"
+	              extra={
+	                <WorkbenchScheduleViewToolbar
+	                  machineCode={poolSelection.machineCode}
+	                  machineOptions={machineOptions}
+	                  onMachineCodeChange={applyWorkbenchMachineCode}
+	                  scheduleFocus={scheduleFocus}
+	                  pathOverridePendingCount={pathOverride.pendingCount}
+	                  pathOverrideContextMachineCode={pathOverride.context.machineCode}
+	                  pathOverrideIsFetching={pathOverride.pendingIsFetching}
+	                  onOpenPathOverrideModal={() => setPathOverrideModalOpen(true)}
+	                  viewMode={workbenchViewMode}
+	                  onViewModeChange={setWorkbenchViewMode}
+	                />
+	              }
+	              style={{ flex: 1, minHeight: 0 }}
+	              bodyStyle={{
+	                height: '100%',
                 minHeight: 0,
                 display: 'flex',
                 flexDirection: 'column',
@@ -638,27 +585,23 @@ const PlanningWorkbench: React.FC = () => {
                     onSelectedMaterialIdsChange={setSelectedMaterialIds}
                     onInspectMaterialId={(id) => openInspector(id)}
                   />
-                ) : workbenchViewMode === 'GANTT' ? (
-                  <ScheduleGanttView
-                    machineCode={poolSelection.machineCode}
-                    urgentLevel={workbenchFilters.urgencyLevel}
-                    dateRange={workbenchDateRange}
-                    suggestedDateRange={autoDateRange}
-                    onDateRangeChange={applyWorkbenchDateRange}
-                    focusedDate={ganttFocusedDate}
-                    autoOpenCell={ganttOpenCellRequest || ganttAutoOpenCell}
-                    statusFilter={scheduleStatusFilter}
-                    onStatusFilterChange={setScheduleStatusFilter}
-                    onFocusChange={setScheduleFocus}
-                    focus={scheduleFocus}
-                    onNavigateToMatrix={(machine, date) => {
-                      setWorkbenchViewMode('MATRIX');
-                      setMatrixFocusRequest({ machine, date, nonce: Date.now() });
-                      setScheduleFocus({ machine, date, source: 'matrixJump' });
-                    }}
-                    planItems={planItemsQuery.data}
-                    loading={planItemsQuery.isLoading}
-                    error={planItemsQuery.error}
+	                ) : workbenchViewMode === 'GANTT' ? (
+	                  <ScheduleGanttView
+	                    machineCode={poolSelection.machineCode}
+	                    urgentLevel={workbenchFilters.urgencyLevel}
+	                    dateRange={workbenchDateRange}
+	                    suggestedDateRange={autoDateRange}
+	                    onDateRangeChange={applyWorkbenchDateRange}
+	                    focusedDate={ganttFocusedDate}
+	                    autoOpenCell={ganttAutoOpenCell}
+	                    statusFilter={scheduleStatusFilter}
+	                    onStatusFilterChange={setScheduleStatusFilter}
+	                    onFocusChange={setScheduleFocus}
+	                    focus={scheduleFocus}
+	                    onNavigateToMatrix={navigateToMatrix}
+	                    planItems={planItemsQuery.data}
+	                    loading={planItemsQuery.isLoading}
+	                    error={planItemsQuery.error}
                     onRetry={() => planItemsQuery.refetch()}
                     selectedMaterialIds={selectedMaterialIds}
                     onSelectedMaterialIdsChange={setSelectedMaterialIds}
