@@ -31,6 +31,7 @@ import { useWorkbenchPathOverride } from './workbench/hooks/useWorkbenchPathOver
 import { useWorkbenchDerivedProps } from './workbench/hooks/useWorkbenchDerivedProps';
 import { useWorkbenchRefreshActions } from './workbench/hooks/useWorkbenchRefreshActions';
 import { useWorkbenchScheduleNavigation } from './workbench/hooks/useWorkbenchScheduleNavigation';
+import { useWorkbenchModalState } from './workbench/hooks/useWorkbenchModalState';
 import type { WorkbenchDateRangeMode } from './workbench/types';
 
 const PlanningWorkbench: React.FC = () => {
@@ -49,8 +50,8 @@ const PlanningWorkbench: React.FC = () => {
   const [legacyRefreshSignal, setLegacyRefreshSignal] = useState(0);
   const bumpLegacyRefreshSignal = useCallback(() => setLegacyRefreshSignal((v) => v + 1), []);
 
-  const [pathOverrideModalOpen, setPathOverrideModalOpen] = useState(false);
-  const [pathOverrideCenterOpen, setPathOverrideCenterOpen] = useState(false);
+  // 【Phase 2 重构】使用 useWorkbenchModalState 聚合 4 个弹窗状态
+  const { modals, openModal, closeModal } = useWorkbenchModalState();
 
   const [poolSelection, setPoolSelection] = useState<MaterialPoolSelection>(() => ({
     machineCode: workbenchFilters.machineCode,
@@ -73,17 +74,13 @@ const PlanningWorkbench: React.FC = () => {
     return [dayjs().subtract(3, 'day'), dayjs().add(10, 'day')];
   });
 
-  const [conditionalSelectOpen, setConditionalSelectOpen] = useState(false);
-
-  const [rhythmModalOpen, setRhythmModalOpen] = useState(false);
-
   const { materialsQuery, materials } = useWorkbenchMaterials({ machineCode: poolSelection.machineCode });
 
-  const openRhythmModal = useCallback(() => setRhythmModalOpen(true), []);
-  const openConditionalSelect = useCallback(() => setConditionalSelectOpen(true), []);
+  const openRhythmModal = useCallback(() => openModal('rhythm'), [openModal]);
+  const openConditionalSelect = useCallback(() => openModal('conditionalSelect'), [openModal]);
   const clearSelection = useCallback(() => setSelectedMaterialIds([]), []);
-  const openPathOverrideConfirm = useCallback(() => setPathOverrideModalOpen(true), []);
-  const openPathOverrideCenter = useCallback(() => setPathOverrideCenterOpen(true), []);
+  const openPathOverrideConfirm = useCallback(() => openModal('pathOverrideConfirm'), [openModal]);
+  const openPathOverrideCenter = useCallback(() => openModal('pathOverrideCenter'), [openModal]);
   const navigateToImport = useCallback(() => navigate('/import'), [navigate]);
   const navigateToComparison = useCallback(() => navigate('/comparison'), [navigate]);
   const navigateToDraftComparison = useCallback(() => navigate('/comparison?tab=draft'), [navigate]);
@@ -185,31 +182,11 @@ const PlanningWorkbench: React.FC = () => {
   }, [refreshAll, setRecalculating, bumpLegacyRefreshSignal]);
 
   const {
-    moveModalOpen,
-    setMoveModalOpen,
-    moveTargetMachine,
-    setMoveTargetMachine,
-    moveTargetDate,
-    setMoveTargetDate,
-    moveSeqMode,
-    setMoveSeqMode,
-    moveStartSeq,
-    setMoveStartSeq,
-    moveValidationMode,
-    setMoveValidationMode,
-    moveSubmitting,
-    moveReason,
-    setMoveReason,
-    moveRecommendLoading,
-    moveRecommendSummary,
-    strategyLabel,
-    selectedPlanItemStats,
-    moveImpactPreview,
-    recommendMoveTarget,
+    moveModalState,
+    moveModalActions,
     openMoveModal,
     openMoveModalAt,
     openMoveModalWithRecommend,
-    submitMove,
   } = useWorkbenchMoveModal({
     activeVersionId,
     operator: currentUser || 'admin',
@@ -387,43 +364,17 @@ const PlanningWorkbench: React.FC = () => {
           machineOptions={machineOptions}
           poolMachineCode={poolSelection.machineCode}
           scheduleFocus={scheduleFocus}
-          rhythmModalOpen={rhythmModalOpen}
-          setRhythmModalOpen={setRhythmModalOpen}
-          pathOverrideModalOpen={pathOverrideModalOpen}
-          setPathOverrideModalOpen={setPathOverrideModalOpen}
-          pathOverrideCenterOpen={pathOverrideCenterOpen}
-          setPathOverrideCenterOpen={setPathOverrideCenterOpen}
+          modals={modals}
+          closeModal={closeModal}
           pathOverride={pathOverride}
-          conditionalSelectOpen={conditionalSelectOpen}
-          setConditionalSelectOpen={setConditionalSelectOpen}
           materials={materials}
           selectedMaterialIds={selectedMaterialIds}
           setSelectedMaterialIds={setSelectedMaterialIds}
           runMaterialOperation={runMaterialOperation}
           runForceReleaseOperation={runForceReleaseOperation}
-          moveModalOpen={moveModalOpen}
-          setMoveModalOpen={setMoveModalOpen}
-          submitMove={submitMove}
-          moveSubmitting={moveSubmitting}
+          moveModalState={moveModalState}
+          moveModalActions={moveModalActions}
           planItemsLoading={planItemsQuery.isLoading}
-          selectedPlanItemStats={selectedPlanItemStats}
-          moveTargetMachine={moveTargetMachine}
-          setMoveTargetMachine={setMoveTargetMachine}
-          moveTargetDate={moveTargetDate}
-          setMoveTargetDate={setMoveTargetDate}
-          moveSeqMode={moveSeqMode}
-          setMoveSeqMode={setMoveSeqMode}
-          moveStartSeq={moveStartSeq}
-          setMoveStartSeq={setMoveStartSeq}
-          moveValidationMode={moveValidationMode}
-          setMoveValidationMode={setMoveValidationMode}
-          moveReason={moveReason}
-          setMoveReason={setMoveReason}
-          recommendMoveTarget={recommendMoveTarget}
-          moveRecommendLoading={moveRecommendLoading}
-          moveRecommendSummary={moveRecommendSummary}
-          strategyLabel={strategyLabel}
-          moveImpactPreview={moveImpactPreview}
           inspectorOpen={inspectorOpen}
           setInspectorOpen={setInspectorOpen}
           inspectedMaterial={inspectedMaterial}

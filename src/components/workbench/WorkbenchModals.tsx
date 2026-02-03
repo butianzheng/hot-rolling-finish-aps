@@ -9,19 +9,20 @@ import PathOverrideConfirmModal from '../path-override-confirm/PathOverrideConfi
 import PathOverridePendingCenterModal from '../path-override-confirm/PathOverridePendingCenterModal';
 import { formatDate } from '../../utils/formatters';
 import type { MaterialPoolMaterial } from './MaterialPool';
-import type {
-  MoveImpactPreview,
-  MoveRecommendSummary,
-  MoveSeqMode,
-  MoveValidationMode,
-  SelectedPlanItemStats,
-} from '../../pages/workbench/types';
+import type { MoveModalState, MoveModalActions } from '../../pages/workbench/hooks/useWorkbenchMoveModal';
+import type { WorkbenchModalState, WorkbenchModalKey } from '../../pages/workbench/hooks/useWorkbenchModalState';
 import type {
   MaterialOperationType,
   WorkbenchPathOverrideState,
   WorkbenchScheduleFocus,
 } from '../../pages/workbench/types';
 
+/**
+ * WorkbenchModals Props（Phase 2 重构）
+ *
+ * 原来：46 个散列 props
+ * 重构后：20 个 props（2 个聚合对象 + 18 个独立 props）
+ */
 const WorkbenchModals: React.FC<{
   activeVersionId: string;
   currentUser: string;
@@ -29,47 +30,28 @@ const WorkbenchModals: React.FC<{
   poolMachineCode: string | null;
   scheduleFocus: WorkbenchScheduleFocus | null;
 
-  rhythmModalOpen: boolean;
-  setRhythmModalOpen: (open: boolean) => void;
+  /** 【新增】弹窗状态聚合对象（4 个弹窗） */
+  modals: WorkbenchModalState;
+  /** 关闭弹窗的统一操作 */
+  closeModal: (key: WorkbenchModalKey) => void;
 
-  pathOverrideModalOpen: boolean;
-  setPathOverrideModalOpen: (open: boolean) => void;
-  pathOverrideCenterOpen: boolean;
-  setPathOverrideCenterOpen: (open: boolean) => void;
+  /** Path Override 状态（包含 context, refetch, recalc 等） */
   pathOverride: WorkbenchPathOverrideState;
 
-  conditionalSelectOpen: boolean;
-  setConditionalSelectOpen: (open: boolean) => void;
+  /** Conditional Select 相关 */
   materials: MaterialPoolMaterial[];
   selectedMaterialIds: string[];
   setSelectedMaterialIds: (ids: string[]) => void;
   runMaterialOperation: (materialIds: string[], type: MaterialOperationType) => void;
   runForceReleaseOperation: (materialIds: string[]) => void;
 
-  moveModalOpen: boolean;
-  setMoveModalOpen: (open: boolean) => void;
-  submitMove: () => Promise<void>;
-  moveSubmitting: boolean;
+  /** 【新增】Move Modal 聚合对象 */
+  moveModalState: MoveModalState;
+  moveModalActions: MoveModalActions;
+  /** 排程数据加载状态（来自 PlanningWorkbench，不在 MoveModalState 中） */
   planItemsLoading: boolean;
-  selectedPlanItemStats: SelectedPlanItemStats;
-  moveTargetMachine: string | null;
-  setMoveTargetMachine: (v: string | null) => void;
-  moveTargetDate: dayjs.Dayjs | null;
-  setMoveTargetDate: (v: dayjs.Dayjs | null) => void;
-  moveSeqMode: MoveSeqMode;
-  setMoveSeqMode: (v: MoveSeqMode) => void;
-  moveStartSeq: number;
-  setMoveStartSeq: (v: number) => void;
-  moveValidationMode: MoveValidationMode;
-  setMoveValidationMode: (v: MoveValidationMode) => void;
-  moveReason: string;
-  setMoveReason: (v: string) => void;
-  recommendMoveTarget: () => Promise<void>;
-  moveRecommendLoading: boolean;
-  moveRecommendSummary: MoveRecommendSummary | null;
-  strategyLabel: string;
-  moveImpactPreview: MoveImpactPreview | null;
 
+  /** Inspector 相关 */
   inspectorOpen: boolean;
   setInspectorOpen: (open: boolean) => void;
   inspectedMaterial: Parameters<typeof MaterialInspector>[0]['material'];
@@ -80,46 +62,20 @@ const WorkbenchModals: React.FC<{
   poolMachineCode,
   scheduleFocus,
 
-  rhythmModalOpen,
-  setRhythmModalOpen,
+  modals,
+  closeModal,
 
-  pathOverrideModalOpen,
-  setPathOverrideModalOpen,
-  pathOverrideCenterOpen,
-  setPathOverrideCenterOpen,
   pathOverride,
 
-  conditionalSelectOpen,
-  setConditionalSelectOpen,
   materials,
   selectedMaterialIds,
   setSelectedMaterialIds,
   runMaterialOperation,
   runForceReleaseOperation,
 
-  moveModalOpen,
-  setMoveModalOpen,
-  submitMove,
-  moveSubmitting,
+  moveModalState,
+  moveModalActions,
   planItemsLoading,
-  selectedPlanItemStats,
-  moveTargetMachine,
-  setMoveTargetMachine,
-  moveTargetDate,
-  setMoveTargetDate,
-  moveSeqMode,
-  setMoveSeqMode,
-  moveStartSeq,
-  setMoveStartSeq,
-  moveValidationMode,
-  setMoveValidationMode,
-  moveReason,
-  setMoveReason,
-  recommendMoveTarget,
-  moveRecommendLoading,
-  moveRecommendSummary,
-  strategyLabel,
-  moveImpactPreview,
 
   inspectorOpen,
   setInspectorOpen,
@@ -128,8 +84,8 @@ const WorkbenchModals: React.FC<{
   return (
     <>
       <DailyRhythmManagerModal
-        open={rhythmModalOpen}
-        onClose={() => setRhythmModalOpen(false)}
+        open={modals.rhythm}
+        onClose={() => closeModal('rhythm')}
         versionId={activeVersionId}
         machineOptions={machineOptions}
         defaultMachineCode={scheduleFocus?.machine || poolMachineCode || machineOptions[0] || null}
@@ -138,8 +94,8 @@ const WorkbenchModals: React.FC<{
       />
 
       <PathOverrideConfirmModal
-        open={pathOverrideModalOpen}
-        onClose={() => setPathOverrideModalOpen(false)}
+        open={modals.pathOverrideConfirm}
+        onClose={() => closeModal('pathOverrideConfirm')}
         versionId={activeVersionId}
         machineCode={pathOverride.context.machineCode}
         planDate={pathOverride.context.planDate}
@@ -149,15 +105,15 @@ const WorkbenchModals: React.FC<{
           pathOverride.pendingRefetch();
           pathOverride.summaryRefetch();
           if (autoRecalc) {
-            setPathOverrideModalOpen(false);
+            closeModal('pathOverrideConfirm');
             await pathOverride.recalcAfterPathOverride(pathOverride.context.planDate || '');
           }
         }}
       />
 
       <PathOverridePendingCenterModal
-        open={pathOverrideCenterOpen}
-        onClose={() => setPathOverrideCenterOpen(false)}
+        open={modals.pathOverrideCenter}
+        onClose={() => closeModal('pathOverrideCenter')}
         versionId={activeVersionId}
         planDateFrom={pathOverride.summaryRange.from}
         planDateTo={pathOverride.summaryRange.to}
@@ -168,15 +124,15 @@ const WorkbenchModals: React.FC<{
           pathOverride.pendingRefetch();
           pathOverride.summaryRefetch();
           if (autoRecalc) {
-            setPathOverrideCenterOpen(false);
+            closeModal('pathOverrideCenter');
             await pathOverride.recalcAfterPathOverride(recalcBaseDate || '');
           }
         }}
       />
 
       <ConditionalSelectModal
-        open={conditionalSelectOpen}
-        onClose={() => setConditionalSelectOpen(false)}
+        open={modals.conditionalSelect}
+        onClose={() => closeModal('conditionalSelect')}
         defaultMachine={poolMachineCode || 'all'}
         machineOptions={machineOptions}
         materials={materials}
@@ -187,31 +143,11 @@ const WorkbenchModals: React.FC<{
       />
 
       <MoveMaterialsModal
-        open={moveModalOpen}
-        onClose={() => setMoveModalOpen(false)}
-        onSubmit={submitMove}
-        submitting={moveSubmitting}
+        state={moveModalState}
+        actions={moveModalActions}
         planItemsLoading={planItemsLoading}
         selectedMaterialIds={selectedMaterialIds}
         machineOptions={machineOptions}
-        selectedPlanItemStats={selectedPlanItemStats}
-        moveTargetMachine={moveTargetMachine}
-        setMoveTargetMachine={setMoveTargetMachine}
-        moveTargetDate={moveTargetDate}
-        setMoveTargetDate={setMoveTargetDate}
-        moveSeqMode={moveSeqMode}
-        setMoveSeqMode={setMoveSeqMode}
-        moveStartSeq={moveStartSeq}
-        setMoveStartSeq={setMoveStartSeq}
-        moveValidationMode={moveValidationMode}
-        setMoveValidationMode={setMoveValidationMode}
-        moveReason={moveReason}
-        setMoveReason={setMoveReason}
-        recommendMoveTarget={() => void recommendMoveTarget()}
-        moveRecommendLoading={moveRecommendLoading}
-        moveRecommendSummary={moveRecommendSummary}
-        strategyLabel={strategyLabel}
-        moveImpactPreview={moveImpactPreview}
       />
 
       <MaterialInspector

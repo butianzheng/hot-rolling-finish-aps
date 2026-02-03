@@ -107,19 +107,26 @@
   - **改造范围**：useWorkbenchPlanItems, useWorkbenchMaterials, useWorkbenchPathOverride, useWorkbenchMoveSubmit, useWorkbenchBatchOperations
   - **遗留兼容**：保留 legacyRefreshSignal 给 RollCycleAnchorCard, PlanItemVisualization
   - **M1 待办**：迁移遗留组件到 React Query
-- [~] A-6 抽离告警与弹窗编排（P1）（Phase 1 完成：2026-02-04）
+- [x] A-6 抽离告警与弹窗编排（P1）（Phase 1+2 完成：2026-02-04）
   - 建议落点：新增 `src/pages/workbench/hooks/useWorkbenchUiOrchestrator.ts`（或拆多个 hook）
   - 目标：减少 `PlanningWorkbench.tsx`/`WorkbenchModals.tsx` 的 prop drilling
   - **Phase 1 完成**：状态聚合（3 个新 hooks）
     - ✅ `useWorkbenchModalState`：聚合 4 个弹窗状态
     - ✅ `useWorkbenchNotification`：统一 message/Modal 反馈
     - ✅ `useWorkbenchMoveModal` 增强：新增 `moveModalState/moveModalActions` 聚合对象
+  - **Phase 2 完成**：实际应用聚合 hooks，重构接口
+    - ✅ MoveMaterialsModal：props 从 25 → 5（-80%）
+    - ✅ WorkbenchModals：props 从 46 → 20（-57%）
+    - ✅ PlanningWorkbench：使用 useWorkbenchModalState，弹窗 useState 从 4 → 1
   - **创建文件**：
     - `src/pages/workbench/hooks/useWorkbenchModalState.ts`
     - `src/pages/workbench/hooks/useWorkbenchNotification.ts`
   - **修改文件**：
     - `src/pages/workbench/hooks/useWorkbenchMoveModal.tsx`：新增类型导出
-  - **Phase 2 待办**：实际应用聚合 hooks，重构 WorkbenchModals/MoveMaterialsModal 接口
+    - `src/components/workbench/MoveMaterialsModal.tsx`：接口重构
+    - `src/components/workbench/WorkbenchModals.tsx`：接口重构
+    - `src/pages/PlanningWorkbench.tsx`：应用新 hooks
+  - **Phase 3 待办**（可选）：迁移遗留组件到 React Query，移除 legacyRefreshSignal
   - 回归测试：✓ 60 frontend tests + ✓ build success
 - [ ] A-7 统一 `ScheduleFocus/PathOverride/DeepLink` 类型（P1）
   - 目标：消除多处重复 type 定义；统一 export/re-export
@@ -279,6 +286,32 @@
     - 消息反馈格式统一（4 种写法 → 1 个 hook）
     - 向后兼容 100%
   - **Phase 2 待办**：实际应用聚合 hooks，重构 WorkbenchModals/MoveMaterialsModal 接口
+
+- 🎯 **A-6 Phase 2 完成**：抽离告警与弹窗编排 - Props 接口重构（2026-02-04）
+  - **目标**：实际应用 Phase 1 创建的聚合 hooks，减少 props drilling
+  - **修改文件**（3 个）：
+    - `src/components/workbench/MoveMaterialsModal.tsx`：Props 接口重构（25 props → 5 props，-80%）
+      - 新接口：`state, actions, planItemsLoading, selectedMaterialIds, machineOptions`
+      - 组件内部改为使用 `state.xxx` 和 `actions.xxx`
+    - `src/components/workbench/WorkbenchModals.tsx`：Props 接口重构（46 props → 20 props，-57%）
+      - 新增：`modals: WorkbenchModalState`, `closeModal`, `moveModalState`, `moveModalActions`
+      - 移除：8 个散列弹窗 props + 24 个散列 move props
+      - 4 个弹窗改为使用 `modals.xxx` 和 `closeModal('xxx')`
+    - `src/pages/PlanningWorkbench.tsx`：应用新 hooks
+      - 删除 4 个弹窗 useState
+      - 添加 `useWorkbenchModalState()` 调用
+      - 修改 useWorkbenchMoveModal 解构，使用聚合对象
+      - WorkbenchModals props 从 46 → 20
+  - **回归测试**：
+    - ✓ 前端：60 tests passed (488ms)
+    - ✓ 构建：成功 (6.66s)
+  - **收益达成**：
+    - PlanningWorkbench 弹窗 useState：4 → 1（-75%）✅
+    - PlanningWorkbench → WorkbenchModals props：46 → 20（-57%）✅
+    - WorkbenchModals → MoveMaterialsModal props：25 → 5（-80%）✅
+    - 消息反馈格式统一 ✅
+    - 向后兼容 100% ✅
+  - **效果**：大幅减少 props drilling，代码更清晰，类型更安全
 
 
 ### 2026-02-03（深夜）

@@ -1,8 +1,8 @@
-# Workbench UI 编排优化 - Phase 1 完成标记
+# Workbench UI 编排优化 - Phase 1+2 完成标记
 
 **任务：** A-6 抽离告警与弹窗编排（P1）
-**阶段：** Phase 1 - 状态聚合
-**状态：** ✅ 完成
+**阶段：** Phase 1+2 - 状态聚合 + Props 重构
+**状态：** ✅ 全部完成
 **日期：** 2026-02-04
 
 ---
@@ -346,9 +346,103 @@ cd src-tauri && cargo test
 - 探索报告：详见 2026-02-04 探索分析
 
 **下一步：**
-- [ ] Phase 2: Props 接口重构（修改 WorkbenchModals/MoveMaterialsModal）
+- [x] Phase 2: Props 接口重构（修改 WorkbenchModals/MoveMaterialsModal）✅ 已完成
 - [ ] Phase 3: 遗留迁移（移除 legacyRefreshSignal）
 
 ---
 
-**✅ Phase 1 已完成，可安全合并到主分支。**
+## 🚀 Phase 2 完成（2026-02-04）
+
+**目标：** 实际应用 Phase 1 创建的聚合 hooks，重构组件接口，减少 props drilling。
+
+### 修改文件（3 个）
+
+1. **[MoveMaterialsModal.tsx](../../src/components/workbench/MoveMaterialsModal.tsx)**
+   - **改动：** Props 接口重构（25 props → 5 props）
+   - **新接口：**
+     ```typescript
+     interface MoveMaterialsModalProps {
+       state: MoveModalState;        // 聚合 13 个状态字段
+       actions: MoveModalActions;     // 聚合 12 个操作方法
+       planItemsLoading: boolean;
+       selectedMaterialIds: string[];
+       machineOptions: string[];
+     }
+     ```
+   - **组件内部：** 所有原来的散列 props 改为 `state.xxx` 和 `actions.xxx`
+
+2. **[WorkbenchModals.tsx](../../src/components/workbench/WorkbenchModals.tsx)**
+   - **改动：** Props 接口重构（46 props → 20 props）
+   - **新接口：**
+     ```typescript
+     {
+       // 基础 props（5个）
+       activeVersionId, currentUser, machineOptions, poolMachineCode, scheduleFocus,
+
+       // 【新增】弹窗状态聚合（2个）
+       modals: WorkbenchModalState,
+       closeModal: (key) => void,
+
+       // 【新增】Move Modal 聚合（2个）
+       moveModalState: MoveModalState,
+       moveModalActions: MoveModalActions,
+
+       // 其他 props（11个）
+       pathOverride, materials, selectedMaterialIds, setSelectedMaterialIds,
+       runMaterialOperation, runForceReleaseOperation, planItemsLoading,
+       inspectorOpen, setInspectorOpen, inspectedMaterial
+     }
+     ```
+   - **弹窗调用：** 4 个弹窗改为使用 `modals.xxx` 和 `closeModal('xxx')`
+   - **MoveMaterialsModal 调用：** 改为传递聚合对象
+
+3. **[PlanningWorkbench.tsx](../../src/pages/PlanningWorkbench.tsx)**
+   - **改动：**
+     - 删除 4 个弹窗 useState（第 51-52, 75-77 行）
+     - 添加 `useWorkbenchModalState()` 调用
+     - 修改 `useWorkbenchMoveModal` 解构，使用聚合对象
+     - 修改 WorkbenchModals props（46 → 20）
+   - **新代码：**
+     ```typescript
+     const { modals, openModal, closeModal } = useWorkbenchModalState();
+     const {
+       moveModalState,
+       moveModalActions,
+       openMoveModal,
+       openMoveModalAt,
+       openMoveModalWithRecommend,
+     } = useWorkbenchMoveModal({ ... });
+
+     <WorkbenchModals
+       modals={modals}
+       closeModal={closeModal}
+       moveModalState={moveModalState}
+       moveModalActions={moveModalActions}
+       ... // 其他 13 个 props
+     />
+     ```
+
+### 收益实现（Phase 1 预期 → Phase 2 实现）
+
+| 指标 | Phase 1 预期 | Phase 2 实现 | 状态 |
+|------|------------|------------|------|
+| PlanningWorkbench 弹窗 useState | 4 → 1 (-75%) | 4 → 1 | ✅ 达成 |
+| PlanningWorkbench → WorkbenchModals props | 46 → 20 | 46 → 20 | ✅ 达成 (-57%) |
+| WorkbenchModals → MoveMaterialsModal props | 25 → 5 | 25 → 5 | ✅ 达成 (-80%) |
+| 消息反馈格式统一 | 4 种 → 1 种 | 已完成 | ✅ 达成 |
+| 向后兼容性 | 100% | 完全兼容 | ✅ 达成 |
+
+### 回归测试
+
+```bash
+npm run build  # ✅ 构建成功（6.66s）
+npm test -- --run  # ✅ 60 tests passed (488ms)
+```
+
+**无破坏性变更，所有现有功能正常运行。**
+
+---
+
+**✅ Phase 1+2 全部完成，可安全合并到主分支。**
+
+**Phase 3（遗留任务）：** 迁移 RollCycleAnchorCard, PlanItemVisualization 到 React Query，移除 legacyRefreshSignal。

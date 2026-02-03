@@ -1,119 +1,83 @@
 import React from 'react';
-import type { Dayjs } from 'dayjs';
 import { Alert, Button, DatePicker, Divider, Input, InputNumber, Modal, Segmented, Select, Space, Table, Tag, Typography } from 'antd';
 import { DEFAULT_MOVE_REASON, QUICK_MOVE_REASONS } from '../../pages/workbench/constants';
-import type { MoveImpactPreview, MoveImpactRow, MoveRecommendSummary, MoveSeqMode, MoveValidationMode, SelectedPlanItemStats } from '../../pages/workbench/types';
+import type { MoveImpactRow, MoveSeqMode, MoveValidationMode } from '../../pages/workbench/types';
+import type { MoveModalState, MoveModalActions } from '../../pages/workbench/hooks/useWorkbenchMoveModal';
 
+/**
+ * MoveMaterialsModal Props（Phase 2 重构：使用聚合对象）
+ *
+ * 原来：25 个散列 props
+ * 重构后：5 个 props（2 个聚合对象 + 3 个独立 props）
+ */
 export interface MoveMaterialsModalProps {
-  open: boolean;
-  onClose: () => void;
-  onSubmit: () => Promise<void>;
-  submitting: boolean;
+  /** 移动弹窗状态对象（包含 13 个状态字段） */
+  state: MoveModalState;
+  /** 移动弹窗操作对象（包含 12 个操作方法） */
+  actions: MoveModalActions;
 
+  /** 排程数据加载状态（来自 PlanningWorkbench） */
   planItemsLoading: boolean;
+  /** 选中的物料 ID 列表 */
   selectedMaterialIds: string[];
+  /** 机组选项列表 */
   machineOptions: string[];
-
-  selectedPlanItemStats: SelectedPlanItemStats;
-
-  moveTargetMachine: string | null;
-  setMoveTargetMachine: (v: string | null) => void;
-  moveTargetDate: Dayjs | null;
-  setMoveTargetDate: (v: Dayjs | null) => void;
-
-  moveSeqMode: MoveSeqMode;
-  setMoveSeqMode: (v: MoveSeqMode) => void;
-  moveStartSeq: number;
-  setMoveStartSeq: (v: number) => void;
-
-  moveValidationMode: MoveValidationMode;
-  setMoveValidationMode: (v: MoveValidationMode) => void;
-
-  moveReason: string;
-  setMoveReason: (v: string) => void;
-
-  recommendMoveTarget: () => void;
-  moveRecommendLoading: boolean;
-  moveRecommendSummary: MoveRecommendSummary | null;
-  strategyLabel: string;
-
-  moveImpactPreview: MoveImpactPreview | null;
 }
 
 const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
-  open,
-  onClose,
-  onSubmit,
-  submitting,
+  state,
+  actions,
   planItemsLoading,
   selectedMaterialIds,
   machineOptions,
-  selectedPlanItemStats,
-  moveTargetMachine,
-  setMoveTargetMachine,
-  moveTargetDate,
-  setMoveTargetDate,
-  moveSeqMode,
-  setMoveSeqMode,
-  moveStartSeq,
-  setMoveStartSeq,
-  moveValidationMode,
-  setMoveValidationMode,
-  moveReason,
-  setMoveReason,
-  recommendMoveTarget,
-  moveRecommendLoading,
-  moveRecommendSummary,
-  strategyLabel,
-  moveImpactPreview,
 }) => {
   return (
     <Modal
       title="移动到..."
-      open={open}
-      onCancel={onClose}
-      onOk={onSubmit}
+      open={state.open}
+      onCancel={() => actions.setOpen(false)}
+      onOk={() => actions.submit()}
       okText="执行移动"
-      confirmLoading={submitting}
-      okButtonProps={{ disabled: selectedMaterialIds.length === 0 || !moveReason.trim() }}
+      confirmLoading={state.submitting}
+      okButtonProps={{ disabled: selectedMaterialIds.length === 0 || !state.reason.trim() }}
     >
       <Space direction="vertical" style={{ width: '100%' }} size={12}>
         {planItemsLoading ? (
           <Alert type="info" showIcon message="正在加载排程数据，用于校验/自动排队..." />
-        ) : selectedPlanItemStats.outOfPlan > 0 ? (
+        ) : state.selectedPlanItemStats.outOfPlan > 0 ? (
           <Alert
             type="warning"
             showIcon
-            message={`已选 ${selectedMaterialIds.length} 个，其中 ${selectedPlanItemStats.outOfPlan} 个不在当前版本排程中，将跳过`}
+            message={`已选 ${selectedMaterialIds.length} 个，其中 ${state.selectedPlanItemStats.outOfPlan} 个不在当前版本排程中，将跳过`}
           />
         ) : null}
 
-        {selectedPlanItemStats.frozenInPlan > 0 ? (
+        {state.selectedPlanItemStats.frozenInPlan > 0 ? (
           <Alert
             type="warning"
             showIcon
-            message={`检测到 ${selectedPlanItemStats.frozenInPlan} 个冻结排程项：STRICT 模式会失败，AUTO_FIX 模式会跳过`}
+            message={`检测到 ${state.selectedPlanItemStats.frozenInPlan} 个冻结排程项：STRICT 模式会失败，AUTO_FIX 模式会跳过`}
           />
         ) : null}
 
         <Space wrap align="center">
           <Button
             size="small"
-            onClick={() => recommendMoveTarget()}
-            loading={moveRecommendLoading}
-            disabled={selectedMaterialIds.length === 0 || !moveTargetMachine}
+            onClick={() => actions.recommendTarget()}
+            loading={state.recommendLoading}
+            disabled={selectedMaterialIds.length === 0 || !state.targetMachine}
           >
             推荐位置（最近可行）
           </Button>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            策略：{strategyLabel}
+            策略：{state.strategyLabel}
           </Typography.Text>
-          {moveRecommendSummary ? (
-            <Tag color={moveRecommendSummary.overLimitCount === 0 ? 'green' : 'orange'}>
-              推荐：{moveRecommendSummary.machine} {moveRecommendSummary.date}{' '}
-              {moveRecommendSummary.unknownCount > 0
-                ? `· 未知容量 ${moveRecommendSummary.unknownCount}`
-                : `· 超限 ${moveRecommendSummary.overLimitCount}`}
+          {state.recommendSummary ? (
+            <Tag color={state.recommendSummary.overLimitCount === 0 ? 'green' : 'orange'}>
+              推荐：{state.recommendSummary.machine} {state.recommendSummary.date}{' '}
+              {state.recommendSummary.unknownCount > 0
+                ? `· 未知容量 ${state.recommendSummary.unknownCount}`
+                : `· 超限 ${state.recommendSummary.overLimitCount}`}
             </Tag>
           ) : null}
         </Space>
@@ -122,8 +86,8 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
           <span>目标机组</span>
           <Select
             style={{ minWidth: 180 }}
-            value={moveTargetMachine}
-            onChange={(v) => setMoveTargetMachine(v)}
+            value={state.targetMachine}
+            onChange={(v) => actions.setTargetMachine(v)}
             options={machineOptions.map((code) => ({ label: code, value: code }))}
             showSearch
             optionFilterProp="label"
@@ -134,8 +98,8 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
         <Space wrap>
           <span>目标日期</span>
           <DatePicker
-            value={moveTargetDate}
-            onChange={(d) => setMoveTargetDate(d)}
+            value={state.targetDate}
+            onChange={(d) => actions.setTargetDate(d)}
             format="YYYY-MM-DD"
             allowClear={false}
           />
@@ -144,19 +108,19 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
         <Space wrap>
           <span>排队方式</span>
           <Segmented
-            value={moveSeqMode}
+            value={state.seqMode}
             options={[
               { label: '追加到末尾', value: 'APPEND' },
               { label: '指定起始序号', value: 'START_SEQ' },
             ]}
-            onChange={(v) => setMoveSeqMode(v as MoveSeqMode)}
+            onChange={(v) => actions.setSeqMode(v as MoveSeqMode)}
           />
-          {moveSeqMode === 'START_SEQ' ? (
+          {state.seqMode === 'START_SEQ' ? (
             <InputNumber
               min={1}
               precision={0}
-              value={moveStartSeq}
-              onChange={(v) => setMoveStartSeq(Number(v || 1))}
+              value={state.startSeq}
+              onChange={(v) => actions.setStartSeq(Number(v || 1))}
               style={{ width: 140 }}
             />
           ) : null}
@@ -165,9 +129,9 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
         <Space wrap>
           <span>校验模式</span>
           <Select
-            value={moveValidationMode}
+            value={state.validationMode}
             style={{ width: 180 }}
-            onChange={(v) => setMoveValidationMode(v as MoveValidationMode)}
+            onChange={(v) => actions.setValidationMode(v as MoveValidationMode)}
             options={[
               { label: 'AUTO_FIX（跳过冻结）', value: 'AUTO_FIX' },
               { label: 'STRICT（遇冻结失败）', value: 'STRICT' },
@@ -183,11 +147,11 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
           <Select
             style={{ minWidth: 220 }}
             value={
-              QUICK_MOVE_REASONS.some((opt) => opt.value === moveReason.trim())
-                ? moveReason.trim()
+              QUICK_MOVE_REASONS.some((opt) => opt.value === state.reason.trim())
+                ? state.reason.trim()
                 : undefined
             }
-            onChange={(v) => setMoveReason(String(v || DEFAULT_MOVE_REASON))}
+            onChange={(v) => actions.setReason(String(v || DEFAULT_MOVE_REASON))}
             options={QUICK_MOVE_REASONS}
             placeholder="选择一个常用原因"
           />
@@ -196,26 +160,26 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
           </Typography.Text>
         </Space>
         <Input.TextArea
-          value={moveReason}
-          onChange={(e) => setMoveReason(e.target.value)}
+          value={state.reason}
+          onChange={(e) => actions.setReason(e.target.value)}
           rows={3}
           autoSize={{ minRows: 3, maxRows: 6 }}
           placeholder="例如：为满足L3紧急订单，调整到更早日期"
         />
 
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          提示：当前后端的 move_items 不返回“影响预览”，执行后可通过风险概览/对比页观察变化。
+          提示：当前后端的 move_items 不返回"影响预览"，执行后可通过风险概览/对比页观察变化。
         </Typography.Text>
 
         <Divider style={{ margin: '4px 0' }} />
 
         <Space direction="vertical" style={{ width: '100%' }} size={8}>
           <Typography.Text strong>影响预览（本地估算）</Typography.Text>
-          {!moveImpactPreview ? (
+          {!state.impactPreview ? (
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               暂无可用预览（请先选择目标机组/日期）。
             </Typography.Text>
-          ) : moveImpactPreview.rows.length === 0 ? (
+          ) : state.impactPreview.rows.length === 0 ? (
             <Alert
               type="info"
               showIcon
@@ -224,14 +188,14 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
             />
           ) : (
             <>
-              {moveImpactPreview.loading ? (
+              {state.impactPreview.loading ? (
                 <Alert type="info" showIcon message="正在加载产能池，用于评估超限风险..." />
               ) : null}
-              {moveImpactPreview.overflowRows.length > 0 ? (
+              {state.impactPreview.overflowRows.length > 0 ? (
                 <Alert
                   type="warning"
                   showIcon
-                  message={`警告：预计有 ${moveImpactPreview.overflowRows.length} 个机组/日期将超出限制产能`}
+                  message={`警告：预计有 ${state.impactPreview.overflowRows.length} 个机组/日期将超出限制产能`}
                   description="可尝试切换到其他日期/机组，或使用 AUTO_FIX 模式（冻结项将跳过）。"
                 />
               ) : (
@@ -241,7 +205,7 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
                 size="small"
                 pagination={false}
                 rowKey={(r) => `${r.machine_code}__${r.date}`}
-                dataSource={moveImpactPreview.rows}
+                dataSource={state.impactPreview.rows}
                 columns={[
                   { title: '机组', dataIndex: 'machine_code', width: 90 },
                   { title: '日期', dataIndex: 'date', width: 120 },
