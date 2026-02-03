@@ -11,11 +11,13 @@ import ScheduleGanttView from './ScheduleGanttView';
 import WorkbenchScheduleViewToolbar from './WorkbenchScheduleViewToolbar';
 import type { WorkbenchViewMode } from '../../stores/use-global-store';
 import type { PlanItemStatusFilter } from '../../utils/planItemStatus';
+import type {
+  WorkbenchGanttAutoOpenCell,
+  WorkbenchMatrixFocusRequest,
+  WorkbenchScheduleFocus,
+} from '../../pages/workbench/types';
 
 const PlanItemVisualization = React.lazy(() => import('../PlanItemVisualization'));
-
-type ScheduleFocus = Parameters<typeof WorkbenchScheduleViewToolbar>[0]['scheduleFocus'];
-type GanttAutoOpenCell = { machine: string; date: string; nonce?: string | number; source?: string } | null;
 
 const WorkbenchMainLayout: React.FC<{
   activeVersionId: string;
@@ -53,9 +55,9 @@ const WorkbenchMainLayout: React.FC<{
   // 右侧：视图与聚焦
   viewMode: WorkbenchViewMode;
   onViewModeChange: (mode: WorkbenchViewMode) => void;
-  scheduleFocus: ScheduleFocus;
-  setScheduleFocus: (focus: ScheduleFocus) => void;
-  matrixFocusRequest: { machine?: string; date: string; nonce: string | number } | null;
+  scheduleFocus: WorkbenchScheduleFocus | null;
+  setScheduleFocus: (focus: WorkbenchScheduleFocus | null) => void;
+  matrixFocusRequest: WorkbenchMatrixFocusRequest | null;
 
   // 状态筛选
   scheduleStatusFilter: PlanItemStatusFilter;
@@ -63,7 +65,7 @@ const WorkbenchMainLayout: React.FC<{
 
   // 甘特图定位/跳转
   focusedDate: string | null;
-  autoOpenCell: GanttAutoOpenCell;
+  autoOpenCell: WorkbenchGanttAutoOpenCell | null;
   openGanttCellDetail: (machine: string, date: string, source: string) => void;
   navigateToMatrix: (machine: string, date: string) => void;
 
@@ -283,4 +285,3 @@ const WorkbenchMainLayout: React.FC<{
 };
 
 export default React.memo(WorkbenchMainLayout);
-

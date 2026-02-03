@@ -1,9 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import {
-  Space,
-  Tag,
-  message,
-} from 'antd';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Space, Tag, message } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -46,7 +42,7 @@ const PlanningWorkbench: React.FC = () => {
   const preferences = useUserPreferences();
   const { setRecalculating, setActiveVersion, setWorkbenchViewMode, setWorkbenchFilters } = useGlobalActions();
   const [refreshSignal, setRefreshSignal] = useState(0);
-  const bumpRefreshSignal = React.useCallback(() => setRefreshSignal((v) => v + 1), []);
+  const bumpRefreshSignal = useCallback(() => setRefreshSignal((v) => v + 1), []);
 
   const [pathOverrideModalOpen, setPathOverrideModalOpen] = useState(false);
   const [pathOverrideCenterOpen, setPathOverrideCenterOpen] = useState(false);
@@ -55,8 +51,8 @@ const PlanningWorkbench: React.FC = () => {
     machineCode: workbenchFilters.machineCode,
     schedState: null,
   }));
-	  const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
-	  const [scheduleStatusFilter, setScheduleStatusFilter] = useState<PlanItemStatusFilter>('ALL');
+  const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
+  const [scheduleStatusFilter, setScheduleStatusFilter] = useState<PlanItemStatusFilter>('ALL');
 
   const [dateRangeMode, setDateRangeMode] = useState<WorkbenchDateRangeMode>(() => {
     const d = searchParams.get('date');
@@ -81,33 +77,33 @@ const PlanningWorkbench: React.FC = () => {
   const { inspectorOpen, setInspectorOpen, setInspectedMaterialId, inspectedMaterial, openInspector } =
     useWorkbenchInspector({ materials });
 
-	  const { deepLinkContext, deepLinkContextLabel } = useWorkbenchDeepLink({
-	    searchParams,
-	    globalMachineCode: workbenchFilters.machineCode,
+  const { deepLinkContext, deepLinkContextLabel } = useWorkbenchDeepLink({
+    searchParams,
+    globalMachineCode: workbenchFilters.machineCode,
     setPoolSelection,
     setWorkbenchFilters,
     setWorkbenchViewMode,
     setDateRangeMode,
     setWorkbenchDateRange,
-	    setInspectorOpen,
-	    setInspectedMaterialId,
-	  });
+    setInspectorOpen,
+    setInspectedMaterialId,
+  });
 
-	  const {
-	    scheduleFocus,
-	    setScheduleFocus,
-	    matrixFocusRequest,
-	    focusedDate: ganttFocusedDate,
-	    autoOpenCell: ganttAutoOpenCell,
-	    openGanttCellDetail,
-	    navigateToMatrix,
-	  } = useWorkbenchScheduleNavigation({
-	    deepLinkContext,
-	    poolMachineCode: poolSelection.machineCode,
-	    setWorkbenchViewMode,
-	  });
+  const {
+    scheduleFocus,
+    setScheduleFocus,
+    matrixFocusRequest,
+    focusedDate: ganttFocusedDate,
+    autoOpenCell: ganttAutoOpenCell,
+    openGanttCellDetail,
+    navigateToMatrix,
+  } = useWorkbenchScheduleNavigation({
+    deepLinkContext,
+    poolMachineCode: poolSelection.machineCode,
+    setWorkbenchViewMode,
+  });
 
-	  const { planItemsQuery, planItems } = useWorkbenchPlanItems({ activeVersionId, refreshSignal });
+  const { planItemsQuery, planItems } = useWorkbenchPlanItems({ activeVersionId, refreshSignal });
 
   // AUTO 日期范围（基于当前机组的排程数据）
   const { autoDateRange, applyWorkbenchDateRange, resetWorkbenchDateRangeToAuto } = useWorkbenchAutoDateRange({
@@ -131,13 +127,13 @@ const PlanningWorkbench: React.FC = () => {
     materialsRefetch: materialsQuery.refetch,
   });
 
-	  const applyWorkbenchMachineCode = (machineCode: string | null) => {
-	    setPoolSelection((prev) => {
-	      if (prev.machineCode === machineCode) return prev;
-	      return { machineCode, schedState: null };
-	    });
-	    setWorkbenchFilters({ machineCode });
-	  };
+  const applyWorkbenchMachineCode = (machineCode: string | null) => {
+    setPoolSelection((prev) => {
+      if (prev.machineCode === machineCode) return prev;
+      return { machineCode, schedState: null };
+    });
+    setWorkbenchFilters({ machineCode });
+  };
 
   const selectedMaterials = useMemo(() => {
     const set = new Set(selectedMaterialIds);
@@ -189,13 +185,13 @@ const PlanningWorkbench: React.FC = () => {
     deepLinkDate: deepLinkContext?.date || null,
     poolMachineCode: poolSelection.machineCode,
     machineOptions,
-	    defaultStrategy: preferences.defaultStrategy,
-	    workbenchDateRange,
-	    planItems,
-	    planItemsRefetch: planItemsQuery.refetch,
-	    selectedMaterialIds,
-	    setSelectedMaterialIds,
-	    bumpRefreshSignal,
+    defaultStrategy: preferences.defaultStrategy,
+    workbenchDateRange,
+    planItems,
+    planItemsRefetch: planItemsQuery.refetch,
+    selectedMaterialIds,
+    setSelectedMaterialIds,
+    bumpRefreshSignal,
     materialsRefetch: materialsQuery.refetch,
   });
 
@@ -248,29 +244,29 @@ const PlanningWorkbench: React.FC = () => {
           }}
         />
 
-	        {/* 工具栏 */}
-	        <WorkbenchTopToolbar
-	          activeVersionId={activeVersionId}
-	          currentUser={currentUser}
-	          selectedMaterialIds={selectedMaterialIds}
-	          onRefresh={() => {
-	            setRefreshSignal((v) => v + 1);
-	            materialsQuery.refetch();
-	          }}
-	          onOpenRhythmModal={() => setRhythmModalOpen(true)}
-	          onOpenConditionalSelect={() => setConditionalSelectOpen(true)}
-	          onClearSelection={() => setSelectedMaterialIds([])}
-	          openMoveModal={openMoveModal}
-	          runMaterialOperation={runMaterialOperation}
-	          runForceReleaseOperation={runForceReleaseOperation}
-	          onBeforeOptimize={() => setRecalculating(true)}
-	          onAfterOptimize={() => {
-	            setRecalculating(false);
-	            setRefreshSignal((v) => v + 1);
-	            materialsQuery.refetch();
-	            planItemsQuery.refetch();
-	          }}
-	        />
+        {/* 工具栏 */}
+        <WorkbenchTopToolbar
+          activeVersionId={activeVersionId}
+          currentUser={currentUser}
+          selectedMaterialIds={selectedMaterialIds}
+          onRefresh={() => {
+            setRefreshSignal((v) => v + 1);
+            materialsQuery.refetch();
+          }}
+          onOpenRhythmModal={() => setRhythmModalOpen(true)}
+          onOpenConditionalSelect={() => setConditionalSelectOpen(true)}
+          onClearSelection={() => setSelectedMaterialIds([])}
+          openMoveModal={openMoveModal}
+          runMaterialOperation={runMaterialOperation}
+          runForceReleaseOperation={runForceReleaseOperation}
+          onBeforeOptimize={() => setRecalculating(true)}
+          onAfterOptimize={() => {
+            setRecalculating(false);
+            setRefreshSignal((v) => v + 1);
+            materialsQuery.refetch();
+            planItemsQuery.refetch();
+          }}
+        />
 
         <WorkbenchAlerts
           activeVersionId={activeVersionId}
@@ -343,20 +339,20 @@ const PlanningWorkbench: React.FC = () => {
           onRequestMoveToCell={(machine, date) => openMoveModalAt(machine, date)}
         />
 
-	        {/* 状态栏 */}
-	        <WorkbenchStatusBar
-	          selectedMaterialCount={selectedMaterialIds.length}
-	          selectedTotalWeight={selectedTotalWeight}
-	          disabled={selectedMaterialIds.length === 0}
-	          onLock={() => runMaterialOperation(selectedMaterialIds, 'lock')}
-	          onUnlock={() => runMaterialOperation(selectedMaterialIds, 'unlock')}
-	          onSetUrgent={() => runMaterialOperation(selectedMaterialIds, 'urgent_on')}
-	          onClearUrgent={() => runMaterialOperation(selectedMaterialIds, 'urgent_off')}
-	          onForceRelease={() => runForceReleaseOperation(selectedMaterialIds)}
-	          onOpenMoveRecommend={openMoveModalWithRecommend}
-	          onOpenMoveModal={openMoveModal}
-	          onClearSelection={() => setSelectedMaterialIds([])}
-	        />
+        {/* 状态栏 */}
+        <WorkbenchStatusBar
+          selectedMaterialCount={selectedMaterialIds.length}
+          selectedTotalWeight={selectedTotalWeight}
+          disabled={selectedMaterialIds.length === 0}
+          onLock={() => runMaterialOperation(selectedMaterialIds, 'lock')}
+          onUnlock={() => runMaterialOperation(selectedMaterialIds, 'unlock')}
+          onSetUrgent={() => runMaterialOperation(selectedMaterialIds, 'urgent_on')}
+          onClearUrgent={() => runMaterialOperation(selectedMaterialIds, 'urgent_off')}
+          onForceRelease={() => runForceReleaseOperation(selectedMaterialIds)}
+          onOpenMoveRecommend={openMoveModalWithRecommend}
+          onOpenMoveModal={openMoveModal}
+          onClearSelection={() => setSelectedMaterialIds([])}
+        />
 
         <WorkbenchModals
           activeVersionId={activeVersionId}

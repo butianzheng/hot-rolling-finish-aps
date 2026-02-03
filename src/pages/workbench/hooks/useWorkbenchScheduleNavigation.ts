@@ -5,20 +5,13 @@ import dayjs from 'dayjs';
 import type { WorkbenchViewMode } from '../../../stores/use-global-store';
 import { formatDate } from '../../../utils/formatters';
 import type { WorkbenchDeepLinkContext } from './useWorkbenchDeepLink';
+import type {
+  WorkbenchGanttAutoOpenCell,
+  WorkbenchMatrixFocusRequest,
+  WorkbenchScheduleFocus,
+} from '../types';
 
-export type WorkbenchScheduleFocus = {
-  machine?: string;
-  date: string;
-  source?: string;
-};
-
-export type WorkbenchMatrixFocusRequest = {
-  machine?: string;
-  date: string;
-  nonce: number;
-};
-
-type AutoOpenCell = { machine: string; date: string; nonce?: string | number; source?: string };
+export type { WorkbenchMatrixFocusRequest, WorkbenchScheduleFocus } from '../types';
 
 export function useWorkbenchScheduleNavigation(params: {
   deepLinkContext: WorkbenchDeepLinkContext | null;
@@ -29,7 +22,7 @@ export function useWorkbenchScheduleNavigation(params: {
   setScheduleFocus: Dispatch<SetStateAction<WorkbenchScheduleFocus | null>>;
   matrixFocusRequest: WorkbenchMatrixFocusRequest | null;
   focusedDate: string | null;
-  autoOpenCell: AutoOpenCell | null;
+  autoOpenCell: WorkbenchGanttAutoOpenCell | null;
   openGanttCellDetail: (machine: string, date: string, source: string) => void;
   navigateToMatrix: (machine: string, date: string) => void;
 } {
@@ -43,7 +36,7 @@ export function useWorkbenchScheduleNavigation(params: {
     return d || null;
   }, [deepLinkContext?.date]);
 
-  const deepLinkAutoOpenCell = useMemo<AutoOpenCell | null>(() => {
+  const deepLinkAutoOpenCell = useMemo<WorkbenchGanttAutoOpenCell | null>(() => {
     if (!deepLinkContext?.openCell) return null;
     const machine = String(deepLinkContext.machine || poolMachineCode || '').trim();
     const date = String(deepLinkContext.date || '').trim();
@@ -51,7 +44,7 @@ export function useWorkbenchScheduleNavigation(params: {
     return { machine, date };
   }, [deepLinkContext?.date, deepLinkContext?.machine, deepLinkContext?.openCell, poolMachineCode]);
 
-  const [ganttOpenCellRequest, setGanttOpenCellRequest] = useState<AutoOpenCell | null>(null);
+  const [ganttOpenCellRequest, setGanttOpenCellRequest] = useState<WorkbenchGanttAutoOpenCell | null>(null);
   const autoOpenCell = ganttOpenCellRequest || deepLinkAutoOpenCell;
 
   const openGanttCellDetail = useCallback(
@@ -90,4 +83,3 @@ export function useWorkbenchScheduleNavigation(params: {
     navigateToMatrix,
   };
 }
-

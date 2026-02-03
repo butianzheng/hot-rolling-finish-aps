@@ -2,19 +2,11 @@ import React from 'react';
 import { Alert, Button, Space } from 'antd';
 import { InfoCircleOutlined, SettingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-
-type PathOverrideState = {
-  pendingTotalCount: number;
-  summaryRange: { from: string; to: string };
-  summaryIsFetching: boolean;
-  pendingCount: number;
-  pendingIsFetching: boolean;
-  context: { machineCode: string | null; planDate: string | null };
-};
+import type { WorkbenchPathOverrideState } from '../../pages/workbench/types';
 
 const WorkbenchAlerts: React.FC<{
   activeVersionId: string;
-  pathOverride: PathOverrideState;
+  pathOverride: WorkbenchPathOverrideState;
   onOpenPathOverrideCenter: () => void;
   onOpenPathOverrideConfirm: () => void;
   materialsIsLoading: boolean;
@@ -116,4 +108,3 @@ const WorkbenchAlerts: React.FC<{
 };
 
 export default React.memo(WorkbenchAlerts);
-

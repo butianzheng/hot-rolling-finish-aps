@@ -17,23 +17,14 @@ import type {
   MoveValidationMode,
   SelectedPlanItemStats,
 } from '../../pages/workbench/types';
-
-type ScheduleFocus = { machine?: string; date: string; source?: string } | null;
-
-type PathOverrideState = {
-  context: { machineCode: string | null; planDate: string | null };
-  summaryRange: { from: string; to: string };
-  pendingRefetch: () => void;
-  summaryRefetch: () => void;
-  recalcAfterPathOverride: (baseDate: string) => Promise<void>;
-};
+import type { WorkbenchPathOverrideState, WorkbenchScheduleFocus } from '../../pages/workbench/types';
 
 const WorkbenchModals: React.FC<{
   activeVersionId: string;
   currentUser: string;
   machineOptions: string[];
   poolMachineCode: string | null;
-  scheduleFocus: ScheduleFocus;
+  scheduleFocus: WorkbenchScheduleFocus | null;
 
   rhythmModalOpen: boolean;
   setRhythmModalOpen: (open: boolean) => void;
@@ -42,7 +33,7 @@ const WorkbenchModals: React.FC<{
   setPathOverrideModalOpen: (open: boolean) => void;
   pathOverrideCenterOpen: boolean;
   setPathOverrideCenterOpen: (open: boolean) => void;
-  pathOverride: PathOverrideState;
+  pathOverride: WorkbenchPathOverrideState;
 
   conditionalSelectOpen: boolean;
   setConditionalSelectOpen: (open: boolean) => void;
@@ -234,4 +225,3 @@ const WorkbenchModals: React.FC<{
 };
 
 export default React.memo(WorkbenchModals);
-

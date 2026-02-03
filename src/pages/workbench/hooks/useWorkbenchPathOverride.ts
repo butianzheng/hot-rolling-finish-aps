@@ -6,18 +6,13 @@ import { useQuery } from '@tanstack/react-query';
 import { pathRuleApi, planApi } from '../../../api/tauri';
 import { formatDate } from '../../../utils/formatters';
 import { getErrorMessage } from '../../../utils/errorUtils';
-
-type ScheduleFocus = {
-  machine?: string;
-  date: string;
-  source?: string;
-};
+import type { WorkbenchPathOverrideState, WorkbenchScheduleFocus } from '../types';
 
 type SummaryRow = Awaited<ReturnType<typeof pathRuleApi.listPathOverridePendingSummary>>[number];
 
 export function useWorkbenchPathOverride(params: {
   activeVersionId: string | null;
-  scheduleFocus: ScheduleFocus | null;
+  scheduleFocus: WorkbenchScheduleFocus | null;
   poolMachineCode: string | null;
   autoDateRange: [dayjs.Dayjs, dayjs.Dayjs];
   refreshSignal: number;
@@ -27,17 +22,7 @@ export function useWorkbenchPathOverride(params: {
   setActiveVersion: (versionId: string | null) => void;
   bumpRefreshSignal: () => void;
   materialsRefetch: () => void;
-}): {
-  context: { machineCode: string | null; planDate: string | null };
-  pendingCount: number;
-  pendingIsFetching: boolean;
-  pendingRefetch: () => void;
-  summaryRange: { from: string; to: string };
-  pendingTotalCount: number;
-  summaryIsFetching: boolean;
-  summaryRefetch: () => void;
-  recalcAfterPathOverride: (baseDate: string) => Promise<void>;
-} {
+}): WorkbenchPathOverrideState {
   const {
     activeVersionId,
     scheduleFocus,
@@ -146,4 +131,3 @@ export function useWorkbenchPathOverride(params: {
     recalcAfterPathOverride,
   };
 }
-

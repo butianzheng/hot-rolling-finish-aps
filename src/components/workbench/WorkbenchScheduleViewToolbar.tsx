@@ -3,14 +3,13 @@ import { InfoCircleOutlined } from '@ant-design/icons';
 
 import type { WorkbenchViewMode } from '../../stores/use-global-store';
 import { formatDate } from '../../utils/formatters';
-
-type ScheduleFocus = { machine?: string; date: string; source?: string } | null;
+import type { WorkbenchScheduleFocus } from '../../pages/workbench/types';
 
 export default function WorkbenchScheduleViewToolbar(props: {
   machineCode: string | null;
   machineOptions: string[];
   onMachineCodeChange: (machineCode: string | null) => void;
-  scheduleFocus: ScheduleFocus;
+  scheduleFocus: WorkbenchScheduleFocus | null;
   pathOverridePendingCount: number;
   pathOverrideContextMachineCode: string | null;
   pathOverrideIsFetching: boolean;
@@ -78,4 +77,3 @@ export default function WorkbenchScheduleViewToolbar(props: {
     </Space>
   );
 }
-
