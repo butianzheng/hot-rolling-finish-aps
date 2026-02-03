@@ -5,11 +5,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { message, Modal } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { planApi, materialApi } from '../../api/tauri';
 import { useEvent } from '../../api/eventBus';
 import { useActiveVersionId, useCurrentUser } from '../../stores/use-global-store';
+import { workbenchQueryKeys } from '../../pages/workbench/queryKeys';
 import { formatDate } from '../../utils/formatters';
 import type { PlanItemStatusSummary } from '../../utils/planItemStatus';
 import { matchPlanItemStatusFilter, summarizePlanItemStatus } from '../../utils/planItemStatus';
@@ -81,19 +83,32 @@ export function usePlanItemVisualization(
     urgentLevel,
     statusFilter = 'ALL',
     focusRequest,
-    refreshSignal,
     selectedMaterialIds: controlledSelectedMaterialIds,
     onSelectedMaterialIdsChange,
   } = props;
 
   const activeVersionId = useActiveVersionId();
   const currentUser = useCurrentUser();
+  const queryClient = useQueryClient();
 
-  // 加载状态
-  const [loading, setLoading] = useState(false);
+  // 使用 React Query 获取排产数据
+  const planItemsQuery = useQuery({
+    queryKey: workbenchQueryKeys.planItems.byVersion(activeVersionId),
+    enabled: !!activeVersionId,
+    queryFn: async () => {
+      if (!activeVersionId) return [];
+      const result = await planApi.listPlanItems(activeVersionId);
+      return (Array.isArray(result) ? result : []).map((item: any) => ({
+        key: String(item.material_id ?? ''),
+        ...item,
+      }));
+    },
+    staleTime: 30 * 1000,
+  });
+
+  const planItems = useMemo(() => planItemsQuery.data || [], [planItemsQuery.data]);
 
   // 数据
-  const [planItems, setPlanItems] = useState<PlanItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<PlanItem[]>([]);
   const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [statusSummary, setStatusSummary] = useState<PlanItemStatusSummary>(() =>
@@ -129,6 +144,10 @@ export function usePlanItemVisualization(
   const [forceReleaseModalVisible, setForceReleaseModalVisible] = useState(false);
   const [forceReleaseReason, setForceReleaseReason] = useState('');
   const [forceReleaseMode, setForceReleaseMode] = useState<'AutoFix' | 'Strict'>('AutoFix');
+  const [operationLoading, setOperationLoading] = useState(false);
+
+  // 合并 loading 状态（数据加载 + 操作中）
+  const loading = planItemsQuery.isLoading || operationLoading;
 
   // 拖拽传感器
   const sensors = useSensors(
@@ -168,40 +187,17 @@ export function usePlanItemVisualization(
     setStatistics(stats);
   }, []);
 
-  // 加载排产明细
+  // 加载排产明细（兼容性包装，实际使用 React Query refetch）
   const loadPlanItems = useCallback(
-    async (versionId?: string, date?: string) => {
-      if (!versionId && !activeVersionId) {
-        message.warning('请先激活一个版本');
+    async (_versionId?: string, _date?: string) => {
+      if (!_versionId && !activeVersionId) {
+        message.warning('请先���活一个版本');
         return;
       }
-
-      const targetVersionId = versionId || activeVersionId;
-      setLoading(true);
-      try {
-        let result;
-        if (date) {
-          result = await planApi.listItemsByDate(targetVersionId!, date);
-        } else {
-          result = await planApi.listPlanItems(targetVersionId!);
-        }
-
-        const items = (Array.isArray(result) ? result : []).map((item: any) => ({
-          key: String(item.material_id ?? ''),
-          ...item,
-        }));
-
-        setPlanItems(items);
-        setFilteredItems(items);
-        calculateStatistics(items);
-        message.success(`成功加载 ${items.length} 条排产明细`);
-      } catch (error: any) {
-        console.error('加载排产明细失败:', error);
-      } finally {
-        setLoading(false);
-      }
+      // 忽略参数（原实现支持 date 参数但实际未使用）
+      await planItemsQuery.refetch();
     },
-    [activeVersionId, calculateStatistics]
+    [activeVersionId, planItemsQuery]
   );
 
   // 筛选数据
@@ -287,7 +283,7 @@ export function usePlanItemVisualization(
       return;
     }
 
-    setLoading(true);
+    setOperationLoading(true);
     try {
       const res: any = await materialApi.batchForceRelease(
         selectedMaterialIds,
@@ -319,7 +315,7 @@ export function usePlanItemVisualization(
     } catch (error: any) {
       console.error('强制放行失败:', error);
     } finally {
-      setLoading(false);
+      setOperationLoading(false);
     }
   }, [
     forceReleaseReason,
@@ -400,10 +396,12 @@ export function usePlanItemVisualization(
     setSearchText('');
   }, []);
 
-  // 订阅 plan_updated 事件
+  // 订阅 plan_updated 事件（使用 React Query invalidate）
   useEvent('plan_updated', () => {
     if (activeVersionId) {
-      loadPlanItems(activeVersionId);
+      queryClient.invalidateQueries({
+        queryKey: workbenchQueryKeys.planItems.all,
+      });
     }
   });
 
@@ -430,13 +428,6 @@ export function usePlanItemVisualization(
       }
     }
   }, [focusRequest?.nonce]);
-
-  // 初始加载
-  useEffect(() => {
-    if (activeVersionId) {
-      loadPlanItems(activeVersionId);
-    }
-  }, [activeVersionId, refreshSignal, loadPlanItems]);
 
   // 筛选条件变化时重新筛选
   useEffect(() => {

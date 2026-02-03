@@ -39,7 +39,6 @@ export interface PlanItemVisualizationProps {
   statusFilter?: PlanItemStatusFilter;
   onStatusFilterChange?: (next: PlanItemStatusFilter) => void;
   focusRequest?: { machine?: string; date: string; nonce: string | number } | null;
-  refreshSignal?: number;
   selectedMaterialIds?: string[];
   onSelectedMaterialIdsChange?: (ids: string[]) => void;
 }
