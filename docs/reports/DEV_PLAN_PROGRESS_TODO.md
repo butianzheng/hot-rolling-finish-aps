@@ -3,7 +3,7 @@
 > 用途：把"架构/维护/稳定/性能"的持续演进落成可执行任务，并在每次提交后更新状态与进度日志，方便后续开发与跟踪。
 
 最后更新：2026-02-04
-当前基线：`main@d4bf14f`
+当前基线：`main@6b13e7a`
 
 ---
 
@@ -133,8 +133,22 @@
     - ✅ UrgencyLevel：从 2 处重复定义统一到 `d2-order-failure.ts`
     - ✅ d5/d6/组件改为从 d2 导入，消除重复维护
   - 回归测试：✓ 60 frontend tests + ✓ 432 unit tests + ✓ build success
-- [ ] C-2 IPC 返回类型逐步消灭 `any`（P1）
+- [x] C-2 IPC 返回类型逐步消灭 `any`（P1）（2026-02-04）
   - DoD：边界层 runtime validate；业务层类型严格
+  - **修复成果**：
+    - ✅ Phase 1: PathOverrideConfirmModal - 移除 11 处 any 强制转换
+    - ✅ Phase 1: PathOverridePendingCenterModal - 移除 11 处 any 强制转换
+    - ✅ Phase 2: strategy-draft.ts - 修复 6 处 any 类型定义
+    - ✅ Phase 3: ipcClient.tsx - error handling any → unknown
+    - ✅ Phase 3: decisionService.ts - snake/camel 转换类型安全
+  - **修复文件**：
+    - `src/components/path-override-confirm/PathOverrideConfirmModal.tsx`：移除 `.map((r: any) => ({` 强制转换，使用 Zod 推断类型
+    - `src/components/path-override-confirm/PathOverridePendingCenterModal.tsx`：同上
+    - `src/types/strategy-draft.ts`：parameters 改为 `Record<string, unknown>`，MaterialDetailPayload 使用 `z.infer`
+    - `src/api/ipcClient.tsx`：IpcError.details + params 类型改进，parseError 改用 unknown
+    - `src/api/tauri/decisionService.ts`：递归转换函数 + callWithValidation 改用 unknown，错误类型改进
+  - 回归测试：✓ 60 frontend tests + ✓ 432 unit tests + ✓ build success
+  - **效果**：高频路径（Path Override）类型安全提升，IPC 边界层消除 any，保持 JSON 结构灵活性
 
 ### D. DB/后端稳定性（高优先）
 
@@ -162,6 +176,45 @@
 ## 4. 进度日志（建议每次提交追加）
 
 ### 2026-02-04（凌晨）
+
+- 🎯 **C-2 完成**：IPC 返回类型逐步消灭 `any`（高频路径类型安全提升）
+  - **问题发现**：
+    - PathOverrideConfirmModal 组件中 11 处 `any` 强制转换（`.map((r: any) => ({`）
+    - strategy-draft.ts 中 6 处 `any` 类型定义（parameters, master, state, payload_json 等）
+    - ipcClient.tsx 和 decisionService.ts 中 15 处 `any` 类型（错误处理、递归转换）
+    - 虽然 IPC 层有 Zod 验证，但组件层和类型定义层仍使用 `any`，失去类型安全保障
+  - **修复策略**：
+    - Phase 1: 组件层 - 移除强制转换，直接使用 API 返回的 Zod 推断类型
+    - Phase 2: 类型定义 - `any` → `Record<string, unknown>` 或 `z.infer<typeof Schema>`
+    - Phase 3: IPC 边界 - `any` → `unknown`，添加 runtime type guards
+  - **修复文件**（5 个文件，共 22 处 `any` 修复）：
+    - `src/components/path-override-confirm/PathOverrideConfirmModal.tsx`：
+      - 移除 `.map((r: any) => ({` 强制转换，数据已通过 Zod 验证
+      - 5 处 `catch (e: any)` → `catch (e: unknown)`
+    - `src/components/path-override-confirm/PathOverridePendingCenterModal.tsx`：
+      - 同上，移除 6 处 `any`
+    - `src/types/strategy-draft.ts`：
+      - parameters: `any` → `Record<string, unknown>`（2 处）
+      - MaterialDetailPayload: 使用 `z.infer<typeof MaterialMasterSchema>` 等（2 处）
+      - ActionLogRow JSON 字段: `any` → `Record<string, unknown>`（2 处）
+    - `src/api/ipcClient.tsx`：
+      - IpcError.details: `any` → `Record<string, unknown>`
+      - params: `any` → `unknown`（添加 type guard）
+      - parseError: `any` → `unknown`，改进错误处理逻辑
+    - `src/api/tauri/decisionService.ts`：
+      - objectToSnakeCase/objectToCamelCase: `any` → `unknown`（4 处）
+      - normalizeTauriParams: `Record<string, any>` → `Record<string, unknown>`
+      - DecisionApiError/ValidationError: `any` → `Record<string, unknown>` / `unknown`（2 处）
+      - callWithValidation: params `any` → `unknown`，schema `any` → `z.ZodTypeAny`（2 处）
+  - **回归测试**：
+    - ✓ 前端：60 tests passed
+    - ✓ 后端：432 unit tests passed
+    - ✓ 构建：成功（修复 TS 编译错误）
+  - **效果**：
+    - 高频路径（Path Override 确认）类型安全提升
+    - IPC 边界层消除 `any`，统一使用 `unknown` + type guards
+    - 保持 JSON 结构灵活性（`Record<string, unknown>`）
+    - 所有 Zod runtime 验证机制保留
 
 - 🎯 **D-2 完成**：迁移流程/脚本标准化
   - **问题发现**：
