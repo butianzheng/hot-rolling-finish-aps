@@ -8,6 +8,7 @@ import type { IpcPlanItem } from '../move/planItems';
 import type { MoveImpactBase } from '../move/impact';
 import { computeMoveImpactBase } from '../move/impact';
 import { buildCapacityPoolMap } from '../move/recommend';
+import { makeMachineDateKey } from '../move/key';
 
 type IpcCapacityPool = Awaited<ReturnType<typeof capacityApi.getCapacityPools>>[number];
 
@@ -66,7 +67,7 @@ export function useWorkbenchMoveImpactPreview(params: {
     const poolMap = buildCapacityPoolMap(pools);
 
     const rows = moveImpactBase.rows.map((r) => {
-      const cap = poolMap.get(`${r.machine_code}__${r.date}`);
+      const cap = poolMap.get(makeMachineDateKey(r.machine_code, r.date));
       return {
         ...r,
         target_capacity_t: cap?.target ?? null,

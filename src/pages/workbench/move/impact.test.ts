@@ -5,6 +5,7 @@
 import dayjs from 'dayjs';
 import { describe, it, expect } from 'vitest';
 import { computeMoveImpactBase } from './impact';
+import { makeMachineDateKey } from './key';
 
 describe('workbench/move/impact', () => {
   it('AUTO_FIX：跳过 locked_in_plan 项，影响仅按可移动项计算', () => {
@@ -21,9 +22,9 @@ describe('workbench/move/impact', () => {
     });
 
     expect(res?.rows).toHaveLength(2);
-    const byKey = new Map(res?.rows.map((r) => [`${r.machine_code}__${r.date}`, r] as const));
-    expect(byKey.get('M1__2026-02-01')?.delta_t).toBe(-20);
-    expect(byKey.get('M2__2026-02-02')?.delta_t).toBe(20);
+    const byKey = new Map(res?.rows.map((r) => [makeMachineDateKey(r.machine_code, r.date), r] as const));
+    expect(byKey.get(makeMachineDateKey('M1', '2026-02-01'))?.delta_t).toBe(-20);
+    expect(byKey.get(makeMachineDateKey('M2', '2026-02-02'))?.delta_t).toBe(20);
   });
 
   it('STRICT：包含 locked_in_plan 项，影响按全量计算', () => {
@@ -40,9 +41,9 @@ describe('workbench/move/impact', () => {
     });
 
     expect(res?.rows).toHaveLength(2);
-    const byKey = new Map(res?.rows.map((r) => [`${r.machine_code}__${r.date}`, r] as const));
-    expect(byKey.get('M1__2026-02-01')?.delta_t).toBe(-30);
-    expect(byKey.get('M2__2026-02-02')?.delta_t).toBe(30);
+    const byKey = new Map(res?.rows.map((r) => [makeMachineDateKey(r.machine_code, r.date), r] as const));
+    expect(byKey.get(makeMachineDateKey('M1', '2026-02-01'))?.delta_t).toBe(-30);
+    expect(byKey.get(makeMachineDateKey('M2', '2026-02-02'))?.delta_t).toBe(30);
   });
 
   it('目标机组/日期与原位置相同：净变化为 0 时 rows 为空', () => {
@@ -63,4 +64,3 @@ describe('workbench/move/impact', () => {
     expect(res?.dateTo).toBe('2026-02-01');
   });
 });
-

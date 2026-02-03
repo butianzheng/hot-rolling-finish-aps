@@ -4,6 +4,7 @@ import type { Dayjs } from 'dayjs';
 import { capacityApi } from '../../../api/tauri';
 import type { MoveRecommendSummary, MoveValidationMode } from '../types';
 import type { IpcPlanItem } from './planItems';
+import { makeMachineDateKey } from './key';
 
 export type IpcCapacityPool = Awaited<ReturnType<typeof capacityApi.getCapacityPools>>[number];
 
@@ -33,7 +34,7 @@ export function buildTonnageMap(planItems: IpcPlanItem[]): Map<string, number> {
     if (!machine || !date) return;
     const weight = Number(it.weight_t ?? 0);
     if (!Number.isFinite(weight) || weight <= 0) return;
-    const key = `${machine}__${date}`;
+    const key = makeMachineDateKey(machine, date);
     tonnageMap.set(key, (tonnageMap.get(key) ?? 0) + weight);
   });
   return tonnageMap;
@@ -68,7 +69,7 @@ export function buildMoveDeltaBase(movable: MoveRecommendMovable[]): {
   const totalWeight = (movable ?? []).reduce((sum, it) => sum + it.weight_t, 0);
   const deltaBase = new Map<string, number>();
   (movable ?? []).forEach((it) => {
-    const fromKey = `${it.from_machine}__${it.from_date}`;
+    const fromKey = makeMachineDateKey(it.from_machine, it.from_date);
     deltaBase.set(fromKey, (deltaBase.get(fromKey) ?? 0) - it.weight_t);
   });
   return { totalWeight, deltaBase };
@@ -128,7 +129,7 @@ export function buildCapacityPoolMap(pools: IpcCapacityPool[]): Map<string, Capa
     if (!machine || !date) return;
     const target = Number(p.target_capacity_t ?? 0);
     const limit = Number(p.limit_capacity_t ?? 0);
-    poolMap.set(`${machine}__${date}`, {
+    poolMap.set(makeMachineDateKey(machine, date), {
       target: Number.isFinite(target) && target > 0 ? target : null,
       limit: Number.isFinite(limit) && limit > 0 ? limit : null,
     });
@@ -150,7 +151,7 @@ export function scoreCandidateDates(params: {
   const scored = (candidates ?? [])
     .map((date) => {
       const deltaMap = new Map<string, number>(deltaBase);
-      const toKey = `${targetMachine}__${date}`;
+      const toKey = makeMachineDateKey(targetMachine, date);
       deltaMap.set(toKey, (deltaMap.get(toKey) ?? 0) + totalWeight);
 
       const keys = Array.from(deltaMap.entries()).filter(([, d]) => Number.isFinite(d) && Math.abs(d) > 1e-9);
@@ -222,4 +223,3 @@ export function buildRecommendSummary(targetMachine: string, best: CandidateScor
     maxUtilPct: best.maxUtilPct,
   };
 }
-
