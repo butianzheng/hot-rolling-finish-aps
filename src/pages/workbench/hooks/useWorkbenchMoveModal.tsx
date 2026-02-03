@@ -54,6 +54,14 @@ export type MoveModalActions = {
   submit: () => Promise<void>;
 };
 
+/**
+ * Workbench 移位弹窗状态管理（A-8 瘦身后）
+ *
+ * 返回值从 30+ 字段精简到 5 字段：
+ * - moveModalState: 聚合状态对象
+ * - moveModalActions: 聚合操作对象
+ * - openMoveModal / openMoveModalAt / openMoveModalWithRecommend: 外部调用方法
+ */
 export function useWorkbenchMoveModal(params: {
   activeVersionId: string | null;
   operator: string | null;
@@ -66,35 +74,11 @@ export function useWorkbenchMoveModal(params: {
   selectedMaterialIds: string[];
   setSelectedMaterialIds: Dispatch<SetStateAction<string[]>>;
 }): {
-  // 【新增】聚合对象
   moveModalState: MoveModalState;
   moveModalActions: MoveModalActions;
-  // 【保留】散列导出（向后兼容）
-  moveModalOpen: boolean;
-  setMoveModalOpen: Dispatch<SetStateAction<boolean>>;
-  moveTargetMachine: string | null;
-  setMoveTargetMachine: Dispatch<SetStateAction<string | null>>;
-  moveTargetDate: dayjs.Dayjs | null;
-  setMoveTargetDate: Dispatch<SetStateAction<dayjs.Dayjs | null>>;
-  moveSeqMode: MoveSeqMode;
-  setMoveSeqMode: Dispatch<SetStateAction<MoveSeqMode>>;
-  moveStartSeq: number;
-  setMoveStartSeq: Dispatch<SetStateAction<number>>;
-  moveValidationMode: MoveValidationMode;
-  setMoveValidationMode: Dispatch<SetStateAction<MoveValidationMode>>;
-  moveSubmitting: boolean;
-  moveReason: string;
-  setMoveReason: Dispatch<SetStateAction<string>>;
-  moveRecommendLoading: boolean;
-  moveRecommendSummary: MoveRecommendSummary | null;
-  strategyLabel: string;
-  selectedPlanItemStats: SelectedPlanItemStats;
-  moveImpactPreview: MoveImpactPreview | null;
-  recommendMoveTarget: () => Promise<void>;
   openMoveModal: () => void;
   openMoveModalAt: (targetMachine: string, targetDate: string) => void;
   openMoveModalWithRecommend: () => void;
-  submitMove: () => Promise<void>;
 } {
   const {
     activeVersionId,
@@ -310,35 +294,10 @@ export function useWorkbenchMoveModal(params: {
   );
 
   return {
-    // 【新增】聚合对象（推荐使用，可减少 props 数量）
     moveModalState,
     moveModalActions,
-
-    // 【保留】散列导出（向后兼容）
-    moveModalOpen,
-    setMoveModalOpen,
-    moveTargetMachine,
-    setMoveTargetMachine,
-    moveTargetDate,
-    setMoveTargetDate,
-    moveSeqMode,
-    setMoveSeqMode,
-    moveStartSeq,
-    setMoveStartSeq,
-    moveValidationMode,
-    setMoveValidationMode,
-    moveSubmitting,
-    moveReason,
-    setMoveReason,
-    moveRecommendLoading,
-    moveRecommendSummary,
-    strategyLabel,
-    selectedPlanItemStats,
-    moveImpactPreview,
-    recommendMoveTarget,
     openMoveModal,
     openMoveModalAt,
     openMoveModalWithRecommend,
-    submitMove,
   };
 }
