@@ -18,7 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import ErrorBoundary from '../components/ErrorBoundary';
 import PageSkeleton from '../components/PageSkeleton';
 import NoActiveVersionGuide from '../components/NoActiveVersionGuide';
-import { materialApi, pathRuleApi, planApi } from '../api/tauri';
+import { materialApi, planApi } from '../api/tauri';
 import {
   useActiveVersionId,
   useAdminOverrideMode,
@@ -30,7 +30,6 @@ import {
 } from '../stores/use-global-store';
 import { formatDate } from '../utils/formatters';
 import { normalizeSchedState } from '../utils/schedState';
-import { getErrorMessage } from '../utils/errorUtils';
 import type { PlanItemStatusFilter } from '../utils/planItemStatus';
 import MaterialPool, { type MaterialPoolMaterial, type MaterialPoolSelection } from '../components/workbench/MaterialPool';
 import ScheduleCardView from '../components/workbench/ScheduleCardView';
@@ -49,6 +48,7 @@ import { useWorkbenchAutoDateRange } from './workbench/hooks/useWorkbenchAutoDat
 import { useWorkbenchDeepLink } from './workbench/hooks/useWorkbenchDeepLink';
 import { useWorkbenchBatchOperations } from './workbench/hooks/useWorkbenchBatchOperations';
 import { useWorkbenchMoveModal } from './workbench/hooks/useWorkbenchMoveModal';
+import { useWorkbenchPathOverride } from './workbench/hooks/useWorkbenchPathOverride';
 import MoveMaterialsModal from '../components/workbench/MoveMaterialsModal';
 import type { WorkbenchDateRangeMode } from './workbench/types';
 
@@ -56,7 +56,6 @@ const PlanItemVisualization = React.lazy(() => import('../components/PlanItemVis
 
 type IpcMaterialWithState = Awaited<ReturnType<typeof materialApi.listMaterials>>[number];
 type IpcMaterialDetail = Awaited<ReturnType<typeof materialApi.getMaterialDetail>>;
-type IpcPathOverridePendingSummary = Awaited<ReturnType<typeof pathRuleApi.listPathOverridePendingSummary>>[number];
 
 const PlanningWorkbench: React.FC = () => {
   const navigate = useNavigate();
@@ -230,69 +229,6 @@ const PlanningWorkbench: React.FC = () => {
     planItemsQuery.refetch();
   }, [activeVersionId, refreshSignal, planItemsQuery.refetch]);
 
-  const defaultPlanDate = useMemo(() => formatDate(dayjs()), []);
-  const pathOverrideContext = useMemo(() => {
-    const machine = String(scheduleFocus?.machine || poolSelection.machineCode || '').trim();
-    const date = String(scheduleFocus?.date || defaultPlanDate).trim();
-    return {
-      machineCode: machine || null,
-      planDate: date || null,
-    };
-  }, [defaultPlanDate, poolSelection.machineCode, scheduleFocus?.date, scheduleFocus?.machine]);
-
-  const pathOverridePendingQuery = useQuery({
-    queryKey: [
-      'pathOverridePending',
-      activeVersionId,
-      pathOverrideContext.machineCode,
-      pathOverrideContext.planDate,
-      refreshSignal,
-    ],
-    enabled: !!activeVersionId && !!pathOverrideContext.machineCode && !!pathOverrideContext.planDate,
-    queryFn: async () => {
-      if (!activeVersionId || !pathOverrideContext.machineCode || !pathOverrideContext.planDate) return [];
-      return pathRuleApi.listPathOverridePending({
-        versionId: activeVersionId,
-        machineCode: pathOverrideContext.machineCode,
-        planDate: pathOverrideContext.planDate,
-      });
-    },
-    staleTime: 15 * 1000,
-  });
-
-  const pathOverridePendingCount = useMemo(() => {
-    return pathOverridePendingQuery.data?.length ?? 0;
-  }, [pathOverridePendingQuery.data]);
-
-  const recalcAfterPathOverride = async (baseDate: string) => {
-    if (!activeVersionId) return;
-    const base = String(baseDate || '').trim() || defaultPlanDate;
-    setRecalculating(true);
-    try {
-      const res = await planApi.recalcFull(
-        activeVersionId,
-        base,
-        undefined,
-        currentUser || 'admin',
-        preferences.defaultStrategy || 'balanced'
-      );
-      const nextVersionId = String(res?.version_id ?? '').trim();
-      if (nextVersionId) {
-        setActiveVersion(nextVersionId);
-        message.success(`已重算并切换到新版本：${nextVersionId}`);
-      } else {
-        message.success(String(res?.message || '重算完成'));
-      }
-      setRefreshSignal((v) => v + 1);
-      materialsQuery.refetch();
-    } catch (e: unknown) {
-      console.error('[Workbench] recalcAfterPathOverride failed:', e);
-      message.error(getErrorMessage(e) || '重算失败');
-    } finally {
-      setRecalculating(false);
-    }
-  };
-
   // AUTO 日期范围（基于当前机组的排程数据）
   const { autoDateRange, applyWorkbenchDateRange, resetWorkbenchDateRangeToAuto } = useWorkbenchAutoDateRange({
     planItems: planItemsQuery.data || [],
@@ -301,39 +237,19 @@ const PlanningWorkbench: React.FC = () => {
     setDateRangeMode,
     setWorkbenchDateRange,
   });
-
-  // 路径规则：跨日期/跨机组待确认汇总（基于当前 AUTO 日期范围）
-  const pathOverrideSummaryRange = useMemo(() => {
-    return {
-      from: formatDate(autoDateRange[0]),
-      to: formatDate(autoDateRange[1]),
-    };
-  }, [autoDateRange]);
-
-  const pathOverrideSummaryQuery = useQuery({
-    queryKey: [
-      'pathOverridePendingSummary',
-      activeVersionId,
-      pathOverrideSummaryRange.from,
-      pathOverrideSummaryRange.to,
-      refreshSignal,
-    ],
-    enabled: !!activeVersionId,
-    queryFn: async () => {
-      if (!activeVersionId) return [];
-      return pathRuleApi.listPathOverridePendingSummary({
-        versionId: activeVersionId,
-        planDateFrom: pathOverrideSummaryRange.from,
-        planDateTo: pathOverrideSummaryRange.to,
-      });
-    },
-    staleTime: 15 * 1000,
+  const pathOverride = useWorkbenchPathOverride({
+    activeVersionId,
+    scheduleFocus,
+    poolMachineCode: poolSelection.machineCode,
+    autoDateRange,
+    refreshSignal,
+    currentUser,
+    defaultStrategy: preferences.defaultStrategy,
+    setRecalculating,
+    setActiveVersion,
+    bumpRefreshSignal,
+    materialsRefetch: materialsQuery.refetch,
   });
-
-  const pathOverridePendingTotalCount = useMemo(() => {
-    const list: IpcPathOverridePendingSummary[] = pathOverrideSummaryQuery.data ?? [];
-    return list.reduce((sum, r) => sum + Number(r.pending_count ?? 0), 0);
-  }, [pathOverrideSummaryQuery.data]);
 
   const openInspector = (materialId: string) => {
     setInspectedMaterialId(materialId);
@@ -566,16 +482,16 @@ const PlanningWorkbench: React.FC = () => {
           open={pathOverrideModalOpen}
           onClose={() => setPathOverrideModalOpen(false)}
           versionId={activeVersionId}
-          machineCode={pathOverrideContext.machineCode}
-          planDate={pathOverrideContext.planDate}
+          machineCode={pathOverride.context.machineCode}
+          planDate={pathOverride.context.planDate}
           operator={currentUser || 'system'}
           onConfirmed={async ({ confirmedCount, autoRecalc }) => {
             if (confirmedCount <= 0) return;
-            pathOverridePendingQuery.refetch();
-            pathOverrideSummaryQuery.refetch();
+            pathOverride.pendingRefetch();
+            pathOverride.summaryRefetch();
             if (autoRecalc) {
               setPathOverrideModalOpen(false);
-              await recalcAfterPathOverride(pathOverrideContext.planDate || defaultPlanDate);
+              await pathOverride.recalcAfterPathOverride(pathOverride.context.planDate || '');
             }
           }}
         />
@@ -584,34 +500,34 @@ const PlanningWorkbench: React.FC = () => {
           open={pathOverrideCenterOpen}
           onClose={() => setPathOverrideCenterOpen(false)}
           versionId={activeVersionId}
-          planDateFrom={pathOverrideSummaryRange.from}
-          planDateTo={pathOverrideSummaryRange.to}
+          planDateFrom={pathOverride.summaryRange.from}
+          planDateTo={pathOverride.summaryRange.to}
           machineOptions={machineOptions}
           operator={currentUser || 'system'}
           onConfirmed={async ({ confirmedCount, autoRecalc, recalcBaseDate }) => {
             if (confirmedCount <= 0) return;
-            pathOverridePendingQuery.refetch();
-            pathOverrideSummaryQuery.refetch();
+            pathOverride.pendingRefetch();
+            pathOverride.summaryRefetch();
             if (autoRecalc) {
               setPathOverrideCenterOpen(false);
-              await recalcAfterPathOverride(recalcBaseDate || defaultPlanDate);
+              await pathOverride.recalcAfterPathOverride(recalcBaseDate || '');
             }
           }}
         />
 
-        {pathOverridePendingTotalCount > 0 && activeVersionId ? (
+        {pathOverride.pendingTotalCount > 0 && activeVersionId ? (
           <Alert
             type="warning"
             showIcon
-            message={`路径规则待确认（跨日期/跨机组）：${pathOverridePendingTotalCount} 条`}
-            description={`范围 ${pathOverrideSummaryRange.from} ~ ${pathOverrideSummaryRange.to}（确认后建议重算生成新版本）`}
+            message={`路径规则待确认（跨日期/跨机组）：${pathOverride.pendingTotalCount} 条`}
+            description={`范围 ${pathOverride.summaryRange.from} ~ ${pathOverride.summaryRange.to}（确认后建议重算生成新版本）`}
             action={
               <Space>
                 <Button
                   size="small"
                   type="primary"
                   icon={<InfoCircleOutlined />}
-                  loading={pathOverrideSummaryQuery.isFetching}
+                  loading={pathOverride.summaryIsFetching}
                   onClick={() => setPathOverrideCenterOpen(true)}
                 >
                   待确认中心
@@ -621,19 +537,19 @@ const PlanningWorkbench: React.FC = () => {
           />
         ) : null}
 
-        {pathOverridePendingCount > 0 && pathOverrideContext.machineCode && pathOverrideContext.planDate ? (
+        {pathOverride.pendingCount > 0 && pathOverride.context.machineCode && pathOverride.context.planDate ? (
           <Alert
             type="warning"
             showIcon
-            message={`路径规则待确认：${pathOverridePendingCount} 条`}
-            description={`机组 ${pathOverrideContext.machineCode} · 日期 ${pathOverrideContext.planDate}（确认后建议重算生成新版本）`}
+            message={`路径规则待确认：${pathOverride.pendingCount} 条`}
+            description={`机组 ${pathOverride.context.machineCode} · 日期 ${pathOverride.context.planDate}（确认后建议重算生成新版本）`}
             action={
               <Space>
                 <Button
                   size="small"
                   type="primary"
                   icon={<InfoCircleOutlined />}
-                  loading={pathOverridePendingQuery.isFetching}
+                  loading={pathOverride.pendingIsFetching}
                   onClick={() => setPathOverrideModalOpen(true)}
                 >
                   去确认
@@ -725,7 +641,7 @@ const PlanningWorkbench: React.FC = () => {
               refreshSignal={refreshSignal}
               onAfterReset={() => {
                 setRefreshSignal((v) => v + 1);
-                pathOverridePendingQuery.refetch();
+                pathOverride.pendingRefetch();
                 message.info('已重置换辊周期：建议执行“一键优化/重算”以刷新排程结果');
               }}
             />
@@ -778,13 +694,13 @@ const PlanningWorkbench: React.FC = () => {
                   <Button
                     size="small"
                     icon={<InfoCircleOutlined />}
-                    type={pathOverridePendingCount > 0 ? 'primary' : 'default'}
-                    danger={pathOverridePendingCount > 0}
-                    disabled={!pathOverrideContext.machineCode}
-                    loading={pathOverridePendingQuery.isFetching}
+                    type={pathOverride.pendingCount > 0 ? 'primary' : 'default'}
+                    danger={pathOverride.pendingCount > 0}
+                    disabled={!pathOverride.context.machineCode}
+                    loading={pathOverride.pendingIsFetching}
                     onClick={() => setPathOverrideModalOpen(true)}
                   >
-                    路径待确认{pathOverridePendingCount > 0 ? ` ${pathOverridePendingCount}` : ''}
+                    路径待确认{pathOverride.pendingCount > 0 ? ` ${pathOverride.pendingCount}` : ''}
                   </Button>
                   <Segmented
                     value={workbenchViewMode}
