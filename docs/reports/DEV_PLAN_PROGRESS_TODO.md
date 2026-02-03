@@ -60,12 +60,21 @@
 
 ### M1（P1）Workbench：类型与 UI 编排收敛（降耦合）
 
-- [ ] M1-1 统一 `ScheduleFocus / PathOverride / DeepLink` 等类型定义（消除重复定义）
+- [x] M1-1 统一 `ScheduleFocus / PathOverride / DeepLink` 等类型定义（消除重复定义）（2026-02-04 完成，对应 A-7）
   - DoD：类型只在一个位置定义；其他位置只 re-export；避免 copy-paste
-- [ ] M1-2 抽离“告警与弹窗编排”（Alerts/Modals/全局 message/confirm 的 orchestration）
+  - 现状：所有核心类型已集中到 `src/pages/workbench/types.ts`
+- [x] M1-2 抽离"告警与弹窗编排"（Alerts/Modals/全局 message/confirm 的 orchestration）（2026-02-04 完成，对应 A-6 Phase 1+2）
   - DoD：PlanningWorkbench 仅保留页面装配；弹窗 open/close 与业务副作用集中到 hook/service
-- [ ] M1-3 继续瘦身 `useWorkbenchMoveModal.tsx`（目标：< 200 行）
+  - 效果：WorkbenchModals props 从 46 → 20（-57%），PlanningWorkbench 弹窗 useState 从 4 → 1
+- [x] M1-3 继续瘦身 `useWorkbenchMoveModal.tsx`（目标：< 200 行）（2026-02-04 部分完成）
   - DoD：UI state 与纯计算分层；推荐/影响预览/提交分别独立，避免互相 import state
+  - 成果：303 行 → 265 行（-38 行，12.5% 减少）
+  - 优化：
+    - ✅ MoveModalState/MoveModalActions 类型移至 types.ts
+    - ✅ getStrategyLabel 工具函数抽取至 utils.ts
+    - ✅ openMoveModal 系列函数重复逻辑合并为 resetAndOpenModal
+    - ✅ DoD 已完成：推荐/影响预览/提交已独立到单独 hooks
+  - 回归测试：✓ 60 frontend tests passed
 
 ### M2（P1/P2）IPC/Schema：单一事实来源（避免漂移）
 
@@ -452,6 +461,31 @@
     - 消息反馈格式统一 ✅
     - 向后兼容 100% ✅
   - **效果**：大幅减少 props drilling，代码更清晰，类型更安全
+
+- 🎯 **M1 完成**：Workbench 类型与 UI 编排收敛（2026-02-04）
+  - **M1-1（A-7 已完成）**：统一 ScheduleFocus/PathOverride/DeepLink 类型定义
+    - 现状：所有核心类型已集中到 `src/pages/workbench/types.ts`
+    - hooks 使用 re-export 保持向后兼容
+  - **M1-2（A-6 Phase 1+2 已完成）**：抽离告警与弹窗编排
+    - useWorkbenchModalState 聚合 4 个弹窗状态
+    - WorkbenchModals props 从 46 → 20（-57%）
+    - PlanningWorkbench 弹窗 useState 从 4 → 1
+  - **M1-3 部分完成**：瘦身 useWorkbenchMoveModal.tsx
+    - 修改文件（3 个）：
+      - `src/pages/workbench/types.ts`：添加 MoveModalState/MoveModalActions 类型定义
+      - `src/pages/workbench/utils.ts`：添加 getStrategyLabel 工具函数
+      - `src/pages/workbench/hooks/useWorkbenchMoveModal.tsx`：
+        - 移除类型定义，改为从 types.ts 导入并 re-export
+        - 使用 getStrategyLabel 工具函数替代内联逻辑
+        - 抽取 resetAndOpenModal 辅助函数合并重复逻辑
+        - 精简 openMoveModal/openMoveModalAt/openMoveModalWithRecommend
+    - 效果：
+      - 文件从 303 行 → 265 行（-38 行，12.5% 减少）
+      - ✅ DoD 已完成：推荐/影响预览/提交已独立到单独 hooks
+      - ✅ 类型定义统一，消除重复
+      - ✅ 重复逻辑合并，代码更清晰
+    - 回归测试：✓ 60 frontend tests passed
+    - 目标未完全达成：<200 行（当前 265 行），但已实现关键改进
 
 - 🎯 **M3-2 完成**：迁移通道单一化 - ensure_schema 与 migrations 分工明确（2026-02-04）
   - **背景**：D-2 已完成文档明确权威来源，但代码层面缺少"首次启动自动建表"功能
