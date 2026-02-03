@@ -1,24 +1,54 @@
 import { useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
-export function useWorkbenchRefreshActions(params: {
-  bumpRefreshSignal: () => void;
-  materialsRefetch: () => void;
-  planItemsRefetch: () => void;
-}): {
-  refreshAll: () => void;
-  retryMaterials: () => void;
-  retryPlanItems: () => void;
+import { workbenchQueryKeys } from '../queryKeys';
+
+/**
+ * Workbench 统一刷新协调器
+ *
+ * 使用 React Query 的 invalidateQueries 统一管理刷新策略
+ * 替代之前的 refreshSignal + direct refetch 双轨制
+ */
+export function useWorkbenchRefreshActions(): {
+  refreshAll: () => Promise<void>;
+  refreshPlanItems: () => Promise<void>;
+  refreshMaterials: () => Promise<void>;
+  refreshPathOverride: () => Promise<void>;
 } {
-  const { bumpRefreshSignal, materialsRefetch, planItemsRefetch } = params;
+  const queryClient = useQueryClient();
 
-  const retryMaterials = useCallback(() => void materialsRefetch(), [materialsRefetch]);
-  const retryPlanItems = useCallback(() => void planItemsRefetch(), [planItemsRefetch]);
+  // 刷新所有 Workbench 数据（操作完成后的全量刷新）
+  const refreshAll = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: workbenchQueryKeys.all }),
+      // 遗留 queryKeys：ScheduleCardView 等组件使用旧 key 格式
+      // TODO(M1): 统一所有组件到 workbenchQueryKeys 后可移除
+      queryClient.invalidateQueries({ queryKey: ['planItems'] }),
+      queryClient.invalidateQueries({ queryKey: ['materials'] }),
+    ]);
+  }, [queryClient]);
 
-  const refreshAll = useCallback(() => {
-    bumpRefreshSignal();
-    void materialsRefetch();
-  }, [bumpRefreshSignal, materialsRefetch]);
+  // 刷新 planItems（仅刷新排程数据）
+  const refreshPlanItems = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: workbenchQueryKeys.planItems.all,
+    });
+  }, [queryClient]);
 
-  return { refreshAll, retryMaterials, retryPlanItems };
+  // 刷新 materials（仅刷新物料数据）
+  const refreshMaterials = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: workbenchQueryKeys.materials.all,
+    });
+  }, [queryClient]);
+
+  // 刷新 pathOverride（路径规则相关）
+  const refreshPathOverride = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: workbenchQueryKeys.pathOverride.all,
+    });
+  }, [queryClient]);
+
+  return { refreshAll, refreshPlanItems, refreshMaterials, refreshPathOverride };
 }
 

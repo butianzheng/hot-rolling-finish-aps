@@ -28,8 +28,6 @@ export function useWorkbenchMoveModal(params: {
   planItems: IpcPlanItem[];
   selectedMaterialIds: string[];
   setSelectedMaterialIds: Dispatch<SetStateAction<string[]>>;
-  bumpRefreshSignal: () => void;
-  materialsRefetch: () => void;
 }): {
   moveModalOpen: boolean;
   setMoveModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -68,8 +66,6 @@ export function useWorkbenchMoveModal(params: {
     planItems,
     selectedMaterialIds,
     setSelectedMaterialIds,
-    bumpRefreshSignal,
-    materialsRefetch,
   } = params;
 
   const [moveModalOpen, setMoveModalOpen] = useState(false);
@@ -155,8 +151,6 @@ export function useWorkbenchMoveModal(params: {
     setMoveModalOpen,
     setMoveReason,
     setSelectedMaterialIds,
-    bumpRefreshSignal,
-    materialsRefetch,
   });
 
   const openMoveModal = useCallback(() => {

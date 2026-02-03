@@ -16,7 +16,13 @@ import {
 } from '../move/planItems';
 import { buildMoveRequests, computeMoveStartSeq, validateMoveSubmitParams } from '../move/submit';
 import { showMoveSubmitResult } from '../move/showMoveSubmitResult';
+import { useWorkbenchRefreshActions } from './useWorkbenchRefreshActions';
 
+/**
+ * Workbench 移位提交逻辑
+ *
+ * 使用统一的刷新协调器
+ */
 export function useWorkbenchMoveSubmit(params: {
   activeVersionId: string | null;
   operator: string | null;
@@ -31,8 +37,6 @@ export function useWorkbenchMoveSubmit(params: {
   setMoveModalOpen: Dispatch<SetStateAction<boolean>>;
   setMoveReason: Dispatch<SetStateAction<string>>;
   setSelectedMaterialIds: Dispatch<SetStateAction<string[]>>;
-  bumpRefreshSignal: () => void;
-  materialsRefetch: () => void;
 }): {
   moveSubmitting: boolean;
   submitMove: () => Promise<void>;
@@ -51,11 +55,10 @@ export function useWorkbenchMoveSubmit(params: {
     setMoveModalOpen,
     setMoveReason,
     setSelectedMaterialIds,
-    bumpRefreshSignal,
-    materialsRefetch,
   } = params;
 
   const [moveSubmitting, setMoveSubmitting] = useState(false);
+  const { refreshAll } = useWorkbenchRefreshActions();
 
   const submitMove = useCallback(async () => {
     const invalid = validateMoveSubmitParams({
@@ -104,8 +107,9 @@ export function useWorkbenchMoveSubmit(params: {
       setMoveModalOpen(false);
       setMoveReason('');
       setSelectedMaterialIds([]);
-      bumpRefreshSignal();
-      materialsRefetch();
+
+      // 使用统一刷新协调器
+      await refreshAll();
 
       showMoveSubmitResult(res, missing);
     } catch (e: unknown) {
@@ -116,8 +120,6 @@ export function useWorkbenchMoveSubmit(params: {
     }
   }, [
     activeVersionId,
-    bumpRefreshSignal,
-    materialsRefetch,
     moveReason,
     moveSeqMode,
     moveStartSeq,
@@ -130,6 +132,7 @@ export function useWorkbenchMoveSubmit(params: {
     setMoveModalOpen,
     setMoveReason,
     setSelectedMaterialIds,
+    refreshAll,
   ]);
 
   return { moveSubmitting, submitMove };

@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { materialApi } from '../../../api/tauri';
 import type { MaterialPoolMaterial } from '../../../components/workbench/MaterialPool';
 import { normalizeSchedState } from '../../../utils/schedState';
+import { workbenchQueryKeys } from '../queryKeys';
 
 type IpcMaterialWithState = Awaited<ReturnType<typeof materialApi.listMaterials>>[number];
 
@@ -14,6 +15,11 @@ type MaterialQueryParams = {
   offset: number;
 };
 
+/**
+ * Workbench materials 数据查询
+ *
+ * 使用统一的 queryKey，通过 invalidateQueries 触发刷新
+ */
 export function useWorkbenchMaterials(params: { machineCode: string | null }): {
   materialQueryParams: MaterialQueryParams;
   materialsQuery: UseQueryResult<IpcMaterialWithState[], unknown>;
@@ -32,7 +38,7 @@ export function useWorkbenchMaterials(params: { machineCode: string | null }): {
   }, [machineCode]);
 
   const materialsQuery = useQuery({
-    queryKey: ['materials', materialQueryParams],
+    queryKey: workbenchQueryKeys.materials.list(materialQueryParams),
     queryFn: async () => {
       return materialApi.listMaterials(materialQueryParams);
     },

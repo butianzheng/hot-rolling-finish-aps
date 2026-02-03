@@ -1,41 +1,44 @@
 import { useCallback, useMemo } from 'react';
 import dayjs from 'dayjs';
 import { message } from 'antd';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { pathRuleApi, planApi } from '../../../api/tauri';
 import { formatDate } from '../../../utils/formatters';
 import { getErrorMessage } from '../../../utils/errorUtils';
 import type { WorkbenchPathOverrideState, WorkbenchScheduleFocus } from '../types';
+import { workbenchQueryKeys } from '../queryKeys';
 
 type SummaryRow = Awaited<ReturnType<typeof pathRuleApi.listPathOverridePendingSummary>>[number];
 
+/**
+ * Workbench 路径规则覆盖状态
+ *
+ * 使用统一的 queryKey，通过 invalidateQueries 触发刷新
+ * 移除 refreshSignal 依赖
+ */
 export function useWorkbenchPathOverride(params: {
   activeVersionId: string | null;
   scheduleFocus: WorkbenchScheduleFocus | null;
   poolMachineCode: string | null;
   autoDateRange: [dayjs.Dayjs, dayjs.Dayjs];
-  refreshSignal: number;
   currentUser: string | null;
   defaultStrategy: string | null | undefined;
   setRecalculating: (flag: boolean) => void;
   setActiveVersion: (versionId: string | null) => void;
-  bumpRefreshSignal: () => void;
-  materialsRefetch: () => void;
 }): WorkbenchPathOverrideState {
   const {
     activeVersionId,
     scheduleFocus,
     poolMachineCode,
     autoDateRange,
-    refreshSignal,
     currentUser,
     defaultStrategy,
     setRecalculating,
     setActiveVersion,
-    bumpRefreshSignal,
-    materialsRefetch,
   } = params;
+
+  const queryClient = useQueryClient();
 
   const defaultPlanDate = useMemo(() => formatDate(dayjs()), []);
 
@@ -49,7 +52,11 @@ export function useWorkbenchPathOverride(params: {
   }, [defaultPlanDate, poolMachineCode, scheduleFocus?.date, scheduleFocus?.machine]);
 
   const pendingQuery = useQuery({
-    queryKey: ['pathOverridePending', activeVersionId, context.machineCode, context.planDate, refreshSignal],
+    queryKey: workbenchQueryKeys.pathOverride.pending(
+      activeVersionId,
+      context.machineCode,
+      context.planDate || ''
+    ),
     enabled: !!activeVersionId && !!context.machineCode && !!context.planDate,
     queryFn: async () => {
       if (!activeVersionId || !context.machineCode || !context.planDate) return [];
@@ -84,8 +91,8 @@ export function useWorkbenchPathOverride(params: {
         } else {
           message.success(String(res?.message || '重算完成'));
         }
-        bumpRefreshSignal();
-        materialsRefetch();
+        // 使用统一的 queryKey 刷新
+        await queryClient.invalidateQueries({ queryKey: workbenchQueryKeys.all });
       } catch (e: unknown) {
         console.error('[Workbench] recalcAfterPathOverride failed:', e);
         message.error(getErrorMessage(e) || '重算失败');
@@ -95,11 +102,10 @@ export function useWorkbenchPathOverride(params: {
     },
     [
       activeVersionId,
-      bumpRefreshSignal,
       currentUser,
       defaultPlanDate,
       defaultStrategy,
-      materialsRefetch,
+      queryClient,
       setActiveVersion,
       setRecalculating,
     ]
@@ -113,7 +119,7 @@ export function useWorkbenchPathOverride(params: {
   }, [autoDateRange]);
 
   const summaryQuery = useQuery({
-    queryKey: ['pathOverridePendingSummary', activeVersionId, summaryRange.from, summaryRange.to, refreshSignal],
+    queryKey: workbenchQueryKeys.pathOverride.summary(activeVersionId, summaryRange.from),
     enabled: !!activeVersionId,
     queryFn: async () => {
       if (!activeVersionId) return [];

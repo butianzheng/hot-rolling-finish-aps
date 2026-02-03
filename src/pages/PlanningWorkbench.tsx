@@ -43,8 +43,11 @@ const PlanningWorkbench: React.FC = () => {
   const workbenchFilters = useGlobalStore((state) => state.workbenchFilters);
   const preferences = useUserPreferences();
   const { setRecalculating, setActiveVersion, setWorkbenchViewMode, setWorkbenchFilters } = useGlobalActions();
-  const [refreshSignal, setRefreshSignal] = useState(0);
-  const bumpRefreshSignal = useCallback(() => setRefreshSignal((v) => v + 1), []);
+
+  // TODO(M1): 待迁移的遗留组件（RollCycleAnchorCard, ScheduleCardView, PlanItemVisualization）仍依赖 signal
+  // 后续应将这些组件也改为使用 React Query，然后移除此 signal
+  const [legacyRefreshSignal, setLegacyRefreshSignal] = useState(0);
+  const bumpLegacyRefreshSignal = useCallback(() => setLegacyRefreshSignal((v) => v + 1), []);
 
   const [pathOverrideModalOpen, setPathOverrideModalOpen] = useState(false);
   const [pathOverrideCenterOpen, setPathOverrideCenterOpen] = useState(false);
@@ -75,7 +78,6 @@ const PlanningWorkbench: React.FC = () => {
   const [rhythmModalOpen, setRhythmModalOpen] = useState(false);
 
   const { materialsQuery, materials } = useWorkbenchMaterials({ machineCode: poolSelection.machineCode });
-  const materialsRefetch = materialsQuery.refetch;
 
   const openRhythmModal = useCallback(() => setRhythmModalOpen(true), []);
   const openConditionalSelect = useCallback(() => setConditionalSelectOpen(true), []);
@@ -116,14 +118,9 @@ const PlanningWorkbench: React.FC = () => {
     setWorkbenchViewMode,
   });
 
-  const { planItemsQuery, planItems } = useWorkbenchPlanItems({ activeVersionId, refreshSignal });
-  const planItemsRefetch = planItemsQuery.refetch;
+  const { planItemsQuery, planItems } = useWorkbenchPlanItems({ activeVersionId });
 
-  const { refreshAll, retryMaterials, retryPlanItems } = useWorkbenchRefreshActions({
-    bumpRefreshSignal,
-    materialsRefetch,
-    planItemsRefetch,
-  });
+  const { refreshAll, refreshPlanItems, refreshMaterials } = useWorkbenchRefreshActions();
 
   // AUTO 日期范围（基于当前机组的排程数据）
   const { autoDateRange, applyWorkbenchDateRange, resetWorkbenchDateRangeToAuto } = useWorkbenchAutoDateRange({
@@ -138,13 +135,10 @@ const PlanningWorkbench: React.FC = () => {
     scheduleFocus,
     poolMachineCode: poolSelection.machineCode,
     autoDateRange,
-    refreshSignal,
     currentUser,
     defaultStrategy: preferences.defaultStrategy,
     setRecalculating,
     setActiveVersion,
-    bumpRefreshSignal,
-    materialsRefetch,
   });
 
   const applyWorkbenchMachineCode = useCallback((machineCode: string | null) => {
@@ -178,15 +172,17 @@ const PlanningWorkbench: React.FC = () => {
   );
 
   const handleAfterRollCycleReset = useCallback(() => {
-    bumpRefreshSignal();
-    message.info('已重置换辊周期：建议执行“一键优化/重算”以刷新排程结果');
-  }, [bumpRefreshSignal]);
+    void refreshAll();
+    bumpLegacyRefreshSignal();
+    message.info('已重置换辊周期：建议执行"一键优化/重算"以刷新排程结果');
+  }, [refreshAll, bumpLegacyRefreshSignal]);
 
   const handleBeforeOptimize = useCallback(() => setRecalculating(true), [setRecalculating]);
   const handleAfterOptimize = useCallback(() => {
     setRecalculating(false);
-    refreshAll();
-  }, [refreshAll, setRecalculating]);
+    void refreshAll();
+    bumpLegacyRefreshSignal();
+  }, [refreshAll, setRecalculating, bumpLegacyRefreshSignal]);
 
   const {
     moveModalOpen,
@@ -225,8 +221,6 @@ const PlanningWorkbench: React.FC = () => {
     planItems,
     selectedMaterialIds,
     setSelectedMaterialIds,
-    bumpRefreshSignal,
-    materialsRefetch,
   });
 
   const { runMaterialOperation, runForceReleaseOperation } = useWorkbenchBatchOperations({
@@ -234,8 +228,6 @@ const PlanningWorkbench: React.FC = () => {
     currentUser,
     materials,
     setSelectedMaterialIds,
-    bumpRefreshSignal,
-    materialsRefetch,
   });
 
   const statusBarHandlers = useMemo(
@@ -338,7 +330,7 @@ const PlanningWorkbench: React.FC = () => {
           materials={materials}
           materialsLoading={materialsQuery.isLoading}
           materialsError={materialsQuery.error}
-          onRetryMaterials={retryMaterials}
+          onRetryMaterials={refreshMaterials}
           poolSelection={poolSelection}
           onPoolSelectionChange={handlePoolSelectionChange}
           poolFilters={poolFilters}
@@ -346,7 +338,7 @@ const PlanningWorkbench: React.FC = () => {
           selectedMaterialIds={selectedMaterialIds}
           onSelectedMaterialIdsChange={setSelectedMaterialIds}
           onInspectMaterialId={openInspector}
-          refreshSignal={refreshSignal}
+          refreshSignal={legacyRefreshSignal}
           onAfterRollCycleReset={handleAfterRollCycleReset}
           workbenchDateRange={workbenchDateRange}
           autoDateRange={autoDateRange}
@@ -370,7 +362,7 @@ const PlanningWorkbench: React.FC = () => {
           planItemsData={planItemsQuery.data}
           planItemsLoading={planItemsQuery.isLoading}
           planItemsError={planItemsQuery.error}
-          onRetryPlanItems={retryPlanItems}
+          onRetryPlanItems={refreshPlanItems}
           onRequestMoveToCell={openMoveModalAt}
         />
 

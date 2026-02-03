@@ -8,18 +8,22 @@ import type { RedLineViolation } from '../../../components/guards/RedLineGuard';
 import type { MaterialPoolMaterial } from '../../../components/workbench/MaterialPool';
 import type { MaterialOperationType } from '../types';
 import { extractForceReleaseViolations } from '../utils';
+import { useWorkbenchRefreshActions } from './useWorkbenchRefreshActions';
 
 type IpcImpactSummary = Awaited<ReturnType<typeof materialApi.batchForceRelease>>;
 
 export type { MaterialOperationType } from '../types';
 
+/**
+ * Workbench 批量操作逻辑
+ *
+ * 使用统一的刷新协调器
+ */
 export function useWorkbenchBatchOperations(params: {
   adminOverrideMode: boolean;
   currentUser: string | null;
   materials: MaterialPoolMaterial[];
   setSelectedMaterialIds: Dispatch<SetStateAction<string[]>>;
-  bumpRefreshSignal: () => void;
-  materialsRefetch: () => void;
 }): {
   runMaterialOperation: (materialIds: string[], type: MaterialOperationType) => void;
   runForceReleaseOperation: (materialIds: string[]) => void;
@@ -29,9 +33,9 @@ export function useWorkbenchBatchOperations(params: {
     currentUser,
     materials,
     setSelectedMaterialIds,
-    bumpRefreshSignal,
-    materialsRefetch,
   } = params;
+
+  const { refreshAll } = useWorkbenchRefreshActions();
 
   const materialsRef = useRef<MaterialPoolMaterial[]>(materials);
   useEffect(() => {
@@ -159,17 +163,16 @@ export function useWorkbenchBatchOperations(params: {
             message.success('已取消紧急标志');
           }
 
-          bumpRefreshSignal();
-          materialsRefetch();
+          // 使用统一刷新协调器
+          await refreshAll();
         },
       });
     },
     [
       adminOverrideMode,
-      bumpRefreshSignal,
       checkRedLineViolations,
       currentUser,
-      materialsRefetch,
+      refreshAll,
       showRedLineModal,
     ]
   );
@@ -295,15 +298,14 @@ export function useWorkbenchBatchOperations(params: {
           }
 
           setSelectedMaterialIds([]);
-          bumpRefreshSignal();
-          materialsRefetch();
+          // 使用统一刷新协调器
+          await refreshAll();
         },
       });
     },
     [
-      bumpRefreshSignal,
       currentUser,
-      materialsRefetch,
+      refreshAll,
       setSelectedMaterialIds,
     ]
   );

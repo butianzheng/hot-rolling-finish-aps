@@ -2,8 +2,8 @@
 
 > 用途：把“架构/维护/稳定/性能”的持续演进落成可执行任务，并在每次提交后更新状态与进度日志，方便后续开发与跟踪。
 
-最后更新：2026-02-03  
-当前基线：`main@d111c62`
+最后更新：2026-02-03
+当前基线：`main@b31e2d2`
 
 ---
 
@@ -50,9 +50,12 @@
 
 - [x] M0-1 统一 refreshAll/retry*（`d111c62`）
 - [x] M0-2 Move 关键链路一致性 + 单测护栏（`1cc4a28`/`26ff8e1`/`6141330`/`5ec4369`）
-- [ ] M0-3 统一 Workbench “刷新策略”口径（refreshSignal vs invalidateQueries）
-  - DoD：明确并固化一种主路径（保留另一种仅作为兼容/过渡），避免“各处各刷”的漂移
-  - 回归：`npm test -- --run` + `npm run build`
+- [x] M0-3 统一 Workbench "刷新策略"口径（refreshSignal vs invalidateQueries）（2026-02-03）
+  - DoD：明确并固化一种主路径（保留另一种仅作为兼容/过渡），避免"各处各刷"的漂移
+  - 回归：`npm test -- --run` ✓ + `npm run build` ✓
+  - **主路径**：React Query `invalidateQueries` + `workbenchQueryKeys`
+  - **过渡兼容**：保留 `legacyRefreshSignal` 给未迁移组件（RollCycleAnchorCard, PlanItemVisualization）
+  - **M1 遗留**：将上述遗留组件迁移到 React Query
 
 ### M1（P1）Workbench：类型与 UI 编排收敛（降耦合）
 
@@ -93,12 +96,17 @@
 - [x] A-2 Move：ImpactPreview 与 Recommend/Submit 口径对齐（`26ff8e1`）
 - [x] A-3 Move：machine-date key 统一（`6141330`）
 - [x] A-4 Move：Recommend 关键边界单测补齐（`5ec4369`）
-- [ ] A-5 抽离告警与弹窗编排（P1）
+- [x] A-5 统一 Workbench 刷新策略（2026-02-03）
+  - **主路径**：使用 React Query 的 invalidateQueries + workbenchQueryKeys
+  - **改造范围**：useWorkbenchPlanItems, useWorkbenchMaterials, useWorkbenchPathOverride, useWorkbenchMoveSubmit, useWorkbenchBatchOperations
+  - **遗留兼容**：保留 legacyRefreshSignal 给 RollCycleAnchorCard, PlanItemVisualization
+  - **M1 待办**：迁移遗留组件到 React Query
+- [ ] A-6 抽离告警与弹窗编排（P1）
   - 建议落点：新增 `src/pages/workbench/hooks/useWorkbenchUiOrchestrator.ts`（或拆多个 hook）
   - 目标：减少 `PlanningWorkbench.tsx`/`WorkbenchModals.tsx` 的 prop drilling
-- [ ] A-6 统一 `ScheduleFocus/PathOverride/DeepLink` 类型（P1）
+- [ ] A-7 统一 `ScheduleFocus/PathOverride/DeepLink` 类型（P1）
   - 目标：消除多处重复 type 定义；统一 export/re-export
-- [ ] A-7 继续瘦身 Move hooks（P1）
+- [ ] A-8 继续瘦身 Move hooks（P1）
   - `src/pages/workbench/hooks/useWorkbenchMoveRecommend.ts:1`
   - `src/pages/workbench/hooks/useWorkbenchMoveSubmit.tsx:1`
   - `src/pages/workbench/hooks/useWorkbenchMoveModal.tsx:1`
@@ -131,7 +139,18 @@
 
 ## 4. 进度日志（建议每次提交追加）
 
-### 2026-02-03
+### 2026-02-03（晚）
+
+- 🎯 **M0-3 完成**：统一 Workbench 刷新策略（refreshSignal → invalidateQueries）
+  - 创建 `src/pages/workbench/queryKeys.ts`：定义统一的 workbenchQueryKeys 层级结构
+  - 改造核心 hooks：useWorkbenchPlanItems, useWorkbenchMaterials, useWorkbenchPathOverride
+  - 改造刷新协调器：useWorkbenchRefreshActions 使用 invalidateQueries
+  - 改造操作 hooks：useWorkbenchMoveSubmit, useWorkbenchBatchOperations 移除 refreshSignal 依赖
+  - 保留 legacyRefreshSignal 兼容未迁移组件（RollCycleAnchorCard, PlanItemVisualization）
+  - 回归测试：✓ 60 tests passed, ✓ build success
+  - **效果**：消除双轨制刷新，主路径固化为 React Query invalidateQueries
+
+### 2026-02-03（早）
 
 - `d111c62`：Workbench refreshAll 收敛 + props 稳定化（减少无效渲染与刷新链耦合）
 - `5ec4369`：Recommend 边界单测补齐（tonnage/capacity/movable/score）
