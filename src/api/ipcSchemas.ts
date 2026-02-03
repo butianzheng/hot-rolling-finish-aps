@@ -12,7 +12,7 @@ import {
   ColdStockProfileResponseSchema as ColdStockProfileResponseSchemaStrict,
   RollCampaignAlertResponseSchema as RollCampaignAlertResponseSchemaStrict,
   CapacityOpportunityResponseSchema as CapacityOpportunityResponseSchemaStrict,
-} from '../types/schemas/decision-schema';
+} from './ipcSchemas/decision';
 
 export { z };
 

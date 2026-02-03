@@ -22,4 +22,4 @@ export { rhythmApi } from './tauri/rhythmApi';
 // Decision Service (D1-D6)
 // ==========================================
 // 统一对外出口：推荐在业务/Hook 中通过 `api/tauri.ts` 引用，避免绕过统一封装
-export * from '../services/decision-service';
+export * from './tauri/decisionService';
