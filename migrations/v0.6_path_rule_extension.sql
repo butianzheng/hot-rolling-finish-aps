@@ -5,6 +5,8 @@
 -- 功能: 宽厚路径规则 + Roll Cycle 锚点 + 人工确认突破
 -- ==========================================
 
+PRAGMA foreign_keys = ON;
+
 -- ==========================================
 -- 1. material_state 表: 新增人工确认字段
 -- ==========================================
@@ -56,6 +58,10 @@ ON roller_campaign(anchor_source) WHERE anchor_source IS NOT NULL;
 -- ==========================================
 -- 注意: 仅在配置项不存在时插入
 
+-- 创建 GLOBAL scope（如果不存在）
+INSERT OR IGNORE INTO config_scope (scope_id, scope_type, scope_key, created_at)
+VALUES ('global', 'GLOBAL', 'GLOBAL', datetime('now', 'localtime'));
+
 INSERT OR IGNORE INTO config_kv (scope_id, key, value, updated_at)
 VALUES
   ('global', 'path_rule_enabled', 'true', datetime('now', 'localtime')),
@@ -64,6 +70,13 @@ VALUES
   ('global', 'path_override_allowed_urgency_levels', 'L2,L3', datetime('now', 'localtime')),
   ('global', 'seed_s2_percentile', '0.95', datetime('now', 'localtime')),
   ('global', 'seed_s2_small_sample_threshold', '10', datetime('now', 'localtime'));
+
+-- ==========================================
+-- 5. 更新 schema_version
+-- ==========================================
+
+INSERT OR IGNORE INTO schema_version (version, applied_at)
+  VALUES (6, datetime('now'));
 
 -- ==========================================
 -- 迁移说明

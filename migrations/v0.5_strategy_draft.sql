@@ -2,6 +2,8 @@
 -- v0.5: decision_strategy_draft (策略草案持久化)
 -- ==========================================
 
+PRAGMA foreign_keys = ON;
+
 CREATE TABLE IF NOT EXISTS decision_strategy_draft (
   draft_id TEXT PRIMARY KEY,
   base_version_id TEXT NOT NULL REFERENCES plan_version(version_id),
@@ -34,3 +36,7 @@ CREATE INDEX IF NOT EXISTS idx_strategy_draft_base_version ON decision_strategy_
 CREATE INDEX IF NOT EXISTS idx_strategy_draft_status ON decision_strategy_draft(status);
 CREATE INDEX IF NOT EXISTS idx_strategy_draft_expires_at ON decision_strategy_draft(expires_at);
 CREATE INDEX IF NOT EXISTS idx_strategy_draft_created_at ON decision_strategy_draft(created_at DESC);
+
+-- 更新 schema_version
+INSERT OR IGNORE INTO schema_version (version, applied_at)
+  VALUES (5, datetime('now'));

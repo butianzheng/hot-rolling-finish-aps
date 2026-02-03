@@ -4,6 +4,8 @@
 -- - 主键设计为 (version_id, machine_code, material_id)：
 --   每个 material 在每个版本+机组仅记录一次，plan_date 表示首次遇到 OVERRIDE_REQUIRED 的日期
 
+PRAGMA foreign_keys = ON;
+
 CREATE TABLE IF NOT EXISTS path_override_pending (
   version_id TEXT NOT NULL REFERENCES plan_version(version_id) ON DELETE CASCADE,
   machine_code TEXT NOT NULL REFERENCES machine_master(machine_code),
@@ -27,4 +29,3 @@ CREATE INDEX IF NOT EXISTS idx_path_override_pending_version_machine_date
   ON path_override_pending(version_id, machine_code, plan_date);
 CREATE INDEX IF NOT EXISTS idx_path_override_pending_version_material
   ON path_override_pending(version_id, material_id);
-
