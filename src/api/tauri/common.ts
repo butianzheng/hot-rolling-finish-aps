@@ -1,0 +1,10 @@
+// ==========================================
+// Shared types for Tauri API layer
+// ==========================================
+
+export interface ErrorResponse {
+  code: string;
+  message: string;
+  details?: any;
+}
+
