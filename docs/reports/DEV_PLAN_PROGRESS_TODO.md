@@ -84,8 +84,22 @@
     - ✅ 集成测试：21 个文件已修复（使用 `test_helpers::open_test_connection()`）
     - 🟡 单元测试：3/17 个文件已修复（剩余为技术债务，M1 处理）
   - 回归测试：✓ 432 unit tests passed + ✓ 10 integration tests passed + ✓ 前端 60 tests passed
-- [ ] M3-2 迁移通道单一化（明确 migrations/ensure_schema 的分工）
+- [x] M3-2 迁移通道单一化（明确 migrations/ensure_schema 的分工）（2026-02-04）
   - DoD：文档明确"权威 schema/迁移"来源；开发/生产升级路径可重复执行且可回滚
+  - **新增功能**：
+    - ✅ `ensure_schema()` 函数（src/db.rs）：首次启动自动建表
+    - ✅ 集成到 AppState::new()（src/app/state.rs）：应用启动时调用
+  - **文档更新**：
+    - ✅ 职责分工：明确 ensure_schema（自动）与 migrations（手动）的区别
+    - ✅ 首次部署指南：生产环境首次部署流程
+    - ✅ 部署检查清单：首次部署和版本升级的完整 checklist
+    - ✅ 常见问题（FAQ）：解答 ensure_schema 相关疑问
+  - **效果**：
+    - 开发环境首次启动：无需手动执行 SQL，自动建表
+    - 生产环境首次部署：无需手动执行 SQL，自动建表
+    - 版本升级：仍需人工执行 migrations/*.sql（符合工业系统要求）
+    - 符合安全原则：不自动执行增量迁移，避免数据风险
+  - 回归测试：✓ 432 unit tests passed + ✓ 60 frontend tests passed
 
 ### M4（P2）性能优化（测量驱动）
 
@@ -438,6 +452,34 @@
     - 消息反馈格式统一 ✅
     - 向后兼容 100% ✅
   - **效果**：大幅减少 props drilling，代码更清晰，类型更安全
+
+- 🎯 **M3-2 完成**：迁移通道单一化 - ensure_schema 与 migrations 分工明确（2026-02-04）
+  - **背景**：D-2 已完成文档明确权威来源，但代码层面缺少"首次启动自动建表"功能
+  - **新增功能**：
+    - `ensure_schema()` 函数（src/db.rs）：
+      - 检测 schema_version 表是否存在
+      - 如果不存在，自动执行 scripts/dev_db/schema.sql 建表
+      - 插入当前版本号（schema_version=6）
+      - 如果已存在，什么也不做（不自动升级）
+    - 集成到 AppState::new()（src/app/state.rs）：
+      - 应用启动时调用 ensure_schema()
+      - 确保首次部署能自动创建完整表结构
+  - **文档更新**（docs/guides/DB_SCHEMA_MIGRATION_GUIDE.md）：
+    - 新增"职责分工"章节：明确 ensure_schema（自动建表）与 migrations（手动升级）的区别
+    - 新增"首次部署（生产环境）"章节：指导生产环境首次部署流程
+    - 新增"生产环境部署检查清单"：首次部署和版本升级的完整 checklist
+    - 新增"常见问题（FAQ）"：解答 ensure_schema 相关疑问
+  - **职责分工**：
+    - ensure_schema（自动）：仅首次建表，当 schema_version 表不存在时执行
+    - migrations/*.sql（手动）：增量升级，需人工确认后执行
+  - **效果**：
+    - ✅ 开发环境首次启动：无需手动执行 SQL，自动建表
+    - ✅ 生产环境首次部署：无需手动执行 SQL，自动建表
+    - ✅ 版本升级：仍需人工执行 migrations/*.sql（符合工业系统要求）
+    - ✅ 符合安全原则：不自动执行增量迁移，避免数据风险
+  - **回归测试**：
+    - ✓ 后端：432 unit tests passed
+    - ✓ 前端：60 tests passed
 
 
 ### 2026-02-03（深夜）
