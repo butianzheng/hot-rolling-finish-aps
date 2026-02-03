@@ -1,13 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   Button,
   Card,
   Space,
   Tag,
   message,
 } from 'antd';
-import { InfoCircleOutlined, SettingOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -21,22 +19,18 @@ import {
   useGlobalStore,
   useUserPreferences,
 } from '../stores/use-global-store';
-import { formatDate } from '../utils/formatters';
 import type { PlanItemStatusFilter } from '../utils/planItemStatus';
 import MaterialPool, { type MaterialPoolSelection } from '../components/workbench/MaterialPool';
 import ScheduleCardView from '../components/workbench/ScheduleCardView';
 import ScheduleGanttView from '../components/workbench/ScheduleGanttView';
-import DailyRhythmManagerModal from '../components/workbench/DailyRhythmManagerModal';
-import ConditionalSelectModal from '../components/workbench/ConditionalSelectModal';
 import WorkbenchScheduleViewToolbar from '../components/workbench/WorkbenchScheduleViewToolbar';
 import WorkbenchTopToolbar from '../components/workbench/WorkbenchTopToolbar';
 import WorkbenchStatusBar from '../components/workbench/WorkbenchStatusBar';
-import PathOverrideConfirmModal from '../components/path-override-confirm/PathOverrideConfirmModal';
-import PathOverridePendingCenterModal from '../components/path-override-confirm/PathOverridePendingCenterModal';
 import RollCycleAnchorCard from '../components/roll-cycle-anchor/RollCycleAnchorCard';
 import { CapacityTimelineContainer } from '../components/CapacityTimelineContainer';
-import { MaterialInspector } from '../components/MaterialInspector';
 import DecisionFlowGuide from '../components/flow/DecisionFlowGuide';
+import WorkbenchAlerts from '../components/workbench/WorkbenchAlerts';
+import WorkbenchModals from '../components/workbench/WorkbenchModals';
 import { useWorkbenchAutoDateRange } from './workbench/hooks/useWorkbenchAutoDateRange';
 import { useWorkbenchDeepLink } from './workbench/hooks/useWorkbenchDeepLink';
 import { useWorkbenchBatchOperations } from './workbench/hooks/useWorkbenchBatchOperations';
@@ -46,7 +40,6 @@ import { useWorkbenchMoveModal } from './workbench/hooks/useWorkbenchMoveModal';
 import { useWorkbenchPlanItems } from './workbench/hooks/useWorkbenchPlanItems';
 import { useWorkbenchPathOverride } from './workbench/hooks/useWorkbenchPathOverride';
 import { useWorkbenchScheduleNavigation } from './workbench/hooks/useWorkbenchScheduleNavigation';
-import MoveMaterialsModal from '../components/workbench/MoveMaterialsModal';
 import type { WorkbenchDateRangeMode } from './workbench/types';
 
 const PlanItemVisualization = React.lazy(() => import('../components/PlanItemVisualization'));
@@ -288,136 +281,18 @@ const PlanningWorkbench: React.FC = () => {
 	          }}
 	        />
 
-        <DailyRhythmManagerModal
-          open={rhythmModalOpen}
-          onClose={() => setRhythmModalOpen(false)}
-          versionId={activeVersionId}
-          machineOptions={machineOptions}
-          defaultMachineCode={scheduleFocus?.machine || poolSelection.machineCode || machineOptions[0] || null}
-          defaultPlanDate={scheduleFocus?.date || formatDate(dayjs())}
-          operator={currentUser || 'system'}
+        <WorkbenchAlerts
+          activeVersionId={activeVersionId}
+          pathOverride={pathOverride}
+          onOpenPathOverrideCenter={() => setPathOverrideCenterOpen(true)}
+          onOpenPathOverrideConfirm={() => setPathOverrideModalOpen(true)}
+          materialsIsLoading={materialsQuery.isLoading}
+          materialsError={materialsQuery.error}
+          materialsCount={materials.length}
+          planItemsIsLoading={planItemsQuery.isLoading}
+          planItemsError={planItemsQuery.error}
+          planItemsData={planItemsQuery.data}
         />
-
-        <PathOverrideConfirmModal
-          open={pathOverrideModalOpen}
-          onClose={() => setPathOverrideModalOpen(false)}
-          versionId={activeVersionId}
-          machineCode={pathOverride.context.machineCode}
-          planDate={pathOverride.context.planDate}
-          operator={currentUser || 'system'}
-          onConfirmed={async ({ confirmedCount, autoRecalc }) => {
-            if (confirmedCount <= 0) return;
-            pathOverride.pendingRefetch();
-            pathOverride.summaryRefetch();
-            if (autoRecalc) {
-              setPathOverrideModalOpen(false);
-              await pathOverride.recalcAfterPathOverride(pathOverride.context.planDate || '');
-            }
-          }}
-        />
-
-        <PathOverridePendingCenterModal
-          open={pathOverrideCenterOpen}
-          onClose={() => setPathOverrideCenterOpen(false)}
-          versionId={activeVersionId}
-          planDateFrom={pathOverride.summaryRange.from}
-          planDateTo={pathOverride.summaryRange.to}
-          machineOptions={machineOptions}
-          operator={currentUser || 'system'}
-          onConfirmed={async ({ confirmedCount, autoRecalc, recalcBaseDate }) => {
-            if (confirmedCount <= 0) return;
-            pathOverride.pendingRefetch();
-            pathOverride.summaryRefetch();
-            if (autoRecalc) {
-              setPathOverrideCenterOpen(false);
-              await pathOverride.recalcAfterPathOverride(recalcBaseDate || '');
-            }
-          }}
-        />
-
-        {pathOverride.pendingTotalCount > 0 && activeVersionId ? (
-          <Alert
-            type="warning"
-            showIcon
-            message={`路径规则待确认（跨日期/跨机组）：${pathOverride.pendingTotalCount} 条`}
-	            description={`范围 ${pathOverride.summaryRange.from} ~ ${pathOverride.summaryRange.to}（确认后建议重算生成新版本）`}
-	            action={
-	              <Space>
-	                <Button
-	                  size="small"
-	                  type="primary"
-	                  icon={<InfoCircleOutlined />}
-	                  loading={pathOverride.summaryIsFetching}
-	                  onClick={() => setPathOverrideCenterOpen(true)}
-	                >
-	                  待确认中心
-	                </Button>
-	                <Button
-	                  size="small"
-	                  icon={<SettingOutlined />}
-	                  onClick={() => navigate('/settings?tab=path_rule')}
-	                >
-	                  路径规则设置
-	                </Button>
-	              </Space>
-	            }
-	          />
-	        ) : null}
-
-        {pathOverride.pendingCount > 0 && pathOverride.context.machineCode && pathOverride.context.planDate ? (
-          <Alert
-            type="warning"
-            showIcon
-            message={`路径规则待确认：${pathOverride.pendingCount} 条`}
-	            description={`机组 ${pathOverride.context.machineCode} · 日期 ${pathOverride.context.planDate}（确认后建议重算生成新版本）`}
-	            action={
-	              <Space>
-	                <Button
-	                  size="small"
-	                  type="primary"
-	                  icon={<InfoCircleOutlined />}
-	                  loading={pathOverride.pendingIsFetching}
-	                  onClick={() => setPathOverrideModalOpen(true)}
-	                >
-	                  去确认
-	                </Button>
-	                <Button
-	                  size="small"
-	                  icon={<SettingOutlined />}
-	                  onClick={() => navigate('/settings?tab=path_rule')}
-	                >
-	                  路径规则设置
-	                </Button>
-	              </Space>
-	            }
-	          />
-	        ) : null}
-
-        {!materialsQuery.isLoading && !materialsQuery.error && materials.length === 0 ? (
-          <Alert
-            type="info"
-            showIcon
-            message="暂无物料数据"
-            description="请先在“数据导入”导入材料CSV；导入成功后再返回工作台进行排程与干预。"
-            action={
-              <Button size="small" type="primary" onClick={() => navigate('/import')}>
-                去导入
-              </Button>
-            }
-          />
-        ) : null}
-
-        {!planItemsQuery.isLoading &&
-        !planItemsQuery.error &&
-        Array.isArray(planItemsQuery.data) &&
-        planItemsQuery.data.length === 0 ? (
-          <Alert
-            type="info"
-            showIcon
-            message="当前版本暂无排程明细"
-            description="可点击右上角“一键优化”执行重算生成排程，然后再使用矩阵/甘特图视图进行调整。"
-          />
-        ) : null}
 
         {/* 主体：左物料池 + 右视图 */}
         <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 12 }}>
@@ -595,25 +470,31 @@ const PlanningWorkbench: React.FC = () => {
 	          onClearSelection={() => setSelectedMaterialIds([])}
 	        />
 
-        <ConditionalSelectModal
-          open={conditionalSelectOpen}
-          onClose={() => setConditionalSelectOpen(false)}
-          defaultMachine={poolSelection.machineCode || 'all'}
+        <WorkbenchModals
+          activeVersionId={activeVersionId}
+          currentUser={currentUser}
           machineOptions={machineOptions}
+          poolMachineCode={poolSelection.machineCode}
+          scheduleFocus={scheduleFocus}
+          rhythmModalOpen={rhythmModalOpen}
+          setRhythmModalOpen={setRhythmModalOpen}
+          pathOverrideModalOpen={pathOverrideModalOpen}
+          setPathOverrideModalOpen={setPathOverrideModalOpen}
+          pathOverrideCenterOpen={pathOverrideCenterOpen}
+          setPathOverrideCenterOpen={setPathOverrideCenterOpen}
+          pathOverride={pathOverride}
+          conditionalSelectOpen={conditionalSelectOpen}
+          setConditionalSelectOpen={setConditionalSelectOpen}
           materials={materials}
           selectedMaterialIds={selectedMaterialIds}
-          onSelectedMaterialIdsChange={setSelectedMaterialIds}
-          onMaterialOperation={runMaterialOperation}
-          onForceReleaseOperation={runForceReleaseOperation}
-        />
-        <MoveMaterialsModal
-          open={moveModalOpen}
-          onClose={() => setMoveModalOpen(false)}
-          onSubmit={submitMove}
-          submitting={moveSubmitting}
+          setSelectedMaterialIds={setSelectedMaterialIds}
+          runMaterialOperation={runMaterialOperation}
+          runForceReleaseOperation={runForceReleaseOperation}
+          moveModalOpen={moveModalOpen}
+          setMoveModalOpen={setMoveModalOpen}
+          submitMove={submitMove}
+          moveSubmitting={moveSubmitting}
           planItemsLoading={planItemsQuery.isLoading}
-          selectedMaterialIds={selectedMaterialIds}
-          machineOptions={machineOptions}
           selectedPlanItemStats={selectedPlanItemStats}
           moveTargetMachine={moveTargetMachine}
           setMoveTargetMachine={setMoveTargetMachine}
@@ -627,22 +508,14 @@ const PlanningWorkbench: React.FC = () => {
           setMoveValidationMode={setMoveValidationMode}
           moveReason={moveReason}
           setMoveReason={setMoveReason}
-          recommendMoveTarget={() => void recommendMoveTarget()}
+          recommendMoveTarget={recommendMoveTarget}
           moveRecommendLoading={moveRecommendLoading}
           moveRecommendSummary={moveRecommendSummary}
           strategyLabel={strategyLabel}
           moveImpactPreview={moveImpactPreview}
-        />
-
-        {/* 物料 Inspector */}
-        <MaterialInspector
-          visible={inspectorOpen}
-          material={inspectedMaterial}
-          onClose={() => setInspectorOpen(false)}
-          onLock={(id) => runMaterialOperation([id], 'lock')}
-          onUnlock={(id) => runMaterialOperation([id], 'unlock')}
-          onSetUrgent={(id) => runMaterialOperation([id], 'urgent_on')}
-          onClearUrgent={(id) => runMaterialOperation([id], 'urgent_off')}
+          inspectorOpen={inspectorOpen}
+          setInspectorOpen={setInspectorOpen}
+          inspectedMaterial={inspectedMaterial}
         />
       </div>
     </ErrorBoundary>
