@@ -2,11 +2,12 @@ import { useMemo } from 'react';
 import dayjs from 'dayjs';
 import { useQuery } from '@tanstack/react-query';
 
-import { capacityApi, planApi } from '../../../api/tauri';
+import { capacityApi } from '../../../api/tauri';
 import { formatDate } from '../../../utils/formatters';
 import type { MoveImpactPreview, MoveImpactRow } from '../types';
+import { buildPlanItemByIdMap, type IpcPlanItem } from '../move/planItems';
+import { buildCapacityPoolMap, buildTonnageMap } from '../move/recommend';
 
-type IpcPlanItem = Awaited<ReturnType<typeof planApi.listPlanItems>>[number];
 type IpcCapacityPool = Awaited<ReturnType<typeof capacityApi.getCapacityPools>>[number];
 
 type MoveImpactBase = {
@@ -29,28 +30,15 @@ export function useWorkbenchMoveImpactPreview(params: {
 
   const moveImpactBase = useMemo<MoveImpactBase | null>(() => {
     if (!moveModalOpen) return null;
-    if (!moveTargetMachine) return null;
+    const targetMachine = String(moveTargetMachine || '').trim();
+    if (!targetMachine) return null;
     if (!moveTargetDate || !moveTargetDate.isValid()) return null;
 
     const targetDate = formatDate(moveTargetDate);
     const raw = planItems ?? [];
 
-    const tonnageMap = new Map<string, number>();
-    raw.forEach((it) => {
-      const machine = String(it.machine_code ?? '').trim();
-      const date = String(it.plan_date ?? '').trim();
-      if (!machine || !date) return;
-      const weight = Number(it.weight_t ?? 0);
-      if (!Number.isFinite(weight) || weight <= 0) return;
-      const key = `${machine}__${date}`;
-      tonnageMap.set(key, (tonnageMap.get(key) ?? 0) + weight);
-    });
-
-    const byId = new Map<string, IpcPlanItem>();
-    raw.forEach((it) => {
-      const id = String(it.material_id ?? '').trim();
-      if (id) byId.set(id, it);
-    });
+    const tonnageMap = buildTonnageMap(raw);
+    const byId = buildPlanItemByIdMap(raw);
 
     const deltaMap = new Map<string, number>();
     selectedMaterialIds.forEach((id) => {
@@ -63,7 +51,7 @@ export function useWorkbenchMoveImpactPreview(params: {
       if (!Number.isFinite(weight) || weight <= 0) return;
 
       const fromKey = `${fromMachine}__${fromDate}`;
-      const toKey = `${moveTargetMachine}__${targetDate}`;
+      const toKey = `${targetMachine}__${targetDate}`;
       if (fromKey === toKey) return;
       deltaMap.set(fromKey, (deltaMap.get(fromKey) ?? 0) - weight);
       deltaMap.set(toKey, (deltaMap.get(toKey) ?? 0) + weight);
@@ -76,7 +64,7 @@ export function useWorkbenchMoveImpactPreview(params: {
     if (affectedKeys.length === 0) {
       return {
         targetDate,
-        affectedMachines: [moveTargetMachine],
+        affectedMachines: [targetMachine],
         dateFrom: targetDate,
         dateTo: targetDate,
         rows: [],
@@ -139,18 +127,7 @@ export function useWorkbenchMoveImpactPreview(params: {
   return useMemo<MoveImpactPreview | null>(() => {
     if (!moveImpactBase) return null;
     const pools: IpcCapacityPool[] = moveImpactCapacityQuery.data ?? [];
-    const poolMap = new Map<string, { target: number | null; limit: number | null }>();
-    pools.forEach((p) => {
-      const machine = String(p.machine_code ?? '').trim();
-      const date = String(p.plan_date ?? '').trim();
-      if (!machine || !date) return;
-      const target = Number(p.target_capacity_t ?? 0);
-      const limit = Number(p.limit_capacity_t ?? 0);
-      poolMap.set(`${machine}__${date}`, {
-        target: Number.isFinite(target) && target > 0 ? target : null,
-        limit: Number.isFinite(limit) && limit > 0 ? limit : null,
-      });
-    });
+    const poolMap = buildCapacityPoolMap(pools);
 
     const rows = moveImpactBase.rows.map((r) => {
       const cap = poolMap.get(`${r.machine_code}__${r.date}`);
@@ -169,4 +146,3 @@ export function useWorkbenchMoveImpactPreview(params: {
     return { rows, overflowRows, loading: moveImpactCapacityQuery.isLoading };
   }, [moveImpactBase, moveImpactCapacityQuery.data, moveImpactCapacityQuery.isLoading]);
 }
-
