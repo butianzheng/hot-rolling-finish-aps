@@ -103,20 +103,31 @@
 - [x] A-2 Move：ImpactPreview 与 Recommend/Submit 口径对齐（`26ff8e1`）
 - [x] A-3 Move：machine-date key 统一（`6141330`）
 - [x] A-4 Move：Recommend 关键边界单测补齐（`5ec4369`）
-- [x] A-5 统一 Workbench 刷新策略（2026-02-03 → 2026-02-04 Phase 1）
+- [x] A-5 统一 Workbench 刷新策略（2026-02-03 → 2026-02-04 完成）
   - **主路径**：使用 React Query 的 invalidateQueries + workbenchQueryKeys
-  - **改造范围**：useWorkbenchPlanItems, useWorkbenchMaterials, useWorkbenchPathOverride, useWorkbenchMoveSubmit, useWorkbenchBatchOperations
+  - **改造范围**：useWorkbenchPlanItems, useWorkbenchMaterials, useWorkbenchPathOverride, useWorkbenchMoveSubmit, useWorkbenchBatchOperations, RollCycleAnchorCard, ScheduleCardView, PlanItemVisualization
   - **Phase 1 完成**（2026-02-04）：RollCycleAnchorCard 迁移到 React Query
-    - 修改文件：
-      - `src/pages/workbench/queryKeys.ts`：新增 rollCycleAnchor queryKey
-      - `src/pages/workbench/hooks/useWorkbenchRefreshActions.ts`：新增 refreshRollCycleAnchor
-      - `src/components/roll-cycle-anchor/RollCycleAnchorCard.tsx`：useQuery 替代手动 fetch + useEffect
-      - `src/components/workbench/WorkbenchMainLayout.tsx`：移除 refreshSignal prop
-      - `src/pages/PlanningWorkbench.tsx`：更新 TODO 注释
+    - 修改文件：queryKeys.ts, useWorkbenchRefreshActions.ts, RollCycleAnchorCard.tsx, WorkbenchMainLayout.tsx, PlanningWorkbench.tsx
     - 效果：RollCycleAnchorCard 完全使用 React Query，自动参与 refreshAll 刷新
-    - 回归测试：✓ 60 frontend tests + ✓ build success
-  - **遗留兼容**：保留 legacyRefreshSignal 给 ScheduleCardView, PlanItemVisualization
-  - **Phase 2 待办**：迁移 ScheduleCardView, PlanItemVisualization 到 React Query，移除 legacyRefreshSignal
+  - **Phase 2 完成**（2026-02-04）：ScheduleCardView, PlanItemVisualization 迁移 + legacyRefreshSignal 完全移除
+    - Phase 2.1 - ScheduleCardView 迁移：
+      - 修改文件：usePlanItems.ts, types.ts, index.tsx
+      - 使用 workbenchQueryKeys.planItems.byVersion()，移除 refreshSignal useEffect
+    - Phase 2.2 - PlanItemVisualization 迁移：
+      - 修改文件：usePlanItemVisualization.tsx, types.ts
+      - 使用 React Query useQuery 替代手动 fetch
+      - 保留 event bus 但改用 queryClient.invalidateQueries
+      - 添加 operationLoading state 用于批量操作
+    - Phase 2.3 - legacyRefreshSignal 完全移除：
+      - 修改文件：PlanningWorkbench.tsx, WorkbenchMainLayout.tsx
+      - 删除 legacyRefreshSignal 和 bumpLegacyRefreshSignal
+      - 移除所有 refreshSignal prop 传递
+  - **最终效果**：
+    - ✅ 100% 统一使用 React Query 刷新策略
+    - ✅ refreshAll() 通过 invalidateQueries 刷新所有 Workbench 数据
+    - ✅ 移除双轨制刷新机制，简化代码维护
+    - ✅ 所有组件自动参与统一刷新协调
+  - 回归测试：✓ 60 frontend tests + ✓ build success
 - [x] A-6 抽离告警与弹窗编排（P1）（Phase 1+2 完成：2026-02-04）
   - 建议落点：新增 `src/pages/workbench/hooks/useWorkbenchUiOrchestrator.ts`（或拆多个 hook）
   - 目标：减少 `PlanningWorkbench.tsx`/`WorkbenchModals.tsx` 的 prop drilling
@@ -315,6 +326,41 @@
     - ✓ 前端：60 tests passed (498ms)
     - ✓ 构建：成功 (6.39s)
   - **Phase 2 待办**：迁移 ScheduleCardView, PlanItemVisualization，完全移除 legacyRefreshSignal
+
+- 🎯 **A-5 Phase 2 完成**：ScheduleCardView, PlanItemVisualization 迁移 + legacyRefreshSignal 完全移除（2026-02-04）
+  - **背景**：A-5 Phase 1 完成后，仍有 2 个遗留组件使用 legacyRefreshSignal
+  - **Phase 2.1 - ScheduleCardView 迁移**：
+    - 修改文件（3 个）：
+      - `src/components/schedule-card-view/usePlanItems.ts`：使用 workbenchQueryKeys，移除 refreshSignal useEffect
+      - `src/components/schedule-card-view/types.ts`：移除 refreshSignal prop
+      - `src/components/schedule-card-view/index.tsx`：移除 refreshSignal 接收和传递
+    - 效果：统一使用 workbenchQueryKeys.planItems.byVersion()，自动参与 refreshAll 刷新
+  - **Phase 2.2 - PlanItemVisualization 迁移**：
+    - 修改文件（2 个）：
+      - `src/components/plan-item-visualization/usePlanItemVisualization.tsx`：
+        - 使用 React Query useQuery 替代手动 loadPlanItems
+        - 移除 refreshSignal useEffect 监听
+        - 保留 event bus 但改用 queryClient.invalidateQueries
+        - 添加 operationLoading state 用于批量操作 loading
+      - `src/components/plan-item-visualization/types.ts`：移除 refreshSignal prop
+    - 效果：完全迁移到 React Query，保留 event bus 兼容性
+  - **Phase 2.3 - legacyRefreshSignal 完全移除**：
+    - 修改文件（2 个）：
+      - `src/pages/PlanningWorkbench.tsx`：
+        - 删除 legacyRefreshSignal 和 bumpLegacyRefreshSignal 定义
+        - 从 handleAfterRollCycleReset/handleAfterOptimize 移除 bump 调用
+        - 移除传递给 WorkbenchMainLayout 的 refreshSignal prop
+      - `src/components/workbench/WorkbenchMainLayout.tsx`：移除 refreshSignal prop 定义和解构参数
+    - 效果：完全移除双轨制刷新机制
+  - **最终效果**：
+    - ✅ 100% 统一使用 React Query 刷新策略
+    - ✅ refreshAll() 通过 invalidateQueries 刷新所有 Workbench 数据
+    - ✅ 移除 legacyRefreshSignal/bumpLegacyRefreshSignal（-15 行代码）
+    - ✅ 所有 Workbench 组件（3 个视图 + RollCycleAnchorCard）自动参与统一刷新协调
+    - ✅ 简化代码维护，消除刷新漂移风险
+  - **回归测试**：
+    - ✓ 前端：60 tests passed (494ms)
+    - ✓ 构建：成功 (6.46s)
 
 - 🎯 **A-7 完成**：统一 ScheduleFocus/PathOverride/DeepLink 类型定义（2026-02-04）
   - **探索结果**：
