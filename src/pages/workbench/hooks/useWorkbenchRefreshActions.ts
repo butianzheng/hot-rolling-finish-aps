@@ -14,6 +14,7 @@ export function useWorkbenchRefreshActions(): {
   refreshPlanItems: () => Promise<void>;
   refreshMaterials: () => Promise<void>;
   refreshPathOverride: () => Promise<void>;
+  refreshRollCycleAnchor: () => Promise<void>;
 } {
   const queryClient = useQueryClient();
 
@@ -49,6 +50,13 @@ export function useWorkbenchRefreshActions(): {
     });
   }, [queryClient]);
 
-  return { refreshAll, refreshPlanItems, refreshMaterials, refreshPathOverride };
+  // 刷新 rollCycleAnchor（换辊周期锚点）
+  const refreshRollCycleAnchor = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: workbenchQueryKeys.rollCycleAnchor.all,
+    });
+  }, [queryClient]);
+
+  return { refreshAll, refreshPlanItems, refreshMaterials, refreshPathOverride, refreshRollCycleAnchor };
 }
 

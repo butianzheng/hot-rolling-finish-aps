@@ -45,7 +45,7 @@ const PlanningWorkbench: React.FC = () => {
   const preferences = useUserPreferences();
   const { setRecalculating, setActiveVersion, setWorkbenchViewMode, setWorkbenchFilters } = useGlobalActions();
 
-  // TODO(M1): 待迁移的遗留组件（RollCycleAnchorCard, ScheduleCardView, PlanItemVisualization）仍依赖 signal
+  // TODO(M1): 待迁移的遗留组件（ScheduleCardView, PlanItemVisualization）仍依赖 signal
   // 后续应将这些组件也改为使用 React Query，然后移除此 signal
   const [legacyRefreshSignal, setLegacyRefreshSignal] = useState(0);
   const bumpLegacyRefreshSignal = useCallback(() => setLegacyRefreshSignal((v) => v + 1), []);

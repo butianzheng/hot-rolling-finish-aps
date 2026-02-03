@@ -1,7 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, Button, Card, Descriptions, Input, Modal, Space, Tag, Typography, message } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
+import { useQuery } from '@tanstack/react-query';
 import { pathRuleApi } from '../../api/tauri';
+import { workbenchQueryKeys } from '../../pages/workbench/queryKeys';
 
 type RollCycleAnchorDto = {
   version_id: string;
@@ -33,7 +35,6 @@ export type RollCycleAnchorCardProps = {
   versionId: string | null;
   machineCode: string | null;
   operator: string;
-  refreshSignal?: number;
   onAfterReset?: () => void;
 };
 
@@ -41,45 +42,39 @@ const RollCycleAnchorCard: React.FC<RollCycleAnchorCardProps> = ({
   versionId,
   machineCode,
   operator,
-  refreshSignal,
   onAfterReset,
 }) => {
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [data, setData] = useState<RollCycleAnchorDto | null>(null);
-
   const [resetOpen, setResetOpen] = useState(false);
   const [resetReason, setResetReason] = useState('');
   const [resetSubmitting, setResetSubmitting] = useState(false);
 
   const canQuery = !!(versionId && machineCode);
 
-  const loadAnchor = async () => {
-    if (!canQuery) {
-      setData(null);
-      return;
-    }
-    setLoading(true);
-    setLoadError(null);
-    try {
+  // 使用 React Query 获取换辊周期锚点数据
+  const {
+    data,
+    isLoading: loading,
+    error: loadError,
+    refetch,
+  } = useQuery({
+    queryKey: workbenchQueryKeys.rollCycleAnchor.byMachine(versionId, machineCode),
+    enabled: canQuery,
+    queryFn: async () => {
+      if (!canQuery) return null;
       const raw = await pathRuleApi.getRollCycleAnchor({
         versionId: versionId!,
         machineCode: machineCode!,
       });
-      setData(raw ? (raw as RollCycleAnchorDto) : null);
-    } catch (e: any) {
-      console.error('[RollCycleAnchorCard] loadAnchor failed:', e);
-      setData(null);
-      setLoadError(String(e?.message || e || '加载锚点失败'));
-    } finally {
-      setLoading(false);
-    }
-  };
+      return raw ? (raw as RollCycleAnchorDto) : null;
+    },
+    staleTime: 30 * 1000, // 30s 缓存
+  });
 
-  useEffect(() => {
-    void loadAnchor();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [versionId, machineCode, refreshSignal]);
+  const errorMessage = loadError ? String((loadError as any)?.message || loadError || '加载锚点失败') : null;
+
+  const handleRefresh = useCallback(() => {
+    void refetch();
+  }, [refetch]);
 
   const anchorSourceMeta = useMemo(() => {
     const key = String(data?.anchor_source || 'NONE').toUpperCase();
@@ -109,7 +104,7 @@ const RollCycleAnchorCard: React.FC<RollCycleAnchorCardProps> = ({
       message.success('已重置换辊周期（锚点已清空）');
       setResetOpen(false);
       setResetReason('');
-      await loadAnchor();
+      await refetch();
       onAfterReset?.();
     } catch (e: any) {
       console.error('[RollCycleAnchorCard] resetRollCycle failed:', e);
@@ -126,7 +121,7 @@ const RollCycleAnchorCard: React.FC<RollCycleAnchorCardProps> = ({
         title="RollCycle 锚点"
         extra={
           <Space>
-            <Button icon={<ReloadOutlined />} size="small" onClick={loadAnchor} disabled={!canQuery || loading}>
+            <Button icon={<ReloadOutlined />} size="small" onClick={handleRefresh} disabled={!canQuery || loading}>
               刷新
             </Button>
             <Button size="small" danger onClick={openReset} disabled={!canQuery || loading}>
@@ -140,8 +135,8 @@ const RollCycleAnchorCard: React.FC<RollCycleAnchorCardProps> = ({
           <Alert type="warning" showIcon message="尚未选择版本" />
         ) : !machineCode ? (
           <Alert type="info" showIcon message="请选择机组后查看锚点" />
-        ) : loadError ? (
-          <Alert type="error" showIcon message={loadError} />
+        ) : errorMessage ? (
+          <Alert type="error" showIcon message={errorMessage} />
         ) : loading ? (
           <Typography.Text type="secondary">加载中...</Typography.Text>
         ) : !data ? (

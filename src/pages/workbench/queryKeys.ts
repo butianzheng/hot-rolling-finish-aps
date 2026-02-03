@@ -31,4 +31,11 @@ export const workbenchQueryKeys = {
     summary: (versionId: string | null, dateFrom: string) =>
       ['workbench', 'pathOverride', 'summary', versionId, dateFrom] as const,
   },
+
+  /** rollCycleAnchor 换辊周期锚点 */
+  rollCycleAnchor: {
+    all: ['workbench', 'rollCycleAnchor'] as const,
+    byMachine: (versionId: string | null, machineCode: string | null) =>
+      ['workbench', 'rollCycleAnchor', versionId, machineCode] as const,
+  },
 } as const;

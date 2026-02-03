@@ -196,7 +196,6 @@ const WorkbenchMainLayout: React.FC<{
           versionId={activeVersionId}
           machineCode={poolSelection.machineCode}
           operator={currentUser || 'system'}
-          refreshSignal={refreshSignal}
           onAfterReset={onAfterRollCycleReset}
         />
 
