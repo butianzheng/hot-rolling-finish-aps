@@ -14,11 +14,9 @@ import {
 import { DownOutlined, InfoCircleOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { useQuery } from '@tanstack/react-query';
 import ErrorBoundary from '../components/ErrorBoundary';
 import PageSkeleton from '../components/PageSkeleton';
 import NoActiveVersionGuide from '../components/NoActiveVersionGuide';
-import { planApi } from '../api/tauri';
 import {
   useActiveVersionId,
   useAdminOverrideMode,
@@ -49,6 +47,7 @@ import { useWorkbenchBatchOperations } from './workbench/hooks/useWorkbenchBatch
 import { useWorkbenchInspector } from './workbench/hooks/useWorkbenchInspector';
 import { useWorkbenchMaterials } from './workbench/hooks/useWorkbenchMaterials';
 import { useWorkbenchMoveModal } from './workbench/hooks/useWorkbenchMoveModal';
+import { useWorkbenchPlanItems } from './workbench/hooks/useWorkbenchPlanItems';
 import { useWorkbenchPathOverride } from './workbench/hooks/useWorkbenchPathOverride';
 import MoveMaterialsModal from '../components/workbench/MoveMaterialsModal';
 import type { WorkbenchDateRangeMode } from './workbench/types';
@@ -123,25 +122,11 @@ const PlanningWorkbench: React.FC = () => {
     setInspectedMaterialId,
   });
 
-  const planItemsQuery = useQuery({
-    queryKey: ['planItems', activeVersionId],
-    enabled: !!activeVersionId,
-    queryFn: async () => {
-      if (!activeVersionId) return [];
-      return planApi.listPlanItems(activeVersionId);
-    },
-    staleTime: 30 * 1000,
-  });
-
-  React.useEffect(() => {
-    if (!activeVersionId) return;
-    if (refreshSignal == null) return;
-    planItemsQuery.refetch();
-  }, [activeVersionId, refreshSignal, planItemsQuery.refetch]);
+  const { planItemsQuery, planItems } = useWorkbenchPlanItems({ activeVersionId, refreshSignal });
 
   // AUTO 日期范围（基于当前机组的排程数据）
   const { autoDateRange, applyWorkbenchDateRange, resetWorkbenchDateRangeToAuto } = useWorkbenchAutoDateRange({
-    planItems: planItemsQuery.data || [],
+    planItems,
     machineCode: poolSelection.machineCode,
     dateRangeMode,
     setDateRangeMode,
@@ -245,13 +230,13 @@ const PlanningWorkbench: React.FC = () => {
     deepLinkDate: deepLinkContext?.date || null,
     poolMachineCode: poolSelection.machineCode,
     machineOptions,
-    defaultStrategy: preferences.defaultStrategy,
-    workbenchDateRange,
-    planItems: planItemsQuery.data ?? [],
-    planItemsRefetch: planItemsQuery.refetch,
-    selectedMaterialIds,
-    setSelectedMaterialIds,
-    bumpRefreshSignal,
+	    defaultStrategy: preferences.defaultStrategy,
+	    workbenchDateRange,
+	    planItems,
+	    planItemsRefetch: planItemsQuery.refetch,
+	    selectedMaterialIds,
+	    setSelectedMaterialIds,
+	    bumpRefreshSignal,
     materialsRefetch: materialsQuery.refetch,
   });
 
