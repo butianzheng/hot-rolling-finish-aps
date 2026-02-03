@@ -1,14 +1,14 @@
-import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { planApi } from '../../api/tauri';
 import { useActiveVersionId } from '../../stores/use-global-store';
+import { workbenchQueryKeys } from '../../pages/workbench/queryKeys';
 import type { PlanItemRow } from './types';
 
-export const usePlanItems = (machineCode?: string | null, refreshSignal?: number) => {
+export const usePlanItems = (machineCode?: string | null) => {
   const activeVersionId = useActiveVersionId();
 
   const query = useQuery({
-    queryKey: ['planItems', activeVersionId, machineCode || 'all'],
+    queryKey: workbenchQueryKeys.planItems.byVersion(activeVersionId),
     enabled: !!activeVersionId,
     queryFn: async () => {
       if (!activeVersionId) return [];
@@ -19,12 +19,6 @@ export const usePlanItems = (machineCode?: string | null, refreshSignal?: number
     },
     staleTime: 30 * 1000,
   });
-
-  useEffect(() => {
-    if (!activeVersionId) return;
-    if (refreshSignal == null) return;
-    query.refetch();
-  }, [activeVersionId, refreshSignal, query.refetch]);
 
   return query;
 };

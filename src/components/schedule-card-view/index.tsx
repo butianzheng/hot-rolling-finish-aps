@@ -18,10 +18,9 @@ const ScheduleCardView: React.FC<ScheduleCardViewProps> = ({
   dateRange,
   statusFilter = 'ALL',
   onStatusFilterChange,
-  refreshSignal,
 }) => {
   const activeVersionId = useActiveVersionId();
-  const query = usePlanItems(machineCode, refreshSignal);
+  const query = usePlanItems(machineCode);
 
   const items = useMemo(() => {
     return normalizePlanItems(query.data);

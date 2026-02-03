@@ -24,7 +24,6 @@ export interface ScheduleCardViewProps {
   // 排程状态快速筛选（已排/冻结/强放/可调）
   statusFilter?: PlanItemStatusFilter;
   onStatusFilterChange?: (next: PlanItemStatusFilter) => void;
-  refreshSignal?: number;
   selectedMaterialIds: string[];
   onSelectedMaterialIdsChange: (ids: string[]) => void;
   onInspectMaterialId?: (materialId: string) => void;
