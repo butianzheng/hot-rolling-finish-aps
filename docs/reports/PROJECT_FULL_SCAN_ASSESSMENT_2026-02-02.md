@@ -48,6 +48,7 @@
 
 > 备注：存在 `src/app/tauri_commands.rs.backup`（2257 行）这类“非编译文件但体量巨大”的备份文件，建议迁移到 `docs/archived/` 或移除，避免误导与噪声。
 > 备注更新（2026-02-03）：上述 `.backup` 文件已清理，避免误导与噪声。
+> 备注更新（2026-02-03）：`src/api/plan_api.rs` 已按域拆分为 `src/api/plan_api/*.rs`（入口文件保留）；`src/app/tauri_commands.rs` 也已按域拆分为 `src/app/tauri_commands/*.rs`（入口文件保留）。
 
 ### 2.3 典型技术债指标
 
@@ -78,7 +79,8 @@
   - 初始化时的 DB/PRAGMA/索引/ensure_schema 行为分散（见数据库章节）
 
 2) **核心域 API/服务文件过大**
-- `src/api/plan_api.rs`、`src/decision/services/refresh_service.rs`、`src/pages/PlanningWorkbench.tsx` 等属于“演进摩擦点”，小需求容易变成大改动。
+- `src/decision/services/refresh_service.rs`、`src/pages/PlanningWorkbench.tsx` 等属于“演进摩擦点”，小需求容易变成大改动。
+  - 更新（2026-02-03）：`src/api/plan_api.rs` 已拆分为 `src/api/plan_api/*.rs`，降低单文件体量与耦合。
 
 3) **IPC/Schema 重复实现导致漂移**
 - 前端存在 `src/api/tauri.ts`（含 `decisionApi`）与 `src/services/decision-service.ts` 双通道；同时 Decision 的 Zod Schema 在 `src/api/ipcSchemas.ts` 与 `src/types/schemas/decision-schema.ts` 可能重复维护。
@@ -122,7 +124,7 @@
 观察到的现实问题：
 - `AppState` 初始化共享连接 `Connection::open(&db_path)` 未显式执行 `PRAGMA foreign_keys = ON;`（`src/app/state.rs:115`）
 - 部分 Repository 自行 `Connection::open(db_path)`（例如 `src/repository/material_repo.rs:33`），同样未统一 PRAGMA
-- `PlanApi` 中存在“显式删除关联数据（避免依赖 SQLite foreign_keys 配置）”的注释与实现（`src/api/plan_api.rs:220`），这说明当前运行时 foreign_keys 行为并不可信赖
+- `PlanApi` 中存在“显式删除关联数据（避免依赖 SQLite foreign_keys 配置）”的注释与实现（现位于 `src/api/plan_api/plan_management.rs`），这说明当前运行时 foreign_keys 行为并不可信赖
 
 风险：
 - 外键不生效导致“看似删除了版本，实则遗留孤儿数据”
@@ -223,6 +225,7 @@
 ### P1（中优先级：可维护性/可测试性）
 
 1) 拆分巨型文件：`plan_api.rs`、`tauri_commands.rs`、`refresh_service.rs`、`PlanningWorkbench.tsx`
+   - 更新（2026-02-03）：`plan_api.rs`、`tauri_commands.rs` 已完成按域拆分；后续优先 `refresh_service.rs`、`PlanningWorkbench.tsx`。
 2) 分批清理 unwrap/expect（按热点文件逐步替换为可解释错误）
 3) 分批减少 TS any：优先 `src/api/tauri.ts`，用 zod inference + 泛型约束替代
 
