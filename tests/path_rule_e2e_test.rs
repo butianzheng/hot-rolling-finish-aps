@@ -48,7 +48,7 @@ mod path_rule_e2e_test {
         Arc<MaterialStateRepository>,
     ) {
         let (temp_file, db_path) = create_test_db().expect("create_test_db failed");
-        let conn = Arc::new(Mutex::new(Connection::open(&db_path).expect("open db failed")));
+        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).expect("open db failed")));
 
         // === Repository ===
         let material_master_repo =

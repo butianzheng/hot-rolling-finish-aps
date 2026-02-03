@@ -9,6 +9,45 @@ use rusqlite::Connection;
 use std::error::Error;
 use tempfile::NamedTempFile;
 
+/// 打开测试数据库连接（带统一 PRAGMA 配置）
+///
+/// 用于替代测试中的 `Connection::open(&db_path)`，确保所有测试连接
+/// 都应用统一的 PRAGMA 配置（foreign_keys, busy_timeout 等）
+///
+/// # 参数
+/// - `db_path`: 数据库文件路径
+///
+/// # 返回
+/// - 配置好的数据库连接
+///
+/// # 示例
+/// ```ignore
+/// let conn = open_test_connection(&db_path)?;
+/// ```
+pub fn open_test_connection(db_path: &str) -> Result<Connection, Box<dyn Error>> {
+    let conn = open_sqlite_connection(db_path)?;
+    Ok(conn)
+}
+
+/// 打开内存测试数据库连接（带统一 PRAGMA 配置）
+///
+/// 用于替代测试中的 `Connection::open_in_memory()`，确保内存数据库
+/// 也应用统一的 PRAGMA 配置
+///
+/// # 返回
+/// - 配置好的内存数据库连接
+///
+/// # 示例
+/// ```ignore
+/// let conn = open_test_memory_connection()?;
+/// ```
+pub fn open_test_memory_connection() -> Result<Connection, Box<dyn Error>> {
+    let conn = Connection::open_in_memory()?;
+    hot_rolling_aps::db::configure_sqlite_connection(&conn)?;
+    Ok(conn)
+}
+
+
 /// 创建临时测试数据库并初始化 schema
 ///
 /// # 返回

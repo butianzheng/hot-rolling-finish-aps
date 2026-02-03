@@ -272,7 +272,7 @@ mod strategy_draft_persistence_test {
             diff_items_truncated: false,
         };
 
-        let conn = Arc::new(Mutex::new(Connection::open(&db_path).unwrap()));
+        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).unwrap()));
         let draft_repo = StrategyDraftRepository::new(conn);
         draft_repo.insert(&draft).unwrap();
 

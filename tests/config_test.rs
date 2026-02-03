@@ -24,7 +24,7 @@ async fn test_config_manager_creation() {
 async fn test_get_season_mode() {
     // 创建测试数据库并插入配置
     let (_temp_file, db_path) = create_test_db().expect("Failed to create test db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     insert_test_config(&conn).expect("Failed to insert test config");
 
     // 创建 ConfigManager
@@ -39,7 +39,7 @@ async fn test_get_season_mode() {
 #[tokio::test]
 async fn test_get_manual_season() {
     let (_temp_file, db_path) = create_test_db().expect("Failed to create test db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     insert_test_config(&conn).expect("Failed to insert test config");
 
     let config_manager = ConfigManager::new(&db_path).expect("Failed to create ConfigManager");
@@ -53,7 +53,7 @@ async fn test_get_manual_season() {
 #[tokio::test]
 async fn test_get_winter_months() {
     let (_temp_file, db_path) = create_test_db().expect("Failed to create test db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     insert_test_config(&conn).expect("Failed to insert test config");
 
     let config_manager = ConfigManager::new(&db_path).expect("Failed to create ConfigManager");
@@ -70,7 +70,7 @@ async fn test_get_winter_months() {
 #[tokio::test]
 async fn test_get_min_temp_days() {
     let (_temp_file, db_path) = create_test_db().expect("Failed to create test db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     insert_test_config(&conn).expect("Failed to insert test config");
 
     let config_manager = ConfigManager::new(&db_path).expect("Failed to create ConfigManager");
@@ -89,7 +89,7 @@ async fn test_get_min_temp_days() {
 #[tokio::test]
 async fn test_get_current_min_temp_days_manual_mode() {
     let (_temp_file, db_path) = create_test_db().expect("Failed to create test db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     insert_test_config(&conn).expect("Failed to insert test config");
 
     let config_manager = ConfigManager::new(&db_path).expect("Failed to create ConfigManager");
@@ -105,7 +105,7 @@ async fn test_get_current_min_temp_days_manual_mode() {
 #[tokio::test]
 async fn test_get_current_min_temp_days_auto_mode() {
     let (_temp_file, db_path) = create_test_db().expect("Failed to create test db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
 
     // 插入AUTO模式配置
     conn.execute(
@@ -137,7 +137,7 @@ async fn test_get_current_min_temp_days_auto_mode() {
 #[tokio::test]
 async fn test_get_standard_finishing_machines() {
     let (_temp_file, db_path) = create_test_db().expect("Failed to create test db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     insert_test_config(&conn).expect("Failed to insert test config");
 
     let config_manager = ConfigManager::new(&db_path).expect("Failed to create ConfigManager");
@@ -154,7 +154,7 @@ async fn test_get_standard_finishing_machines() {
 #[tokio::test]
 async fn test_get_machine_offset_days() {
     let (_temp_file, db_path) = create_test_db().expect("Failed to create test db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     insert_test_config(&conn).expect("Failed to insert test config");
 
     let config_manager = ConfigManager::new(&db_path).expect("Failed to create ConfigManager");
@@ -168,7 +168,7 @@ async fn test_get_machine_offset_days() {
 #[tokio::test]
 async fn test_get_dq_config() {
     let (_temp_file, db_path) = create_test_db().expect("Failed to create test db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     insert_test_config(&conn).expect("Failed to insert test config");
 
     let config_manager = ConfigManager::new(&db_path).expect("Failed to create ConfigManager");

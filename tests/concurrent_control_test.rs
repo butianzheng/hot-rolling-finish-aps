@@ -47,7 +47,7 @@ mod concurrent_control_test {
     ) {
         let (temp_file, db_path) = create_test_db().unwrap();
 
-        let conn = Arc::new(Mutex::new(Connection::open(&db_path).unwrap()));
+        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).unwrap()));
         let material_master_repo = Arc::new(MaterialMasterRepository::new(&db_path).unwrap());
         let material_state_repo = Arc::new(MaterialStateRepository::new(&db_path).unwrap());
         let plan_repo = Arc::new(PlanRepository::new(conn.clone()));

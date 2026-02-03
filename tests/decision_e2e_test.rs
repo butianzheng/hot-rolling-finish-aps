@@ -36,7 +36,7 @@ mod decision_e2e_test {
         Arc<DecisionRefreshService>,
     ) {
         let (temp_file, db_path) = create_test_db().unwrap();
-        let conn = Arc::new(Mutex::new(Connection::open(&db_path).unwrap()));
+        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).unwrap()));
 
         // 决策层 Repositories
         let day_summary_repo = Arc::new(DaySummaryRepository::new(conn.clone()));
@@ -80,7 +80,7 @@ mod decision_e2e_test {
 
         // 1. 创建测试版本
         let version_id = "e2e_basic_v001";
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
         conn.execute(
             "INSERT INTO plan (plan_id, plan_name, plan_type, created_by) VALUES ('TEST_PLAN', 'Test Plan', 'manual', 'test_user')",
             rusqlite::params![],
@@ -146,7 +146,7 @@ mod decision_e2e_test {
         let (_temp, db_path, decision_api, refresh_service) = setup_decision_test_env();
 
         let version_id = "e2e_d1_v001";
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
         conn.execute(
             "INSERT INTO plan (plan_id, plan_name, plan_type, created_by) VALUES ('TEST_PLAN', 'Test Plan', 'manual', 'test_user')",
             rusqlite::params![],
@@ -223,7 +223,7 @@ mod decision_e2e_test {
         let (_temp, db_path, decision_api, refresh_service) = setup_decision_test_env();
 
         let version_id = "e2e_d4_v001";
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
         conn.execute(
             "INSERT INTO plan (plan_id, plan_name, plan_type, created_by) VALUES ('TEST_PLAN', 'Test Plan', 'manual', 'test_user')",
             rusqlite::params![],
@@ -337,7 +337,7 @@ mod decision_e2e_test {
         let (_temp, db_path, decision_api, _refresh_service) = setup_decision_test_env();
 
         let version_id = "e2e_struct_v001";
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
         conn.execute(
             "INSERT INTO plan (plan_id, plan_name, plan_type, created_by) VALUES ('TEST_PLAN', 'Test Plan', 'manual', 'test_user')",
             rusqlite::params![],
@@ -431,7 +431,7 @@ mod decision_e2e_test {
         let (_temp, db_path, decision_api, refresh_service) = setup_decision_test_env();
 
         let version_id = "e2e_d2_v001";
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
         conn.execute(
             "INSERT INTO plan (plan_id, plan_name, plan_type, created_by) VALUES ('TEST_PLAN', 'Test Plan', 'manual', 'test_user')",
             rusqlite::params![],
@@ -519,7 +519,7 @@ mod decision_e2e_test {
         let (_temp, db_path, decision_api, refresh_service) = setup_decision_test_env();
 
         let version_id = "e2e_d3_v001";
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
         conn.execute(
             "INSERT INTO plan (plan_id, plan_name, plan_type, created_by) VALUES ('TEST_PLAN', 'Test Plan', 'manual', 'test_user')",
             rusqlite::params![],
@@ -598,7 +598,7 @@ mod decision_e2e_test {
         let (_temp, db_path, decision_api, refresh_service) = setup_decision_test_env();
 
         let version_id = "e2e_d5_v001";
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
         conn.execute(
             "INSERT INTO plan (plan_id, plan_name, plan_type, created_by) VALUES ('TEST_PLAN', 'Test Plan', 'manual', 'test_user')",
             rusqlite::params![],
@@ -741,7 +741,7 @@ mod decision_e2e_test {
         let (_temp, db_path, decision_api, refresh_service) = setup_decision_test_env();
 
         let version_id = "e2e_d6_v001";
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
         conn.execute(
             "INSERT INTO plan (plan_id, plan_name, plan_type, created_by) VALUES ('TEST_PLAN', 'Test Plan', 'manual', 'test_user')",
             rusqlite::params![],
@@ -838,7 +838,7 @@ mod decision_e2e_test {
         let (_temp, db_path, decision_api, refresh_service) = setup_decision_test_env();
 
         let version_id = "e2e_p2_integration_v001";
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
         conn.execute(
             "INSERT INTO plan (plan_id, plan_name, plan_type, created_by) VALUES ('TEST_PLAN', 'Test Plan', 'manual', 'test_user')",
             rusqlite::params![],

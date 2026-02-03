@@ -65,7 +65,7 @@ mod full_business_flow_e2e_test {
     ) {
         // 创建临时数据库
         let (temp_file, db_path) = create_test_db().unwrap();
-        let conn = Arc::new(Mutex::new(Connection::open(&db_path).unwrap()));
+        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).unwrap()));
 
         // === Repository 层 ===
         let material_master_repo =

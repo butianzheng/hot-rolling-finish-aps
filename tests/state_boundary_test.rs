@@ -27,7 +27,7 @@ use std::sync::{Arc, Mutex};
 /// 创建测试数据库并返回连接
 fn setup_test_db() -> (tempfile::NamedTempFile, String, Arc<Mutex<Connection>>) {
     let (temp_file, db_path) = test_helpers::create_test_db().expect("创建测试数据库失败");
-    let conn = Connection::open(&db_path).expect("打开数据库失败");
+    let conn = test_helpers::open_test_connection(&db_path).expect("打开数据库失败");
     test_helpers::insert_test_config(&conn).expect("插入配置失败");
 
     (temp_file, db_path, Arc::new(Mutex::new(conn)))

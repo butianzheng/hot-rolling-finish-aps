@@ -48,7 +48,7 @@ async fn test_import_1000_records_under_5_seconds() {
     let (_temp_file, db_path) = test_helpers::create_test_db().expect("Failed to create test db");
 
     // 插入测试配置
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     test_helpers::insert_test_config(&conn).expect("Failed to insert config");
     drop(conn);
 

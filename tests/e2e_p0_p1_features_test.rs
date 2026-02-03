@@ -55,7 +55,7 @@ mod e2e_p0_p1_features_test {
         let (temp_file, db_path) = create_test_db().unwrap();
 
         // 创建repositories
-        let conn = Arc::new(Mutex::new(Connection::open(&db_path).unwrap()));
+        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).unwrap()));
         let material_master_repo = Arc::new(MaterialMasterRepository::new(&db_path).unwrap());
         let material_state_repo = Arc::new(MaterialStateRepository::new(&db_path).unwrap());
         let plan_repo = Arc::new(PlanRepository::new(conn.clone()));
@@ -226,7 +226,7 @@ mod e2e_p0_p1_features_test {
             .unwrap();
 
         // 2.2 记录 dry-run 前的数据库状态
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
         let cap_before: i64 = conn
             .query_row("SELECT COUNT(*) FROM capacity_pool", [], |row| row.get(0))
             .unwrap();
@@ -633,7 +633,7 @@ mod e2e_p0_p1_features_test {
         );
 
         // 5. ActionLog 应记录发布草案行为
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
         let apply_log_count: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM action_log WHERE action_type = 'APPLY_STRATEGY_DRAFT'",

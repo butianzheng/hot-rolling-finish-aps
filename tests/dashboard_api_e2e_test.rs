@@ -40,7 +40,7 @@ mod dashboard_api_e2e_test {
         Arc<DecisionRefreshService>,
     ) {
         let (temp_file, db_path) = create_test_db().unwrap();
-        let conn = Arc::new(Mutex::new(Connection::open(&db_path).unwrap()));
+        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).unwrap()));
 
         // 决策层 Repositories
         let day_summary_repo = Arc::new(DaySummaryRepository::new(conn.clone()));
@@ -94,7 +94,7 @@ mod dashboard_api_e2e_test {
         let (_temp, db_path, dashboard_api, refresh_service) = setup_dashboard_test_env();
 
         let version_id = "dashboard_d1_simple_v001";
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
 
         // 1. 创建版本
         conn.execute(
@@ -165,7 +165,7 @@ mod dashboard_api_e2e_test {
         let (_temp, db_path, dashboard_api, refresh_service) = setup_dashboard_test_env();
 
         let version_id = "dashboard_d1_full_v001";
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
 
         // 1. 创建版本
         conn.execute(
@@ -244,7 +244,7 @@ mod dashboard_api_e2e_test {
         let (_temp, db_path, dashboard_api, refresh_service) = setup_dashboard_test_env();
 
         let version_id = "dashboard_backward_v001";
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
 
         // 1. 创建版本
         conn.execute(
@@ -297,7 +297,7 @@ mod dashboard_api_e2e_test {
     fn test_action_log_by_time_range() {
         let (_temp, db_path, dashboard_api, _refresh_service) = setup_dashboard_test_env();
 
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
 
         // 1. 创建测试日志
         let log_time1 = NaiveDateTime::parse_from_str("2026-01-24 10:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
@@ -351,7 +351,7 @@ mod dashboard_api_e2e_test {
     fn test_action_log_by_version() {
         let (_temp, db_path, dashboard_api, _refresh_service) = setup_dashboard_test_env();
 
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
 
         // 1. 创建测试日志（不同版本）
         let log_time = NaiveDateTime::parse_from_str("2026-01-24 10:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
@@ -400,7 +400,7 @@ mod dashboard_api_e2e_test {
     #[test]
     fn test_action_log_by_material_id_in_time_range() {
         let (_temp, db_path, dashboard_api, _refresh_service) = setup_dashboard_test_env();
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
 
         let t1 = NaiveDateTime::parse_from_str("2026-01-24 10:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
         let t2 = NaiveDateTime::parse_from_str("2026-01-24 11:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
@@ -519,7 +519,7 @@ mod dashboard_api_e2e_test {
     fn test_recent_actions() {
         let (_temp, db_path, dashboard_api, _refresh_service) = setup_dashboard_test_env();
 
-        let conn = Connection::open(&db_path).unwrap();
+        let conn = test_helpers::open_test_connection(&db_path).unwrap();
 
         // 1. 创建多条测试日志
         for i in 1..=5 {

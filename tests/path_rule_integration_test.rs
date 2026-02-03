@@ -34,7 +34,7 @@ mod path_rule_integration_test {
     fn test_path_override_pending_confirm_and_engine_gate() {
         let (_tmp, db_path) = create_test_db().expect("create_test_db failed");
 
-        let conn = Connection::open(&db_path).expect("open db failed");
+        let conn = test_helpers::open_test_connection(&db_path).expect("open db failed");
         conn.execute("PRAGMA foreign_keys = ON", []).unwrap();
         let conn = Arc::new(Mutex::new(conn));
 
@@ -233,7 +233,7 @@ mod path_rule_integration_test {
     fn test_roll_cycle_reset_creates_new_campaign() {
         let (_tmp, db_path) = create_test_db().expect("create_test_db failed");
 
-        let conn = Connection::open(&db_path).expect("open db failed");
+        let conn = test_helpers::open_test_connection(&db_path).expect("open db failed");
         conn.execute("PRAGMA foreign_keys = ON", []).unwrap();
         let conn = Arc::new(Mutex::new(conn));
 

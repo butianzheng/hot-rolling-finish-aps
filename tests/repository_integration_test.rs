@@ -61,7 +61,7 @@ async fn test_complete_import_flow() {
     println!("✓ 步骤 1: 测试数据库已创建");
 
     // 步骤 2: 插入测试配置
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     test_helpers::insert_test_config(&conn).expect("Failed to insert config");
     drop(conn);
     println!("✓ 步骤 2: 测试配置已插入");
@@ -151,7 +151,7 @@ async fn test_repository_queries() {
 
     // 步骤 1: 创建测试数据库并导入数据
     let (_temp_file, db_path) = test_helpers::create_test_db().expect("Failed to create test db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     test_helpers::insert_test_config(&conn).expect("Failed to insert config");
     drop(conn);
 

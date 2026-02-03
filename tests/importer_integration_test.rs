@@ -60,7 +60,7 @@ async fn test_import_csv_basic() {
 
     // 创建测试数据库并插入配置
     let (_temp_file, db_path) = create_test_db().expect("Failed to create test db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     insert_test_config(&conn).expect("Failed to insert test config");
 
     // 创建 MaterialImporter
@@ -88,7 +88,7 @@ async fn test_import_csv_data_verification() {
 
     // 创建测试数据库并插入配置
     let (_temp_file, db_path) = create_test_db().expect("Failed to create test db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     insert_test_config(&conn).expect("Failed to insert test config");
 
     // 创建 MaterialImporter

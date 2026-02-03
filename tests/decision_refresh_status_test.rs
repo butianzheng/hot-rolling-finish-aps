@@ -72,7 +72,7 @@ mod decision_refresh_status_test {
     #[test]
     fn test_get_refresh_status_inflight_failed_and_completed() {
         let (_temp_file, db_path) = create_test_db().unwrap();
-        let conn = Arc::new(Mutex::new(Connection::open(&db_path).unwrap()));
+        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).unwrap()));
 
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
         let decision_refresh_repo = Arc::new(DecisionRefreshRepository::new(conn.clone()));

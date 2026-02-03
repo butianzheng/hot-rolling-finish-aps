@@ -239,7 +239,7 @@ fn setup_performance_test_env(
     Box<dyn std::error::Error>,
 > {
     let (temp_file, db_path) = test_helpers::create_test_db()?;
-    let conn = Arc::new(Mutex::new(Connection::open(&db_path)?));
+    let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path)?));
 
     // 生成测试数据
     {

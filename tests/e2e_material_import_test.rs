@@ -63,7 +63,7 @@ async fn test_e2e_csv_import_to_state_derivation() {
 
     // 步骤 1: 创建测试数据库和配置
     let (_temp_file, db_path) = test_helpers::create_test_db().expect("Failed to create test db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     test_helpers::insert_test_config(&conn).expect("Failed to insert config");
     drop(conn);
     println!("✓ 步骤 1: 测试环境已初始化");
@@ -224,7 +224,7 @@ async fn test_e2e_urgent_material_state_derivation() {
 
     // 步骤 1: 创建测试环境
     let (_temp_file, db_path) = test_helpers::create_test_db().expect("Failed to create test db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     test_helpers::insert_test_config(&conn).expect("Failed to insert config");
     drop(conn);
     println!("✓ 步骤 1: 测试环境已初始化");
@@ -275,7 +275,7 @@ async fn test_e2e_maturity_date_calculation() {
 
     // 步骤 1: 创建测试环境
     let (_temp_file, db_path) = test_helpers::create_test_db().expect("Failed to create test db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     test_helpers::insert_test_config(&conn).expect("Failed to insert config");
     drop(conn);
     println!("✓ 步骤 1: 测试环境已初始化");
@@ -346,7 +346,7 @@ async fn test_e2e_bulk_import_performance() {
 
     // 步骤 1: 创建测试环境
     let (_temp_file, db_path) = test_helpers::create_test_db().expect("Failed to create test db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     test_helpers::insert_test_config(&conn).expect("Failed to insert config");
     drop(conn);
     println!("✓ 步骤 1: 测试环境已初始化");
@@ -405,7 +405,7 @@ async fn test_e2e_duplicate_import_conflict_detection() {
 
     // 步骤 1: 创建测试环境
     let (_temp_file, db_path) = test_helpers::create_test_db().expect("Failed to create test db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Failed to open db");
+    let conn = test_helpers::open_test_connection(&db_path).expect("Failed to open db");
     test_helpers::insert_test_config(&conn).expect("Failed to insert config");
     drop(conn);
     println!("✓ 步骤 1: 测试环境已初始化");

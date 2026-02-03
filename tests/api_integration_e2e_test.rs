@@ -55,7 +55,7 @@ mod api_integration_e2e_test {
         Arc<CapacityPoolRepository>,
     ) {
         let (temp_file, db_path) = create_test_db().unwrap();
-        let conn = Arc::new(Mutex::new(Connection::open(&db_path).unwrap()));
+        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).unwrap()));
 
         // Repositories
         let material_master_repo =
