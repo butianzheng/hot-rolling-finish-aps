@@ -115,6 +115,11 @@ impl AppState {
         // 创建数据库连接（共享连接）
         let conn = open_sqlite_connection(&db_path)
             .map_err(|e| format!("无法打开数据库: {}", e))?;
+
+        // 确保 Schema 存在（首次启动自动建表）
+        crate::db::ensure_schema(&conn)
+            .map_err(|e| format!("ensure_schema 失败: {}", e))?;
+
         // Best-effort: keep DB optimizations from blocking app startup.
         if let Err(e) = ensure_action_log_indexes(&conn) {
             tracing::warn!("action_log 索引初始化失败(将继续启动): {}", e);
