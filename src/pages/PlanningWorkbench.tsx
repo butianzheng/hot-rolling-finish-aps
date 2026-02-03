@@ -54,6 +54,7 @@ import type { RedLineViolation } from '../components/guards/RedLineGuard';
 import DecisionFlowGuide from '../components/flow/DecisionFlowGuide';
 import { DEFAULT_MOVE_REASON, QUICK_MOVE_REASONS } from './workbench/constants';
 import { useWorkbenchAutoDateRange } from './workbench/hooks/useWorkbenchAutoDateRange';
+import { useWorkbenchDeepLink } from './workbench/hooks/useWorkbenchDeepLink';
 import type { ConditionLockFilter, MoveImpactRow, MoveItemResultRow, MoveSeqMode, MoveValidationMode, WorkbenchDateRangeMode } from './workbench/types';
 import { extractForceReleaseViolations } from './workbench/utils';
 
@@ -143,120 +144,17 @@ const PlanningWorkbench: React.FC = () => {
   const [autoRecommendOnOpen, setAutoRecommendOnOpen] = useState(false);
   const [rhythmModalOpen, setRhythmModalOpen] = useState(false);
 
-  // 深链接：从“策略对比/变更明细”等页面跳转到工作台时，可携带 material_id 自动打开详情侧栏
-  React.useEffect(() => {
-    const materialId = searchParams.get('material_id');
-    const id = String(materialId || '').trim();
-    if (!id) return;
-    setInspectedMaterialId(id);
-    setInspectorOpen(true);
-  }, [searchParams]);
-
-  // 与全局筛选同步：允许其他页面（如风险下钻）回填机组筛选
-  React.useEffect(() => {
-    const nextMachine = workbenchFilters.machineCode ?? null;
-    setPoolSelection((prev) => {
-      if (prev.machineCode === nextMachine) return prev;
-      return { machineCode: nextMachine, schedState: null };
-    });
-  }, [workbenchFilters.machineCode]);
-
-  // 深链接：从风险概览跳转时，处理上下文参数（第三阶段）
-  const [deepLinkContext, setDeepLinkContext] = React.useState<{
-    machine?: string;
-    date?: string;
-    urgency?: string;
-    context?: string;
-    focus?: string;
-    openCell?: boolean;
-  } | null>(null);
-
-  React.useEffect(() => {
-    const machine = searchParams.get('machine');
-    const date = searchParams.get('date');
-    const urgency = searchParams.get('urgency');
-    const context = searchParams.get('context');
-    const focus = searchParams.get('focus');
-    const openCell = searchParams.get('openCell');
-
-    // 如果有深链接参数，保存到状态并应用
-    if (machine || date || urgency || context || focus || openCell) {
-      const openCellFlag = openCell === '1' || openCell === 'true';
-      setDeepLinkContext({
-        machine: machine || undefined,
-        date: date || undefined,
-        urgency: urgency || undefined,
-        context: context || undefined,
-        focus: focus || undefined,
-        openCell: openCellFlag,
-      });
-
-      // 应用机组筛选
-      if (machine) {
-        setPoolSelection((prev) => {
-          if (prev.machineCode === machine) return prev;
-          return { machineCode: machine, schedState: null };
-        });
-        setWorkbenchFilters({ machineCode: machine });
-      }
-
-      // 应用紧急度筛选（扩展功能）
-      if (urgency) {
-        setWorkbenchFilters({ urgencyLevel: urgency });
-      }
-
-      // 深链接日期：默认聚焦前后各 3 天，并锁定范围，避免被自动范围覆盖
-      if (date) {
-        const focusDate = dayjs(date);
-        if (focusDate.isValid()) {
-          setWorkbenchDateRange([focusDate.subtract(3, 'day'), focusDate.add(3, 'day')]);
-          setDateRangeMode('PINNED');
-        }
-      }
-
-      // 深链接指定甘特图定位（风险日/瓶颈点等）
-      if (focus === 'gantt' || openCellFlag) {
-        setWorkbenchViewMode('GANTT');
-      }
-
-      // 显示来源提示
-      const contextLabel =
-        context === 'risk'
-          ? '风险日'
-          : context === 'bottleneck'
-          ? '瓶颈点'
-          : context === 'capacityOpportunity'
-          ? '容量优化机会'
-          : context === 'orders'
-          ? '订单失败'
-          : context === 'coldStock'
-          ? '冷坨高压力'
-          : context === 'roll'
-          ? '换辊警报'
-          : '';
-
-      if (contextLabel) {
-        const filterHints = [];
-        if (machine) filterHints.push(`机组: ${machine}`);
-        if (urgency) filterHints.push(`紧急度: ${urgency}`);
-        if (date) filterHints.push(`日期: ${date}`);
-
-        const filterInfo = filterHints.length > 0 ? `（${filterHints.join('、')}）` : '';
-        message.info(`已从「${contextLabel}」跳转，自动应用相关筛选条件${filterInfo}`);
-      }
-    }
-  }, [searchParams, setWorkbenchFilters, setWorkbenchViewMode]);
-
-  const deepLinkContextLabel = useMemo(() => {
-    const ctx = String(deepLinkContext?.context || '').trim();
-    if (ctx === 'risk') return '风险日';
-    if (ctx === 'bottleneck') return '瓶颈点';
-    if (ctx === 'capacityOpportunity') return '容量优化机会';
-    if (ctx === 'orders') return '订单失败';
-    if (ctx === 'coldStock') return '冷坨高压力';
-    if (ctx === 'roll') return '换辊警报';
-    return '';
-  }, [deepLinkContext?.context]);
+  const { deepLinkContext, deepLinkContextLabel } = useWorkbenchDeepLink({
+    searchParams,
+    globalMachineCode: workbenchFilters.machineCode,
+    setPoolSelection,
+    setWorkbenchFilters,
+    setWorkbenchViewMode,
+    setDateRangeMode,
+    setWorkbenchDateRange,
+    setInspectorOpen,
+    setInspectedMaterialId,
+  });
 
   // P2-2 修复：queryKey 包含筛选参数，避免缓存污染
   // 注意：暂保留 limit=1000 硬编码，待后续实施 useInfiniteQuery 分页优化
