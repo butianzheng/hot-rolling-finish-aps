@@ -23,6 +23,27 @@ export type MoveImpactRow = {
   limit_capacity_t: number | null;
 };
 
+export type SelectedPlanItemStats = {
+  inPlan: number;
+  frozenInPlan: number;
+  outOfPlan: number;
+};
+
+export type MoveImpactPreview = {
+  rows: MoveImpactRow[];
+  overflowRows: MoveImpactRow[];
+  loading: boolean;
+};
+
+export type MoveRecommendSummary = {
+  machine: string;
+  date: string;
+  overLimitCount: number;
+  unknownCount: number;
+  totalOverT: number;
+  maxUtilPct: number;
+};
+
 export type ConditionLockFilter = 'ALL' | 'LOCKED' | 'UNLOCKED';
 
 export type ForceReleaseViolation = {

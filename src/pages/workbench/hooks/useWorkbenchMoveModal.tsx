@@ -7,32 +7,19 @@ import { capacityApi, planApi } from '../../../api/tauri';
 import { formatDate } from '../../../utils/formatters';
 import { getErrorMessage } from '../../../utils/errorUtils';
 import { DEFAULT_MOVE_REASON } from '../constants';
-import type { MoveImpactRow, MoveItemResultRow, MoveSeqMode, MoveValidationMode } from '../types';
+import type {
+  MoveImpactPreview,
+  MoveImpactRow,
+  MoveItemResultRow,
+  MoveRecommendSummary,
+  MoveSeqMode,
+  MoveValidationMode,
+  SelectedPlanItemStats,
+} from '../types';
 
 type IpcPlanItem = Awaited<ReturnType<typeof planApi.listPlanItems>>[number];
 type IpcCapacityPool = Awaited<ReturnType<typeof capacityApi.getCapacityPools>>[number];
 type IpcMoveItemsResponse = Awaited<ReturnType<typeof planApi.moveItems>>;
-
-export type SelectedPlanItemStats = {
-  inPlan: number;
-  frozenInPlan: number;
-  outOfPlan: number;
-};
-
-export type MoveImpactPreview = {
-  rows: MoveImpactRow[];
-  overflowRows: MoveImpactRow[];
-  loading: boolean;
-};
-
-export type MoveRecommendSummary = {
-  machine: string;
-  date: string;
-  overLimitCount: number;
-  unknownCount: number;
-  totalOverT: number;
-  maxUtilPct: number;
-};
 
 export function useWorkbenchMoveModal(params: {
   activeVersionId: string | null;
