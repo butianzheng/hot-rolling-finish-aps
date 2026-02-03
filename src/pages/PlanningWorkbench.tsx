@@ -18,7 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import ErrorBoundary from '../components/ErrorBoundary';
 import PageSkeleton from '../components/PageSkeleton';
 import NoActiveVersionGuide from '../components/NoActiveVersionGuide';
-import { materialApi, planApi } from '../api/tauri';
+import { planApi } from '../api/tauri';
 import {
   useActiveVersionId,
   useAdminOverrideMode,
@@ -29,9 +29,8 @@ import {
   type WorkbenchViewMode,
 } from '../stores/use-global-store';
 import { formatDate } from '../utils/formatters';
-import { normalizeSchedState } from '../utils/schedState';
 import type { PlanItemStatusFilter } from '../utils/planItemStatus';
-import MaterialPool, { type MaterialPoolMaterial, type MaterialPoolSelection } from '../components/workbench/MaterialPool';
+import MaterialPool, { type MaterialPoolSelection } from '../components/workbench/MaterialPool';
 import ScheduleCardView from '../components/workbench/ScheduleCardView';
 import ScheduleGanttView from '../components/workbench/ScheduleGanttView';
 import BatchOperationToolbar from '../components/workbench/BatchOperationToolbar';
@@ -48,14 +47,13 @@ import { useWorkbenchAutoDateRange } from './workbench/hooks/useWorkbenchAutoDat
 import { useWorkbenchDeepLink } from './workbench/hooks/useWorkbenchDeepLink';
 import { useWorkbenchBatchOperations } from './workbench/hooks/useWorkbenchBatchOperations';
 import { useWorkbenchInspector } from './workbench/hooks/useWorkbenchInspector';
+import { useWorkbenchMaterials } from './workbench/hooks/useWorkbenchMaterials';
 import { useWorkbenchMoveModal } from './workbench/hooks/useWorkbenchMoveModal';
 import { useWorkbenchPathOverride } from './workbench/hooks/useWorkbenchPathOverride';
 import MoveMaterialsModal from '../components/workbench/MoveMaterialsModal';
 import type { WorkbenchDateRangeMode } from './workbench/types';
 
 const PlanItemVisualization = React.lazy(() => import('../components/PlanItemVisualization'));
-
-type IpcMaterialWithState = Awaited<ReturnType<typeof materialApi.listMaterials>>[number];
 
 const PlanningWorkbench: React.FC = () => {
   const navigate = useNavigate();
@@ -108,48 +106,7 @@ const PlanningWorkbench: React.FC = () => {
 
   const [rhythmModalOpen, setRhythmModalOpen] = useState(false);
 
-  // P2-2 修复：queryKey 包含筛选参数，避免缓存污染
-  // 注意：暂保留 limit=1000 硬编码，待后续实施 useInfiniteQuery 分页优化
-  const materialQueryParams = useMemo(() => ({
-    machine_code: poolSelection.machineCode && poolSelection.machineCode !== 'all'
-      ? poolSelection.machineCode
-      : undefined,
-    limit: 1000,
-    offset: 0,
-  }), [poolSelection.machineCode]);
-
-  const materialsQuery = useQuery({
-    queryKey: ['materials', materialQueryParams],
-    queryFn: async () => {
-      return materialApi.listMaterials(materialQueryParams);
-    },
-    staleTime: 30 * 1000,
-  });
-
-  const materials = useMemo<MaterialPoolMaterial[]>(() => {
-    const raw: IpcMaterialWithState[] = materialsQuery.data ?? [];
-    return raw.map((m) => {
-      const sched = normalizeSchedState(m.sched_state);
-      const is_mature =
-        sched === 'PENDING_MATURE'
-          ? false
-          : sched === 'READY' || sched === 'FORCE_RELEASE' || sched === 'SCHEDULED'
-            ? true
-            : undefined;
-
-      return {
-        material_id: String(m.material_id ?? '').trim(),
-        machine_code: String(m.machine_code ?? '').trim(),
-        weight_t: Number(m.weight_t ?? 0),
-        steel_mark: String(m.steel_mark ?? '').trim(),
-        sched_state: String(m.sched_state ?? '').trim(),
-        urgent_level: String(m.urgent_level ?? '').trim(),
-        lock_flag: Boolean(m.lock_flag),
-        manual_urgent_flag: Boolean(m.manual_urgent_flag),
-        is_mature,
-      };
-    });
-  }, [materialsQuery.data]);
+  const { materialsQuery, materials } = useWorkbenchMaterials({ machineCode: poolSelection.machineCode });
 
   const { inspectorOpen, setInspectorOpen, setInspectedMaterialId, inspectedMaterial, openInspector } =
     useWorkbenchInspector({ materials });
