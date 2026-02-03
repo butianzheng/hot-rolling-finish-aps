@@ -40,16 +40,19 @@ export function useGanttData({
   // 标准化数据
   const normalized = useMemo<PlanItemRow[]>(() => {
     const raw = Array.isArray(planItems) ? planItems : [];
-    return raw.map((it: any) => ({
-      material_id: String(it?.material_id ?? ''),
-      machine_code: String(it?.machine_code ?? ''),
-      plan_date: String(it?.plan_date ?? ''),
-      seq_no: Number(it?.seq_no ?? 0),
-      weight_t: Number(it?.weight_t ?? 0),
-      urgent_level: it?.urgent_level ? String(it.urgent_level) : undefined,
-      locked_in_plan: !!it?.locked_in_plan,
-      force_release_in_plan: !!it?.force_release_in_plan,
-    }));
+    return raw.map((it: unknown) => {
+      const r = (it && typeof it === 'object' ? it : {}) as Record<string, unknown>;
+      return {
+        material_id: String(r.material_id ?? ''),
+        machine_code: String(r.machine_code ?? ''),
+        plan_date: String(r.plan_date ?? ''),
+        seq_no: Number(r.seq_no ?? 0),
+        weight_t: Number(r.weight_t ?? 0),
+        urgent_level: r.urgent_level ? String(r.urgent_level) : undefined,
+        locked_in_plan: !!r.locked_in_plan,
+        force_release_in_plan: !!r.force_release_in_plan,
+      };
+    });
   }, [planItems]);
 
   // 可用日期键

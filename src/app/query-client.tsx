@@ -21,7 +21,7 @@ export const queryClient = new QueryClient({
       // 默认配置
       staleTime: 5 * 60 * 1000, // 5分钟
       gcTime: 10 * 60 * 1000, // 10分钟（原cacheTime）
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: false, // 工业场景：用户频繁切换标签页，避免不必要的重新获取
       refetchOnReconnect: true,
       retry: 2,
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
@@ -35,9 +35,10 @@ export const queryClient = new QueryClient({
       retryDelay: 1000,
 
       // 全局错误处理
-      onError: (error: any) => {
+      onError: (error: unknown) => {
         console.error('[Mutation Error]', error);
-        message.error(error?.message || '操作失败，请重试');
+        const msg = error instanceof Error ? error.message : '操作失败，请重试';
+        message.error(msg);
       },
     },
   },

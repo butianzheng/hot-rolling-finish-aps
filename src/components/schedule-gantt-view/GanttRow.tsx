@@ -2,6 +2,7 @@
  * 甘特图行渲染组件
  */
 
+import React from 'react';
 import { Typography } from 'antd';
 import type { RowComponentProps } from 'react-window';
 import { FONT_FAMILIES } from '../../theme';
@@ -34,7 +35,7 @@ export type GanttRowData = {
   todayIndex: number;
 };
 
-export const GanttRow = ({
+export const GanttRow = React.memo(function GanttRow({
   index,
   style,
   machines,
@@ -48,7 +49,7 @@ export const GanttRow = ({
   onOpenCell,
   timelineWidth,
   todayIndex,
-}: RowComponentProps<GanttRowData>) => {
+}: RowComponentProps<GanttRowData>) {
   const machine = machines[index] || '';
   const byDate = itemsByMachineDate.get(machine) ?? null;
   let total = 0;
@@ -283,4 +284,4 @@ export const GanttRow = ({
       </div>
     </div>
   );
-};
+});

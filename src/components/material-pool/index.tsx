@@ -79,7 +79,7 @@ const MaterialPool: React.FC<MaterialPoolProps> = ({
           type="error"
           showIcon
           message="物料池加载失败"
-          description={String((error as any)?.message || error)}
+          description={error instanceof Error ? error.message : String(error)}
           action={
             onRetry ? (
               <Button size="small" onClick={onRetry}>
@@ -144,7 +144,7 @@ const MaterialPool: React.FC<MaterialPoolProps> = ({
                   listRef={listRef}
                   rowCount={pool.rows.length}
                   rowHeight={ROW_HEIGHT}
-                  rowComponent={MaterialPoolRow}
+                  rowComponent={MaterialPoolRow as any} // React.memo 包装后类型与 react-window 不兼容
                   rowProps={{
                     rows: pool.rows,
                     selected: pool.selectedSet,

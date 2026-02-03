@@ -4,7 +4,7 @@
  * 增强版：显示操作状态徽章、风险标记
  */
 
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Checkbox, Typography, Tooltip } from 'antd';
 import { DownOutlined, RightOutlined } from '@ant-design/icons';
 import type { RowComponentProps } from 'react-window';
@@ -57,7 +57,7 @@ const CompactRiskBadge: React.FC<{ badge: RiskBadge }> = ({ badge }) => {
   );
 };
 
-export const MaterialPoolRow = ({
+export const MaterialPoolRow = React.memo(function MaterialPoolRow({
   index,
   style,
   rows,
@@ -65,7 +65,7 @@ export const MaterialPoolRow = ({
   onToggle,
   onInspect,
   onToggleUrgency,
-}: RowComponentProps<RowData>) => {
+}: RowComponentProps<RowData>) {
   const row = rows[index];
 
   // Header row (紧急度分组头)
@@ -220,4 +220,4 @@ export const MaterialPoolRow = ({
       </div>
     </div>
   );
-};
+});

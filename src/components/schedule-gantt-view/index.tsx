@@ -206,6 +206,15 @@ export default function ScheduleGanttView({
     return byMachine;
   }, [dateKeys, machineCode, normalized]);
 
+  // 稳定化 onOpenCell 回调以支持 React.memo 优化
+  const handleOpenCell = useCallback(
+    (machine: string, date: string) => {
+      setCellDetail({ machine, date });
+      onFocusChange?.({ machine, date, source: 'ganttCell' });
+    },
+    [onFocusChange, setCellDetail]
+  );
+
   const timelineWidth = useMemo(() => dateKeys.length * COLUMN_WIDTH, [dateKeys.length]);
 
   // 容量查询
@@ -236,13 +245,14 @@ export default function ScheduleGanttView({
   const capacityByMachineDate = useMemo(() => {
     const map = new Map<string, CapacityData>();
     const raw = Array.isArray(capacityQuery.data) ? capacityQuery.data : [];
-    raw.forEach((row: any) => {
-      const machine = String(row?.machine_code ?? '').trim();
-      const date = normalizeDateKey(String(row?.plan_date ?? ''));
+    raw.forEach((row: unknown) => {
+      const r = (row && typeof row === 'object' ? row : {}) as Record<string, unknown>;
+      const machine = String(r.machine_code ?? '').trim();
+      const date = normalizeDateKey(String(r.plan_date ?? ''));
       if (!machine || !date) return;
-      const target = Number(row?.target_capacity_t ?? 0);
-      const limit = Number(row?.limit_capacity_t ?? 0);
-      const used = Number(row?.used_capacity_t ?? 0);
+      const target = Number(r.target_capacity_t ?? 0);
+      const limit = Number(r.limit_capacity_t ?? 0);
+      const used = Number(r.used_capacity_t ?? 0);
 
       map.set(`${machine}__${date}`, {
         target: Number.isFinite(target) ? target : 0,
@@ -514,7 +524,7 @@ export default function ScheduleGanttView({
           type="error"
           showIcon
           message="甘特图数据加载失败"
-          description={String((error as any)?.message || error)}
+          description={error instanceof Error ? error.message : String(error)}
           action={onRetry ? <a onClick={onRetry} style={{ padding: '0 8px' }}>重试</a> : null}
           style={{ marginBottom: 8 }}
         />
@@ -583,7 +593,7 @@ export default function ScheduleGanttView({
                 listRef={listRef}
                 rowCount={machines.length}
                 rowHeight={ROW_HEIGHT}
-                rowComponent={GanttRow}
+                rowComponent={GanttRow as any} // React.memo 包装后类型与 react-window 不兼容
                 rowProps={{
                   machines,
                   itemsByMachineDate: itemsByMachineDateFiltered,
@@ -593,10 +603,7 @@ export default function ScheduleGanttView({
                   selected: selectedSet,
                   onToggle: toggleSelection,
                   onInspect: onInspectMaterialId,
-                  onOpenCell: (machine: string, date: string) => {
-                    setCellDetail({ machine, date });
-                    onFocusChange?.({ machine, date, source: 'ganttCell' });
-                  },
+                  onOpenCell: handleOpenCell,
                   timelineWidth,
                   todayIndex,
                 }}

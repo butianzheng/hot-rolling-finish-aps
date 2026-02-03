@@ -9,10 +9,8 @@ import { useWorkbenchMoveImpactPreview } from './useWorkbenchMoveImpactPreview';
 import { useWorkbenchMoveRecommend } from './useWorkbenchMoveRecommend';
 import { useWorkbenchMoveSubmit } from './useWorkbenchMoveSubmit';
 import type {
-  MoveImpactPreview,
   MoveModalActions,
   MoveModalState,
-  MoveRecommendSummary,
   MoveSeqMode,
   MoveValidationMode,
   SelectedPlanItemStats,
