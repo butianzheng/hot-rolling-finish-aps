@@ -52,6 +52,8 @@ export type ForceReleaseViolation = {
   reason?: unknown;
 };
 
+export type MaterialOperationType = 'lock' | 'unlock' | 'urgent_on' | 'urgent_off';
+
 // =============================
 // Workbench UI: schedule focus
 // =============================

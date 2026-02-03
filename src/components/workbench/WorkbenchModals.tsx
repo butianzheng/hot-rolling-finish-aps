@@ -9,7 +9,6 @@ import PathOverrideConfirmModal from '../path-override-confirm/PathOverrideConfi
 import PathOverridePendingCenterModal from '../path-override-confirm/PathOverridePendingCenterModal';
 import { formatDate } from '../../utils/formatters';
 import type { MaterialPoolMaterial } from './MaterialPool';
-import type { MaterialOperationType } from '../../pages/workbench/hooks/useWorkbenchBatchOperations';
 import type {
   MoveImpactPreview,
   MoveRecommendSummary,
@@ -17,7 +16,11 @@ import type {
   MoveValidationMode,
   SelectedPlanItemStats,
 } from '../../pages/workbench/types';
-import type { WorkbenchPathOverrideState, WorkbenchScheduleFocus } from '../../pages/workbench/types';
+import type {
+  MaterialOperationType,
+  WorkbenchPathOverrideState,
+  WorkbenchScheduleFocus,
+} from '../../pages/workbench/types';
 
 const WorkbenchModals: React.FC<{
   activeVersionId: string;

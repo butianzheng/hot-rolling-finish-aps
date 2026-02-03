@@ -6,11 +6,12 @@ import { materialApi } from '../../../api/tauri';
 import { RedLineGuard, createFrozenZoneViolation, createMaturityViolation } from '../../../components/guards/RedLineGuard';
 import type { RedLineViolation } from '../../../components/guards/RedLineGuard';
 import type { MaterialPoolMaterial } from '../../../components/workbench/MaterialPool';
+import type { MaterialOperationType } from '../types';
 import { extractForceReleaseViolations } from '../utils';
 
 type IpcImpactSummary = Awaited<ReturnType<typeof materialApi.batchForceRelease>>;
 
-export type MaterialOperationType = 'lock' | 'unlock' | 'urgent_on' | 'urgent_off';
+export type { MaterialOperationType } from '../types';
 
 export function useWorkbenchBatchOperations(params: {
   adminOverrideMode: boolean;
@@ -312,4 +313,3 @@ export function useWorkbenchBatchOperations(params: {
 
   return { runMaterialOperation, runForceReleaseOperation };
 }
-

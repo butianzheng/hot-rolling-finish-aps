@@ -5,8 +5,7 @@ import { useNavigate } from 'react-router-dom';
 
 import BatchOperationToolbar from './BatchOperationToolbar';
 import OneClickOptimizeMenu from './OneClickOptimizeMenu';
-
-type MaterialOperationType = 'lock' | 'unlock' | 'urgent_on' | 'urgent_off';
+import type { MaterialOperationType } from '../../pages/workbench/types';
 
 const WorkbenchTopToolbar: React.FC<{
   activeVersionId: string;
