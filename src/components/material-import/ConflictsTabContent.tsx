@@ -30,6 +30,7 @@ import { conflictTypeLabel } from '../../utils/importFormatters';
 import { getErrorMessage } from '../../utils/errorUtils';
 import type { ImportConflict } from '../../types/import';
 import { importApi } from '../../api/tauri';
+import { useCurrentUser } from '../../stores/use-global-store';
 
 export interface ConflictsTabContentProps {
   // 查询过滤
@@ -74,6 +75,8 @@ export const ConflictsTabContent: React.FC<ConflictsTabContentProps> = ({
   onBatchResolveConflicts,
   onViewRawData,
 }) => {
+  const currentUser = useCurrentUser();
+
   // 批量选择状态
   const [selectedConflictIds, setSelectedConflictIds] = useState<React.Key[]>([]);
   const [batchResolveLoading, setBatchResolveLoading] = useState(false);
@@ -120,7 +123,7 @@ export const ConflictsTabContent: React.FC<ConflictsTabContentProps> = ({
           conflictIdStrings,
           action,
           `批量处理 - ${action}`,
-          'admin' // TODO: 从全局状态获取当前用户
+          currentUser || 'admin'
         );
 
         message.success(
