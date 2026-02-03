@@ -118,6 +118,7 @@ export function useWorkbenchMoveModal(params: {
     moveModalOpen,
     moveTargetMachine,
     moveTargetDate,
+    moveValidationMode,
     planItems,
     selectedMaterialIds,
   });
