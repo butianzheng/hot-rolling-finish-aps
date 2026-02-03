@@ -58,7 +58,7 @@ export const createVersionColumns = (
   {
     title: '版本',
     key: 'version',
-    render: (_: any, record) => {
+    render: (_, record) => {
       const label = formatVersionLabelWithCode(record);
       return (
         <Space size={6}>
