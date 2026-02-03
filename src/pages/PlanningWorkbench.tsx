@@ -52,39 +52,12 @@ import { MaterialInspector } from '../components/MaterialInspector';
 import { RedLineGuard, createFrozenZoneViolation, createMaturityViolation } from '../components/guards/RedLineGuard';
 import type { RedLineViolation } from '../components/guards/RedLineGuard';
 import DecisionFlowGuide from '../components/flow/DecisionFlowGuide';
+import { DEFAULT_MOVE_REASON, QUICK_MOVE_REASONS } from './workbench/constants';
+import { useWorkbenchAutoDateRange } from './workbench/hooks/useWorkbenchAutoDateRange';
+import type { ConditionLockFilter, MoveImpactRow, MoveItemResultRow, MoveSeqMode, MoveValidationMode, WorkbenchDateRangeMode } from './workbench/types';
+import { extractForceReleaseViolations } from './workbench/utils';
 
 const PlanItemVisualization = React.lazy(() => import('../components/PlanItemVisualization'));
-type MoveSeqMode = 'APPEND' | 'START_SEQ';
-type MoveValidationMode = 'AUTO_FIX' | 'STRICT';
-type MoveItemResultRow = {
-  material_id: string;
-  success: boolean;
-  from_machine: string | null;
-  from_date: string | null;
-  to_machine: string;
-  to_date: string;
-  error: string | null;
-  violation_type: string | null;
-};
-type MoveImpactRow = {
-  machine_code: string;
-  date: string;
-  before_t: number;
-  delta_t: number;
-  after_t: number;
-  target_capacity_t: number | null;
-  limit_capacity_t: number | null;
-};
-type ConditionLockFilter = 'ALL' | 'LOCKED' | 'UNLOCKED';
-
-const DEFAULT_MOVE_REASON = '手工微调';
-const QUICK_MOVE_REASONS: Array<{ label: string; value: string }> = [
-  { label: '手工微调', value: '手工微调' },
-  { label: '处理产能超限', value: '处理产能超限' },
-  { label: '满足紧急订单', value: '满足紧急订单' },
-  { label: '轧辊/工艺约束调整', value: '轧辊/工艺约束调整' },
-  { label: '冷坯消化', value: '冷坯消化' },
-];
 
 type IpcMaterialWithState = Awaited<ReturnType<typeof materialApi.listMaterials>>[number];
 type IpcMaterialDetail = Awaited<ReturnType<typeof materialApi.getMaterialDetail>>;
@@ -93,19 +66,6 @@ type IpcCapacityPool = Awaited<ReturnType<typeof capacityApi.getCapacityPools>>[
 type IpcImpactSummary = Awaited<ReturnType<typeof materialApi.batchForceRelease>>;
 type IpcMoveItemsResponse = Awaited<ReturnType<typeof planApi.moveItems>>;
 type IpcPathOverridePendingSummary = Awaited<ReturnType<typeof pathRuleApi.listPathOverridePendingSummary>>[number];
-
-type ForceReleaseViolation = {
-  material_id?: unknown;
-  violation_type?: unknown;
-  reason?: unknown;
-};
-
-function extractForceReleaseViolations(details: unknown): ForceReleaseViolation[] {
-  if (!details || typeof details !== 'object') return [];
-  const violations = (details as { violations?: unknown }).violations;
-  if (!Array.isArray(violations)) return [];
-  return violations.filter((v): v is ForceReleaseViolation => v != null && typeof v === 'object');
-}
 
 const PlanningWorkbench: React.FC = () => {
   const navigate = useNavigate();
@@ -139,7 +99,6 @@ const PlanningWorkbench: React.FC = () => {
     nonce: number;
   } | null>(null);
 
-  type WorkbenchDateRangeMode = 'AUTO' | 'PINNED' | 'MANUAL';
   const [dateRangeMode, setDateRangeMode] = useState<WorkbenchDateRangeMode>(() => {
     const d = searchParams.get('date');
     const focusDate = d ? dayjs(d) : null;
@@ -469,39 +428,13 @@ const PlanningWorkbench: React.FC = () => {
   };
 
   // AUTO 日期范围（基于当前机组的排程数据）
-  const autoDateRange = useMemo<[dayjs.Dayjs, dayjs.Dayjs]>(() => {
-    const filteredItems = (planItemsQuery.data || []).filter(
-      (item: IpcPlanItem) => !poolSelection.machineCode ||
-                    poolSelection.machineCode === 'all' ||
-                    item.machine_code === poolSelection.machineCode
-    );
-
-    if (filteredItems.length === 0) {
-      // 默认日期范围：今天前 3 天到后 10 天
-      return [dayjs().subtract(3, 'day'), dayjs().add(10, 'day')];
-    }
-
-    // 提取所有排程日期
-    const dates = filteredItems
-      .map((item: IpcPlanItem) => dayjs(item.plan_date))
-      .filter((d: dayjs.Dayjs) => d.isValid());
-
-    if (dates.length === 0) {
-      return [dayjs().subtract(3, 'day'), dayjs().add(10, 'day')];
-    }
-
-    // 找到最早和最晚的日期
-    const sortedDates = dates.sort((a: dayjs.Dayjs, b: dayjs.Dayjs) => a.valueOf() - b.valueOf());
-    const minDate = sortedDates[0].subtract(1, 'day'); // 前面留 1 天余量
-    const maxDate = sortedDates[sortedDates.length - 1].add(3, 'day'); // 后面留 3 天余量
-
-    return [minDate, maxDate];
-  }, [planItemsQuery.data, poolSelection.machineCode]);
-
-  React.useEffect(() => {
-    if (dateRangeMode !== 'AUTO') return;
-    setWorkbenchDateRange(autoDateRange);
-  }, [autoDateRange, dateRangeMode]);
+  const { autoDateRange, applyWorkbenchDateRange, resetWorkbenchDateRangeToAuto } = useWorkbenchAutoDateRange({
+    planItems: planItemsQuery.data || [],
+    machineCode: poolSelection.machineCode,
+    dateRangeMode,
+    setDateRangeMode,
+    setWorkbenchDateRange,
+  });
 
   // 路径规则：跨日期/跨机组待确认汇总（基于当前 AUTO 日期范围）
   const pathOverrideSummaryRange = useMemo(() => {
@@ -535,27 +468,6 @@ const PlanningWorkbench: React.FC = () => {
     const list: IpcPathOverridePendingSummary[] = pathOverrideSummaryQuery.data ?? [];
     return list.reduce((sum, r) => sum + Number(r.pending_count ?? 0), 0);
   }, [pathOverrideSummaryQuery.data]);
-
-  const applyWorkbenchDateRange = (next: [dayjs.Dayjs, dayjs.Dayjs]) => {
-    if (!next || !next[0] || !next[1]) return;
-    let start = next[0].startOf('day');
-    let end = next[1].startOf('day');
-    if (end.isBefore(start)) {
-      const tmp = start;
-      start = end;
-      end = tmp;
-    }
-    setWorkbenchDateRange([start, end]);
-    const isAuto =
-      formatDate(start) === formatDate(autoDateRange[0]) &&
-      formatDate(end) === formatDate(autoDateRange[1]);
-    setDateRangeMode(isAuto ? 'AUTO' : 'MANUAL');
-  };
-
-  const resetWorkbenchDateRangeToAuto = () => {
-    setDateRangeMode('AUTO');
-    setWorkbenchDateRange(autoDateRange);
-  };
 
   const openInspector = (materialId: string) => {
     setInspectedMaterialId(materialId);

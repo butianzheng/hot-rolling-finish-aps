@@ -174,6 +174,7 @@
 
 主要问题：
 - `src/app/tauri_commands.rs` 体量过大（2989 行），且存在备份文件噪声，长期维护成本高
+  - 更新（2026-02-03）：已按域拆分为 `src/app/tauri_commands/*.rs`，入口 `src/app/tauri_commands.rs` 仅保留 mod/re-export（保持命令名与注册方式不变）
 - 前端 IPC 封装存在“双体系”：
   - `src/api/tauri.ts`（含 `decisionApi`，但返回 `any`，且与 `decision-service.ts` 功能重复）
   - `src/services/decision-service.ts`（做 camelCase/snake_case 转换与更完整类型）
@@ -182,7 +183,7 @@
 建议（P0/P1）：
 - 选定一个“前端 IPC 入口”（推荐以 `src/api/tauri.ts` 为唯一入口，decision-service 作为其内部实现或直接合并）
 - 选定一个“Schema Source-of-Truth”（推荐集中在 `src/api/ipcSchemas.ts`，其余位置只 re-export，不再复制）
-- 将 `tauri_commands.rs` 按域拆文件（plan/material/config/decision/path_rule/roller…），并在 `mod.rs` 统一注册
+- 将 `tauri_commands.rs` 按域拆文件（plan/material/config/decision/path_rule/roller…），并在 `mod.rs` 统一注册（已完成，见上方更新）
 
 ---
 
