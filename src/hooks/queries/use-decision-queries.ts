@@ -21,7 +21,7 @@ import {
   getCapacityOpportunityForRecentDays,
   DecisionApiError,
   ValidationError,
-} from '../../services/decision-service';
+} from '../../api/tauri';
 import type {
   GetDecisionDaySummaryRequest,
   DecisionDaySummaryResponse,

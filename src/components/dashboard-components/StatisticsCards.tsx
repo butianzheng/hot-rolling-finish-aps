@@ -40,7 +40,7 @@ export const StatisticsCards: React.FC<StatisticsCardsProps> = ({
         >
           <Statistic
             title="未满足紧急单"
-            value={orderFailureSummary?.total_failures ?? orderFailures.length}
+            value={orderFailureSummary?.totalFailures ?? orderFailures.length}
             prefix={<WarningOutlined />}
             valueStyle={{ color: '#cf1322' }}
           />
@@ -54,7 +54,7 @@ export const StatisticsCards: React.FC<StatisticsCardsProps> = ({
         >
           <Statistic
             title="冷料数量"
-            value={coldStockSummary?.total_cold_stock_count ?? coldStockBuckets.reduce((sum, b) => sum + (b.count || 0), 0)}
+            value={coldStockSummary?.totalColdStockCount ?? coldStockBuckets.reduce((sum, b) => sum + (b.count || 0), 0)}
             prefix={<ClockCircleOutlined />}
             valueStyle={{ color: '#faad14' }}
           />
@@ -65,8 +65,8 @@ export const StatisticsCards: React.FC<StatisticsCardsProps> = ({
           <Statistic
             title="冷料总重(吨)"
             value={formatNumber(
-              coldStockSummary?.total_cold_stock_weight_t ??
-                coldStockBuckets.reduce((sum, b) => sum + (b.weight_t || 0), 0),
+              coldStockSummary?.totalColdStockWeightT ??
+                coldStockBuckets.reduce((sum, b) => sum + (b.weightT || 0), 0),
               2
             )}
             prefix={<DatabaseOutlined />}
@@ -80,15 +80,15 @@ export const StatisticsCards: React.FC<StatisticsCardsProps> = ({
           onClick={() => {
             if (!mostCongestedPoint) return;
             const qs = new URLSearchParams({
-              machine: mostCongestedPoint.machine_code,
-              date: mostCongestedPoint.plan_date,
+              machine: mostCongestedPoint.machineCode,
+              date: mostCongestedPoint.planDate,
             }).toString();
             onNavigate(`/overview?tab=d4&${qs}`);
           }}
         >
           <Statistic
             title="最拥堵机组"
-            value={mostCongestedPoint?.machine_code || '-'}
+            value={mostCongestedPoint?.machineCode || '-'}
             prefix={<ThunderboltOutlined />}
             valueStyle={{ color: '#1890ff' }}
           />

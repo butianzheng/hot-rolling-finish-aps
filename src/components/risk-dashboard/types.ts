@@ -2,25 +2,29 @@
  * 风险仪表盘 - 类型定义
  */
 
-export interface BlockedUrgentOrderRow {
-  contract_no: string;
-  due_date: string;
-  urgency_level: string;
-  fail_type: string;
-  completion_rate: number;
-  days_to_due: number;
-  machine_code: string;
-}
+import type { ColdStockBucket, OrderFailure } from '../../types/decision';
 
-export interface ColdStockBucketRow {
-  machine_code: string;
-  age_bin: string;
-  pressure_level: string;
-  count: number;
-  weight_t: number;
-  avg_age_days: number;
-  max_age_days: number;
-}
+export type BlockedUrgentOrderRow = Pick<
+  OrderFailure,
+  | 'contractNo'
+  | 'dueDate'
+  | 'urgencyLevel'
+  | 'failType'
+  | 'completionRate'
+  | 'daysToDue'
+  | 'machineCode'
+>;
+
+export type ColdStockBucketRow = Pick<
+  ColdStockBucket,
+  | 'machineCode'
+  | 'ageBin'
+  | 'pressureLevel'
+  | 'count'
+  | 'weightT'
+  | 'avgAgeDays'
+  | 'maxAgeDays'
+>;
 
 // 风险等级颜色
 export const getRiskColor = (level: string) => {

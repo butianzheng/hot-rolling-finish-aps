@@ -9,6 +9,7 @@
 // - 目标用于监控/评估，不直接改变排程结果
 // ==========================================
 
+use crate::db::open_sqlite_connection;
 use crate::repository::error::{RepositoryError, RepositoryResult};
 use rusqlite::{params, Connection, Result as SqliteResult};
 use std::collections::HashMap;
@@ -44,8 +45,7 @@ pub struct PlanRhythmRepository {
 
 impl PlanRhythmRepository {
     pub fn new(db_path: &str) -> RepositoryResult<Self> {
-        let conn = Connection::open(db_path)?;
-        conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+        let conn = open_sqlite_connection(db_path)?;
         let repo = Self {
             conn: Arc::new(Mutex::new(conn)),
         };
@@ -53,10 +53,10 @@ impl PlanRhythmRepository {
         Ok(repo)
     }
 
-    pub fn from_connection(conn: Arc<Mutex<Connection>>) -> Self {
+    pub fn from_connection(conn: Arc<Mutex<Connection>>) -> RepositoryResult<Self> {
         let repo = Self { conn };
-        let _ = repo.ensure_tables();
-        repo
+        repo.ensure_tables()?;
+        Ok(repo)
     }
 
     fn get_conn(&self) -> RepositoryResult<std::sync::MutexGuard<Connection>> {

@@ -4,6 +4,7 @@
 // 职责: 提供测试所需的数据库初始化、测试数据生成等功能
 // ==========================================
 
+use hot_rolling_aps::db::open_sqlite_connection;
 use rusqlite::Connection;
 use std::error::Error;
 use tempfile::NamedTempFile;
@@ -17,7 +18,7 @@ pub fn create_test_db() -> Result<(NamedTempFile, String), Box<dyn Error>> {
     let temp_file = NamedTempFile::new()?;
     let db_path = temp_file.path().to_str().unwrap().to_string();
 
-    let conn = Connection::open(&db_path)?;
+    let conn = open_sqlite_connection(&db_path)?;
 
     // 初始化 schema
     init_schema(&conn)?;

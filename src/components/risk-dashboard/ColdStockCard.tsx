@@ -47,13 +47,13 @@ export const ColdStockCard: React.FC<ColdStockCardProps> = ({ coldStockBuckets }
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
                     type="number"
-                    dataKey="avg_age_days"
+                    dataKey="avgAgeDays"
                     name="平均库龄"
                     label={{ value: '平均库龄(天)', position: 'insideBottom', offset: -5 }}
                   />
                   <YAxis
                     type="number"
-                    dataKey="weight_t"
+                    dataKey="weightT"
                     name="重量(t)"
                     label={{ value: '重量(t)', angle: -90, position: 'insideLeft' }}
                   />
@@ -71,12 +71,12 @@ export const ColdStockCard: React.FC<ColdStockCardProps> = ({ coldStockBuckets }
                               color: '#fff',
                             }}
                           >
-                            <div style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>{data.machine_code}</div>
-                            <div>库龄分桶: {data.age_bin}</div>
-                            <div>压力等级: {data.pressure_level}</div>
+                            <div style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>{data.machineCode}</div>
+                            <div>库龄分桶: {data.ageBin}</div>
+                            <div>压力等级: {data.pressureLevel}</div>
                             <div>数量: {data.count}</div>
-                            <div>重量: {data.weight_t} 吨</div>
-                            <div>平均库龄: {data.avg_age_days} 天</div>
+                            <div>重量: {data.weightT} 吨</div>
+                            <div>平均库龄: {data.avgAgeDays} 天</div>
                           </div>
                         );
                       }
@@ -88,9 +88,9 @@ export const ColdStockCard: React.FC<ColdStockCardProps> = ({ coldStockBuckets }
                       <Cell
                         key={`cell-${index}`}
                         fill={
-                          entry.pressure_level === 'CRITICAL'
+                          entry.pressureLevel === 'CRITICAL'
                             ? '#ff4d4f'
-                            : entry.pressure_level === 'HIGH'
+                            : entry.pressureLevel === 'HIGH'
                             ? '#faad14'
                             : '#13c2c2'
                         }

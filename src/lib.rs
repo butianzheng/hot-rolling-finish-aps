@@ -28,6 +28,9 @@ pub mod importer;
 // 配置层 - 系统配置
 pub mod config;
 
+// 数据库基础设施（连接初始化/PRAGMA 统一）
+pub mod db;
+
 // 日志系统
 pub mod logging;
 

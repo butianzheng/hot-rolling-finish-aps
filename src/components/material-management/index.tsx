@@ -230,7 +230,7 @@ const MaterialManagement: React.FC = () => {
       }
       if (params.steel_mark) {
         filtered = filtered.filter((m: Material) =>
-          m.steel_mark.toLowerCase().includes(params.steel_mark.toLowerCase())
+          String(m.steel_mark ?? '').toLowerCase().includes(String(params.steel_mark).toLowerCase())
         );
       }
 

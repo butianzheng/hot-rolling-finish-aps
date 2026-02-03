@@ -51,7 +51,7 @@ export const MaterialInspector: React.FC<MaterialInspectorProps> = ({
           <MaterialStatusIcons
             lockFlag={material.lock_flag}
             schedState={material.sched_state}
-            tempIssue={material.temp_issue || !material.is_mature}
+            tempIssue={material.temp_issue || material.is_mature === false}
           />
         </Space>
       }

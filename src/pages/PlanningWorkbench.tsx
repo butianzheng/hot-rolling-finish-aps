@@ -36,6 +36,7 @@ import {
 } from '../stores/use-global-store';
 import { formatDate } from '../utils/formatters';
 import { normalizeSchedState } from '../utils/schedState';
+import { getErrorMessage } from '../utils/errorUtils';
 import type { PlanItemStatusFilter } from '../utils/planItemStatus';
 import MaterialPool, { type MaterialPoolMaterial, type MaterialPoolSelection } from '../components/workbench/MaterialPool';
 import ScheduleCardView from '../components/workbench/ScheduleCardView';
@@ -84,6 +85,27 @@ const QUICK_MOVE_REASONS: Array<{ label: string; value: string }> = [
   { label: '轧辊/工艺约束调整', value: '轧辊/工艺约束调整' },
   { label: '冷坯消化', value: '冷坯消化' },
 ];
+
+type IpcMaterialWithState = Awaited<ReturnType<typeof materialApi.listMaterials>>[number];
+type IpcMaterialDetail = Awaited<ReturnType<typeof materialApi.getMaterialDetail>>;
+type IpcPlanItem = Awaited<ReturnType<typeof planApi.listPlanItems>>[number];
+type IpcCapacityPool = Awaited<ReturnType<typeof capacityApi.getCapacityPools>>[number];
+type IpcImpactSummary = Awaited<ReturnType<typeof materialApi.batchForceRelease>>;
+type IpcMoveItemsResponse = Awaited<ReturnType<typeof planApi.moveItems>>;
+type IpcPathOverridePendingSummary = Awaited<ReturnType<typeof pathRuleApi.listPathOverridePendingSummary>>[number];
+
+type ForceReleaseViolation = {
+  material_id?: unknown;
+  violation_type?: unknown;
+  reason?: unknown;
+};
+
+function extractForceReleaseViolations(details: unknown): ForceReleaseViolation[] {
+  if (!details || typeof details !== 'object') return [];
+  const violations = (details as { violations?: unknown }).violations;
+  if (!Array.isArray(violations)) return [];
+  return violations.filter((v): v is ForceReleaseViolation => v != null && typeof v === 'object');
+}
 
 const PlanningWorkbench: React.FC = () => {
   const navigate = useNavigate();
@@ -290,27 +312,34 @@ const PlanningWorkbench: React.FC = () => {
   const materialsQuery = useQuery({
     queryKey: ['materials', materialQueryParams],
     queryFn: async () => {
-      const res = await materialApi.listMaterials(materialQueryParams);
-      return Array.isArray(res) ? res : [];
+      return materialApi.listMaterials(materialQueryParams);
     },
     staleTime: 30 * 1000,
   });
 
   const materials = useMemo<MaterialPoolMaterial[]>(() => {
-    const raw = Array.isArray(materialsQuery.data) ? materialsQuery.data : [];
-    return raw.map((m: any) => ({
-      material_id: String(m?.material_id ?? ''),
-      machine_code: String(m?.machine_code ?? ''),
-      weight_t: Number(m?.weight_t ?? 0),
-      steel_mark: String(m?.steel_mark ?? ''),
-      sched_state: String(m?.sched_state ?? ''),
-      urgent_level: String(m?.urgent_level ?? ''),
-      lock_flag: !!m?.lock_flag,
-      manual_urgent_flag: !!m?.manual_urgent_flag,
-      is_frozen: m?.is_frozen === true,
-      is_mature: m?.is_mature === true ? true : m?.is_mature === false ? false : undefined,
-      temp_issue: m?.temp_issue === true,
-    }));
+    const raw: IpcMaterialWithState[] = materialsQuery.data ?? [];
+    return raw.map((m) => {
+      const sched = normalizeSchedState(m.sched_state);
+      const is_mature =
+        sched === 'PENDING_MATURE'
+          ? false
+          : sched === 'READY' || sched === 'FORCE_RELEASE' || sched === 'SCHEDULED'
+            ? true
+            : undefined;
+
+      return {
+        material_id: String(m.material_id ?? '').trim(),
+        machine_code: String(m.machine_code ?? '').trim(),
+        weight_t: Number(m.weight_t ?? 0),
+        steel_mark: String(m.steel_mark ?? '').trim(),
+        sched_state: String(m.sched_state ?? '').trim(),
+        urgent_level: String(m.urgent_level ?? '').trim(),
+        lock_flag: Boolean(m.lock_flag),
+        manual_urgent_flag: Boolean(m.manual_urgent_flag),
+        is_mature,
+      };
+    });
   }, [materialsQuery.data]);
 
   const materialDetailQuery = useQuery({
@@ -326,25 +355,37 @@ const PlanningWorkbench: React.FC = () => {
   const inspectedMaterial = useMemo(() => {
     if (!inspectedMaterialId) return null;
     const fromList = materials.find((m) => m.material_id === inspectedMaterialId) || null;
-    const fromDetail = materialDetailQuery.data ? (materialDetailQuery.data as any) : null;
-    const merged = { ...(fromList || {}), ...(fromDetail || {}) };
+    const detail: IpcMaterialDetail | null = materialDetailQuery.data ?? null;
+    const master = detail?.master ?? null;
+    const state = detail?.state ?? null;
 
-    // 保持与 MaterialInspector 的字段命名一致（snake_case -> camelCase 这里不做转换，只做兜底）
+    const sched_state = String(state?.sched_state ?? fromList?.sched_state ?? '').trim();
+    const normalizedSched = normalizeSchedState(sched_state);
+    const is_mature =
+      normalizedSched === 'PENDING_MATURE'
+        ? false
+        : normalizedSched === 'READY' || normalizedSched === 'FORCE_RELEASE' || normalizedSched === 'SCHEDULED'
+          ? true
+          : undefined;
+
+    const machineFromMaster = String(
+      master?.next_machine_code ?? master?.current_machine_code ?? master?.rework_machine_code ?? ''
+    ).trim();
+
     return {
-      material_id: String(merged?.material_id ?? inspectedMaterialId),
-      machine_code: String(merged?.machine_code ?? ''),
-      weight_t: Number(merged?.weight_t ?? 0),
-      steel_mark: String(merged?.steel_mark ?? ''),
-      sched_state: String(merged?.sched_state ?? ''),
-      urgent_level: String(merged?.urgent_level ?? ''),
-      lock_flag: !!merged?.lock_flag,
-      manual_urgent_flag: !!merged?.manual_urgent_flag,
-      is_frozen: merged?.is_frozen === true,
-      is_mature: merged?.is_mature === true ? true : merged?.is_mature === false ? false : undefined,
-      temp_issue: merged?.temp_issue === true,
-      urgent_reason: merged?.urgent_reason ? String(merged.urgent_reason) : undefined,
-      eligibility_reason: merged?.eligibility_reason ? String(merged.eligibility_reason) : undefined,
-      priority_reason: merged?.priority_reason ? String(merged.priority_reason) : undefined,
+      material_id: String(master?.material_id ?? state?.material_id ?? fromList?.material_id ?? inspectedMaterialId).trim(),
+      machine_code: String(fromList?.machine_code ?? machineFromMaster ?? '').trim(),
+      weight_t: Number(fromList?.weight_t ?? master?.weight_t ?? 0),
+      steel_mark: String(fromList?.steel_mark ?? master?.steel_mark ?? '').trim(),
+      sched_state,
+      urgent_level: String(state?.urgent_level ?? fromList?.urgent_level ?? '').trim(),
+      lock_flag: Boolean(state?.lock_flag ?? fromList?.lock_flag ?? false),
+      manual_urgent_flag: Boolean(state?.manual_urgent_flag ?? fromList?.manual_urgent_flag ?? false),
+      is_mature,
+      temp_issue: false,
+      urgent_reason: state?.urgent_reason ? String(state.urgent_reason) : undefined,
+      eligibility_reason: undefined,
+      priority_reason: undefined,
     };
   }, [inspectedMaterialId, materialDetailQuery.data, materials]);
 
@@ -353,8 +394,7 @@ const PlanningWorkbench: React.FC = () => {
     enabled: !!activeVersionId,
     queryFn: async () => {
       if (!activeVersionId) return [];
-      const res = await planApi.listPlanItems(activeVersionId);
-      return Array.isArray(res) ? res : [];
+      return planApi.listPlanItems(activeVersionId);
     },
     staleTime: 30 * 1000,
   });
@@ -386,18 +426,17 @@ const PlanningWorkbench: React.FC = () => {
     enabled: !!activeVersionId && !!pathOverrideContext.machineCode && !!pathOverrideContext.planDate,
     queryFn: async () => {
       if (!activeVersionId || !pathOverrideContext.machineCode || !pathOverrideContext.planDate) return [];
-      const res = await pathRuleApi.listPathOverridePending({
+      return pathRuleApi.listPathOverridePending({
         versionId: activeVersionId,
         machineCode: pathOverrideContext.machineCode,
         planDate: pathOverrideContext.planDate,
       });
-      return Array.isArray(res) ? res : [];
     },
     staleTime: 15 * 1000,
   });
 
   const pathOverridePendingCount = useMemo(() => {
-    return Array.isArray(pathOverridePendingQuery.data) ? pathOverridePendingQuery.data.length : 0;
+    return pathOverridePendingQuery.data?.length ?? 0;
   }, [pathOverridePendingQuery.data]);
 
   const recalcAfterPathOverride = async (baseDate: string) => {
@@ -405,7 +444,7 @@ const PlanningWorkbench: React.FC = () => {
     const base = String(baseDate || '').trim() || defaultPlanDate;
     setRecalculating(true);
     try {
-      const res: any = await planApi.recalcFull(
+      const res = await planApi.recalcFull(
         activeVersionId,
         base,
         undefined,
@@ -421,9 +460,9 @@ const PlanningWorkbench: React.FC = () => {
       }
       setRefreshSignal((v) => v + 1);
       materialsQuery.refetch();
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('[Workbench] recalcAfterPathOverride failed:', e);
-      message.error(String(e?.message || '重算失败'));
+      message.error(getErrorMessage(e) || '重算失败');
     } finally {
       setRecalculating(false);
     }
@@ -432,7 +471,7 @@ const PlanningWorkbench: React.FC = () => {
   // AUTO 日期范围（基于当前机组的排程数据）
   const autoDateRange = useMemo<[dayjs.Dayjs, dayjs.Dayjs]>(() => {
     const filteredItems = (planItemsQuery.data || []).filter(
-      (item: any) => !poolSelection.machineCode ||
+      (item: IpcPlanItem) => !poolSelection.machineCode ||
                     poolSelection.machineCode === 'all' ||
                     item.machine_code === poolSelection.machineCode
     );
@@ -444,7 +483,7 @@ const PlanningWorkbench: React.FC = () => {
 
     // 提取所有排程日期
     const dates = filteredItems
-      .map((item: any) => dayjs(item.plan_date))
+      .map((item: IpcPlanItem) => dayjs(item.plan_date))
       .filter((d: dayjs.Dayjs) => d.isValid());
 
     if (dates.length === 0) {
@@ -483,19 +522,18 @@ const PlanningWorkbench: React.FC = () => {
     enabled: !!activeVersionId,
     queryFn: async () => {
       if (!activeVersionId) return [];
-      const res = await pathRuleApi.listPathOverridePendingSummary({
+      return pathRuleApi.listPathOverridePendingSummary({
         versionId: activeVersionId,
         planDateFrom: pathOverrideSummaryRange.from,
         planDateTo: pathOverrideSummaryRange.to,
       });
-      return Array.isArray(res) ? res : [];
     },
     staleTime: 15 * 1000,
   });
 
   const pathOverridePendingTotalCount = useMemo(() => {
-    const list: any[] = Array.isArray(pathOverrideSummaryQuery.data) ? pathOverrideSummaryQuery.data : [];
-    return list.reduce((sum, r) => sum + Number(r?.pending_count ?? 0), 0);
+    const list: IpcPathOverridePendingSummary[] = pathOverrideSummaryQuery.data ?? [];
+    return list.reduce((sum, r) => sum + Number(r.pending_count ?? 0), 0);
   }, [pathOverrideSummaryQuery.data]);
 
   const applyWorkbenchDateRange = (next: [dayjs.Dayjs, dayjs.Dayjs]) => {
@@ -611,10 +649,10 @@ const PlanningWorkbench: React.FC = () => {
   }, [conditionalMatches]);
 
   const planItemById = useMemo(() => {
-    const map = new Map<string, any>();
-    const raw = Array.isArray(planItemsQuery.data) ? planItemsQuery.data : [];
-    raw.forEach((it: any) => {
-      const id = String(it?.material_id ?? '').trim();
+    const map = new Map<string, IpcPlanItem>();
+    const raw = planItemsQuery.data ?? [];
+    raw.forEach((it) => {
+      const id = String(it.material_id ?? '').trim();
       if (id) map.set(id, it);
     });
     return map;
@@ -638,22 +676,22 @@ const PlanningWorkbench: React.FC = () => {
     if (!moveTargetDate || !moveTargetDate.isValid()) return null;
 
     const targetDate = formatDate(moveTargetDate);
-    const raw = Array.isArray(planItemsQuery.data) ? planItemsQuery.data : [];
+    const raw = planItemsQuery.data ?? [];
 
     const tonnageMap = new Map<string, number>();
-    raw.forEach((it: any) => {
-      const machine = String(it?.machine_code ?? '').trim();
-      const date = String(it?.plan_date ?? '').trim();
+    raw.forEach((it) => {
+      const machine = String(it.machine_code ?? '').trim();
+      const date = String(it.plan_date ?? '').trim();
       if (!machine || !date) return;
-      const weight = Number(it?.weight_t ?? 0);
+      const weight = Number(it.weight_t ?? 0);
       if (!Number.isFinite(weight) || weight <= 0) return;
       const key = `${machine}__${date}`;
       tonnageMap.set(key, (tonnageMap.get(key) ?? 0) + weight);
     });
 
-    const byId = new Map<string, any>();
-    raw.forEach((it: any) => {
-      const id = String(it?.material_id ?? '').trim();
+    const byId = new Map<string, IpcPlanItem>();
+    raw.forEach((it) => {
+      const id = String(it.material_id ?? '').trim();
       if (id) byId.set(id, it);
     });
 
@@ -661,10 +699,10 @@ const PlanningWorkbench: React.FC = () => {
     selectedMaterialIds.forEach((id) => {
       const it = byId.get(id);
       if (!it) return;
-      const fromMachine = String(it?.machine_code ?? '').trim();
-      const fromDate = String(it?.plan_date ?? '').trim();
+      const fromMachine = String(it.machine_code ?? '').trim();
+      const fromDate = String(it.plan_date ?? '').trim();
       if (!fromMachine || !fromDate) return;
-      const weight = Number(it?.weight_t ?? 0);
+      const weight = Number(it.weight_t ?? 0);
       if (!Number.isFinite(weight) || weight <= 0) return;
 
       const fromKey = `${fromMachine}__${fromDate}`;
@@ -733,27 +771,26 @@ const PlanningWorkbench: React.FC = () => {
       !!moveImpactBase.dateTo,
     queryFn: async () => {
       if (!activeVersionId || !moveImpactBase) return [];
-      const res = await capacityApi.getCapacityPools(
+      return capacityApi.getCapacityPools(
         moveImpactBase.affectedMachines,
         moveImpactBase.dateFrom,
         moveImpactBase.dateTo,
         activeVersionId
       );
-      return Array.isArray(res) ? res : [];
     },
     staleTime: 30 * 1000,
   });
 
   const moveImpactPreview = useMemo(() => {
     if (!moveImpactBase) return null;
-    const pools = Array.isArray(moveImpactCapacityQuery.data) ? moveImpactCapacityQuery.data : [];
+    const pools: IpcCapacityPool[] = moveImpactCapacityQuery.data ?? [];
     const poolMap = new Map<string, { target: number | null; limit: number | null }>();
-    pools.forEach((p: any) => {
-      const machine = String(p?.machine_code ?? '').trim();
-      const date = String(p?.plan_date ?? '').trim();
+    pools.forEach((p) => {
+      const machine = String(p.machine_code ?? '').trim();
+      const date = String(p.plan_date ?? '').trim();
       if (!machine || !date) return;
-      const target = Number(p?.target_capacity_t ?? 0);
-      const limit = Number(p?.limit_capacity_t ?? 0);
+      const target = Number(p.target_capacity_t ?? 0);
+      const limit = Number(p.limit_capacity_t ?? 0);
       poolMap.set(`${machine}__${date}`, {
         target: Number.isFinite(target) && target > 0 ? target : null,
         limit: Number.isFinite(limit) && limit > 0 ? limit : null,
@@ -798,21 +835,21 @@ const PlanningWorkbench: React.FC = () => {
     }
 
     // 仅基于“可移动”的已选物料做推荐（AUTO_FIX 模式下，冻结项会被跳过）
-    let planItemsRaw = Array.isArray(planItemsQuery.data) ? planItemsQuery.data : [];
+    let planItemsRaw: IpcPlanItem[] = planItemsQuery.data ?? [];
     if (planItemsRaw.length === 0) {
       const fetched = await planApi.listPlanItems(activeVersionId);
-      planItemsRaw = Array.isArray(fetched) ? fetched : [];
+      planItemsRaw = fetched;
     }
 
-    const byId = new Map<string, any>();
+    const byId = new Map<string, IpcPlanItem>();
     const tonnageMap = new Map<string, number>();
-    planItemsRaw.forEach((it: any) => {
-      const id = String(it?.material_id ?? '').trim();
+    planItemsRaw.forEach((it) => {
+      const id = String(it.material_id ?? '').trim();
       if (id) byId.set(id, it);
-      const machine = String(it?.machine_code ?? '').trim();
-      const date = String(it?.plan_date ?? '').trim();
+      const machine = String(it.machine_code ?? '').trim();
+      const date = String(it.plan_date ?? '').trim();
       if (!machine || !date) return;
-      const weight = Number(it?.weight_t ?? 0);
+      const weight = Number(it.weight_t ?? 0);
       if (!Number.isFinite(weight) || weight <= 0) return;
       const key = `${machine}__${date}`;
       tonnageMap.set(key, (tonnageMap.get(key) ?? 0) + weight);
@@ -820,13 +857,13 @@ const PlanningWorkbench: React.FC = () => {
 
     const movable = selectedMaterialIds
       .map((id) => byId.get(id))
-      .filter(Boolean)
-      .filter((it: any) => !(moveValidationMode === 'AUTO_FIX' && it?.locked_in_plan === true))
-      .map((it: any) => ({
-        material_id: String(it?.material_id ?? '').trim(),
-        from_machine: String(it?.machine_code ?? '').trim(),
-        from_date: String(it?.plan_date ?? '').trim(),
-        weight_t: Number(it?.weight_t ?? 0),
+      .filter((it): it is IpcPlanItem => Boolean(it))
+      .filter((it) => !(moveValidationMode === 'AUTO_FIX' && it.locked_in_plan === true))
+      .map((it) => ({
+        material_id: String(it.material_id ?? '').trim(),
+        from_machine: String(it.machine_code ?? '').trim(),
+        from_date: String(it.plan_date ?? '').trim(),
+        weight_t: Number(it.weight_t ?? 0),
       }))
       .filter((it) => it.material_id && it.from_machine && it.from_date && Number.isFinite(it.weight_t) && it.weight_t > 0);
 
@@ -878,16 +915,16 @@ const PlanningWorkbench: React.FC = () => {
       [originDates[originDates.length - 1], candidateDates[candidateDates.length - 1]].filter(Boolean).sort().slice(-1)[0] ||
       candidateDates[candidateDates.length - 1];
 
-    setMoveRecommendLoading(true);
+      setMoveRecommendLoading(true);
     try {
       const pools = await capacityApi.getCapacityPools(affectedMachines, dateFrom, dateTo, activeVersionId);
       const poolMap = new Map<string, { target: number | null; limit: number | null }>();
-      (Array.isArray(pools) ? pools : []).forEach((p: any) => {
-        const machine = String(p?.machine_code ?? '').trim();
-        const date = String(p?.plan_date ?? '').trim();
+      pools.forEach((p: IpcCapacityPool) => {
+        const machine = String(p.machine_code ?? '').trim();
+        const date = String(p.plan_date ?? '').trim();
         if (!machine || !date) return;
-        const target = Number(p?.target_capacity_t ?? 0);
-        const limit = Number(p?.limit_capacity_t ?? 0);
+        const target = Number(p.target_capacity_t ?? 0);
+        const limit = Number(p.limit_capacity_t ?? 0);
         poolMap.set(`${machine}__${date}`, {
           target: Number.isFinite(target) && target > 0 ? target : null,
           limit: Number.isFinite(limit) && limit > 0 ? limit : null,
@@ -983,9 +1020,9 @@ const PlanningWorkbench: React.FC = () => {
       });
 
       message.success(`推荐位置：${targetMachine} / ${best.date}（策略：${strategyLabel}）`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('推荐位置失败:', error);
-      message.error(`推荐位置失败: ${error?.message || error}`);
+      message.error(`推荐位置失败: ${getErrorMessage(error)}`);
     } finally {
       setMoveRecommendLoading(false);
     }
@@ -1210,13 +1247,13 @@ const PlanningWorkbench: React.FC = () => {
         }
 
         const operator = currentUser || 'admin';
-        const res: any = await materialApi.batchForceRelease(materialIds, operator, trimmed, mode);
+        const res: IpcImpactSummary = await materialApi.batchForceRelease(materialIds, operator, trimmed, mode);
 
         message.success(String(res?.message || '强制放行完成'));
 
-        const violations = Array.isArray(res?.details?.violations) ? res.details.violations : [];
+        const violations = extractForceReleaseViolations(res?.details);
         if (violations.length > 0) {
-          const rows = violations.map((v: any, idx: number) => ({
+          const rows = violations.map((v, idx: number) => ({
             key: `${String(v?.material_id ?? idx)}__${idx}`,
             material_id: String(v?.material_id ?? ''),
             violation_type: String(v?.violation_type ?? ''),
@@ -1326,16 +1363,16 @@ const PlanningWorkbench: React.FC = () => {
     try {
       const targetDate = formatDate(moveTargetDate);
 
-      let planItemsRaw = Array.isArray(planItemsQuery.data) ? planItemsQuery.data : [];
+      let planItemsRaw: IpcPlanItem[] = planItemsQuery.data ?? [];
       if (planItemsRaw.length === 0) {
         // 避免由于 Query 未命中导致误判“未排入”
         const fetched = await planApi.listPlanItems(activeVersionId);
-        planItemsRaw = Array.isArray(fetched) ? fetched : [];
+        planItemsRaw = fetched;
       }
 
-      const byId = new Map<string, any>();
-      planItemsRaw.forEach((it: any) => {
-        const id = String(it?.material_id ?? '').trim();
+      const byId = new Map<string, IpcPlanItem>();
+      planItemsRaw.forEach((it) => {
+        const id = String(it.material_id ?? '').trim();
         if (id) byId.set(id, it);
       });
 
@@ -1363,11 +1400,9 @@ const PlanningWorkbench: React.FC = () => {
       if (moveSeqMode === 'APPEND') {
         const maxSeq = planItemsRaw
           .filter(
-            (it: any) =>
-              String(it?.machine_code ?? '') === moveTargetMachine &&
-              String(it?.plan_date ?? '') === targetDate
+            (it) => String(it.machine_code ?? '') === moveTargetMachine && String(it.plan_date ?? '') === targetDate
           )
-          .reduce((max: number, it: any) => Math.max(max, Number(it?.seq_no ?? 0)), 0);
+          .reduce((max: number, it) => Math.max(max, Number(it.seq_no ?? 0)), 0);
         startSeq = Math.max(1, maxSeq + 1);
       }
 
@@ -1379,7 +1414,7 @@ const PlanningWorkbench: React.FC = () => {
       }));
 
       const operator = currentUser || 'admin';
-      const res: any = await planApi.moveItems(activeVersionId, moves, moveValidationMode, operator, reason);
+      const res: IpcMoveItemsResponse = await planApi.moveItems(activeVersionId, moves, moveValidationMode, operator, reason);
 
       setMoveModalOpen(false);
       setMoveReason('');
@@ -1390,18 +1425,16 @@ const PlanningWorkbench: React.FC = () => {
 
       const failedCount = Number(res?.failed_count ?? 0);
       if (failedCount > 0) {
-        const results: MoveItemResultRow[] = (Array.isArray(res?.results) ? res.results : []).map(
-          (r: any) => ({
-            material_id: String(r?.material_id ?? ''),
-            success: !!r?.success,
-            from_machine: r?.from_machine == null ? null : String(r.from_machine),
-            from_date: r?.from_date == null ? null : String(r.from_date),
-            to_machine: String(r?.to_machine ?? ''),
-            to_date: String(r?.to_date ?? ''),
-            error: r?.error == null ? null : String(r.error),
-            violation_type: r?.violation_type == null ? null : String(r.violation_type),
-          })
-        );
+        const results: MoveItemResultRow[] = (res.results ?? []).map((r) => ({
+          material_id: String(r?.material_id ?? ''),
+          success: Boolean(r?.success),
+          from_machine: r?.from_machine == null ? null : String(r.from_machine),
+          from_date: r?.from_date == null ? null : String(r.from_date),
+          to_machine: String(r?.to_machine ?? ''),
+          to_date: String(r?.to_date ?? ''),
+          error: r?.error == null ? null : String(r.error),
+          violation_type: r?.violation_type == null ? null : String(r.violation_type),
+        }));
         Modal.info({
           title: '移动完成（部分失败）',
           width: 920,
@@ -1453,9 +1486,9 @@ const PlanningWorkbench: React.FC = () => {
           message.info(`有 ${missing.length} 个物料不在当前版本排程中，已跳过`);
         }
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('[Workbench] moveItems failed:', e);
-      message.error(e?.message || '移动失败');
+      message.error(getErrorMessage(e) || '移动失败');
     } finally {
       setMoveSubmitting(false);
     }
@@ -2349,7 +2382,7 @@ const PlanningWorkbench: React.FC = () => {
         {/* 物料 Inspector */}
         <MaterialInspector
           visible={inspectorOpen}
-          material={inspectedMaterial as any}
+          material={inspectedMaterial}
           onClose={() => setInspectorOpen(false)}
           onLock={(id) => runMaterialOperation([id], 'lock')}
           onUnlock={(id) => runMaterialOperation([id], 'unlock')}

@@ -7,6 +7,7 @@
 
 use crate::domain::risk::RiskSnapshot;
 use crate::domain::types::RiskLevel;
+use crate::db::open_sqlite_connection;
 use crate::repository::error::{RepositoryError, RepositoryResult};
 use chrono::NaiveDate;
 use rusqlite::{params, Connection, Result as SqliteResult};
@@ -32,7 +33,7 @@ impl RiskSnapshotRepository {
     /// # 返回
     /// - RepositoryResult<Self>
     pub fn new(db_path: &str) -> RepositoryResult<Self> {
-        let conn = Connection::open(db_path)?;
+        let conn = open_sqlite_connection(db_path)?;
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
         })

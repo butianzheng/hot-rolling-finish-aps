@@ -7,6 +7,7 @@
 // ==========================================
 
 use crate::domain::material::{ImportBatch, ImportConflict, MaterialMaster, MaterialState};
+use crate::db::open_sqlite_connection;
 use crate::repository::material_import_repo::MaterialImportRepository;
 use async_trait::async_trait;
 use rusqlite::{params, Connection, Transaction};
@@ -39,10 +40,7 @@ impl MaterialImportRepositoryImpl {
     /// # 参数
     /// - db_path: 数据库文件路径
     pub fn new(db_path: &str) -> Result<Self, Box<dyn Error>> {
-        let conn = Connection::open(db_path)?;
-
-        // 启用外键约束
-        conn.execute("PRAGMA foreign_keys = ON", [])?;
+        let conn = open_sqlite_connection(db_path)?;
 
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),

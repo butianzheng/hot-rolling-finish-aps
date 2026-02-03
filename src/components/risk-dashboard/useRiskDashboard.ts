@@ -3,8 +3,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { dashboardApi } from '../../api/tauri';
-import { decisionService } from '../../services/decision-service';
+import { decisionService } from '../../api/tauri';
 import { parseAlertLevel } from '../../types/decision';
 import { useActiveVersionId } from '../../stores/use-global-store';
 import type { DangerDayData, RollCampaignHealth } from '../../types/dashboard';
@@ -38,9 +37,9 @@ export function useRiskDashboard(): UseRiskDashboardReturn {
     (async () => {
       try {
         const [mostRiskyRes, urgentRes, coldRes, rollRes] = await Promise.allSettled([
-          dashboardApi.getMostRiskyDate(activeVersionId),
-          dashboardApi.getUnsatisfiedUrgentMaterials(activeVersionId),
-          dashboardApi.getColdStockMaterials(activeVersionId, 30),
+          decisionService.getMostRiskyDate(activeVersionId),
+          decisionService.getUnsatisfiedUrgentMaterials(activeVersionId),
+          decisionService.getColdStockMaterials(activeVersionId, 30),
           decisionService.getAllRollCampaignAlerts(activeVersionId),
         ]);
 
@@ -49,7 +48,7 @@ export function useRiskDashboard(): UseRiskDashboardReturn {
         if (mostRiskyRes.status === 'fulfilled') {
           const most = mostRiskyRes.value?.items?.[0];
           if (most) {
-            const riskLevelRaw = String(most.risk_level || '').toUpperCase();
+            const riskLevelRaw = String(most.riskLevel || '').toUpperCase();
             const riskLevel: DangerDayData['riskLevel'] =
               riskLevelRaw === 'CRITICAL'
                 ? 'critical'
@@ -60,11 +59,11 @@ export function useRiskDashboard(): UseRiskDashboardReturn {
                 : 'low';
 
             setDangerDay({
-              date: most.plan_date,
+              date: most.planDate,
               riskLevel,
-              capacityOverflow: Number(most.overload_weight_t || 0),
-              urgentBacklog: Number(most.urgent_failure_count || 0),
-              reasons: (most.top_reasons || []).map((r: any) => r?.msg || '').filter(Boolean),
+              capacityOverflow: Number(most.overloadWeightT || 0),
+              urgentBacklog: Number(most.urgentFailureCount || 0),
+              reasons: (most.topReasons || []).map((r: any) => r?.msg || '').filter(Boolean),
             });
           } else {
             setDangerDay(null);

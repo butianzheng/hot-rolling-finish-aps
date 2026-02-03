@@ -6,6 +6,7 @@
 // ==========================================
 
 use crate::domain::capacity::CapacityPool;
+use crate::db::open_sqlite_connection;
 use crate::repository::error::{RepositoryError, RepositoryResult};
 use chrono::NaiveDate;
 use rusqlite::{params, Connection, OptionalExtension, Result as SqliteResult};
@@ -31,7 +32,7 @@ impl CapacityPoolRepository {
     /// - Ok(CapacityPoolRepository): 仓储实例
     /// - Err: 数据库连接错误
     pub fn new(db_path: String) -> RepositoryResult<Self> {
-        let conn = Connection::open(&db_path)?;
+        let conn = open_sqlite_connection(&db_path)?;
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
         })

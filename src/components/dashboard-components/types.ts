@@ -2,51 +2,27 @@
  * Dashboard 类型定义
  */
 
-// D2: OrderFailureDto (snake_case)
-export interface OrderFailureRow {
-  contract_no: string;
-  due_date: string;
-  urgency_level: string;
-  fail_type: string;
-  completion_rate: number; // percent (0-100)
-  total_weight_t: number;
-  unscheduled_weight_t: number;
-  machine_code: string;
-}
+// 统一使用决策层 D2-D4 的 camelCase 类型，避免重复定义与契约漂移
+import type {
+  OrderFailure,
+  OrderFailureSummary,
+  ColdStockBucket,
+  ColdStockSummary,
+  BottleneckPoint,
+} from '../../types/decision';
+
+export type OrderFailureRow = OrderFailure;
+export type ColdStockBucketRow = ColdStockBucket;
+export type BottleneckPointRow = BottleneckPoint;
 
 export interface OrderFailureSetResponse {
   items: OrderFailureRow[];
-  summary?: {
-    total_failures: number;
-    total_unscheduled_weight_t: number;
-  };
-}
-
-// D3: ColdStockBucketDto (snake_case)
-export interface ColdStockBucketRow {
-  machine_code: string;
-  age_bin: string;
-  pressure_level: string;
-  count: number;
-  weight_t: number;
-  avg_age_days: number;
-  max_age_days: number;
+  summary?: OrderFailureSummary;
 }
 
 export interface ColdStockProfileResponse {
   items: ColdStockBucketRow[];
-  summary?: {
-    total_cold_stock_count: number;
-    total_cold_stock_weight_t: number;
-  };
-}
-
-// D4: BottleneckPointDto (snake_case)
-export interface BottleneckPointRow {
-  machine_code: string;
-  plan_date: string;
-  bottleneck_score: number;
-  bottleneck_level: string;
+  summary?: ColdStockSummary;
 }
 
 export interface MachineBottleneckProfileResponse {

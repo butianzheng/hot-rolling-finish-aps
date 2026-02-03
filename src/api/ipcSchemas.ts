@@ -40,6 +40,74 @@ export function zodValidator<T extends z.ZodTypeAny>(schema: T, name: string) {
 }
 
 const DateString = z.string().min(1);
+const DateTimeString = z.string().min(1);
+
+// ==========================================================
+// Common / shared response schemas
+// ==========================================================
+
+// Common success response for commands that return `{}`.
+export const EmptyOkResponseSchema = z.object({}).passthrough();
+
+// ==========================================================
+// Import API 响应 Schema（优先级2）
+// ==========================================================
+
+export const DqSummarySchema = z
+  .object({
+    total_rows: z.number(),
+    success: z.number(),
+    blocked: z.number(),
+    warning: z.number(),
+    conflict: z.number(),
+  })
+  .passthrough();
+
+export const DqViolationSchema = z
+  .object({
+    row_number: z.number(),
+    material_id: z.string().nullable().optional(),
+    level: z.string(),
+    field: z.string(),
+    message: z.string(),
+  })
+  .passthrough();
+
+export const ImportApiResponseSchema = z
+  .object({
+    imported: z.number(),
+    updated: z.number(),
+    conflicts: z.number(),
+    batch_id: z.string(),
+    import_batch_id: z.string(),
+    dq_summary: DqSummarySchema,
+    dq_violations: z.array(DqViolationSchema),
+    elapsed_ms: z.number(),
+  })
+  .passthrough();
+
+export const ImportConflictSchema = z
+  .object({
+    conflict_id: z.string(),
+    batch_id: z.string(),
+    row_number: z.number(),
+    material_id: z.string().nullable().optional(),
+    conflict_type: z.string(),
+    raw_data: z.string(),
+    reason: z.string(),
+    resolved: z.boolean(),
+    created_at: DateTimeString,
+  })
+  .passthrough();
+
+export const ImportConflictListResponseSchema = z
+  .object({
+    conflicts: z.array(ImportConflictSchema),
+    total: z.number(),
+    limit: z.number(),
+    offset: z.number(),
+  })
+  .passthrough();
 
 // ==========================================================
 // P0-1: strategy draft (draft persistence)
@@ -405,6 +473,101 @@ export const PlanItemSchema = z
   })
   .passthrough();
 
+export const StrategyPresetSchema = z
+  .object({
+    strategy: z.string(),
+    title: z.string(),
+    description: z.string(),
+    default_parameters: z.unknown(),
+  })
+  .passthrough();
+
+export const ManualRefreshDecisionResponseSchema = z
+  .object({
+    version_id: z.string(),
+    task_id: z.string().nullable().optional(),
+    success: z.boolean(),
+    message: z.string(),
+  })
+  .passthrough();
+
+export const RollbackVersionResponseSchema = z
+  .object({
+    plan_id: z.string(),
+    from_version_id: z.string().nullable().optional(),
+    to_version_id: z.string(),
+    restored_config_count: z.number().nullable().optional(),
+    config_restore_skipped: z.string().nullable().optional(),
+    message: z.string(),
+  })
+  .passthrough();
+
+export const RiskDeltaSchema = z
+  .object({
+    date: DateString,
+    risk_score_a: z.number().nullable().optional(),
+    risk_score_b: z.number().nullable().optional(),
+    risk_score_delta: z.number(),
+  })
+  .passthrough();
+
+export const CapacityDeltaSchema = z
+  .object({
+    machine_code: z.string(),
+    date: DateString,
+    used_capacity_a: z.number().nullable().optional(),
+    used_capacity_b: z.number().nullable().optional(),
+    capacity_delta: z.number(),
+  })
+  .passthrough();
+
+export const ConfigChangeSchema = z
+  .object({
+    key: z.string(),
+    value_a: z.string().nullable().optional(),
+    value_b: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const VersionComparisonResultSchema = z
+  .object({
+    version_id_a: z.string(),
+    version_id_b: z.string(),
+    moved_count: z.number(),
+    added_count: z.number(),
+    removed_count: z.number(),
+    squeezed_out_count: z.number(),
+    risk_delta: z.array(RiskDeltaSchema).nullable().optional(),
+    capacity_delta: z.array(CapacityDeltaSchema).nullable().optional(),
+    config_changes: z.array(ConfigChangeSchema).nullable().optional(),
+    message: z.string(),
+  })
+  .passthrough();
+
+export const MoveItemResultSchema = z
+  .object({
+    material_id: z.string(),
+    success: z.boolean(),
+    from_date: DateString.nullable().optional(),
+    from_machine: z.string().nullable().optional(),
+    to_date: DateString,
+    to_machine: z.string(),
+    error: z.string().nullable().optional(),
+    violation_type: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const MoveItemsResponseSchema = z
+  .object({
+    version_id: z.string(),
+    results: z.array(MoveItemResultSchema),
+    success_count: z.number(),
+    failed_count: z.number(),
+    has_violations: z.boolean(),
+    message: z.string(),
+  })
+  .passthrough();
+
 // ==========================================================
 // Config API 响应 Schema（优先级3）
 // ==========================================================
@@ -412,8 +575,10 @@ export const PlanItemSchema = z
 export const ConfigItemSchema = z
   .object({
     scope_id: z.string(),
+    scope_type: z.string(),
     key: z.string(),
     value: z.string(),
+    updated_at: z.string().optional(),
   })
   .passthrough();
 
@@ -423,6 +588,51 @@ export const ImpactSummarySchema = z
     fail_count: z.number(),
     message: z.string(),
     details: z.record(z.unknown()).nullable().optional(),
+  })
+  .passthrough();
+
+export const BatchUpdateConfigsResponseSchema = z
+  .object({
+    updated_count: z.number(),
+  })
+  .passthrough();
+
+export const RestoreConfigFromSnapshotResponseSchema = z
+  .object({
+    restored_count: z.number(),
+  })
+  .passthrough();
+
+export const ConfigSnapshotSchema = z.record(z.unknown());
+
+export const CustomStrategyParametersSchema = z
+  .object({
+    urgent_weight: z.number().nullable().optional(),
+    capacity_weight: z.number().nullable().optional(),
+    cold_stock_weight: z.number().nullable().optional(),
+    due_date_weight: z.number().nullable().optional(),
+    rolling_output_age_weight: z.number().nullable().optional(),
+    cold_stock_age_threshold_days: z.number().nullable().optional(),
+    overflow_tolerance_pct: z.number().nullable().optional(),
+  })
+  .passthrough();
+
+export const CustomStrategyProfileSchema = z
+  .object({
+    strategy_id: z.string(),
+    title: z.string(),
+    description: z.string().nullable().optional(),
+    base_strategy: z.string(),
+    parameters: CustomStrategyParametersSchema.nullable().optional(),
+  })
+  .passthrough();
+
+export const SaveCustomStrategyResponseSchema = z
+  .object({
+    strategy_id: z.string(),
+    stored_key: z.string(),
+    existed: z.boolean(),
+    message: z.string(),
   })
   .passthrough();
 
@@ -436,6 +646,36 @@ export const RecalcResponseSchema = z
     plan_items_count: z.number(),
     frozen_items_count: z.number(),
     success: z.boolean(),
+    message: z.string(),
+  })
+  .passthrough();
+
+// ==========================================================
+// Capacity API 响应 Schema（优先级3）
+// ==========================================================
+
+export const CapacityPoolSchema = z
+  .object({
+    version_id: z.string(),
+    machine_code: z.string(),
+    plan_date: DateString,
+    target_capacity_t: z.number(),
+    limit_capacity_t: z.number(),
+    used_capacity_t: z.number(),
+    overflow_t: z.number(),
+    frozen_capacity_t: z.number(),
+    accumulated_tonnage_t: z.number(),
+    roll_campaign_id: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const BatchUpdateCapacityPoolsResponseSchema = z
+  .object({
+    requested: z.number(),
+    updated: z.number(),
+    skipped: z.number(),
+    upserted_rows: z.number(),
+    refresh: ManualRefreshDecisionResponseSchema.nullable().optional(),
     message: z.string(),
   })
   .passthrough();
@@ -497,6 +737,41 @@ export const BatchConfirmPathOverrideResultSchema = z
     success_count: z.number(),
     fail_count: z.number(),
     failed_material_ids: z.array(z.string()),
+  })
+  .passthrough();
+
+// ==========================================================
+// Roller / Roll Campaign API 响应 Schema（优先级3）
+// ==========================================================
+
+export const RollCampaignPlanInfoSchema = z
+  .object({
+    version_id: z.string(),
+    machine_code: z.string(),
+    initial_start_at: DateTimeString,
+    next_change_at: DateTimeString.nullable().optional(),
+    downtime_minutes: z.number().nullable().optional(),
+    updated_at: DateTimeString,
+    updated_by: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const RollerCampaignInfoSchema = z
+  .object({
+    version_id: z.string(),
+    machine_code: z.string(),
+    campaign_no: z.number(),
+    start_date: DateString,
+    end_date: DateString.nullable().optional(),
+    cum_weight_t: z.number(),
+    suggest_threshold_t: z.number(),
+    hard_limit_t: z.number(),
+    status: z.string(),
+    is_active: z.boolean(),
+    remaining_tonnage_t: z.number(),
+    utilization_ratio: z.number(),
+    should_change_roll: z.boolean(),
+    is_hard_stop: z.boolean(),
   })
   .passthrough();
 

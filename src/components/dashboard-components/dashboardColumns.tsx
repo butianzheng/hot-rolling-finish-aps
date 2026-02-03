@@ -13,28 +13,28 @@ export function createOrderFailureColumns(): ColumnsType<OrderFailureRow> {
   return [
     {
       title: '合同号',
-      dataIndex: 'contract_no',
-      key: 'contract_no',
+      dataIndex: 'contractNo',
+      key: 'contractNo',
     },
     {
       title: '紧急等级',
-      dataIndex: 'urgency_level',
-      key: 'urgency_level',
+      dataIndex: 'urgencyLevel',
+      key: 'urgencyLevel',
     },
     {
       title: '交期',
-      dataIndex: 'due_date',
-      key: 'due_date',
+      dataIndex: 'dueDate',
+      key: 'dueDate',
     },
     {
       title: '失败类型',
-      dataIndex: 'fail_type',
-      key: 'fail_type',
+      dataIndex: 'failType',
+      key: 'failType',
     },
     {
       title: '完成率',
-      dataIndex: 'completion_rate',
-      key: 'completion_rate',
+      dataIndex: 'completionRate',
+      key: 'completionRate',
       render: (val: number) => {
         const n = typeof val === 'number' ? val : 0;
         const pct = n <= 1 ? n * 100 : n; // 兼容 0-1 与 0-100 两种口径
@@ -51,18 +51,18 @@ export function createColdStockColumns(): ColumnsType<ColdStockBucketRow> {
   return [
     {
       title: '机组',
-      dataIndex: 'machine_code',
-      key: 'machine_code',
+      dataIndex: 'machineCode',
+      key: 'machineCode',
     },
     {
       title: '库龄分桶',
-      dataIndex: 'age_bin',
-      key: 'age_bin',
+      dataIndex: 'ageBin',
+      key: 'ageBin',
     },
     {
       title: '压力等级',
-      dataIndex: 'pressure_level',
-      key: 'pressure_level',
+      dataIndex: 'pressureLevel',
+      key: 'pressureLevel',
     },
     {
       title: '数量',
@@ -72,8 +72,8 @@ export function createColdStockColumns(): ColumnsType<ColdStockBucketRow> {
     },
     {
       title: '重量(吨)',
-      dataIndex: 'weight_t',
-      key: 'weight_t',
+      dataIndex: 'weightT',
+      key: 'weightT',
       render: (val: number) => formatNumber(val, 2),
     },
   ];

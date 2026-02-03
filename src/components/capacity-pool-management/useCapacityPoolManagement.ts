@@ -287,7 +287,7 @@ export function useCapacityPoolManagement(): UseCapacityPoolManagementReturn {
       message.success(`${resp?.message || '批量更新完成'}：更新 ${updated} 条，跳过 ${skipped} 条`);
 
       if (resp?.refresh) {
-        const refresh = resp.refresh as any;
+        const refresh = resp.refresh;
         const text = String(refresh?.message || '').trim();
         if (text) {
           if (refresh?.success) message.info(text);
@@ -302,9 +302,9 @@ export function useCapacityPoolManagement(): UseCapacityPoolManagementReturn {
       setSelectedRowKeys([]);
       setSelectedPools([]);
       await loadCapacityPools();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('批量更新产能池失败:', error);
-      message.error(error?.message || '批量更新失败');
+      message.error(getErrorMessage(error) || '批量更新失败');
     } finally {
       setLoading(false);
     }

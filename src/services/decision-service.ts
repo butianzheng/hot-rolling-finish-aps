@@ -259,6 +259,31 @@ export async function getColdStockProfile(
 // ==========================================
 
 /**
+ * 获取“哪天最危险”（兼容旧 dashboard_api.get_most_risky_date 语义）
+ *
+ * 默认:
+ * - 日期范围: 今天 ~ 30 天后
+ * - limit: 10
+ * - sortBy: risk_score
+ */
+export async function getMostRiskyDate(
+  versionId: string
+): Promise<DecisionDaySummaryResponse> {
+  const today = new Date();
+  const dateFrom = new Date(today);
+  const dateTo = new Date(today);
+  dateTo.setDate(today.getDate() + 30);
+
+  return getDecisionDaySummary({
+    versionId,
+    dateFrom: dateFrom.toISOString().split('T')[0],
+    dateTo: dateTo.toISOString().split('T')[0],
+    limit: 10,
+    sortBy: 'risk_score',
+  });
+}
+
+/**
  * 获取最近N天的风险摘要
  */
 export async function getRiskSummaryForRecentDays(
@@ -300,6 +325,29 @@ export async function getBottleneckForRecentDays(
 }
 
 /**
+ * 获取“哪个机组最堵”（兼容旧 dashboard_api.get_most_congested_machine 语义）
+ *
+ * 默认:
+ * - 日期范围: 今天 ~ 7 天后
+ * - limit: 10
+ */
+export async function getMostCongestedMachine(
+  versionId: string
+): Promise<MachineBottleneckProfileResponse> {
+  const today = new Date();
+  const dateFrom = new Date(today);
+  const dateTo = new Date(today);
+  dateTo.setDate(today.getDate() + 7);
+
+  return getMachineBottleneckProfile({
+    versionId,
+    dateFrom: dateFrom.toISOString().split('T')[0],
+    dateTo: dateTo.toISOString().split('T')[0],
+    limit: 10,
+  });
+}
+
+/**
  * 获取所有失败订单（不分页）
  */
 export async function getAllFailedOrders(
@@ -308,6 +356,39 @@ export async function getAllFailedOrders(
   return listOrderFailureSet({
     versionId,
     limit: 1000, // 较大的限制，获取所有数据
+  });
+}
+
+/**
+ * 获取“哪些紧急单无法完成”（兼容旧 dashboard_api.get_unsatisfied_urgent_materials 语义）
+ *
+ * 默认:
+ * - limit: 100
+ */
+export async function getUnsatisfiedUrgentMaterials(
+  versionId: string
+): Promise<OrderFailureSetResponse> {
+  return listOrderFailureSet({
+    versionId,
+    limit: 100,
+  });
+}
+
+/**
+ * 获取“哪些冷料压库”（兼容旧 dashboard_api.get_cold_stock_materials 语义）
+ *
+ * 说明：旧接口的 thresholdDays 参数已在后端废弃，这里保留签名用于兼容，但不参与过滤。
+ *
+ * 默认:
+ * - limit: 100
+ */
+export async function getColdStockMaterials(
+  versionId: string,
+  _thresholdDays?: number
+): Promise<ColdStockProfileResponse> {
+  return getColdStockProfile({
+    versionId,
+    limit: 100,
   });
 }
 
@@ -396,18 +477,22 @@ export async function getCapacityOpportunityForRecentDays(
 export const decisionService = {
   // D1: 日期风险摘要
   getDecisionDaySummary,
+  getMostRiskyDate,
   getRiskSummaryForRecentDays,
 
   // D4: 机组堵塞概况
   getMachineBottleneckProfile,
+  getMostCongestedMachine,
   getBottleneckForRecentDays,
 
   // D2: 订单失败集合
   listOrderFailureSet,
+  getUnsatisfiedUrgentMaterials,
   getAllFailedOrders,
 
   // D3: 冷料压库概况
   getColdStockProfile,
+  getColdStockMaterials,
   getHighPressureColdStock,
 
   // D5: 轧制活动警报

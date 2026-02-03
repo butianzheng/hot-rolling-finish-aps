@@ -4,9 +4,9 @@
 
 export interface Material {
   material_id: string;
-  machine_code: string;
-  weight_t: number;
-  steel_mark: string;
+  machine_code?: string | null;
+  weight_t?: number | null;
+  steel_mark?: string | null;
   sched_state: string;
   urgent_level: string;
   lock_flag: boolean;

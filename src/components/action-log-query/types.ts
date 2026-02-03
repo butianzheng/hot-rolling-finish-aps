@@ -10,10 +10,10 @@ export interface ActionLog {
   actor: string;
   payload_json?: any;
   impact_summary_json?: any;
-  machine_code?: string;
-  date_range_start?: string;
-  date_range_end?: string;
-  detail?: string;
+  machine_code?: string | null;
+  date_range_start?: string | null;
+  date_range_end?: string | null;
+  detail?: string | null;
 }
 
 // 操作类型映射

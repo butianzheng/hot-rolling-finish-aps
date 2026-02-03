@@ -64,16 +64,16 @@ const Dashboard: React.FC = () => {
             <Table
               columns={orderFailureColumns}
               dataSource={state.orderFailures}
-              rowKey={(r) => `${r.contract_no}-${r.due_date}-${r.machine_code}`}
+              rowKey={(r) => `${r.contractNo}-${r.dueDate}-${r.machineCode}`}
               loading={state.loading}
               pagination={{ pageSize: 5 }}
               size="small"
               onRow={(record) => ({
                 onClick: () => {
                   const qs = new URLSearchParams({
-                    contractNo: record.contract_no,
-                    urgency: record.urgency_level,
-                    failType: record.fail_type,
+                    contractNo: record.contractNo,
+                    urgency: record.urgencyLevel,
+                    failType: record.failType,
                   }).toString();
                   navigate(`/overview?tab=d2&${qs}`);
                 },
@@ -86,16 +86,16 @@ const Dashboard: React.FC = () => {
             <Table
               columns={coldStockColumns}
               dataSource={state.coldStockBuckets}
-              rowKey={(r) => `${r.machine_code}-${r.age_bin}-${r.pressure_level}`}
+              rowKey={(r) => `${r.machineCode}-${r.ageBin}-${r.pressureLevel}`}
               loading={state.loading}
               pagination={{ pageSize: 5 }}
               size="small"
               onRow={(record) => ({
                 onClick: () => {
                   const qs = new URLSearchParams({
-                    machine: record.machine_code,
-                    ageBin: record.age_bin,
-                    pressureLevel: record.pressure_level,
+                    machine: record.machineCode,
+                    ageBin: record.ageBin,
+                    pressureLevel: record.pressureLevel,
                   }).toString();
                   navigate(`/overview?tab=d3&${qs}`);
                 },

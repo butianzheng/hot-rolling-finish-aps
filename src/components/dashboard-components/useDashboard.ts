@@ -4,7 +4,7 @@
 
 import { useState, useCallback } from 'react';
 import { message } from 'antd';
-import { dashboardApi } from '../../api/tauri';
+import { decisionService } from '../../api/tauri';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { useActiveVersionId } from '../../stores/use-global-store';
 import type {
@@ -70,14 +70,14 @@ export function useDashboard(): UseDashboardReturn {
     setLoading(true);
     try {
       // 加载未满足的紧急单
-      const orderFailureSet = (await dashboardApi.getUnsatisfiedUrgentMaterials(
+      const orderFailureSet = (await decisionService.getUnsatisfiedUrgentMaterials(
         activeVersionId
       )) as OrderFailureSetResponse;
       setOrderFailures(orderFailureSet?.items || []);
       setOrderFailureSummary(orderFailureSet?.summary);
 
       // 加载冷料（库存超过30天）
-      const coldStockProfile = (await dashboardApi.getColdStockMaterials(
+      const coldStockProfile = (await decisionService.getColdStockMaterials(
         activeVersionId,
         30
       )) as ColdStockProfileResponse;
@@ -85,13 +85,13 @@ export function useDashboard(): UseDashboardReturn {
       setColdStockSummary(coldStockProfile?.summary);
 
       // 加载最拥堵机组
-      const bottleneckProfile = (await dashboardApi.getMostCongestedMachine(
+      const bottleneckProfile = (await decisionService.getMostCongestedMachine(
         activeVersionId
       )) as MachineBottleneckProfileResponse;
       const points = bottleneckProfile?.items || [];
       const most = points.reduce<BottleneckPointRow | null>((max, p) => {
         if (!max) return p;
-        return p.bottleneck_score > max.bottleneck_score ? p : max;
+        return p.bottleneckScore > max.bottleneckScore ? p : max;
       }, null);
       setMostCongestedPoint(most);
     } catch (error: any) {

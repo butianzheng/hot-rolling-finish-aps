@@ -51,6 +51,7 @@ use hot_rolling_aps::domain::types::SchedState;
 
 use std::sync::Mutex;
 use rusqlite::Connection;
+use hot_rolling_aps::db::open_sqlite_connection;
 
 // ==========================================
 // API测试环境
@@ -93,7 +94,7 @@ impl ApiTestEnv {
             .map_err(|e| format!("创建测试数据库失败: {}", e))?;
 
         // 初始化数据库连接
-        let conn = Connection::open(&db_path)
+        let conn = open_sqlite_connection(&db_path)
             .map_err(|e| format!("无法打开数据库: {}", e))?;
         let conn = Arc::new(Mutex::new(conn));
 
@@ -251,7 +252,10 @@ impl ApiTestEnv {
 
         // RollerApi
         let roller_repo = Arc::new(RollerCampaignRepository::from_connection(conn.clone()));
-        let roll_plan_repo = Arc::new(RollCampaignPlanRepository::from_connection(conn.clone()));
+        let roll_plan_repo = Arc::new(
+            RollCampaignPlanRepository::from_connection(conn.clone())
+                .map_err(|e| format!("无法创建RollCampaignPlanRepository: {}", e))?
+        );
         let roller_api = Arc::new(RollerApi::new(
             roller_repo,
             roll_plan_repo,

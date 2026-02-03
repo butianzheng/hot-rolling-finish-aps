@@ -5,6 +5,7 @@ import { useDecisionRefreshStatus } from '../hooks/useDecisionRefreshStatus';
 import { useEvent } from '../api/eventBus';
 import { dashboardApi } from '../api/tauri';
 import { useCurrentUser } from '../stores/use-global-store';
+import { getErrorMessage } from '../utils/errorUtils';
 
 function isRecent(ts?: string | null, windowMs: number = 15_000): boolean {
   if (!ts) return false;
@@ -27,7 +28,7 @@ export const DecisionRefreshTag: React.FC<{ versionId: string | null }> = ({ ver
 
   const hint = useMemo(() => {
     if (!data) return '决策刷新状态未知';
-    const counts = data.queue_counts || ({} as any);
+    const counts = data.queue_counts;
     const running = Number(counts.running || 0) + Number(counts.pending || 0);
     const lastCompletedAt = data.latest_log?.completed_at ?? data.latest_task?.completed_at ?? null;
 
@@ -83,8 +84,8 @@ export const DecisionRefreshTag: React.FC<{ versionId: string | null }> = ({ ver
         const resp = await dashboardApi.manualRefreshDecision(versionId, operator);
         message.success(resp?.message || '已触发决策刷新');
         query.refetch();
-      } catch (e: any) {
-        message.error(e?.message || '触发决策刷新失败');
+      } catch (e: unknown) {
+        message.error(getErrorMessage(e) || '触发决策刷新失败');
       } finally {
         setRetrying(false);
       }

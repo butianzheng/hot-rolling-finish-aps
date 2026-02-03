@@ -47,6 +47,7 @@
 - `src/engine/capacity_filler.rs`（924）
 
 > 备注：存在 `src/app/tauri_commands.rs.backup`（2257 行）这类“非编译文件但体量巨大”的备份文件，建议迁移到 `docs/archived/` 或移除，避免误导与噪声。
+> 备注更新（2026-02-03）：上述 `.backup` 文件已清理，避免误导与噪声。
 
 ### 2.3 典型技术债指标
 
@@ -261,4 +262,3 @@ rg -n ":\\s*any\\b|as any\\b|Promise<any>" src | wc -l
 rg --files src | tr '\\n' '\\0' | xargs -0 wc -l | sort -nr | head -20
 npm run test -- --run
 ```
-

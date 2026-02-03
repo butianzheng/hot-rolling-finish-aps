@@ -11,19 +11,22 @@ import { IpcClient } from './ipcClient';
 import {
   z,
   zodValidator,
+  EmptyOkResponseSchema,
+  ImportApiResponseSchema,
+  ImportConflictListResponseSchema,
   GenerateStrategyDraftsResponseSchema,
   ListStrategyDraftsResponseSchema,
   ApplyStrategyDraftResponseSchema,
   GetStrategyDraftDetailResponseSchema,
   CleanupStrategyDraftsResponseSchema,
+  StrategyPresetSchema,
+  ManualRefreshDecisionResponseSchema,
+  RollbackVersionResponseSchema,
+  VersionComparisonResultSchema,
+  MoveItemsResponseSchema,
   VersionComparisonKpiResultSchema,
   DecisionRefreshStatusResponseSchema,
   DecisionDaySummaryResponseSchema,
-  OrderFailureSetResponseSchema,
-  ColdStockProfileResponseSchema,
-  MachineBottleneckProfileResponseSchema,
-  RollCampaignAlertsResponseSchema,
-  CapacityOpportunityResponseSchema,
   MaterialWithStateSchema,
   MaterialDetailResponseSchema,
   PlanSchema,
@@ -32,12 +35,21 @@ import {
   ConfigItemSchema,
   ActionLogSchema,
   ImpactSummarySchema,
+  BatchUpdateConfigsResponseSchema,
+  RestoreConfigFromSnapshotResponseSchema,
+  ConfigSnapshotSchema,
+  CustomStrategyProfileSchema,
+  SaveCustomStrategyResponseSchema,
   RecalcResponseSchema,
+  CapacityPoolSchema,
+  BatchUpdateCapacityPoolsResponseSchema,
   PathRuleConfigSchema,
   PathOverridePendingSchema,
   PathOverridePendingSummarySchema,
   RollCycleAnchorSchema,
   BatchConfirmPathOverrideResultSchema,
+  RollCampaignPlanInfoSchema,
+  RollerCampaignInfoSchema,
   BatchResolveConflictsResponseSchema,
   type BatchResolveConflictsResponse,
   CancelImportBatchResponseSchema,
@@ -68,12 +80,14 @@ export const importApi = {
     filePath: string,
     sourceBatchId: string,
     mappingProfileId?: string
-  ): Promise<any> {
+  ): Promise<z.infer<typeof ImportApiResponseSchema>> {
     // 使用 snake_case 参数名（后端配置 rename_all = "snake_case"）
     return IpcClient.call('import_materials', {
       file_path: filePath,
       source_batch_id: sourceBatchId,
       mapping_profile_id: mappingProfileId,
+    }, {
+      validate: zodValidator(ImportApiResponseSchema, 'import_materials'),
     });
   },
 
@@ -82,8 +96,10 @@ export const importApi = {
     limit: number = 50,
     offset: number = 0,
     batchId?: string
-  ): Promise<any> {
-    return IpcClient.call('list_import_conflicts', { status, limit, offset, batch_id: batchId });
+  ): Promise<z.infer<typeof ImportConflictListResponseSchema>> {
+    return IpcClient.call('list_import_conflicts', { status, limit, offset, batch_id: batchId }, {
+      validate: zodValidator(ImportConflictListResponseSchema, 'list_import_conflicts'),
+    });
   },
 
   async resolveImportConflict(
@@ -91,12 +107,14 @@ export const importApi = {
     action: 'KEEP_EXISTING' | 'OVERWRITE' | 'MERGE',
     note?: string,
     operator: string = 'system'
-  ): Promise<any> {
-    return IpcClient.call('resolve_import_conflict', {
+  ): Promise<void> {
+    await IpcClient.call('resolve_import_conflict', {
       conflict_id: conflictId,
       action,
       note,
       operator,
+    }, {
+      validate: zodValidator(EmptyOkResponseSchema, 'resolve_import_conflict'),
     });
   },
 
@@ -152,7 +170,7 @@ export const materialApi = {
     steel_grade?: string;
     limit: number;
     offset: number;
-  }): Promise<any> {
+  }): Promise<Array<z.infer<typeof MaterialWithStateSchema>>> {
     return IpcClient.call('list_materials', {
       machine_code: params.machine_code,
       steel_grade: params.steel_grade,
@@ -163,13 +181,13 @@ export const materialApi = {
     });
   },
 
-  async getMaterialDetail(materialId: string): Promise<any> {
+  async getMaterialDetail(materialId: string): Promise<z.infer<typeof MaterialDetailResponseSchema>> {
     return IpcClient.call('get_material_detail', { material_id: materialId }, {
       validate: zodValidator(MaterialDetailResponseSchema, 'get_material_detail'),
     });
   },
 
-  async listReadyMaterials(machineCode?: string): Promise<any> {
+  async listReadyMaterials(machineCode?: string): Promise<Array<z.infer<typeof MaterialWithStateSchema>>> {
     return IpcClient.call('list_ready_materials', { machine_code: machineCode }, {
       validate: zodValidator(z.array(MaterialWithStateSchema), 'list_ready_materials'),
     });
@@ -181,7 +199,7 @@ export const materialApi = {
     operator: string,
     reason: string,
     mode?: 'Strict' | 'AutoFix'
-  ): Promise<any> {
+  ): Promise<z.infer<typeof ImpactSummarySchema>> {
     return IpcClient.call('batch_lock_materials', {
       material_ids: materialIds,
       lock_flag: lockFlag,
@@ -198,7 +216,7 @@ export const materialApi = {
     operator: string,
     reason: string,
     mode?: 'Strict' | 'AutoFix'
-  ): Promise<any> {
+  ): Promise<z.infer<typeof ImpactSummarySchema>> {
     return IpcClient.call('batch_force_release', {
       material_ids: materialIds,
       operator,
@@ -214,7 +232,7 @@ export const materialApi = {
     manualUrgentFlag: boolean,
     operator: string,
     reason: string
-  ): Promise<any> {
+  ): Promise<z.infer<typeof ImpactSummarySchema>> {
     return IpcClient.call('batch_set_urgent', {
       material_ids: materialIds,
       manual_urgent_flag: manualUrgentFlag,
@@ -228,7 +246,7 @@ export const materialApi = {
   async listMaterialsByUrgentLevel(
     urgentLevel: string,
     machineCode?: string
-  ): Promise<any> {
+  ): Promise<Array<z.infer<typeof MaterialWithStateSchema>>> {
     return IpcClient.call('list_materials_by_urgent_level', {
       urgent_level: urgentLevel,
       machine_code: machineCode,
@@ -250,13 +268,13 @@ export const planApi = {
     });
   },
 
-  async listPlans(): Promise<any> {
+  async listPlans(): Promise<Array<z.infer<typeof PlanSchema>>> {
     return IpcClient.call('list_plans', {}, {
       validate: zodValidator(z.array(PlanSchema), 'list_plans'),
     });
   },
 
-  async getPlanDetail(planId: string): Promise<any> {
+  async getPlanDetail(planId: string): Promise<z.infer<typeof PlanSchema> | null | undefined> {
     return IpcClient.call('get_plan_detail', { plan_id: planId }, {
       validate: zodValidator(PlanSchema.nullable().optional(), 'get_plan_detail'),
     });
@@ -296,7 +314,7 @@ export const planApi = {
     });
   },
 
-  async listVersions(planId: string): Promise<any> {
+  async listVersions(planId: string): Promise<Array<z.infer<typeof PlanVersionSchema>>> {
     return IpcClient.call('list_versions', { plan_id: planId }, {
       validate: zodValidator(z.array(PlanVersionSchema), 'list_versions'),
     });
@@ -314,12 +332,14 @@ export const planApi = {
     targetVersionId: string,
     operator: string,
     reason: string
-  ): Promise<any> {
+  ): Promise<z.infer<typeof RollbackVersionResponseSchema>> {
     return IpcClient.call('rollback_version', {
       plan_id: planId,
       target_version_id: targetVersionId,
       operator,
       reason,
+    }, {
+      validate: zodValidator(RollbackVersionResponseSchema, 'rollback_version'),
     });
   },
 
@@ -329,7 +349,7 @@ export const planApi = {
     frozenDate?: string,
     operator: string = 'admin',
     strategy?: string
-  ): Promise<any> {
+  ): Promise<z.infer<typeof RecalcResponseSchema>> {
     return IpcClient.call('simulate_recalc', {
       version_id: versionId,
       base_date: baseDate,
@@ -347,7 +367,7 @@ export const planApi = {
     frozenDate?: string,
     operator: string = 'admin',
     strategy?: string
-  ): Promise<any> {
+  ): Promise<z.infer<typeof RecalcResponseSchema>> {
     return IpcClient.call('recalc_full', {
       version_id: versionId,
       base_date: baseDate,
@@ -359,8 +379,10 @@ export const planApi = {
     });
   },
 
-  async getStrategyPresets(): Promise<any> {
-    return IpcClient.call('get_strategy_presets');
+  async getStrategyPresets(): Promise<Array<z.infer<typeof StrategyPresetSchema>>> {
+    return IpcClient.call('get_strategy_presets', {}, {
+      validate: zodValidator(z.array(StrategyPresetSchema), 'get_strategy_presets'),
+    });
   },
 
   async generateStrategyDrafts(params: {
@@ -369,7 +391,7 @@ export const planApi = {
     plan_date_to: string;
     strategies: string[];
     operator: string;
-  }): Promise<any> {
+  }): Promise<z.infer<typeof GenerateStrategyDraftsResponseSchema>> {
     return IpcClient.call('generate_strategy_drafts', {
       base_version_id: params.base_version_id,
       plan_date_from: params.plan_date_from,
@@ -381,7 +403,7 @@ export const planApi = {
     });
   },
 
-  async applyStrategyDraft(draftId: string, operator: string): Promise<any> {
+  async applyStrategyDraft(draftId: string, operator: string): Promise<z.infer<typeof ApplyStrategyDraftResponseSchema>> {
     return IpcClient.call('apply_strategy_draft', {
       draft_id: draftId,
       operator,
@@ -390,7 +412,7 @@ export const planApi = {
     });
   },
 
-  async getStrategyDraftDetail(draftId: string): Promise<any> {
+  async getStrategyDraftDetail(draftId: string): Promise<z.infer<typeof GetStrategyDraftDetailResponseSchema>> {
     return IpcClient.call('get_strategy_draft_detail', {
       draft_id: draftId,
     }, {
@@ -404,7 +426,7 @@ export const planApi = {
     plan_date_to: string;
     status_filter?: string;
     limit?: number;
-  }): Promise<any> {
+  }): Promise<z.infer<typeof ListStrategyDraftsResponseSchema>> {
     return IpcClient.call('list_strategy_drafts', {
       base_version_id: params.base_version_id,
       plan_date_from: params.plan_date_from,
@@ -416,7 +438,7 @@ export const planApi = {
     });
   },
 
-  async cleanupExpiredStrategyDrafts(keepDays: number): Promise<any> {
+  async cleanupExpiredStrategyDrafts(keepDays: number): Promise<z.infer<typeof CleanupStrategyDraftsResponseSchema>> {
     return IpcClient.call('cleanup_expired_strategy_drafts', {
       keep_days: keepDays,
     }, {
@@ -433,7 +455,7 @@ export const planApi = {
       limit?: number;
       offset?: number;
     }
-  ): Promise<any> {
+  ): Promise<Array<z.infer<typeof PlanItemSchema>>> {
     return IpcClient.call('list_plan_items', {
       version_id: versionId,
       plan_date_from: opts?.plan_date_from,
@@ -446,7 +468,7 @@ export const planApi = {
     });
   },
 
-  async listItemsByDate(versionId: string, planDate: string): Promise<any> {
+  async listItemsByDate(versionId: string, planDate: string): Promise<Array<z.infer<typeof PlanItemSchema>>> {
     return IpcClient.call('list_items_by_date', {
       version_id: versionId,
       plan_date: planDate,
@@ -455,14 +477,16 @@ export const planApi = {
     });
   },
 
-  async compareVersions(versionIdA: string, versionIdB: string): Promise<any> {
+  async compareVersions(versionIdA: string, versionIdB: string): Promise<z.infer<typeof VersionComparisonResultSchema>> {
     return IpcClient.call('compare_versions', {
       version_id_a: versionIdA,
       version_id_b: versionIdB,
+    }, {
+      validate: zodValidator(VersionComparisonResultSchema, 'compare_versions'),
     });
   },
 
-  async compareVersionsKpi(versionIdA: string, versionIdB: string): Promise<any> {
+  async compareVersionsKpi(versionIdA: string, versionIdB: string): Promise<z.infer<typeof VersionComparisonKpiResultSchema>> {
     return IpcClient.call('compare_versions_kpi', {
       version_id_a: versionIdA,
       version_id_b: versionIdB,
@@ -482,13 +506,15 @@ export const planApi = {
     mode: 'AUTO_FIX' | 'STRICT' = 'AUTO_FIX',
     operator: string = 'system',
     reason?: string
-  ): Promise<any> {
+  ): Promise<z.infer<typeof MoveItemsResponseSchema>> {
     return IpcClient.call('move_items', {
       version_id: versionId,
       moves: JSON.stringify(moves),
       mode,
       operator,
       reason,
+    }, {
+      validate: zodValidator(MoveItemsResponseSchema, 'move_items'),
     });
   },
 };
@@ -503,12 +529,14 @@ export const capacityApi = {
     dateFrom: string,
     dateTo: string,
     versionId?: string
-  ): Promise<any> {
+  ): Promise<Array<z.infer<typeof CapacityPoolSchema>>> {
     return IpcClient.call('get_capacity_pools', {
       machine_codes: JSON.stringify(machineCodes),  // 后端期望 JSON 字符串
       date_from: dateFrom,
       date_to: dateTo,
       version_id: versionId,
+    }, {
+      validate: zodValidator(z.array(CapacityPoolSchema), 'get_capacity_pools'),
     });
   },
 
@@ -520,8 +548,8 @@ export const capacityApi = {
     reason: string,
     operator: string = 'system',
     versionId?: string
-  ): Promise<any> {
-    return IpcClient.call('update_capacity_pool', {
+  ): Promise<void> {
+    await IpcClient.call('update_capacity_pool', {
       machine_code: machineCode,
       plan_date: planDate,
       target_capacity_t: targetCapacityT,
@@ -529,6 +557,8 @@ export const capacityApi = {
       reason,
       operator,
       version_id: versionId,
+    }, {
+      validate: zodValidator(EmptyOkResponseSchema, 'update_capacity_pool'),
     });
   },
 
@@ -542,12 +572,14 @@ export const capacityApi = {
     reason: string,
     operator: string = 'system',
     versionId?: string
-  ): Promise<any> {
+  ): Promise<z.infer<typeof BatchUpdateCapacityPoolsResponseSchema>> {
     return IpcClient.call('batch_update_capacity_pools', {
       updates: JSON.stringify(updates),
       reason,
       operator,
       version_id: versionId,
+    }, {
+      validate: zodValidator(BatchUpdateCapacityPoolsResponseSchema, 'batch_update_capacity_pools'),
     });
   },
 };
@@ -557,49 +589,22 @@ export const capacityApi = {
 // ==========================================
 
 export const dashboardApi = {
-  async listRiskSnapshots(versionId: string): Promise<any> {
-    return IpcClient.call('list_risk_snapshots', { version_id: versionId });
+  async listRiskSnapshots(versionId: string): Promise<z.infer<typeof DecisionDaySummaryResponseSchema>> {
+    return IpcClient.call('list_risk_snapshots', { version_id: versionId }, {
+      validate: zodValidator(DecisionDaySummaryResponseSchema, 'list_risk_snapshots'),
+    });
   },
 
-  async getRiskSnapshot(versionId: string, snapshotDate: string): Promise<any> {
+  async getRiskSnapshot(versionId: string, snapshotDate: string): Promise<z.infer<typeof DecisionDaySummaryResponseSchema>> {
     return IpcClient.call('get_risk_snapshot', {
       version_id: versionId,
       snapshot_date: snapshotDate,
-    });
-  },
-
-  async getMostRiskyDate(versionId: string): Promise<any> {
-    return IpcClient.call('get_most_risky_date', { version_id: versionId }, {
-      validate: zodValidator(DecisionDaySummaryResponseSchema, 'get_most_risky_date'),
-    });
-  },
-
-  async getUnsatisfiedUrgentMaterials(versionId?: string): Promise<any> {
-    return IpcClient.call('get_unsatisfied_urgent_materials', {
-      version_id: versionId,
     }, {
-      validate: zodValidator(OrderFailureSetResponseSchema, 'get_unsatisfied_urgent_materials'),
+      validate: zodValidator(DecisionDaySummaryResponseSchema, 'get_risk_snapshot'),
     });
   },
 
-  async getColdStockMaterials(versionId: string, thresholdDays?: number): Promise<any> {
-    return IpcClient.call('get_cold_stock_materials', {
-      version_id: versionId,
-      threshold_days: thresholdDays,
-    }, {
-      validate: zodValidator(ColdStockProfileResponseSchema, 'get_cold_stock_materials'),
-    });
-  },
-
-  async getMostCongestedMachine(versionId: string): Promise<any> {
-    return IpcClient.call('get_most_congested_machine', {
-      version_id: versionId,
-    }, {
-      validate: zodValidator(MachineBottleneckProfileResponseSchema, 'get_most_congested_machine'),
-    });
-  },
-
-  async getRefreshStatus(versionId: string): Promise<any> {
+  async getRefreshStatus(versionId: string): Promise<z.infer<typeof DecisionRefreshStatusResponseSchema>> {
     return IpcClient.call('get_refresh_status', {
       version_id: versionId,
     }, {
@@ -607,14 +612,16 @@ export const dashboardApi = {
     });
   },
 
-  async manualRefreshDecision(versionId: string, operator: string = 'admin'): Promise<any> {
+  async manualRefreshDecision(versionId: string, operator: string = 'admin'): Promise<z.infer<typeof ManualRefreshDecisionResponseSchema>> {
     return IpcClient.call('manual_refresh_decision', {
       version_id: versionId,
       operator,
+    }, {
+      validate: zodValidator(ManualRefreshDecisionResponseSchema, 'manual_refresh_decision'),
     });
   },
 
-  async listActionLogs(startTime: string, endTime: string): Promise<any> {
+  async listActionLogs(startTime: string, endTime: string): Promise<Array<z.infer<typeof ActionLogSchema>>> {
     return IpcClient.call('list_action_logs', {
       start_time: startTime,
       end_time: endTime,
@@ -628,7 +635,7 @@ export const dashboardApi = {
     startTime: string,
     endTime: string,
     limit?: number
-  ): Promise<any> {
+  ): Promise<Array<z.infer<typeof ActionLogSchema>>> {
     return IpcClient.call('list_action_logs_by_material', {
       material_id: materialId,
       start_time: startTime,
@@ -639,7 +646,7 @@ export const dashboardApi = {
     });
   },
 
-  async listActionLogsByVersion(versionId: string): Promise<any> {
+  async listActionLogsByVersion(versionId: string): Promise<Array<z.infer<typeof ActionLogSchema>>> {
     return IpcClient.call('list_action_logs_by_version', {
       version_id: versionId,
     }, {
@@ -654,7 +661,7 @@ export const dashboardApi = {
       start_time?: string;
       end_time?: string;
     }
-  ): Promise<any> {
+  ): Promise<Array<z.infer<typeof ActionLogSchema>>> {
     return IpcClient.call('get_recent_actions', {
       limit,
       offset: opts?.offset,
@@ -671,13 +678,13 @@ export const dashboardApi = {
 // ==========================================
 
 export const configApi = {
-  async listConfigs(): Promise<any> {
+  async listConfigs(): Promise<Array<z.infer<typeof ConfigItemSchema>>> {
     return IpcClient.call('list_configs', {}, {
       validate: zodValidator(z.array(ConfigItemSchema), 'list_configs'),
     });
   },
 
-  async getConfig(scopeId: string, key: string): Promise<any> {
+  async getConfig(scopeId: string, key: string): Promise<z.infer<typeof ConfigItemSchema> | null | undefined> {
     return IpcClient.call('get_config', {
       scope_id: scopeId,
       key,
@@ -692,13 +699,15 @@ export const configApi = {
     value: string,
     operator: string,
     reason: string
-  ): Promise<any> {
-    return IpcClient.call('update_config', {
+  ): Promise<void> {
+    await IpcClient.call('update_config', {
       scope_id: scopeId,
       key,
       value,
       operator,
       reason,
+    }, {
+      validate: zodValidator(EmptyOkResponseSchema, 'update_config'),
     });
   },
 
@@ -706,33 +715,35 @@ export const configApi = {
     configs: Array<{ scope_id: string; key: string; value: string }>,
     operator: string,
     reason: string
-  ): Promise<any> {
+  ): Promise<z.infer<typeof BatchUpdateConfigsResponseSchema>> {
     // 后端期望 configs 为 JSON 字符串
     return IpcClient.call('batch_update_configs', {
       configs: JSON.stringify(configs),
       operator,
       reason,
     }, {
-      validate: zodValidator(z.object({ updated_count: z.number() }), 'batch_update_configs'),
+      validate: zodValidator(BatchUpdateConfigsResponseSchema, 'batch_update_configs'),
     });
   },
 
-  async getConfigSnapshot(): Promise<any> {
-    return IpcClient.call('get_config_snapshot');
+  async getConfigSnapshot(): Promise<z.infer<typeof ConfigSnapshotSchema>> {
+    return IpcClient.call('get_config_snapshot', {}, {
+      validate: zodValidator(ConfigSnapshotSchema, 'get_config_snapshot'),
+    });
   },
 
   async restoreFromSnapshot(
     snapshotJson: string,
     operator: string,
     reason: string
-  ): Promise<any> {
+  ): Promise<z.infer<typeof RestoreConfigFromSnapshotResponseSchema>> {
     // 注意：后端命令名为 restore_config_from_snapshot
     return IpcClient.call('restore_config_from_snapshot', {
       snapshot_json: snapshotJson,
       operator,
       reason,
     }, {
-      validate: zodValidator(z.object({ restored_count: z.number() }), 'restore_config_from_snapshot'),
+      validate: zodValidator(RestoreConfigFromSnapshotResponseSchema, 'restore_config_from_snapshot'),
     });
   },
 
@@ -741,19 +752,23 @@ export const configApi = {
   // ==========================================
 
   async saveCustomStrategy(params: {
-    strategy: any;
+    strategy: z.infer<typeof CustomStrategyProfileSchema>;
     operator: string;
     reason: string;
-  }): Promise<any> {
+  }): Promise<z.infer<typeof SaveCustomStrategyResponseSchema>> {
     return IpcClient.call('save_custom_strategy', {
       strategy_json: JSON.stringify(params.strategy),
       operator: params.operator,
       reason: params.reason,
+    }, {
+      validate: zodValidator(SaveCustomStrategyResponseSchema, 'save_custom_strategy'),
     });
   },
 
-  async listCustomStrategies(): Promise<any> {
-    return IpcClient.call('list_custom_strategies');
+  async listCustomStrategies(): Promise<Array<z.infer<typeof CustomStrategyProfileSchema>>> {
+    return IpcClient.call('list_custom_strategies', {}, {
+      validate: zodValidator(z.array(CustomStrategyProfileSchema), 'list_custom_strategies'),
+    });
   },
 };
 
@@ -762,21 +777,23 @@ export const configApi = {
 // ==========================================
 
 export const pathRuleApi = {
-  async getPathRuleConfig(): Promise<any> {
+  async getPathRuleConfig(): Promise<z.infer<typeof PathRuleConfigSchema>> {
     return IpcClient.call('get_path_rule_config', {}, {
       validate: zodValidator(PathRuleConfigSchema, 'get_path_rule_config'),
     });
   },
 
   async updatePathRuleConfig(params: {
-    config: any;
+    config: z.infer<typeof PathRuleConfigSchema>;
     operator: string;
     reason: string;
-  }): Promise<any> {
-    return IpcClient.call('update_path_rule_config', {
+  }): Promise<void> {
+    await IpcClient.call('update_path_rule_config', {
       config_json: JSON.stringify(params.config),
       operator: params.operator,
       reason: params.reason,
+    }, {
+      validate: zodValidator(EmptyOkResponseSchema, 'update_path_rule_config'),
     });
   },
 
@@ -784,7 +801,7 @@ export const pathRuleApi = {
     versionId: string;
     machineCode: string;
     planDate: string; // YYYY-MM-DD
-  }): Promise<any> {
+  }): Promise<Array<z.infer<typeof PathOverridePendingSchema>>> {
     return IpcClient.call('list_path_override_pending', {
       version_id: params.versionId,
       machine_code: params.machineCode,
@@ -799,7 +816,7 @@ export const pathRuleApi = {
     planDateFrom: string; // YYYY-MM-DD
     planDateTo: string; // YYYY-MM-DD
     machineCodes?: string[];
-  }): Promise<any> {
+  }): Promise<Array<z.infer<typeof PathOverridePendingSummarySchema>>> {
     return IpcClient.call('list_path_override_pending_summary', {
       version_id: params.versionId,
       plan_date_from: params.planDateFrom,
@@ -815,12 +832,14 @@ export const pathRuleApi = {
     materialId: string;
     confirmedBy: string;
     reason: string;
-  }): Promise<any> {
-    return IpcClient.call('confirm_path_override', {
+  }): Promise<void> {
+    await IpcClient.call('confirm_path_override', {
       version_id: params.versionId,
       material_id: params.materialId,
       confirmed_by: params.confirmedBy,
       reason: params.reason,
+    }, {
+      validate: zodValidator(EmptyOkResponseSchema, 'confirm_path_override'),
     });
   },
 
@@ -829,7 +848,7 @@ export const pathRuleApi = {
     materialIds: string[];
     confirmedBy: string;
     reason: string;
-  }): Promise<any> {
+  }): Promise<z.infer<typeof BatchConfirmPathOverrideResultSchema>> {
     return IpcClient.call('batch_confirm_path_override', {
       version_id: params.versionId,
       material_ids: JSON.stringify(params.materialIds),
@@ -847,7 +866,7 @@ export const pathRuleApi = {
     machineCodes?: string[];
     confirmedBy: string;
     reason: string;
-  }): Promise<any> {
+  }): Promise<z.infer<typeof BatchConfirmPathOverrideResultSchema>> {
     return IpcClient.call('batch_confirm_path_override_by_range', {
       version_id: params.versionId,
       plan_date_from: params.planDateFrom,
@@ -863,7 +882,7 @@ export const pathRuleApi = {
   async getRollCycleAnchor(params: {
     versionId: string;
     machineCode: string;
-  }): Promise<any> {
+  }): Promise<z.infer<typeof RollCycleAnchorSchema> | null> {
     return IpcClient.call('get_roll_cycle_anchor', {
       version_id: params.versionId,
       machine_code: params.machineCode,
@@ -877,187 +896,14 @@ export const pathRuleApi = {
     machineCode: string;
     actor: string;
     reason: string;
-  }): Promise<any> {
-    return IpcClient.call('reset_roll_cycle', {
+  }): Promise<void> {
+    await IpcClient.call('reset_roll_cycle', {
       version_id: params.versionId,
       machine_code: params.machineCode,
       actor: params.actor,
       reason: params.reason,
-    });
-  },
-};
-
-// ==========================================
-// Decision API (D1-D6)
-// ==========================================
-// 注意: 推荐使用 services/decision-service.ts 中的封装
-//       decision-service.ts 提供了 Zod 验证和更完整的类型支持
-//       此处的 decisionApi 提供低层 API 访问，供特殊场景使用
-
-export const decisionApi = {
-  // D1: 哪天最危险
-  async getDecisionDaySummary(params: {
-    versionId: string;
-    dateFrom: string;
-    dateTo: string;
-    riskLevelFilter?: string[];
-    limit?: number;
-    sortBy?: string;
-  }): Promise<any> {
-    return IpcClient.call('get_decision_day_summary', {
-      version_id: params.versionId,
-      date_from: params.dateFrom,
-      date_to: params.dateTo,
-      risk_level_filter: params.riskLevelFilter
-        ? JSON.stringify(params.riskLevelFilter)
-        : undefined,
-      limit: params.limit,
-      sort_by: params.sortBy,
     }, {
-      validate: zodValidator(DecisionDaySummaryResponseSchema, 'get_decision_day_summary'),
-    });
-  },
-
-  // D2: 哪些紧急单无法完成
-  async listOrderFailureSet(params: {
-    versionId: string;
-    failTypeFilter?: string[];
-    urgencyLevelFilter?: string[];
-    machineCodes?: string[];
-    dueDateFrom?: string;
-    dueDateTo?: string;
-    completionRateThreshold?: number;
-    limit?: number;
-    offset?: number;
-  }): Promise<any> {
-    return IpcClient.call('list_order_failure_set', {
-      version_id: params.versionId,
-      fail_type_filter: params.failTypeFilter
-        ? JSON.stringify(params.failTypeFilter)
-        : undefined,
-      urgency_level_filter: params.urgencyLevelFilter
-        ? JSON.stringify(params.urgencyLevelFilter)
-        : undefined,
-      machine_codes: params.machineCodes
-        ? JSON.stringify(params.machineCodes)
-        : undefined,
-      due_date_from: params.dueDateFrom,
-      due_date_to: params.dueDateTo,
-      completion_rate_threshold: params.completionRateThreshold,
-      limit: params.limit,
-      offset: params.offset,
-    }, {
-      validate: zodValidator(OrderFailureSetResponseSchema, 'list_order_failure_set'),
-    });
-  },
-
-  // D3: 哪些冷料压库
-  async getColdStockProfile(params: {
-    versionId: string;
-    machineCodes?: string[];
-    pressureLevelFilter?: string[];
-    ageBinFilter?: string[];
-    limit?: number;
-  }): Promise<any> {
-    return IpcClient.call('get_cold_stock_profile', {
-      version_id: params.versionId,
-      machine_codes: params.machineCodes
-        ? JSON.stringify(params.machineCodes)
-        : undefined,
-      pressure_level_filter: params.pressureLevelFilter
-        ? JSON.stringify(params.pressureLevelFilter)
-        : undefined,
-      age_bin_filter: params.ageBinFilter
-        ? JSON.stringify(params.ageBinFilter)
-        : undefined,
-      limit: params.limit,
-    }, {
-      validate: zodValidator(ColdStockProfileResponseSchema, 'get_cold_stock_profile'),
-    });
-  },
-
-  // D4: 哪个机组最堵
-  async getMachineBottleneckProfile(params: {
-    versionId: string;
-    dateFrom: string;
-    dateTo: string;
-    machineCodes?: string[];
-    bottleneckLevelFilter?: string[];
-    bottleneckTypeFilter?: string[];
-    limit?: number;
-  }): Promise<any> {
-    return IpcClient.call('get_machine_bottleneck_profile', {
-      version_id: params.versionId,
-      date_from: params.dateFrom,
-      date_to: params.dateTo,
-      machine_codes: params.machineCodes
-        ? JSON.stringify(params.machineCodes)
-        : undefined,
-      bottleneck_level_filter: params.bottleneckLevelFilter
-        ? JSON.stringify(params.bottleneckLevelFilter)
-        : undefined,
-      bottleneck_type_filter: params.bottleneckTypeFilter
-        ? JSON.stringify(params.bottleneckTypeFilter)
-        : undefined,
-      limit: params.limit,
-    }, {
-      validate: zodValidator(MachineBottleneckProfileResponseSchema, 'get_machine_bottleneck_profile'),
-    });
-  },
-
-  // D5: 换辊是否异常
-  async getRollCampaignAlert(params: {
-    versionId: string;
-    machineCodes?: string[];
-    alertLevelFilter?: string[];
-    alertTypeFilter?: string[];
-    dateFrom?: string;
-    dateTo?: string;
-    limit?: number;
-  }): Promise<any> {
-    return IpcClient.call('get_roll_campaign_alert', {
-      version_id: params.versionId,
-      machine_codes: params.machineCodes
-        ? JSON.stringify(params.machineCodes)
-        : undefined,
-      alert_level_filter: params.alertLevelFilter
-        ? JSON.stringify(params.alertLevelFilter)
-        : undefined,
-      alert_type_filter: params.alertTypeFilter
-        ? JSON.stringify(params.alertTypeFilter)
-        : undefined,
-      date_from: params.dateFrom,
-      date_to: params.dateTo,
-      limit: params.limit,
-    }, {
-      validate: zodValidator(RollCampaignAlertsResponseSchema, 'get_roll_campaign_alert'),
-    });
-  },
-
-  // D6: 是否存在产能优化空间
-  async getCapacityOpportunity(params: {
-    versionId: string;
-    dateFrom?: string;
-    dateTo?: string;
-    machineCodes?: string[];
-    opportunityTypeFilter?: string[];
-    minOpportunityT?: number;
-    limit?: number;
-  }): Promise<any> {
-    return IpcClient.call('get_capacity_opportunity', {
-      version_id: params.versionId,
-      date_from: params.dateFrom,
-      date_to: params.dateTo,
-      machine_codes: params.machineCodes
-        ? JSON.stringify(params.machineCodes)
-        : undefined,
-      opportunity_type_filter: params.opportunityTypeFilter
-        ? JSON.stringify(params.opportunityTypeFilter)
-        : undefined,
-      min_opportunity_t: params.minOpportunityT,
-      limit: params.limit,
-    }, {
-      validate: zodValidator(CapacityOpportunityResponseSchema, 'get_capacity_opportunity'),
+      validate: zodValidator(EmptyOkResponseSchema, 'reset_roll_cycle'),
     });
   },
 };
@@ -1067,15 +913,19 @@ export const decisionApi = {
 // ==========================================
 
 export const rollApi = {
-  async listRollCampaigns(versionId: string): Promise<any> {
+  async listRollCampaigns(versionId: string): Promise<Array<z.infer<typeof RollerCampaignInfoSchema>>> {
     return IpcClient.call('list_roll_campaigns', {
       version_id: versionId,
+    }, {
+      validate: zodValidator(z.array(RollerCampaignInfoSchema), 'list_roll_campaigns'),
     });
   },
 
-  async listRollCampaignPlans(versionId: string): Promise<any> {
+  async listRollCampaignPlans(versionId: string): Promise<Array<z.infer<typeof RollCampaignPlanInfoSchema>>> {
     return IpcClient.call('list_roll_campaign_plans', {
       version_id: versionId,
+    }, {
+      validate: zodValidator(z.array(RollCampaignPlanInfoSchema), 'list_roll_campaign_plans'),
     });
   },
 
@@ -1087,8 +937,8 @@ export const rollApi = {
     downtimeMinutes?: number;
     operator: string;
     reason: string;
-  }): Promise<any> {
-    return IpcClient.call('upsert_roll_campaign_plan', {
+  }): Promise<void> {
+    await IpcClient.call('upsert_roll_campaign_plan', {
       version_id: params.versionId,
       machine_code: params.machineCode,
       initial_start_at: params.initialStartAt,
@@ -1096,22 +946,28 @@ export const rollApi = {
       downtime_minutes: params.downtimeMinutes,
       operator: params.operator,
       reason: params.reason,
+    }, {
+      validate: zodValidator(EmptyOkResponseSchema, 'upsert_roll_campaign_plan'),
     });
   },
 
   async getActiveRollCampaign(
     versionId: string,
     machineCode: string
-  ): Promise<any> {
+  ): Promise<z.infer<typeof RollerCampaignInfoSchema> | null> {
     return IpcClient.call('get_active_roll_campaign', {
       version_id: versionId,
       machine_code: machineCode,
+    }, {
+      validate: zodValidator(RollerCampaignInfoSchema.nullable(), 'get_active_roll_campaign'),
     });
   },
 
-  async listNeedsRollChange(versionId: string): Promise<any> {
+  async listNeedsRollChange(versionId: string): Promise<Array<z.infer<typeof RollerCampaignInfoSchema>>> {
     return IpcClient.call('list_needs_roll_change', {
       version_id: versionId,
+    }, {
+      validate: zodValidator(z.array(RollerCampaignInfoSchema), 'list_needs_roll_change'),
     });
   },
 
@@ -1131,8 +987,8 @@ export const rollApi = {
     reason: string,
     suggestThresholdT?: number,
     hardLimitT?: number
-  ): Promise<any> {
-    return IpcClient.call('create_roll_campaign', {
+  ): Promise<void> {
+    await IpcClient.call('create_roll_campaign', {
       version_id: versionId,
       machine_code: machineCode,
       campaign_no: campaignNo,
@@ -1141,6 +997,8 @@ export const rollApi = {
       hard_limit_t: hardLimitT,
       operator,
       reason,
+    }, {
+      validate: zodValidator(EmptyOkResponseSchema, 'create_roll_campaign'),
     });
   },
 
@@ -1151,14 +1009,16 @@ export const rollApi = {
     endDate: string,
     operator: string,
     reason: string
-  ): Promise<any> {
-    return IpcClient.call('close_roll_campaign', {
+  ): Promise<void> {
+    await IpcClient.call('close_roll_campaign', {
       version_id: versionId,
       machine_code: machineCode,
       campaign_no: campaignNo,
       end_date: endDate,
       operator,
       reason,
+    }, {
+      validate: zodValidator(EmptyOkResponseSchema, 'close_roll_campaign'),
     });
   },
 };
@@ -1171,7 +1031,7 @@ export const rhythmApi = {
   async listRhythmPresets(
     dimension: string = 'PRODUCT_CATEGORY',
     activeOnly: boolean = true
-  ): Promise<any> {
+  ): Promise<z.infer<typeof PlanRhythmPresetsResponseSchema>> {
     return IpcClient.call('list_rhythm_presets', { dimension, active_only: activeOnly }, {
       validate: zodValidator(PlanRhythmPresetsResponseSchema, 'list_rhythm_presets'),
     });
@@ -1185,7 +1045,7 @@ export const rhythmApi = {
     isActive?: boolean;
     operator: string;
     reason: string;
-  }): Promise<any> {
+  }): Promise<z.infer<typeof PlanRhythmPresetSchema>> {
     return IpcClient.call('upsert_rhythm_preset', {
       preset_id: params.presetId,
       preset_name: params.presetName,
@@ -1204,7 +1064,7 @@ export const rhythmApi = {
     isActive: boolean,
     operator: string,
     reason: string
-  ): Promise<any> {
+  ): Promise<z.infer<typeof PlanRhythmPresetSchema>> {
     return IpcClient.call('set_rhythm_preset_active', {
       preset_id: presetId,
       is_active: isActive,
@@ -1221,7 +1081,7 @@ export const rhythmApi = {
     machineCodes?: string[];
     dateFrom?: string;
     dateTo?: string;
-  }): Promise<any> {
+  }): Promise<z.infer<typeof PlanRhythmTargetsResponseSchema>> {
     return IpcClient.call('list_rhythm_targets', {
       version_id: params.versionId,
       dimension: params.dimension || 'PRODUCT_CATEGORY',
@@ -1242,8 +1102,8 @@ export const rhythmApi = {
     presetId?: string;
     operator: string;
     reason: string;
-  }): Promise<any> {
-    return IpcClient.call('upsert_rhythm_target', {
+  }): Promise<void> {
+    await IpcClient.call('upsert_rhythm_target', {
       version_id: params.versionId,
       machine_code: params.machineCode,
       plan_date: params.planDate,
@@ -1253,7 +1113,7 @@ export const rhythmApi = {
       operator: params.operator,
       reason: params.reason,
     }, {
-      validate: zodValidator(z.object({}).passthrough(), 'upsert_rhythm_target'),
+      validate: zodValidator(EmptyOkResponseSchema, 'upsert_rhythm_target'),
     });
   },
 
@@ -1267,7 +1127,7 @@ export const rhythmApi = {
     overwrite?: boolean;
     operator: string;
     reason: string;
-  }): Promise<any> {
+  }): Promise<z.infer<typeof ApplyRhythmPresetResponseSchema>> {
     return IpcClient.call('apply_rhythm_preset', {
       version_id: params.versionId,
       dimension: params.dimension || 'PRODUCT_CATEGORY',
@@ -1283,7 +1143,7 @@ export const rhythmApi = {
     });
   },
 
-  async getDailyRhythmProfile(versionId: string, machineCode: string, planDate: string): Promise<any> {
+  async getDailyRhythmProfile(versionId: string, machineCode: string, planDate: string): Promise<z.infer<typeof DailyRhythmProfileSchema>> {
     return IpcClient.call('get_daily_rhythm_profile', {
       version_id: versionId,
       machine_code: machineCode,
@@ -1293,3 +1153,9 @@ export const rhythmApi = {
     });
   },
 };
+
+// ==========================================
+// Decision Service (D1-D6)
+// ==========================================
+// 统一对外出口：推荐在业务/Hook 中通过 `api/tauri.ts` 引用，避免绕过统一封装
+export * from '../services/decision-service';

@@ -7,6 +7,7 @@
 
 use crate::domain::roller::RollerCampaign;
 use crate::domain::types::{AnchorSource, RollStatus};
+use crate::db::open_sqlite_connection;
 use crate::repository::error::{RepositoryError, RepositoryResult};
 use chrono::NaiveDate;
 use rusqlite::{params, Connection, OptionalExtension, Result as SqliteResult};
@@ -25,7 +26,7 @@ pub struct RollerCampaignRepository {
 impl RollerCampaignRepository {
     /// 创建新的 RollerCampaignRepository 实例
     pub fn new(db_path: &str) -> RepositoryResult<Self> {
-        let conn = Connection::open(db_path)?;
+        let conn = open_sqlite_connection(db_path)?;
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
         })

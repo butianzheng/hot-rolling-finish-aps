@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 use hot_rolling_aps::app::get_default_db_path;
+use hot_rolling_aps::db::open_sqlite_connection;
 use hot_rolling_aps::decision::services::{DecisionRefreshService, RefreshScope, RefreshTrigger};
 
 const ACTIVE_PLAN_ID: &str = "P001";
@@ -41,8 +42,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     backup_and_reset_db(&db_path)?;
 
-    let conn = Connection::open(&db_path)?;
-    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+    let conn = open_sqlite_connection(&db_path)?;
 
     // Create schema
     let schema_sql = include_str!("../../scripts/dev_db/schema.sql");
@@ -89,9 +89,9 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
 
     let tx = conn.unchecked_transaction()?;
 
-    // schema_version (we seed to 4 to match decision layer presence)
+    // schema_version (dev schema.sql already includes v0.6 features; keep it aligned for startup warnings)
     tx.execute(
-        "INSERT INTO schema_version (version, applied_at) VALUES (4, ?1)",
+        "INSERT INTO schema_version (version, applied_at) VALUES (6, ?1)",
         params![now_sql_dt],
     )?;
 

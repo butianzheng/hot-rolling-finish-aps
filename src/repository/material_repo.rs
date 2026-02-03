@@ -7,6 +7,7 @@
 
 use crate::domain::material::{MaterialMaster, MaterialState};
 use crate::domain::types::{RushLevel, SchedState, UrgentLevel};
+use crate::db::open_sqlite_connection;
 use crate::repository::error::{RepositoryError, RepositoryResult};
 use rusqlite::{params, Connection, Result as SqliteResult, ToSql};
 use serde::{Deserialize, Serialize};
@@ -31,7 +32,7 @@ impl MaterialMasterRepository {
     /// # 返回
     /// - Result<Self, RepositoryError>
     pub fn new(db_path: &str) -> RepositoryResult<Self> {
-        let conn = Connection::open(db_path)?;
+        let conn = open_sqlite_connection(db_path)?;
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
         })
@@ -506,7 +507,7 @@ impl MaterialStateRepository {
     /// # 返回
     /// - RepositoryResult<Self>
     pub fn new(db_path: &str) -> RepositoryResult<Self> {
-        let conn = Connection::open(db_path)?;
+        let conn = open_sqlite_connection(db_path)?;
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
         })

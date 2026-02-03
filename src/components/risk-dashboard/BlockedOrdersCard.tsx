@@ -39,14 +39,14 @@ export const BlockedOrdersCard: React.FC<BlockedOrdersCardProps> = ({ blockedOrd
                   <Space direction="vertical" size={4} style={{ width: '100%' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <Text strong style={{ fontFamily: FONT_FAMILIES.MONOSPACE, fontSize: 13 }}>
-                        {item.contract_no}
+                        {item.contractNo}
                       </Text>
-                      <Tag color={item.urgency_level === 'L3' ? '#ff4d4f' : '#faad14'}>
-                        {item.urgency_level}
+                      <Tag color={item.urgencyLevel === 'L3' ? '#ff4d4f' : '#faad14'}>
+                        {item.urgencyLevel}
                       </Tag>
                     </div>
                     <Text type="secondary" style={{ fontSize: 12 }}>
-                      <ClockCircleOutlined /> 距交期 {item.days_to_due} 天 - {item.fail_type}
+                      <ClockCircleOutlined /> 距交期 {item.daysToDue} 天 - {item.failType}
                     </Text>
                   </Space>
                 </List.Item>

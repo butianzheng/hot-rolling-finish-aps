@@ -31,7 +31,6 @@ export interface UseRiskSnapshotChartsReturn {
 
   // 操作
   loadRiskSnapshots: (versionId: string) => Promise<void>;
-  loadMostRiskyDate: (versionId: string) => Promise<void>;
   refresh: () => void;
 
   // 版本
@@ -61,6 +60,15 @@ export function useRiskSnapshotCharts(): UseRiskSnapshotChartsReturn {
       const result = (await dashboardApi.listRiskSnapshots(versionId)) as DecisionDaySummaryResponse;
       const items = result?.items || [];
       setRawRiskSnapshots(items);
+      // mostRiskyDate 可由已加载数据计算，避免额外 IPC 调用
+      const most = items.reduce<RiskDaySummary | null>((best, cur) => {
+        if (!best) return cur;
+        const bestScore = Number(best.risk_score || 0);
+        const curScore = Number(cur.risk_score || 0);
+        if (curScore !== bestScore) return curScore > bestScore ? cur : best;
+        return String(cur.plan_date || '') < String(best.plan_date || '') ? cur : best;
+      }, null);
+      setMostRiskyDate(most?.plan_date || null);
       message.success(`成功加载 ${items.length} 条风险摘要`);
     } catch (error: any) {
       console.error('加载风险快照失败:', error);
@@ -69,25 +77,12 @@ export function useRiskSnapshotCharts(): UseRiskSnapshotChartsReturn {
     }
   }, []);
 
-  // 加载最危险日期
-  const loadMostRiskyDate = useCallback(async (versionId: string) => {
-    if (!versionId) return;
-    try {
-      const result = (await dashboardApi.getMostRiskyDate(versionId)) as DecisionDaySummaryResponse;
-      const most = result?.items?.[0];
-      setMostRiskyDate(most?.plan_date || null);
-    } catch (error: any) {
-      console.error('加载最危险日期失败:', error);
-    }
-  }, []);
-
   // 刷新操作
   const refresh = useCallback(() => {
     if (selectedVersion) {
       loadRiskSnapshots(selectedVersion);
-      loadMostRiskyDate(selectedVersion);
     }
-  }, [selectedVersion, loadRiskSnapshots, loadMostRiskyDate]);
+  }, [selectedVersion, loadRiskSnapshots]);
 
   // 订阅risk_snapshot_updated事件,自动刷新
   useEvent('risk_snapshot_updated', () => {
@@ -97,7 +92,6 @@ export function useRiskSnapshotCharts(): UseRiskSnapshotChartsReturn {
     if (!selectedVersion || selectedVersion === activeVersionId) {
       const vid = selectedVersion || activeVersionId;
       loadRiskSnapshots(vid);
-      loadMostRiskyDate(vid);
     }
   });
 
@@ -133,9 +127,8 @@ export function useRiskSnapshotCharts(): UseRiskSnapshotChartsReturn {
   useEffect(() => {
     if (selectedVersion) {
       loadRiskSnapshots(selectedVersion);
-      loadMostRiskyDate(selectedVersion);
     }
-  }, [selectedVersion, loadRiskSnapshots, loadMostRiskyDate]);
+  }, [selectedVersion, loadRiskSnapshots]);
 
   // 加载版本下拉选项（跨方案汇总）
   useEffect(() => {
@@ -176,7 +169,6 @@ export function useRiskSnapshotCharts(): UseRiskSnapshotChartsReturn {
     activeTab,
     setActiveTab,
     loadRiskSnapshots,
-    loadMostRiskyDate,
     refresh,
     activeVersionId,
   };

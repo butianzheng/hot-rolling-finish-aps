@@ -8,7 +8,12 @@ import dayjs, { type Dayjs } from 'dayjs';
 import { capacityApi, materialApi, planApi } from '../../api/tauri';
 import { useActiveVersionId, useGlobalStore } from '../../stores/use-global-store';
 import { formatDate } from '../../utils/formatters';
+import { getErrorMessage } from '../../utils/errorUtils';
 import type { CapacityTimelineData } from '../../types/capacity';
+
+type IpcMaterialWithState = Awaited<ReturnType<typeof materialApi.listMaterials>>[number];
+type IpcCapacityPool = Awaited<ReturnType<typeof capacityApi.getCapacityPools>>[number];
+type IpcPlanItem = Awaited<ReturnType<typeof planApi.listItemsByDate>>[number];
 
 export interface UseMaterialTimelineReturn {
   machineOptions: Array<{ label: string; value: string }>;
@@ -38,8 +43,8 @@ export function useMaterialTimeline(): UseMaterialTimelineReturn {
   const loadMachineOptions = useCallback(async () => {
     const result = await materialApi.listMaterials({ limit: 1000, offset: 0 });
     const codes = new Set<string>();
-    (Array.isArray(result) ? result : []).forEach((m: any) => {
-      const code = String(m?.machine_code ?? '').trim();
+    (result as IpcMaterialWithState[]).forEach((m) => {
+      const code = String(m.machine_code ?? '').trim();
       if (code) codes.add(code);
     });
     const options = Array.from(codes)
@@ -70,14 +75,12 @@ export function useMaterialTimeline(): UseMaterialTimelineReturn {
           planApi.listItemsByDate(activeVersionId, dateStr),
         ]);
 
-        const pools = Array.isArray(capacityPools) ? capacityPools : [];
+        const pools: IpcCapacityPool[] = capacityPools ?? [];
         const pool = pools.find(
-          (p: any) => String(p?.machine_code ?? '') === machineCode && String(p?.plan_date ?? '') === dateStr
+          (p) => String(p.machine_code ?? '') === machineCode && String(p.plan_date ?? '') === dateStr
         );
 
-        const planItems = (Array.isArray(itemsByDate) ? itemsByDate : []).filter(
-          (it: any) => String(it?.machine_code ?? '') === machineCode
-        );
+        const planItems: IpcPlanItem[] = (itemsByDate ?? []).filter((it) => String(it.machine_code ?? '') === machineCode);
 
         const buckets: Record<'L0' | 'L1' | 'L2' | 'L3', { tonnage: number; count: number }> = {
           L0: { tonnage: 0, count: 0 },
@@ -86,10 +89,10 @@ export function useMaterialTimeline(): UseMaterialTimelineReturn {
           L3: { tonnage: 0, count: 0 },
         };
 
-        planItems.forEach((it: any) => {
-          const raw = String(it?.urgent_level ?? 'L0').toUpperCase();
+        planItems.forEach((it) => {
+          const raw = String(it.urgent_level ?? 'L0').toUpperCase();
           const level = (['L0', 'L1', 'L2', 'L3'].includes(raw) ? raw : 'L0') as 'L0' | 'L1' | 'L2' | 'L3';
-          const weight = Number(it?.weight_t ?? 0);
+          const weight = Number(it.weight_t ?? 0);
           if (!Number.isFinite(weight) || weight <= 0) return;
           buckets[level].tonnage += weight;
           buckets[level].count += 1;
@@ -134,8 +137,8 @@ export function useMaterialTimeline(): UseMaterialTimelineReturn {
           rollCampaignProgress: Number.isFinite(accumulated) ? accumulated : 0,
           rollChangeThreshold: 2500,
         });
-      } catch (error: any) {
-        setTimelineError(error?.message || String(error) || '加载失败');
+      } catch (error: unknown) {
+        setTimelineError(getErrorMessage(error) || '加载失败');
         setTimelineData(null);
       } finally {
         setTimelineLoading(false);
@@ -157,7 +160,7 @@ export function useMaterialTimeline(): UseMaterialTimelineReturn {
           return preferred || options[0]?.value;
         });
       })
-      .catch((e) => {
+      .catch((e: unknown) => {
         console.error('加载机组列表失败:', e);
       });
   }, [loadMachineOptions, preferredMachineCode]);

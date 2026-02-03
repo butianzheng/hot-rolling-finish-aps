@@ -5,6 +5,7 @@
 // 说明: 用于“换辊时间监控/微调”，不直接影响排程结果
 // ==========================================
 
+use crate::db::open_sqlite_connection;
 use crate::repository::error::{RepositoryError, RepositoryResult};
 use rusqlite::{params, Connection, Result as SqliteResult};
 use std::sync::{Arc, Mutex};
@@ -26,8 +27,7 @@ pub struct RollCampaignPlanRepository {
 
 impl RollCampaignPlanRepository {
     pub fn new(db_path: &str) -> RepositoryResult<Self> {
-        let conn = Connection::open(db_path)?;
-        conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+        let conn = open_sqlite_connection(db_path)?;
         let repo = Self {
             conn: Arc::new(Mutex::new(conn)),
         };
@@ -35,10 +35,10 @@ impl RollCampaignPlanRepository {
         Ok(repo)
     }
 
-    pub fn from_connection(conn: Arc<Mutex<Connection>>) -> Self {
+    pub fn from_connection(conn: Arc<Mutex<Connection>>) -> RepositoryResult<Self> {
         let repo = Self { conn };
-        let _ = repo.ensure_table();
-        repo
+        repo.ensure_table()?;
+        Ok(repo)
     }
 
     fn get_conn(&self) -> RepositoryResult<std::sync::MutexGuard<Connection>> {
@@ -177,4 +177,3 @@ impl RollCampaignPlanRepository {
         Ok(rows)
     }
 }
-

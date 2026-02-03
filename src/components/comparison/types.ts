@@ -14,7 +14,7 @@ export interface Version {
   version_id: string;
   version_no: number;
   status: string;
-  recalc_window_days: number;
+  recalc_window_days?: number | null;
   created_at: string;
   config_snapshot_json?: string | null;
 }

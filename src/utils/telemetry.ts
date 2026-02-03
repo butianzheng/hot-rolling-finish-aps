@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/tauri';
+import { IpcClient } from '../api/ipcClient';
 import { useGlobalStore } from '../stores/use-global-store';
 
 type FrontendLogLevel = 'error' | 'warn' | 'info' | 'debug';
@@ -54,8 +54,11 @@ function makeFingerprint(level: string, message: string, extra?: string): string
 async function getLatestActiveVersionId(): Promise<string | null> {
   if (!isTauriRuntime()) return null;
   try {
-    const raw = await invoke('get_latest_active_version_id', {});
-    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const parsed = await IpcClient.call<unknown>(
+      'get_latest_active_version_id',
+      {},
+      { showError: false }
+    );
     if (typeof parsed === 'string' && parsed.trim()) return parsed.trim();
     return null;
   } catch {
@@ -73,13 +76,17 @@ async function reportToBackend(params: {
   if (!isTauriRuntime()) return;
 
   try {
-    await invoke('report_frontend_event', {
-      version_id: params.version_id ?? null,
-      actor: params.actor ?? null,
-      level: params.level,
-      message: params.message,
-      payload_json: params.payload_json,
-    });
+    await IpcClient.call(
+      'report_frontend_event',
+      {
+        version_id: params.version_id ?? null,
+        actor: params.actor ?? null,
+        level: params.level,
+        message: params.message,
+        payload_json: params.payload_json,
+      },
+      { showError: false }
+    );
   } catch {
     // best-effort: ignore
   }
@@ -147,4 +154,3 @@ export async function reportFrontendError(
     context: safeJson(context),
   });
 }
-

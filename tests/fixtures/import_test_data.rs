@@ -1,13 +1,14 @@
 // 导入测试数据到数据库
 use chrono::Utc;
-use rusqlite::{params, Connection};
+use hot_rolling_aps::db::open_sqlite_connection;
+use rusqlite::params;
 use std::error::Error;
 use uuid::Uuid;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("开始导入测试数据到数据库...");
 
-    let conn = Connection::open("hot_rolling_aps.db")?;
+    let conn = open_sqlite_connection("hot_rolling_aps.db")?;
 
     // 清空现有数据
     println!("清空现有数据...");

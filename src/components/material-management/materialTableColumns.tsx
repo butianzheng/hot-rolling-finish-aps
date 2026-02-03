@@ -81,7 +81,7 @@ export function createMaterialTableColumns(options: MaterialTableColumnsOptions)
           <MaterialStatusIcons
             lockFlag={record.lock_flag}
             schedState={record.sched_state}
-            tempIssue={record.temp_issue || !record.is_mature}
+            tempIssue={record.temp_issue || record.is_mature === false}
           />
           <FrozenZoneBadge locked={record.is_frozen || false} />
         </Space>

@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex};
 use rusqlite::Connection;
 
 use crate::api::{ConfigApi, ImportApi, ManualOperationValidator, MaterialApi, PathRuleApi, PlanApi, DashboardApi, RollerApi, RhythmApi};
+use crate::db::open_sqlite_connection;
 use crate::decision::api::DecisionApiImpl;
 use crate::decision::repository::{
     DaySummaryRepository, BottleneckRepository,
@@ -112,11 +113,30 @@ impl AppState {
         tracing::info!("初始化AppState，数据库路径: {}", db_path);
 
         // 创建数据库连接（共享连接）
-        let conn = Connection::open(&db_path)
+        let conn = open_sqlite_connection(&db_path)
             .map_err(|e| format!("无法打开数据库: {}", e))?;
         // Best-effort: keep DB optimizations from blocking app startup.
         if let Err(e) = ensure_action_log_indexes(&conn) {
             tracing::warn!("action_log 索引初始化失败(将继续启动): {}", e);
+        }
+
+        match crate::db::read_schema_version(&conn) {
+            Ok(Some(v)) if v < crate::db::CURRENT_SCHEMA_VERSION => {
+                tracing::warn!(
+                    "数据库 schema_version={} 低于当前要求 {}，可能需要执行迁移 (migrations/ v0.*.sql) 或重置开发库",
+                    v,
+                    crate::db::CURRENT_SCHEMA_VERSION
+                );
+            }
+            Ok(None) => {
+                tracing::warn!(
+                    "数据库缺少 schema_version 表，无法判断版本；如为旧库请先执行迁移或重置开发库"
+                );
+            }
+            Ok(Some(_)) => {}
+            Err(e) => {
+                tracing::warn!("读取 schema_version 失败(将继续启动): {}", e);
+            }
         }
         let conn = Arc::new(Mutex::new(conn));
 
@@ -125,14 +145,8 @@ impl AppState {
         // ==========================================
 
         // 材料相关Repository
-        let material_master_repo = Arc::new(
-            MaterialMasterRepository::new(&db_path)
-                .map_err(|e| format!("无法创建MaterialMasterRepository: {}", e))?
-        );
-        let material_state_repo = Arc::new(
-            MaterialStateRepository::new(&db_path)
-                .map_err(|e| format!("无法创建MaterialStateRepository: {}", e))?
-        );
+        let material_master_repo = Arc::new(MaterialMasterRepository::from_connection(conn.clone()));
+        let material_state_repo = Arc::new(MaterialStateRepository::from_connection(conn.clone()));
 
         // 排产相关Repository
         let plan_repo = Arc::new(PlanRepository::new(conn.clone()));
@@ -144,27 +158,18 @@ impl AppState {
         let path_override_pending_repo = Arc::new(PathOverridePendingRepository::new(conn.clone()));
         // 策略草案仓储（草案持久化：避免刷新/重启丢失）
         let strategy_draft_repo = Arc::new(StrategyDraftRepository::new(conn.clone()));
-        let risk_snapshot_repo = Arc::new(
-            RiskSnapshotRepository::new(&db_path)
-                .map_err(|e| format!("无法创建RiskSnapshotRepository: {}", e))?
-        );
-        let capacity_pool_repo = Arc::new(
-            CapacityPoolRepository::new(db_path.clone())
-                .map_err(|e| format!("无法创建CapacityPoolRepository: {}", e))?
-        );
+        let risk_snapshot_repo = Arc::new(RiskSnapshotRepository::from_connection(conn.clone()));
+        let capacity_pool_repo = Arc::new(CapacityPoolRepository::from_connection(conn.clone()));
 
-        let roller_campaign_repo = Arc::new(
-            RollerCampaignRepository::new(&db_path)
-                .map_err(|e| format!("无法创建RollerCampaignRepository: {}", e))?
-        );
+        let roller_campaign_repo = Arc::new(RollerCampaignRepository::from_connection(conn.clone()));
 
         let roll_campaign_plan_repo = Arc::new(
-            RollCampaignPlanRepository::new(&db_path)
+            RollCampaignPlanRepository::from_connection(conn.clone())
                 .map_err(|e| format!("无法创建RollCampaignPlanRepository: {}", e))?
         );
 
         let plan_rhythm_repo = Arc::new(
-            PlanRhythmRepository::new(&db_path)
+            PlanRhythmRepository::from_connection(conn.clone())
                 .map_err(|e| format!("无法创建PlanRhythmRepository: {}", e))?
         );
 
@@ -182,7 +187,7 @@ impl AppState {
 
         // 配置管理器
         let config_manager = Arc::new(
-            ConfigManager::new(&db_path)
+            ConfigManager::from_connection(conn.clone())
                 .map_err(|e| format!("无法创建ConfigManager: {}", e))?
         );
 

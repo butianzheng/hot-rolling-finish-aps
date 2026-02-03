@@ -9,6 +9,7 @@
 
 use crate::config::import_config_trait::ImportConfigReader;
 use crate::config::strategy_profile::CustomStrategyProfile;
+use crate::db::open_sqlite_connection;
 use crate::domain::types::{Season, SeasonMode};
 use async_trait::async_trait;
 use chrono::{Datelike, NaiveDate};
@@ -31,12 +32,23 @@ impl ConfigManager {
     /// # 参数
     /// - db_path: 数据库文件路径
     pub fn new(db_path: &str) -> Result<Self, Box<dyn Error>> {
-        let conn = Connection::open(db_path)?;
-        conn.execute("PRAGMA foreign_keys = ON", [])?;
+        let conn = open_sqlite_connection(db_path)?;
 
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
         })
+    }
+
+    /// 从已有连接创建 ConfigManager
+    ///
+    /// 说明：为保证连接行为一致，会对传入连接再次应用统一 PRAGMA（幂等）。
+    pub fn from_connection(conn: Arc<Mutex<Connection>>) -> Result<Self, Box<dyn Error>> {
+        {
+            let conn_guard = conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
+            crate::db::configure_sqlite_connection(&conn_guard)?;
+        }
+
+        Ok(Self { conn })
     }
 
     /// 从 config_kv 表读取配置值（scope_id='global'）
