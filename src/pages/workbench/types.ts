@@ -55,6 +55,19 @@ export type ForceReleaseViolation = {
 export type MaterialOperationType = 'lock' | 'unlock' | 'urgent_on' | 'urgent_off';
 
 // =============================
+// Workbench UI: deep link context
+// =============================
+
+export type WorkbenchDeepLinkContext = {
+  machine?: string;
+  date?: string;
+  urgency?: string;
+  context?: string;
+  focus?: string;
+  openCell?: boolean;
+};
+
+// =============================
 // Workbench UI: schedule focus
 // =============================
 

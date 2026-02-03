@@ -4,8 +4,8 @@ import dayjs from 'dayjs';
 
 import type { WorkbenchViewMode } from '../../../stores/use-global-store';
 import { formatDate } from '../../../utils/formatters';
-import type { WorkbenchDeepLinkContext } from './useWorkbenchDeepLink';
 import type {
+  WorkbenchDeepLinkContext,
   WorkbenchGanttAutoOpenCell,
   WorkbenchMatrixFocusRequest,
   WorkbenchScheduleFocus,

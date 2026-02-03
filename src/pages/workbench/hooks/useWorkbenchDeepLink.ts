@@ -4,16 +4,9 @@ import dayjs from 'dayjs';
 import { message } from 'antd';
 import type { MaterialPoolSelection } from '../../../components/workbench/MaterialPool';
 import type { WorkbenchFilters, WorkbenchViewMode } from '../../../stores/use-global-store';
-import type { WorkbenchDateRangeMode } from '../types';
+import type { WorkbenchDateRangeMode, WorkbenchDeepLinkContext } from '../types';
 
-export type WorkbenchDeepLinkContext = {
-  machine?: string;
-  date?: string;
-  urgency?: string;
-  context?: string;
-  focus?: string;
-  openCell?: boolean;
-};
+export type { WorkbenchDeepLinkContext } from '../types';
 
 function getDeepLinkContextLabel(context: string): string {
   if (context === 'risk') return '风险日';
