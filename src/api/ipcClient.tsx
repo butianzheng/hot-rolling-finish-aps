@@ -5,7 +5,8 @@ import { reportFrontendEvent } from '../utils/telemetry';
 export interface IpcError {
   code: string;
   message: string;
-  details?: any;
+  /** 错误详情（JSON 结构，需运行时检查） */
+  details?: Record<string, unknown>;
 }
 
 export interface IpcOptions {
@@ -28,7 +29,7 @@ const DEBUG_IPC = Boolean(
 export class IpcClient {
   static async call<T>(
     command: string,
-    params: any = {},
+    params: unknown = {},
     options: IpcOptions = {}
   ): Promise<T> {
     const { retry = 0, timeout = 30000, showError = true } = options;
@@ -38,15 +39,22 @@ export class IpcClient {
       console.log(`[IPC Debug] ===== START =====`);
       console.log(`[IPC Debug] Command: ${command}`);
       console.log(`[IPC Debug] Params JSON:`, JSON.stringify(params));
-      console.log(`[IPC Debug] Params keys:`, Object.keys(params));
+      if (typeof params === 'object' && params !== null && !Array.isArray(params)) {
+        console.log(`[IPC Debug] Params keys:`, Object.keys(params));
+      }
       console.log(`[IPC Debug] ===== END =====`);
     }
 
     let lastError: IpcError | null = null;
     for (let i = 0; i <= retry; i++) {
       try {
+        // 确保 params 是 object 类型（Tauri 要求）
+        const invokeParams = (typeof params === 'object' && params !== null)
+          ? params as Record<string, unknown>
+          : {};
+
         const result = await Promise.race([
-          invoke(command, params),
+          invoke(command, invokeParams),
           new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Timeout')), timeout)
           )
@@ -57,7 +65,7 @@ export class IpcClient {
         const parsed = typeof result === 'string' ? JSON.parse(result) : result;
         const validated = typeof options.validate === 'function' ? options.validate(parsed) : parsed;
         return validated as T;
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (DEBUG_IPC) {
           console.error(`[IPC Debug] Error caught:`, error);
           console.error(`[IPC Debug] Error type:`, typeof error);
@@ -72,10 +80,13 @@ export class IpcClient {
     }
 
     if (lastError && showError) {
-      // best-effort: 将“会弹窗的错误”同步写入后端 action_log，便于线下排查
+      // best-effort: 将"会弹窗的错误"同步写入后端 action_log，便于线下排查
+      const paramsKeys = (typeof params === 'object' && params !== null && !Array.isArray(params))
+        ? Object.keys(params)
+        : [];
       void reportFrontendEvent('error', `IPC 调用失败: ${command}`, {
         command,
-        params_keys: Array.isArray(params) ? [] : Object.keys(params || {}),
+        params_keys: paramsKeys,
         error: lastError,
       });
     }
@@ -86,7 +97,7 @@ export class IpcClient {
     throw lastError;
   }
 
-  private static parseError(error: any): IpcError {
+  private static parseError(error: unknown): IpcError {
     if (typeof error === 'string') {
       try {
         return JSON.parse(error);
@@ -94,11 +105,23 @@ export class IpcClient {
         return { code: 'Unknown', message: error };
       }
     }
-    return {
-      code: error.code || 'Unknown',
-      message: error.message || String(error),
-      details: error.details
-    };
+    if (error instanceof Error) {
+      return {
+        code: 'Unknown',
+        message: error.message,
+      };
+    }
+    if (typeof error === 'object' && error !== null) {
+      const obj = error as Record<string, unknown>;
+      return {
+        code: typeof obj.code === 'string' ? obj.code : 'Unknown',
+        message: typeof obj.message === 'string' ? obj.message : String(error),
+        details: typeof obj.details === 'object' && obj.details !== null
+          ? obj.details as Record<string, unknown>
+          : undefined,
+      };
+    }
+    return { code: 'Unknown', message: String(error) };
   }
 
   private static isRetryable(error: IpcError): boolean {

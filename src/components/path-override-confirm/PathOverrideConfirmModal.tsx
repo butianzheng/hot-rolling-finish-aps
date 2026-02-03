@@ -94,26 +94,27 @@ const PathOverrideConfirmModal: React.FC<PathOverrideConfirmModalProps> = ({
       });
       const list: PendingRow[] = Array.isArray(data)
         ? data
-            .map((r: any) => ({
-              material_id: String(r?.material_id ?? ''),
-              material_no: String(r?.material_no ?? r?.material_id ?? ''),
-              width_mm: Number(r?.width_mm ?? 0),
-              thickness_mm: Number(r?.thickness_mm ?? 0),
-              urgent_level: normalizeUrgentLevel(r?.urgent_level),
-              violation_type: String(r?.violation_type ?? 'UNKNOWN').toUpperCase() || 'UNKNOWN',
-              anchor_width_mm: Number(r?.anchor_width_mm ?? 0),
-              anchor_thickness_mm: Number(r?.anchor_thickness_mm ?? 0),
-              width_delta_mm: Number(r?.width_delta_mm ?? 0),
-              thickness_delta_mm: Number(r?.thickness_delta_mm ?? 0),
-            }))
             .filter((r) => !!r.material_id)
+            .map((r) => ({
+              material_id: r.material_id,
+              material_no: r.material_no || r.material_id,
+              width_mm: r.width_mm,
+              thickness_mm: r.thickness_mm,
+              urgent_level: normalizeUrgentLevel(r.urgent_level),
+              violation_type: r.violation_type?.toUpperCase() || 'UNKNOWN',
+              anchor_width_mm: r.anchor_width_mm,
+              anchor_thickness_mm: r.anchor_thickness_mm,
+              width_delta_mm: r.width_delta_mm,
+              thickness_delta_mm: r.thickness_delta_mm,
+            }))
         : [];
       setRows(list);
       setSelectedIds((prev) => prev.filter((id) => list.some((r) => r.material_id === id)));
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('[PathOverrideConfirmModal] loadPending failed:', e);
       setRows([]);
-      setLoadError(String(e?.message || e || '加载待确认列表失败'));
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      setLoadError(errorMessage || '加载待确认列表失败');
     } finally {
       setLoading(false);
     }
@@ -148,9 +149,10 @@ const PathOverrideConfirmModal: React.FC<PathOverrideConfirmModalProps> = ({
       message.success('已确认突破');
       onConfirmed?.({ confirmedCount: 1, autoRecalc });
       await loadPending();
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('[PathOverrideConfirmModal] confirmSingle failed:', e);
-      message.error(String(e?.message || e || '确认失败'));
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      message.error(errorMessage || '确认失败');
     } finally {
       setSubmitting(false);
     }
@@ -189,7 +191,7 @@ const PathOverrideConfirmModal: React.FC<PathOverrideConfirmModalProps> = ({
               <p style={{ marginBottom: 8 }}>成功 {ok} 条，失败 {fail} 条。</p>
               {failed.length > 0 ? (
                 <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
-                  {failed.map((id: any) => String(id || '')).filter(Boolean).join('\n')}
+                  {failed.filter(Boolean).join('\n')}
                 </pre>
               ) : null}
             </div>
@@ -199,9 +201,10 @@ const PathOverrideConfirmModal: React.FC<PathOverrideConfirmModalProps> = ({
       onConfirmed?.({ confirmedCount: ok, autoRecalc });
       setSelectedIds([]);
       await loadPending();
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('[PathOverrideConfirmModal] confirmBatch failed:', e);
-      message.error(String(e?.message || e || '批量确认失败'));
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      message.error(errorMessage || '批量确认失败');
     } finally {
       setSubmitting(false);
     }

@@ -6,6 +6,7 @@
 // 注意: 此服务负责 snake_case ↔ camelCase 转换
 // ==========================================
 
+import { z } from 'zod';
 import { IpcClient } from '../ipcClient';
 import {
   DecisionDaySummaryResponseSchema,
@@ -52,13 +53,13 @@ function toCamelCase(str: string): string {
 /**
  * 递归将对象键从 camelCase 转换为 snake_case
  */
-function objectToSnakeCase(obj: any): any {
+function objectToSnakeCase(obj: unknown): unknown {
   if (obj === null || obj === undefined) return obj;
   if (Array.isArray(obj)) return obj.map(objectToSnakeCase);
   if (typeof obj !== 'object') return obj;
 
-  const result: Record<string, any> = {};
-  for (const [key, value] of Object.entries(obj)) {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
     result[toSnakeCase(key)] = objectToSnakeCase(value);
   }
   return result;
@@ -67,13 +68,13 @@ function objectToSnakeCase(obj: any): any {
 /**
  * 递归将对象键从 snake_case 转换为 camelCase
  */
-function objectToCamelCase(obj: any): any {
+function objectToCamelCase(obj: unknown): unknown {
   if (obj === null || obj === undefined) return obj;
   if (Array.isArray(obj)) return obj.map(objectToCamelCase);
   if (typeof obj !== 'object') return obj;
 
-  const result: Record<string, any> = {};
-  for (const [key, value] of Object.entries(obj)) {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
     result[toCamelCase(key)] = objectToCamelCase(value);
   }
   return result;
@@ -86,16 +87,17 @@ function objectToCamelCase(obj: any): any {
  *
  * 例如 Rust 侧签名为 `Option<String>`，再通过 `serde_json::from_str` 解析为 Vec<String>。
  */
-function normalizeTauriParams(params: Record<string, any>): Record<string, any> {
-  for (const [key, value] of Object.entries(params)) {
+function normalizeTauriParams(params: Record<string, unknown>): Record<string, unknown> {
+  const result = { ...params };
+  for (const [key, value] of Object.entries(result)) {
     if (
       Array.isArray(value) &&
       (key === 'machine_codes' || key.endsWith('_filter'))
     ) {
-      params[key] = JSON.stringify(value);
+      result[key] = JSON.stringify(value);
     }
   }
-  return params;
+  return result;
 }
 
 // ==========================================
@@ -109,7 +111,8 @@ export class DecisionApiError extends Error {
   constructor(
     public code: string,
     message: string,
-    public details?: any
+    /** 错误详情（JSON 结构，需运行时检查） */
+    public details?: Record<string, unknown>
   ) {
     super(message);
     this.name = 'DecisionApiError';
@@ -122,7 +125,8 @@ export class DecisionApiError extends Error {
 export class ValidationError extends Error {
   constructor(
     message: string,
-    public zodError: any
+    /** Zod 验证错误对象 */
+    public zodError: unknown
   ) {
     super(message);
     this.name = 'ValidationError';
@@ -137,15 +141,18 @@ export class ValidationError extends Error {
  */
 async function callWithValidation<T>(
   commandName: string,
-  params: any,
-  schema: any
+  params: unknown,
+  schema: z.ZodTypeAny
 ): Promise<T> {
   try {
     // 将 camelCase 参数转换为 snake_case
-    const snakeCaseParams = normalizeTauriParams(objectToSnakeCase(params));
+    const snakeParams = objectToSnakeCase(params);
+    const normalizedParams = typeof snakeParams === 'object' && snakeParams !== null && !Array.isArray(snakeParams)
+      ? normalizeTauriParams(snakeParams as Record<string, unknown>)
+      : snakeParams;
 
     // 调用Tauri命令
-    const rawResponse = await IpcClient.call(commandName, snakeCaseParams);
+    const rawResponse = await IpcClient.call(commandName, normalizedParams);
 
     // Zod运行时验证
     const parseResult = schema.safeParse(rawResponse);
@@ -164,24 +171,27 @@ async function callWithValidation<T>(
 
     // 将 snake_case 响应转换为 camelCase
     return objectToCamelCase(parseResult.data) as T;
-  } catch (error: any) {
+  } catch (error: unknown) {
     // 如果是已知错误，直接抛出
     if (error instanceof ValidationError || error instanceof DecisionApiError) {
       throw error;
     }
 
     // 尝试解析为错误响应
-    const errorParseResult = ErrorResponseSchema.safeParse(error);
-    if (errorParseResult.success) {
-      const errorData = errorParseResult.data;
-      throw new DecisionApiError(errorData.code, errorData.message, errorData.details);
+    if (typeof ErrorResponseSchema !== 'undefined') {
+      const errorParseResult = ErrorResponseSchema.safeParse(error);
+      if (errorParseResult.success) {
+        const errorData = errorParseResult.data;
+        throw new DecisionApiError(errorData.code, errorData.message, errorData.details);
+      }
     }
 
     // 未知错误
+    const errorMessage = error instanceof Error ? error.message : '未知错误';
     throw new DecisionApiError(
       'UNKNOWN_ERROR',
-      error.message || '未知错误',
-      error
+      errorMessage,
+      error instanceof Error ? undefined : (error as Record<string, unknown>)
     );
   }
 }

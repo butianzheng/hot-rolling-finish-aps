@@ -113,12 +113,12 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
       });
       const list: SummaryRow[] = Array.isArray(data)
         ? data
-            .map((r: any) => ({
-              machine_code: String(r?.machine_code ?? '').trim(),
-              plan_date: String(r?.plan_date ?? '').trim(),
-              pending_count: Number(r?.pending_count ?? 0),
-            }))
             .filter((r) => !!r.machine_code && !!r.plan_date)
+            .map((r) => ({
+              machine_code: r.machine_code.trim(),
+              plan_date: r.plan_date.trim(),
+              pending_count: r.pending_count,
+            }))
         : [];
       list.sort((a, b) => {
         const d = String(a.plan_date).localeCompare(String(b.plan_date));
@@ -126,10 +126,11 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
         return String(a.machine_code).localeCompare(String(b.machine_code));
       });
       setRows(list);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('[PathOverridePendingCenterModal] loadSummary failed:', e);
       setRows([]);
-      setLoadError(String(e?.message || e || '加载待确认汇总失败'));
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      setLoadError(errorMessage || '加载待确认汇总失败');
     } finally {
       setLoading(false);
     }
@@ -151,25 +152,26 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
       });
       const list: PendingRow[] = Array.isArray(data)
         ? data
-            .map((r: any) => ({
-              material_id: String(r?.material_id ?? ''),
-              material_no: String(r?.material_no ?? r?.material_id ?? ''),
-              width_mm: Number(r?.width_mm ?? 0),
-              thickness_mm: Number(r?.thickness_mm ?? 0),
-              urgent_level: normalizeUrgentLevel(r?.urgent_level),
-              violation_type: String(r?.violation_type ?? 'UNKNOWN').toUpperCase() || 'UNKNOWN',
-              anchor_width_mm: Number(r?.anchor_width_mm ?? 0),
-              anchor_thickness_mm: Number(r?.anchor_thickness_mm ?? 0),
-              width_delta_mm: Number(r?.width_delta_mm ?? 0),
-              thickness_delta_mm: Number(r?.thickness_delta_mm ?? 0),
-            }))
             .filter((r) => !!r.material_id)
+            .map((r) => ({
+              material_id: r.material_id,
+              material_no: r.material_no || r.material_id,
+              width_mm: r.width_mm,
+              thickness_mm: r.thickness_mm,
+              urgent_level: normalizeUrgentLevel(r.urgent_level),
+              violation_type: r.violation_type?.toUpperCase() || 'UNKNOWN',
+              anchor_width_mm: r.anchor_width_mm,
+              anchor_thickness_mm: r.anchor_thickness_mm,
+              width_delta_mm: r.width_delta_mm,
+              thickness_delta_mm: r.thickness_delta_mm,
+            }))
         : [];
       setDetailRows(list);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('[PathOverridePendingCenterModal] loadDetail failed:', e);
       setDetailRows([]);
-      setDetailError(String(e?.message || e || '加载明细失败'));
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      setDetailError(errorMessage || '加载明细失败');
     } finally {
       setDetailLoading(false);
     }
@@ -222,7 +224,7 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
               <p style={{ marginBottom: 8 }}>成功 {ok} 条，失败 {fail} 条。</p>
               {failed.length > 0 ? (
                 <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
-                  {failed.map((id: any) => String(id || '')).filter(Boolean).join('\n')}
+                  {failed.filter(Boolean).join('\n')}
                 </pre>
               ) : null}
             </div>
@@ -236,9 +238,10 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
       if (selectedGroup) {
         await loadDetail(selectedGroup.machineCode, selectedGroup.planDate);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('[PathOverridePendingCenterModal] confirmAll failed:', e);
-      message.error(String(e?.message || e || '批量确认失败'));
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      message.error(errorMessage || '批量确认失败');
     } finally {
       setSubmitting(false);
     }

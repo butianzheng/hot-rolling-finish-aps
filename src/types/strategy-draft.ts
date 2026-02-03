@@ -3,6 +3,9 @@
  * 从 StrategyDraftComparison.tsx 提取
  */
 
+import type { z } from 'zod';
+import type { MaterialMasterSchema, MaterialStateSchema } from '../api/ipcSchemas';
+
 export type StrategyKey = string;
 
 export type StrategyPreset = {
@@ -12,7 +15,8 @@ export type StrategyPreset = {
   kind?: 'preset' | 'custom';
   base_strategy?: string;
   strategy_id?: string;
-  parameters?: any;
+  /** 策略参数（JSON 结构，需运行时验证） */
+  parameters?: Record<string, unknown>;
 };
 
 export type CustomStrategyProfile = {
@@ -20,7 +24,8 @@ export type CustomStrategyProfile = {
   title: string;
   description?: string | null;
   base_strategy: string;
-  parameters?: any;
+  /** 策略参数（JSON 结构，需运行时验证） */
+  parameters?: Record<string, unknown>;
 };
 
 export type StrategyDraftSummary = {
@@ -99,9 +104,10 @@ export type GetStrategyDraftDetailResponse = {
   message: string;
 };
 
+/** 物料详情负载（用于临时序列化/传递） */
 export type MaterialDetailPayload = {
-  master: any;
-  state: any;
+  master: z.infer<typeof MaterialMasterSchema> | null;
+  state: z.infer<typeof MaterialStateSchema> | null;
 };
 
 export type ActionLogRow = {
@@ -110,8 +116,10 @@ export type ActionLogRow = {
   action_type: string;
   action_ts: string;
   actor: string;
-  payload_json?: any;
-  impact_summary_json?: any;
+  /** 操作负载（JSON 结构，需运行时验证） */
+  payload_json?: Record<string, unknown>;
+  /** 影响汇总（JSON 结构，需运行时验证） */
+  impact_summary_json?: Record<string, unknown>;
   machine_code?: string | null;
   date_range_start?: string | null;
   date_range_end?: string | null;
