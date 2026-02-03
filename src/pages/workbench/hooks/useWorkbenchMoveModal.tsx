@@ -4,11 +4,14 @@ import dayjs from 'dayjs';
 import { message } from 'antd';
 import { planApi } from '../../../api/tauri';
 import { DEFAULT_MOVE_REASON } from '../constants';
+import { getStrategyLabel } from '../utils';
 import { useWorkbenchMoveImpactPreview } from './useWorkbenchMoveImpactPreview';
 import { useWorkbenchMoveRecommend } from './useWorkbenchMoveRecommend';
 import { useWorkbenchMoveSubmit } from './useWorkbenchMoveSubmit';
 import type {
   MoveImpactPreview,
+  MoveModalActions,
+  MoveModalState,
   MoveRecommendSummary,
   MoveSeqMode,
   MoveValidationMode,
@@ -17,45 +20,11 @@ import type {
 
 type IpcPlanItem = Awaited<ReturnType<typeof planApi.listPlanItems>>[number];
 
-/**
- * 移动弹窗状态对象（聚合）
- */
-export type MoveModalState = {
-  open: boolean;
-  targetMachine: string | null;
-  targetDate: dayjs.Dayjs | null;
-  seqMode: MoveSeqMode;
-  startSeq: number;
-  validationMode: MoveValidationMode;
-  reason: string;
-  submitting: boolean;
-  recommendLoading: boolean;
-  recommendSummary: MoveRecommendSummary | null;
-  strategyLabel: string;
-  selectedPlanItemStats: SelectedPlanItemStats;
-  impactPreview: MoveImpactPreview | null;
-};
+// Re-export types for convenience
+export type { MoveModalState, MoveModalActions } from '../types';
 
 /**
- * 移动弹窗操作对象（聚合）
- */
-export type MoveModalActions = {
-  setOpen: Dispatch<SetStateAction<boolean>>;
-  setTargetMachine: Dispatch<SetStateAction<string | null>>;
-  setTargetDate: Dispatch<SetStateAction<dayjs.Dayjs | null>>;
-  setSeqMode: Dispatch<SetStateAction<MoveSeqMode>>;
-  setStartSeq: Dispatch<SetStateAction<number>>;
-  setValidationMode: Dispatch<SetStateAction<MoveValidationMode>>;
-  setReason: Dispatch<SetStateAction<string>>;
-  recommendTarget: () => Promise<void>;
-  openModal: () => void;
-  openModalAt: (targetMachine: string, targetDate: string) => void;
-  openModalWithRecommend: () => void;
-  submit: () => Promise<void>;
-};
-
-/**
- * Workbench 移位弹窗状态管理（A-8 瘦身后）
+ * Workbench 移位弹窗状态管理（M1-3 瘦身后）
  *
  * 返回值从 30+ 字段精简到 5 字段：
  * - moveModalState: 聚合状态对象
@@ -101,14 +70,7 @@ export function useWorkbenchMoveModal(params: {
   const [moveValidationMode, setMoveValidationMode] = useState<MoveValidationMode>('AUTO_FIX');
   const [moveReason, setMoveReason] = useState<string>('');
 
-  const strategyLabel = useMemo(() => {
-    const v = String(defaultStrategy || 'balanced');
-    if (v === 'urgent_first') return '紧急优先';
-    if (v === 'capacity_first') return '产能优先';
-    if (v === 'cold_stock_first') return '冷坯消化';
-    if (v === 'manual') return '手动调整';
-    return '均衡方案';
-  }, [defaultStrategy]);
+  const strategyLabel = useMemo(() => getStrategyLabel(defaultStrategy), [defaultStrategy]);
 
   const planItemById = useMemo(() => {
     const map = new Map<string, IpcPlanItem>();
@@ -178,36 +140,13 @@ export function useWorkbenchMoveModal(params: {
     setSelectedMaterialIds,
   });
 
-  const openMoveModal = useCallback(() => {
-    if (selectedMaterialIds.length === 0) {
-      message.warning('请先选择物料');
-      return;
-    }
-
-    const fallbackMachine = poolMachineCode || machineOptions[0] || null;
-    const focusDate = deepLinkDate ? dayjs(deepLinkDate) : dayjs();
-    setMoveTargetMachine(fallbackMachine);
-    setMoveTargetDate(focusDate.isValid() ? focusDate : dayjs());
-    setMoveSeqMode('APPEND');
-    setMoveStartSeq(1);
-    setMoveValidationMode('AUTO_FIX');
-    setMoveReason(DEFAULT_MOVE_REASON);
-    clearMoveRecommendSummary();
-    setMoveModalOpen(true);
-  }, [clearMoveRecommendSummary, deepLinkDate, machineOptions, poolMachineCode, selectedMaterialIds.length]);
-
-  const openMoveModalAt = useCallback(
-    (targetMachine: string, targetDate: string) => {
-      if (selectedMaterialIds.length === 0) {
-        message.warning('请先选择物料');
-        return;
-      }
-
-      const machine = String(targetMachine || '').trim() || poolMachineCode || machineOptions[0] || null;
-      const date = dayjs(targetDate);
-
+  /**
+   * 重置弹窗状态并打开（内部辅助函数）
+   */
+  const resetAndOpenModal = useCallback(
+    (machine: string | null, date: dayjs.Dayjs | null) => {
       setMoveTargetMachine(machine);
-      setMoveTargetDate(date.isValid() ? date : dayjs());
+      setMoveTargetDate(date?.isValid() ? date : dayjs());
       setMoveSeqMode('APPEND');
       setMoveStartSeq(1);
       setMoveValidationMode('AUTO_FIX');
@@ -215,7 +154,30 @@ export function useWorkbenchMoveModal(params: {
       clearMoveRecommendSummary();
       setMoveModalOpen(true);
     },
-    [clearMoveRecommendSummary, machineOptions, poolMachineCode, selectedMaterialIds.length]
+    [clearMoveRecommendSummary]
+  );
+
+  const openMoveModal = useCallback(() => {
+    if (selectedMaterialIds.length === 0) {
+      message.warning('请先选择物料');
+      return;
+    }
+    const fallbackMachine = poolMachineCode || machineOptions[0] || null;
+    const focusDate = deepLinkDate ? dayjs(deepLinkDate) : dayjs();
+    resetAndOpenModal(fallbackMachine, focusDate);
+  }, [deepLinkDate, machineOptions, poolMachineCode, resetAndOpenModal, selectedMaterialIds.length]);
+
+  const openMoveModalAt = useCallback(
+    (targetMachine: string, targetDate: string) => {
+      if (selectedMaterialIds.length === 0) {
+        message.warning('请先选择物料');
+        return;
+      }
+      const machine = String(targetMachine || '').trim() || poolMachineCode || machineOptions[0] || null;
+      const date = dayjs(targetDate);
+      resetAndOpenModal(machine, date);
+    },
+    [machineOptions, poolMachineCode, resetAndOpenModal, selectedMaterialIds.length]
   );
 
   const openMoveModalWithRecommend = useCallback(() => {

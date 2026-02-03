@@ -115,3 +115,38 @@ export type WorkbenchPathOverrideState = {
   summaryRefetch: () => void;
   recalcAfterPathOverride: (baseDate: string) => Promise<void>;
 };
+
+// =============================
+// Workbench UI: move modal
+// =============================
+
+export type MoveModalState = {
+  open: boolean;
+  targetMachine: string | null;
+  targetDate: import('dayjs').Dayjs | null;
+  seqMode: MoveSeqMode;
+  startSeq: number;
+  validationMode: MoveValidationMode;
+  reason: string;
+  submitting: boolean;
+  recommendLoading: boolean;
+  recommendSummary: MoveRecommendSummary | null;
+  strategyLabel: string;
+  selectedPlanItemStats: SelectedPlanItemStats;
+  impactPreview: MoveImpactPreview | null;
+};
+
+export type MoveModalActions = {
+  setOpen: import('react').Dispatch<import('react').SetStateAction<boolean>>;
+  setTargetMachine: import('react').Dispatch<import('react').SetStateAction<string | null>>;
+  setTargetDate: import('react').Dispatch<import('react').SetStateAction<import('dayjs').Dayjs | null>>;
+  setSeqMode: import('react').Dispatch<import('react').SetStateAction<MoveSeqMode>>;
+  setStartSeq: import('react').Dispatch<import('react').SetStateAction<number>>;
+  setValidationMode: import('react').Dispatch<import('react').SetStateAction<MoveValidationMode>>;
+  setReason: import('react').Dispatch<import('react').SetStateAction<string>>;
+  recommendTarget: () => Promise<void>;
+  openModal: () => void;
+  openModalAt: (targetMachine: string, targetDate: string) => void;
+  openModalWithRecommend: () => void;
+  submit: () => Promise<void>;
+};
