@@ -3,7 +3,7 @@
 > 用途：把"架构/维护/稳定/性能"的持续演进落成可执行任务，并在每次提交后更新状态与进度日志，方便后续开发与跟踪。
 
 最后更新：2026-02-04
-当前基线：`main@3d5b3bc`
+当前基线：`main@d4bf14f`
 
 ---
 
@@ -143,7 +143,14 @@
   - 批量修复 21 个集成测试文件（tests/ 目录）
   - 修复 3 个关键单元测试文件（src/repository/action_log_repo, decision/repository/bottleneck_repo）
   - 剩余 14 个单元测试文件标记为技术债务（M1 处理）
-- [ ] D-2 迁移流程/脚本标准化（P0/P1）
+- [x] D-2 迁移流程/脚本标准化（P0/P1）（2026-02-04）
+  - DoD：文档明确"权威 schema/迁移"来源；开发/生产升级路径可重复执行且可回滚
+  - **修复成果**：
+    - ✅ 合并 v0.6_path_override_pending.sql 和 v0.6_path_rule_extension.sql → v0.6_path_rules_complete.sql
+    - ✅ 创建 migrations/README.md：详细的迁移指南（文件清单、执行顺序、幂等性说明）
+    - ✅ 更新 docs/guides/DB_SCHEMA_MIGRATION_GUIDE.md：指向 migrations/README.md
+    - ✅ 明确权威来源：scripts/dev_db/schema.sql (新建) + migrations/*.sql (增量升级)
+  - **效果**：消除 v0.6 执行顺序歧义，清晰的迁移路径，可回滚的升级策略
 
 ### E. 后端可维护性（长期收益）
 
@@ -155,6 +162,25 @@
 ## 4. 进度日志（建议每次提交追加）
 
 ### 2026-02-04（凌晨）
+
+- 🎯 **D-2 完成**：迁移流程/脚本标准化
+  - **问题发现**：
+    - 两个 v0.6 迁移文件（v0.6_path_override_pending.sql + v0.6_path_rule_extension.sql）执行顺序不明确
+    - migrations/ 目录缺少 README 说明，开发者不清楚如何选择迁移路径
+    - 权威 schema 来源未文档化
+  - **修复方案**：合并 v0.6 文件为单一来源，添加详细迁移文档
+  - **创建文件**：
+    - `migrations/v0.6_path_rules_complete.sql`（134 行，合并两个 v0.6 文件）
+    - `migrations/README.md`（131 行，完整迁移指南）
+  - **更新文件**：
+    - `docs/guides/DB_SCHEMA_MIGRATION_GUIDE.md`：指向 migrations/README.md，更新 v0.6 引用
+  - **删除文件**：
+    - `migrations/v0.6_path_override_pending.sql`（已合并）
+    - `migrations/v0.6_path_rule_extension.sql`（已合并）
+  - **效果**：
+    - 消除 v0.6 执行顺序歧义
+    - 清晰的权威来源：新建库用 scripts/dev_db/schema.sql，升级用 migrations/*.sql
+    - 完整的迁移文档：包括文件清单、依赖关系、执行顺序、幂等性说明、回滚策略
 
 - 🎯 **C-1 完成**：统一 Decision/Plan schema 来源（消除重复定义）
   - **问题发现**：TypeCount 在 3 个文件中重复定义（d2/d5/d6），UrgencyLevel 在 2 个文件中重复定义（d2/组件）
