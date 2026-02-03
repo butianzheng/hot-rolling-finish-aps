@@ -6,6 +6,12 @@ import type dayjs from 'dayjs';
 import type { MaterialPoolMaterial } from '../material-pool/types';
 import type { OpenScheduleCellOptions } from '../capacity-timeline/types';
 
+// 导入通用类型（避免重复定义）
+import type { UrgencyLevel } from '../../types/decision/d2-order-failure';
+
+// 重新导出供其他组件使用
+export type { UrgencyLevel };
+
 export interface CapacityTimelineContainerProps {
   machineCode?: string | null;
   // 新增：外部日期范围
@@ -34,8 +40,6 @@ export interface MachineOption {
 }
 
 export type DateRangeValue = [dayjs.Dayjs, dayjs.Dayjs];
-
-export type UrgencyLevel = 'L0' | 'L1' | 'L2' | 'L3';
 
 export interface UrgencyBucket {
   tonnage: number;

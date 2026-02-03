@@ -39,14 +39,8 @@ export interface GetCapacityOpportunityRequest {
 // D6 响应类型 (对齐 Rust DTO: src/decision/api/dto.rs L466-519)
 // ==========================================
 
-/**
- * 类型统计
- */
-export interface TypeCount {
-  typeName: string;
-  count: number;
-  weightT: number;
-}
+// 导入通用类型（避免重复定义）
+import type { TypeCount } from './d2-order-failure';
 
 /**
  * 容量优化机会类型（用于 UI 显示）

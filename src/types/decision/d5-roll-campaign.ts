@@ -39,14 +39,8 @@ export interface GetRollCampaignAlertRequest {
 // D5 响应类型 (对齐 Rust DTO: src/decision/api/dto.rs L417-442)
 // ==========================================
 
-/**
- * 类型统计
- */
-export interface TypeCount {
-  typeName: string;
-  count: number;
-  weightT: number;
-}
+// 导入通用类型（避免重复定义）
+import type { TypeCount } from './d2-order-failure';
 
 /**
  * 换辊警报项（单个机组）
