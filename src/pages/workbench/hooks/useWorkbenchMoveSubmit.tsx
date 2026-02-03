@@ -33,7 +33,6 @@ export function useWorkbenchMoveSubmit(params: {
   setSelectedMaterialIds: Dispatch<SetStateAction<string[]>>;
   bumpRefreshSignal: () => void;
   materialsRefetch: () => void;
-  planItemsRefetch: () => void;
 }): {
   moveSubmitting: boolean;
   submitMove: () => Promise<void>;
@@ -54,7 +53,6 @@ export function useWorkbenchMoveSubmit(params: {
     setSelectedMaterialIds,
     bumpRefreshSignal,
     materialsRefetch,
-    planItemsRefetch,
   } = params;
 
   const [moveSubmitting, setMoveSubmitting] = useState(false);
@@ -108,7 +106,6 @@ export function useWorkbenchMoveSubmit(params: {
       setSelectedMaterialIds([]);
       bumpRefreshSignal();
       materialsRefetch();
-      planItemsRefetch();
 
       showMoveSubmitResult(res, missing);
     } catch (e: unknown) {
@@ -129,7 +126,6 @@ export function useWorkbenchMoveSubmit(params: {
     moveValidationMode,
     operator,
     planItems,
-    planItemsRefetch,
     selectedMaterialIds,
     setMoveModalOpen,
     setMoveReason,

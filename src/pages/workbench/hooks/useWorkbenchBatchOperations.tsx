@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { Alert, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
@@ -20,7 +20,6 @@ export function useWorkbenchBatchOperations(params: {
   setSelectedMaterialIds: Dispatch<SetStateAction<string[]>>;
   bumpRefreshSignal: () => void;
   materialsRefetch: () => void;
-  planItemsRefetch: () => void;
 }): {
   runMaterialOperation: (materialIds: string[], type: MaterialOperationType) => void;
   runForceReleaseOperation: (materialIds: string[]) => void;
@@ -32,8 +31,12 @@ export function useWorkbenchBatchOperations(params: {
     setSelectedMaterialIds,
     bumpRefreshSignal,
     materialsRefetch,
-    planItemsRefetch,
   } = params;
+
+  const materialsRef = useRef<MaterialPoolMaterial[]>(materials);
+  useEffect(() => {
+    materialsRef.current = materials;
+  }, [materials]);
 
   const checkRedLineViolations = useCallback(
     (material: MaterialPoolMaterial, operation: MaterialOperationType): RedLineViolation[] => {
@@ -102,7 +105,7 @@ export function useWorkbenchBatchOperations(params: {
 
       if (!adminOverrideMode) {
         const set = new Set(materialIds);
-        const targets = materials.filter((m) => set.has(m.material_id));
+        const targets = materialsRef.current.filter((m) => set.has(m.material_id));
         const violations: RedLineViolation[] = [];
         targets.forEach((m) => violations.push(...checkRedLineViolations(m, type)));
         if (violations.length > 0) {
@@ -158,7 +161,6 @@ export function useWorkbenchBatchOperations(params: {
 
           bumpRefreshSignal();
           materialsRefetch();
-          planItemsRefetch();
         },
       });
     },
@@ -167,9 +169,7 @@ export function useWorkbenchBatchOperations(params: {
       bumpRefreshSignal,
       checkRedLineViolations,
       currentUser,
-      materials,
       materialsRefetch,
-      planItemsRefetch,
       showRedLineModal,
     ]
   );
@@ -182,7 +182,7 @@ export function useWorkbenchBatchOperations(params: {
       }
 
       const set = new Set(materialIds);
-      const targets = materials.filter((m) => set.has(m.material_id));
+      const targets = materialsRef.current.filter((m) => set.has(m.material_id));
       const totalWeight = targets.reduce((sum, m) => sum + Number(m.weight_t || 0), 0);
       const immatureCount = targets.filter((m) => m.is_mature === false).length;
       const unknownMaturityCount = targets.filter((m) => m.is_mature == null).length;
@@ -297,16 +297,13 @@ export function useWorkbenchBatchOperations(params: {
           setSelectedMaterialIds([]);
           bumpRefreshSignal();
           materialsRefetch();
-          planItemsRefetch();
         },
       });
     },
     [
       bumpRefreshSignal,
       currentUser,
-      materials,
       materialsRefetch,
-      planItemsRefetch,
       setSelectedMaterialIds,
     ]
   );

@@ -26,7 +26,6 @@ export function useWorkbenchMoveModal(params: {
   defaultStrategy: string | null | undefined;
   workbenchDateRange: [dayjs.Dayjs, dayjs.Dayjs];
   planItems: IpcPlanItem[];
-  planItemsRefetch: () => void;
   selectedMaterialIds: string[];
   setSelectedMaterialIds: Dispatch<SetStateAction<string[]>>;
   bumpRefreshSignal: () => void;
@@ -67,7 +66,6 @@ export function useWorkbenchMoveModal(params: {
     defaultStrategy,
     workbenchDateRange,
     planItems,
-    planItemsRefetch,
     selectedMaterialIds,
     setSelectedMaterialIds,
     bumpRefreshSignal,
@@ -159,7 +157,6 @@ export function useWorkbenchMoveModal(params: {
     setSelectedMaterialIds,
     bumpRefreshSignal,
     materialsRefetch,
-    planItemsRefetch,
   });
 
   const openMoveModal = useCallback(() => {

@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import type { Dayjs } from 'dayjs';
 import { Button, Card, Space, Tag } from 'antd';
 
 import RollCycleAnchorCard from '../roll-cycle-anchor/RollCycleAnchorCard';
 import { CapacityTimelineContainer } from '../CapacityTimelineContainer';
+import type { OpenScheduleCellOptions } from '../capacity-timeline/types';
 import PageSkeleton from '../PageSkeleton';
 import MaterialPool, { type MaterialPoolFilters, type MaterialPoolMaterial, type MaterialPoolSelection } from './MaterialPool';
 import ScheduleCardView from './ScheduleCardView';
@@ -139,6 +140,23 @@ const WorkbenchMainLayout: React.FC<{
 
   onRequestMoveToCell,
 }) => {
+  const handleInspectMaterial = useCallback(
+    (m: MaterialPoolMaterial) => {
+      onInspectMaterialId(m.material_id);
+    },
+    [onInspectMaterialId]
+  );
+
+  const handleOpenCapacityScheduleCell = useCallback(
+    (machine: string, date: string, _materialIds: string[], options?: OpenScheduleCellOptions) => {
+      if (options?.statusFilter) {
+        setScheduleStatusFilter(options.statusFilter);
+      }
+      openGanttCellDetail(machine, date, 'capacity');
+    },
+    [openGanttCellDetail, setScheduleStatusFilter]
+  );
+
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 12 }}>
       <div style={{ flex: '0 0 380px', minWidth: 320, minHeight: 0 }}>
@@ -169,7 +187,7 @@ const WorkbenchMainLayout: React.FC<{
           onFiltersChange={onPoolFiltersChange}
           selectedMaterialIds={selectedMaterialIds}
           onSelectedMaterialIdsChange={onSelectedMaterialIdsChange}
-          onInspectMaterial={(m) => onInspectMaterialId(m.material_id)}
+          onInspectMaterial={handleInspectMaterial}
         />
       </div>
 
@@ -190,12 +208,7 @@ const WorkbenchMainLayout: React.FC<{
               onMachineCodeChange={onMachineCodeChange}
               onDateRangeChange={onDateRangeChange}
               onResetDateRange={onResetDateRangeToAuto}
-              onOpenScheduleCell={(machine, date, _materialIds, options) => {
-                if (options?.statusFilter) {
-                  setScheduleStatusFilter(options.statusFilter);
-                }
-                openGanttCellDetail(machine, date, 'capacity');
-              }}
+              onOpenScheduleCell={handleOpenCapacityScheduleCell}
               selectedMaterialIds={selectedMaterialIds}
               materials={materials}
             />
