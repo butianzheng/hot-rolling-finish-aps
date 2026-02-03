@@ -17,6 +17,43 @@ import type {
 
 type IpcPlanItem = Awaited<ReturnType<typeof planApi.listPlanItems>>[number];
 
+/**
+ * 移动弹窗状态对象（聚合）
+ */
+export type MoveModalState = {
+  open: boolean;
+  targetMachine: string | null;
+  targetDate: dayjs.Dayjs | null;
+  seqMode: MoveSeqMode;
+  startSeq: number;
+  validationMode: MoveValidationMode;
+  reason: string;
+  submitting: boolean;
+  recommendLoading: boolean;
+  recommendSummary: MoveRecommendSummary | null;
+  strategyLabel: string;
+  selectedPlanItemStats: SelectedPlanItemStats;
+  impactPreview: MoveImpactPreview | null;
+};
+
+/**
+ * 移动弹窗操作对象（聚合）
+ */
+export type MoveModalActions = {
+  setOpen: Dispatch<SetStateAction<boolean>>;
+  setTargetMachine: Dispatch<SetStateAction<string | null>>;
+  setTargetDate: Dispatch<SetStateAction<dayjs.Dayjs | null>>;
+  setSeqMode: Dispatch<SetStateAction<MoveSeqMode>>;
+  setStartSeq: Dispatch<SetStateAction<number>>;
+  setValidationMode: Dispatch<SetStateAction<MoveValidationMode>>;
+  setReason: Dispatch<SetStateAction<string>>;
+  recommendTarget: () => Promise<void>;
+  openModal: () => void;
+  openModalAt: (targetMachine: string, targetDate: string) => void;
+  openModalWithRecommend: () => void;
+  submit: () => Promise<void>;
+};
+
 export function useWorkbenchMoveModal(params: {
   activeVersionId: string | null;
   operator: string | null;
@@ -29,6 +66,10 @@ export function useWorkbenchMoveModal(params: {
   selectedMaterialIds: string[];
   setSelectedMaterialIds: Dispatch<SetStateAction<string[]>>;
 }): {
+  // 【新增】聚合对象
+  moveModalState: MoveModalState;
+  moveModalActions: MoveModalActions;
+  // 【保留】散列导出（向后兼容）
   moveModalOpen: boolean;
   setMoveModalOpen: Dispatch<SetStateAction<boolean>>;
   moveTargetMachine: string | null;
@@ -202,7 +243,78 @@ export function useWorkbenchMoveModal(params: {
     scheduleAutoRecommendOnOpen();
   }, [openMoveModal, scheduleAutoRecommendOnOpen, selectedMaterialIds.length]);
 
+  // 聚合的状态对象（新增，推荐使用）
+  const moveModalState = useMemo(
+    () => ({
+      open: moveModalOpen,
+      targetMachine: moveTargetMachine,
+      targetDate: moveTargetDate,
+      seqMode: moveSeqMode,
+      startSeq: moveStartSeq,
+      validationMode: moveValidationMode,
+      reason: moveReason,
+      submitting: moveSubmitting,
+      recommendLoading: moveRecommendLoading,
+      recommendSummary: moveRecommendSummary,
+      strategyLabel,
+      selectedPlanItemStats,
+      impactPreview: moveImpactPreview,
+    }),
+    [
+      moveModalOpen,
+      moveTargetMachine,
+      moveTargetDate,
+      moveSeqMode,
+      moveStartSeq,
+      moveValidationMode,
+      moveReason,
+      moveSubmitting,
+      moveRecommendLoading,
+      moveRecommendSummary,
+      strategyLabel,
+      selectedPlanItemStats,
+      moveImpactPreview,
+    ]
+  );
+
+  // 聚合的操作对象（新增，推荐使用）
+  const moveModalActions = useMemo(
+    () => ({
+      setOpen: setMoveModalOpen,
+      setTargetMachine: setMoveTargetMachine,
+      setTargetDate: setMoveTargetDate,
+      setSeqMode: setMoveSeqMode,
+      setStartSeq: setMoveStartSeq,
+      setValidationMode: setMoveValidationMode,
+      setReason: setMoveReason,
+      recommendTarget: recommendMoveTarget,
+      openModal: openMoveModal,
+      openModalAt: openMoveModalAt,
+      openModalWithRecommend: openMoveModalWithRecommend,
+      submit: submitMove,
+    }),
+    [
+      setMoveModalOpen,
+      setMoveTargetMachine,
+      setMoveTargetDate,
+      setMoveSeqMode,
+      setMoveStartSeq,
+      setMoveValidationMode,
+      setMoveReason,
+      recommendMoveTarget,
+      openMoveModal,
+      openMoveModalAt,
+      openMoveModalWithRecommend,
+      submitMove,
+    ]
+  );
+
   return {
+    // 【新增】聚合对象（推荐使用，可减少 props 数量）
+    moveModalState,
+    moveModalActions,
+
+    // 【保留】散列导出（向后兼容）
     moveModalOpen,
     setMoveModalOpen,
     moveTargetMachine,

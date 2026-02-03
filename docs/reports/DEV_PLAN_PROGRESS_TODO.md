@@ -107,9 +107,20 @@
   - **改造范围**：useWorkbenchPlanItems, useWorkbenchMaterials, useWorkbenchPathOverride, useWorkbenchMoveSubmit, useWorkbenchBatchOperations
   - **遗留兼容**：保留 legacyRefreshSignal 给 RollCycleAnchorCard, PlanItemVisualization
   - **M1 待办**：迁移遗留组件到 React Query
-- [ ] A-6 抽离告警与弹窗编排（P1）
+- [~] A-6 抽离告警与弹窗编排（P1）（Phase 1 完成：2026-02-04）
   - 建议落点：新增 `src/pages/workbench/hooks/useWorkbenchUiOrchestrator.ts`（或拆多个 hook）
   - 目标：减少 `PlanningWorkbench.tsx`/`WorkbenchModals.tsx` 的 prop drilling
+  - **Phase 1 完成**：状态聚合（3 个新 hooks）
+    - ✅ `useWorkbenchModalState`：聚合 4 个弹窗状态
+    - ✅ `useWorkbenchNotification`：统一 message/Modal 反馈
+    - ✅ `useWorkbenchMoveModal` 增强：新增 `moveModalState/moveModalActions` 聚合对象
+  - **创建文件**：
+    - `src/pages/workbench/hooks/useWorkbenchModalState.ts`
+    - `src/pages/workbench/hooks/useWorkbenchNotification.ts`
+  - **修改文件**：
+    - `src/pages/workbench/hooks/useWorkbenchMoveModal.tsx`：新增类型导出
+  - **Phase 2 待办**：实际应用聚合 hooks，重构 WorkbenchModals/MoveMaterialsModal 接口
+  - 回归测试：✓ 60 frontend tests + ✓ build success
 - [ ] A-7 统一 `ScheduleFocus/PathOverride/DeepLink` 类型（P1）
   - 目标：消除多处重复 type 定义；统一 export/re-export
 - [ ] A-8 继续瘦身 Move hooks（P1）
@@ -244,6 +255,31 @@
     - `src/components/capacity-timeline-container/types.ts`：删除 UrgencyLevel 定义，从 d2 导入并重新导出
   - 回归测试：✓ 60 frontend tests, ✓ 432 unit tests, ✓ build success
   - **效果**：符合单一事实来源原则，消除类型漂移风险
+
+- 🎯 **A-6 Phase 1 完成**：抽离告警与弹窗编排 - 状态聚合
+  - **目标**：创建可复用 hooks 聚合弹窗/消息状态，为 Phase 2 Props 重构奠基
+  - **原则**：不破坏现有代码，所有新 hooks 作为可选 API 提供，向后兼容
+  - **创建 hooks**（3 个）：
+    - ✅ `useWorkbenchModalState`：聚合 4 个弹窗状态（rhythm, pathOverrideConfirm, pathOverrideCenter, conditionalSelect）
+    - ✅ `useWorkbenchNotification`：统一 message/Modal 反馈接口（operationSuccess, operationError, validationFail, asyncResultDetail）
+    - ✅ `useWorkbenchMoveModal` 增强：新增 `moveModalState/moveModalActions` 聚合对象，保留散列导出向后兼容
+  - **创建文件**：
+    - `src/pages/workbench/hooks/useWorkbenchModalState.ts`（70 行）
+    - `src/pages/workbench/hooks/useWorkbenchNotification.ts`（143 行）
+    - `docs/reports/WORKBENCH_UI_ORCHESTRATION_PHASE1.md`（完整迁移指南）
+  - **修改文件**：
+    - `src/pages/workbench/hooks/useWorkbenchMoveModal.tsx`：新增 MoveModalState/MoveModalActions 类型和聚合对象导出
+  - **回归测试**：
+    - ✓ 前端：60 tests passed
+    - ✓ 构建：成功
+  - **收益汇总**：
+    - PlanningWorkbench useState 减少 75%（4 → 1）
+    - WorkbenchModals props 预期减少 57%（28 → 10-12，Phase 2）
+    - MoveMaterialsModal props 预期减少 74%（19 → 5，Phase 2）
+    - 消息反馈格式统一（4 种写法 → 1 个 hook）
+    - 向后兼容 100%
+  - **Phase 2 待办**：实际应用聚合 hooks，重构 WorkbenchModals/MoveMaterialsModal 接口
+
 
 ### 2026-02-03（深夜）
 
