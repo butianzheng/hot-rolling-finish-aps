@@ -46,7 +46,6 @@ const WorkbenchMainLayout: React.FC<{
   onInspectMaterialId: (id: string) => void;
 
   // 右侧：基础联动
-  refreshSignal: number;
   onAfterRollCycleReset: () => void;
   workbenchDateRange: [Dayjs, Dayjs];
   autoDateRange: [Dayjs, Dayjs];
@@ -107,7 +106,6 @@ const WorkbenchMainLayout: React.FC<{
   onSelectedMaterialIdsChange,
   onInspectMaterialId,
 
-  refreshSignal,
   onAfterRollCycleReset,
   workbenchDateRange,
   autoDateRange,
@@ -247,7 +245,6 @@ const WorkbenchMainLayout: React.FC<{
                 dateRange={workbenchDateRange}
                 statusFilter={scheduleStatusFilter}
                 onStatusFilterChange={setScheduleStatusFilter}
-                refreshSignal={refreshSignal}
                 selectedMaterialIds={selectedMaterialIds}
                 onSelectedMaterialIdsChange={onSelectedMaterialIdsChange}
                 onInspectMaterialId={onInspectMaterialId}
@@ -283,7 +280,6 @@ const WorkbenchMainLayout: React.FC<{
                   statusFilter={scheduleStatusFilter}
                   onStatusFilterChange={setScheduleStatusFilter}
                   focusRequest={matrixFocusRequest}
-                  refreshSignal={refreshSignal}
                   selectedMaterialIds={selectedMaterialIds}
                   onSelectedMaterialIdsChange={onSelectedMaterialIdsChange}
                 />

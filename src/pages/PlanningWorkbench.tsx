@@ -45,11 +45,6 @@ const PlanningWorkbench: React.FC = () => {
   const preferences = useUserPreferences();
   const { setRecalculating, setActiveVersion, setWorkbenchViewMode, setWorkbenchFilters } = useGlobalActions();
 
-  // TODO(M1): 待迁移的遗留组件（ScheduleCardView, PlanItemVisualization）仍依赖 signal
-  // 后续应将这些组件也改为使用 React Query，然后移除此 signal
-  const [legacyRefreshSignal, setLegacyRefreshSignal] = useState(0);
-  const bumpLegacyRefreshSignal = useCallback(() => setLegacyRefreshSignal((v) => v + 1), []);
-
   // 【Phase 2 重构】使用 useWorkbenchModalState 聚合 4 个弹窗状态
   const { modals, openModal, closeModal } = useWorkbenchModalState();
 
@@ -170,16 +165,14 @@ const PlanningWorkbench: React.FC = () => {
 
   const handleAfterRollCycleReset = useCallback(() => {
     void refreshAll();
-    bumpLegacyRefreshSignal();
     message.info('已重置换辊周期：建议执行"一键优化/重算"以刷新排程结果');
-  }, [refreshAll, bumpLegacyRefreshSignal]);
+  }, [refreshAll]);
 
   const handleBeforeOptimize = useCallback(() => setRecalculating(true), [setRecalculating]);
   const handleAfterOptimize = useCallback(() => {
     setRecalculating(false);
     void refreshAll();
-    bumpLegacyRefreshSignal();
-  }, [refreshAll, setRecalculating, bumpLegacyRefreshSignal]);
+  }, [refreshAll, setRecalculating]);
 
   const {
     moveModalState,
@@ -315,7 +308,6 @@ const PlanningWorkbench: React.FC = () => {
           selectedMaterialIds={selectedMaterialIds}
           onSelectedMaterialIdsChange={setSelectedMaterialIds}
           onInspectMaterialId={openInspector}
-          refreshSignal={legacyRefreshSignal}
           onAfterRollCycleReset={handleAfterRollCycleReset}
           workbenchDateRange={workbenchDateRange}
           autoDateRange={autoDateRange}
