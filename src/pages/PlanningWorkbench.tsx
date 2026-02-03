@@ -47,6 +47,7 @@ import DecisionFlowGuide from '../components/flow/DecisionFlowGuide';
 import { useWorkbenchAutoDateRange } from './workbench/hooks/useWorkbenchAutoDateRange';
 import { useWorkbenchDeepLink } from './workbench/hooks/useWorkbenchDeepLink';
 import { useWorkbenchBatchOperations } from './workbench/hooks/useWorkbenchBatchOperations';
+import { useWorkbenchInspector } from './workbench/hooks/useWorkbenchInspector';
 import { useWorkbenchMoveModal } from './workbench/hooks/useWorkbenchMoveModal';
 import { useWorkbenchPathOverride } from './workbench/hooks/useWorkbenchPathOverride';
 import MoveMaterialsModal from '../components/workbench/MoveMaterialsModal';
@@ -55,7 +56,6 @@ import type { WorkbenchDateRangeMode } from './workbench/types';
 const PlanItemVisualization = React.lazy(() => import('../components/PlanItemVisualization'));
 
 type IpcMaterialWithState = Awaited<ReturnType<typeof materialApi.listMaterials>>[number];
-type IpcMaterialDetail = Awaited<ReturnType<typeof materialApi.getMaterialDetail>>;
 
 const PlanningWorkbench: React.FC = () => {
   const navigate = useNavigate();
@@ -104,24 +104,9 @@ const PlanningWorkbench: React.FC = () => {
     return [dayjs().subtract(3, 'day'), dayjs().add(10, 'day')];
   });
 
-  const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [inspectedMaterialId, setInspectedMaterialId] = useState<string | null>(null);
-
   const [conditionalSelectOpen, setConditionalSelectOpen] = useState(false);
 
   const [rhythmModalOpen, setRhythmModalOpen] = useState(false);
-
-  const { deepLinkContext, deepLinkContextLabel } = useWorkbenchDeepLink({
-    searchParams,
-    globalMachineCode: workbenchFilters.machineCode,
-    setPoolSelection,
-    setWorkbenchFilters,
-    setWorkbenchViewMode,
-    setDateRangeMode,
-    setWorkbenchDateRange,
-    setInspectorOpen,
-    setInspectedMaterialId,
-  });
 
   // P2-2 修复：queryKey 包含筛选参数，避免缓存污染
   // 注意：暂保留 limit=1000 硬编码，待后续实施 useInfiniteQuery 分页优化
@@ -166,52 +151,20 @@ const PlanningWorkbench: React.FC = () => {
     });
   }, [materialsQuery.data]);
 
-  const materialDetailQuery = useQuery({
-    queryKey: ['materialDetail', inspectedMaterialId],
-    enabled: !!inspectedMaterialId,
-    queryFn: async () => {
-      if (!inspectedMaterialId) return null;
-      return materialApi.getMaterialDetail(inspectedMaterialId);
-    },
-    staleTime: 30 * 1000,
+  const { inspectorOpen, setInspectorOpen, setInspectedMaterialId, inspectedMaterial, openInspector } =
+    useWorkbenchInspector({ materials });
+
+  const { deepLinkContext, deepLinkContextLabel } = useWorkbenchDeepLink({
+    searchParams,
+    globalMachineCode: workbenchFilters.machineCode,
+    setPoolSelection,
+    setWorkbenchFilters,
+    setWorkbenchViewMode,
+    setDateRangeMode,
+    setWorkbenchDateRange,
+    setInspectorOpen,
+    setInspectedMaterialId,
   });
-
-  const inspectedMaterial = useMemo(() => {
-    if (!inspectedMaterialId) return null;
-    const fromList = materials.find((m) => m.material_id === inspectedMaterialId) || null;
-    const detail: IpcMaterialDetail | null = materialDetailQuery.data ?? null;
-    const master = detail?.master ?? null;
-    const state = detail?.state ?? null;
-
-    const sched_state = String(state?.sched_state ?? fromList?.sched_state ?? '').trim();
-    const normalizedSched = normalizeSchedState(sched_state);
-    const is_mature =
-      normalizedSched === 'PENDING_MATURE'
-        ? false
-        : normalizedSched === 'READY' || normalizedSched === 'FORCE_RELEASE' || normalizedSched === 'SCHEDULED'
-          ? true
-          : undefined;
-
-    const machineFromMaster = String(
-      master?.next_machine_code ?? master?.current_machine_code ?? master?.rework_machine_code ?? ''
-    ).trim();
-
-    return {
-      material_id: String(master?.material_id ?? state?.material_id ?? fromList?.material_id ?? inspectedMaterialId).trim(),
-      machine_code: String(fromList?.machine_code ?? machineFromMaster ?? '').trim(),
-      weight_t: Number(fromList?.weight_t ?? master?.weight_t ?? 0),
-      steel_mark: String(fromList?.steel_mark ?? master?.steel_mark ?? '').trim(),
-      sched_state,
-      urgent_level: String(state?.urgent_level ?? fromList?.urgent_level ?? '').trim(),
-      lock_flag: Boolean(state?.lock_flag ?? fromList?.lock_flag ?? false),
-      manual_urgent_flag: Boolean(state?.manual_urgent_flag ?? fromList?.manual_urgent_flag ?? false),
-      is_mature,
-      temp_issue: false,
-      urgent_reason: state?.urgent_reason ? String(state.urgent_reason) : undefined,
-      eligibility_reason: undefined,
-      priority_reason: undefined,
-    };
-  }, [inspectedMaterialId, materialDetailQuery.data, materials]);
 
   const planItemsQuery = useQuery({
     queryKey: ['planItems', activeVersionId],
@@ -250,11 +203,6 @@ const PlanningWorkbench: React.FC = () => {
     bumpRefreshSignal,
     materialsRefetch: materialsQuery.refetch,
   });
-
-  const openInspector = (materialId: string) => {
-    setInspectedMaterialId(materialId);
-    setInspectorOpen(true);
-  };
 
   const applyWorkbenchMachineCode = (machineCode: string | null) => {
     setPoolSelection((prev) => {
