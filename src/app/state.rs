@@ -8,7 +8,7 @@
 use std::sync::{Arc, Mutex};
 use rusqlite::Connection;
 
-use crate::api::{MaterialApi, PlanApi, DashboardApi, ConfigApi, RollerApi, RhythmApi, ManualOperationValidator, ImportApi};
+use crate::api::{ConfigApi, ImportApi, ManualOperationValidator, MaterialApi, PathRuleApi, PlanApi, DashboardApi, RollerApi, RhythmApi};
 use crate::decision::api::DecisionApiImpl;
 use crate::decision::repository::{
     DaySummaryRepository, BottleneckRepository,
@@ -32,6 +32,7 @@ use crate::repository::{
     risk_repo::RiskSnapshotRepository,
     capacity_repo::CapacityPoolRepository,
     roller_repo::RollerCampaignRepository,
+    path_override_pending_repo::PathOverridePendingRepository,
     roll_campaign_plan_repo::RollCampaignPlanRepository,
     plan_rhythm_repo::PlanRhythmRepository,
     strategy_draft_repo::StrategyDraftRepository,
@@ -66,6 +67,9 @@ pub struct AppState {
 
     /// 配置管理API
     pub config_api: Arc<ConfigApi>,
+
+    /// 宽厚路径规则 API
+    pub path_rule_api: Arc<PathRuleApi>,
 
     /// 换辊管理API
     pub roller_api: Arc<RollerApi>,
@@ -137,6 +141,7 @@ impl AppState {
 
         // 其他Repository
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
+        let path_override_pending_repo = Arc::new(PathOverridePendingRepository::new(conn.clone()));
         // 策略草案仓储（草案持久化：避免刷新/重启丢失）
         let strategy_draft_repo = Arc::new(StrategyDraftRepository::new(conn.clone()));
         let risk_snapshot_repo = Arc::new(
@@ -304,6 +309,8 @@ impl AppState {
             capacity_pool_repo.clone(),
             action_log_repo.clone(),
             risk_snapshot_repo.clone(),
+            roller_campaign_repo.clone(),
+            path_override_pending_repo.clone(),
             eligibility_engine.clone(),
             urgency_engine.clone(),
             priority_sorter.clone(),
@@ -386,6 +393,18 @@ impl AppState {
             action_log_repo.clone(),
         ));
 
+        // 宽厚路径规则 API
+        let path_rule_api = Arc::new(PathRuleApi::new(
+            conn.clone(),
+            config_manager.clone(),
+            plan_item_repo.clone(),
+            material_master_repo.clone(),
+            material_state_repo.clone(),
+            roller_campaign_repo.clone(),
+            action_log_repo.clone(),
+            path_override_pending_repo.clone(),
+        ));
+
         // 换辊管理API
         let roller_api = Arc::new(RollerApi::new(
             roller_campaign_repo,
@@ -405,6 +424,7 @@ impl AppState {
             plan_api,
             dashboard_api,
             config_api,
+            path_rule_api,
             roller_api,
             rhythm_api,
             decision_api,

@@ -13,6 +13,7 @@ pub mod roller_api;
 pub mod rhythm_api;
 pub mod validator;
 pub mod import_api;
+pub mod path_rule_api;
 
 // 重导出核心类型
 pub use error::{ApiError, ApiResult, ValidationViolation};
@@ -24,5 +25,6 @@ pub use roller_api::RollerApi;
 pub use rhythm_api::RhythmApi;
 pub use validator::{ValidationMode, ManualOperationValidator};
 pub use import_api::{ImportApi, ImportApiResponse};
+pub use path_rule_api::PathRuleApi;
 
 // TODO: 添加请求日志记录

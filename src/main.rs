@@ -115,6 +115,19 @@ fn main() {
             list_custom_strategies,
 
             // ==========================================
+            // 宽厚路径规则相关命令 (v0.6)
+            // ==========================================
+            get_path_rule_config,
+            update_path_rule_config,
+            list_path_override_pending,
+            list_path_override_pending_summary,
+            confirm_path_override,
+            batch_confirm_path_override,
+            batch_confirm_path_override_by_range,
+            get_roll_cycle_anchor,
+            reset_roll_cycle,
+
+            // ==========================================
             // 换辊管理相关命令 (7个)
             // ==========================================
             list_roll_campaigns,

@@ -32,7 +32,9 @@ mod full_business_flow_e2e_test {
         action_log_repo::ActionLogRepository,
         capacity_repo::CapacityPoolRepository,
         material_repo::{MaterialMasterRepository, MaterialStateRepository},
+        path_override_pending_repo::PathOverridePendingRepository,
         plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository},
+        roller_repo::RollerCampaignRepository,
         risk_repo::RiskSnapshotRepository,
         strategy_draft_repo::StrategyDraftRepository,
         decision_refresh_repo::DecisionRefreshRepository,
@@ -79,6 +81,9 @@ mod full_business_flow_e2e_test {
             Arc::new(RiskSnapshotRepository::new(&db_path).unwrap());
         let capacity_pool_repo =
             Arc::new(CapacityPoolRepository::new(db_path.clone()).unwrap());
+        let roller_campaign_repo =
+            Arc::new(RollerCampaignRepository::new(&db_path).unwrap());
+        let path_override_pending_repo = Arc::new(PathOverridePendingRepository::new(conn.clone()));
 
         // === Engine 层 ===
         let config_manager = Arc::new(ConfigManager::new(&db_path).unwrap());
@@ -96,6 +101,8 @@ mod full_business_flow_e2e_test {
             capacity_pool_repo.clone(),
             action_log_repo.clone(),
             risk_snapshot_repo.clone(),
+            roller_campaign_repo.clone(),
+            path_override_pending_repo.clone(),
             eligibility_engine.clone(),
             urgency_engine.clone(),
             priority_sorter.clone(),

@@ -70,6 +70,14 @@ export const configKeyLabels: Record<string, string> = {
   // 数据质量配置
   weight_anomaly_threshold: '重量异常阈值',
   batch_retention_days: '批次保留天数',
+
+  // 宽厚路径规则（v0.6）
+  path_rule_enabled: '宽厚路径规则开关',
+  path_width_tolerance_mm: '路径宽度容差 (mm)',
+  path_thickness_tolerance_mm: '路径厚度容差 (mm)',
+  path_override_allowed_urgency_levels: '允许人工突破的紧急等级',
+  seed_s2_percentile: 'S2 种子分位数',
+  seed_s2_small_sample_threshold: 'S2 小样本阈值',
 };
 
 // 配置键说明（完整汉化版）
@@ -109,4 +117,15 @@ export const configDescriptions: Record<string, string> = {
   // 数据质量配置
   weight_anomaly_threshold: '重量异常阈值（单位：吨，超过此值视为异常，默认100.0吨）',
   batch_retention_days: '批次数据保留天数（导入批次记录保留时长，默认90天）',
+
+  // 宽厚路径规则（v0.6）
+  path_rule_enabled: '是否启用“由宽到窄、由厚到薄”的路径约束（true/false）',
+  path_width_tolerance_mm: '宽度容差（单位：mm）。候选宽度允许小于锚点宽度的最大差值，超过则判定违规。',
+  path_thickness_tolerance_mm: '厚度容差（单位：mm）。候选厚度允许小于锚点厚度的最大差值，超过则判定违规。',
+  path_override_allowed_urgency_levels:
+    '允许人工确认突破的紧急等级列表（逗号分隔，如：L2,L3）。不在列表内的违规将被硬拦截。',
+  seed_s2_percentile:
+    '无冻结/锁定/已确认锚点时，用历史分布生成初始锚点：取宽度与厚度的该分位数（0~1）。',
+  seed_s2_small_sample_threshold:
+    'S2 种子策略的小样本阈值（整数）。样本数不足时回退到“最大宽度/最大厚度”等保守规则。',
 };

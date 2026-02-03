@@ -2,20 +2,21 @@
  * 配置表格列配置
  */
 
-import { Button, Tag, Tooltip } from 'antd';
-import { EditOutlined } from '@ant-design/icons';
+import { Button, Space, Tag, Tooltip } from 'antd';
+import { EditOutlined, SettingOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { ConfigItem } from './types';
 import { scopeTypeColors, scopeTypeLabels, scopeIdLabels, configKeyLabels, configDescriptions } from './types';
 
 export interface ConfigColumnsOptions {
   onEdit: (record: ConfigItem) => void;
+  onOpenPathRulePanel?: () => void;
 }
 
 export function createConfigColumns(
   options: ConfigColumnsOptions
 ): ColumnsType<ConfigItem> {
-  const { onEdit } = options;
+  const { onEdit, onOpenPathRulePanel } = options;
 
   return [
     {
@@ -71,17 +72,31 @@ export function createConfigColumns(
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 160,
       fixed: 'right',
       render: (_, record) => (
-        <Button
-          type="link"
-          size="small"
-          icon={<EditOutlined />}
-          onClick={() => onEdit(record)}
-        >
-          编辑
-        </Button>
+        <Space size={4}>
+          <Button
+            type="link"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => onEdit(record)}
+          >
+            编辑
+          </Button>
+          {(record.key.startsWith('path_rule_') || record.key.startsWith('seed_s2_')) && onOpenPathRulePanel ? (
+            <Tooltip title="打开路径规则设置面板">
+              <Button
+                type="link"
+                size="small"
+                icon={<SettingOutlined />}
+                onClick={onOpenPathRulePanel}
+              >
+                面板
+              </Button>
+            </Tooltip>
+          ) : null}
+        </Space>
       ),
     },
   ];

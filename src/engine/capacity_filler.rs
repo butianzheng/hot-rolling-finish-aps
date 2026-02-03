@@ -12,7 +12,8 @@
 use crate::domain::capacity::{CapacityConstraint, CapacityPool};
 use crate::domain::material::{MaterialMaster, MaterialState};
 use crate::domain::plan::PlanItem;
-use crate::domain::types::SchedState;
+use crate::domain::types::{PathRuleStatus, SchedState};
+use crate::engine::path_rule::{Anchor, PathRuleEngine};
 use chrono::NaiveDate;
 use tracing::instrument;
 
@@ -21,6 +22,30 @@ use tracing::instrument;
 // ==========================================
 pub struct CapacityFiller {
     // 无状态引擎，不需要注入依赖
+}
+
+/// 单日填充结果（用于承载路径规则锚点状态）
+#[derive(Debug, Clone)]
+pub struct FillSingleDayResult {
+    pub plan_items: Vec<PlanItem>,
+    pub skipped_materials: Vec<(MaterialMaster, MaterialState, String)>,
+    pub path_override_pending: Vec<PathOverridePendingItem>,
+    pub final_anchor: Option<Anchor>,
+    pub final_anchor_material_id: Option<String>,
+}
+
+/// 路径规则：待人工确认记录（由 CapacityFiller 产生，供上层落库/汇总）
+#[derive(Debug, Clone)]
+pub struct PathOverridePendingItem {
+    pub material_id: String,
+    pub urgent_level: String,
+    pub violation_type: String,
+    pub width_mm: f64,
+    pub thickness_mm: f64,
+    pub anchor_width_mm: f64,
+    pub anchor_thickness_mm: f64,
+    pub width_delta_mm: f64,
+    pub thickness_delta_mm: f64,
 }
 
 impl CapacityFiller {
@@ -65,8 +90,37 @@ impl CapacityFiller {
         frozen_items: Vec<PlanItem>,
         version_id: &str,
     ) -> (Vec<PlanItem>, Vec<(MaterialMaster, MaterialState, String)>) {
+        let result = self.fill_single_day_with_path_rule(
+            capacity_pool,
+            candidates,
+            frozen_items,
+            version_id,
+            None,
+            None,
+            None,
+        );
+        (result.plan_items, result.skipped_materials)
+    }
+
+    /// 填充产能池（单日单机组）- 支持宽厚路径规则门控
+    #[allow(clippy::too_many_arguments)]
+    pub fn fill_single_day_with_path_rule(
+        &self,
+        capacity_pool: &mut CapacityPool,
+        candidates: Vec<(MaterialMaster, MaterialState)>,
+        frozen_items: Vec<PlanItem>,
+        version_id: &str,
+        path_rule_engine: Option<&PathRuleEngine>,
+        initial_anchor: Option<Anchor>,
+        initial_anchor_material_id: Option<String>,
+    ) -> FillSingleDayResult {
         let mut plan_items = Vec::new();
         let mut skipped_materials = Vec::new();
+        let mut path_override_pending = Vec::new();
+
+        // 当前锚点（跨材料更新）
+        let mut current_anchor = initial_anchor;
+        let mut current_anchor_material_id = initial_anchor_material_id;
 
         // 1. 先添加冻结区材料
         let mut sequence_no = 1;
@@ -79,6 +133,80 @@ impl CapacityFiller {
         let plan_date = capacity_pool.plan_date;
         for (master, state) in candidates {
             let weight = master.weight_t.unwrap_or(0.0);
+
+            let candidate_width_mm = master.width_mm.unwrap_or(0.0);
+            let candidate_thickness_mm = master.thickness_mm.unwrap_or(0.0);
+            let dims_valid = candidate_width_mm.is_finite()
+                && candidate_thickness_mm.is_finite()
+                && candidate_width_mm > 0.0
+                && candidate_thickness_mm > 0.0;
+
+            // 0) 路径门控（锁定材料不可跳过）
+            if state.sched_state != SchedState::Locked {
+                if let (Some(engine), true) = (path_rule_engine, dims_valid) {
+                    let check = engine.check(
+                        candidate_width_mm,
+                        candidate_thickness_mm,
+                        state.urgent_level,
+                        current_anchor.as_ref(),
+                        state.user_confirmed,
+                    );
+
+                    match check.status {
+                        PathRuleStatus::HardViolation => {
+                            skipped_materials.push((
+                                master,
+                                state,
+                                format!(
+                                    "PATH_HARD_VIOLATION: violation={}, width_delta_mm={:.3}, thickness_delta_mm={:.3}",
+                                    check
+                                        .violation_type
+                                        .map(|v| v.to_string())
+                                        .unwrap_or_else(|| "UNKNOWN".to_string()),
+                                    check.width_delta_mm,
+                                    check.thickness_delta_mm
+                                ),
+                            ));
+                            continue;
+                        }
+                        PathRuleStatus::OverrideRequired => {
+                            let (anchor_width_mm, anchor_thickness_mm) =
+                                current_anchor.as_ref().map(|a| (a.width_mm, a.thickness_mm)).unwrap_or((0.0, 0.0));
+                            path_override_pending.push(PathOverridePendingItem {
+                                material_id: master.material_id.clone(),
+                                urgent_level: state.urgent_level.to_string(),
+                                violation_type: check
+                                    .violation_type
+                                    .map(|v| v.to_string())
+                                    .unwrap_or_else(|| "UNKNOWN".to_string()),
+                                width_mm: candidate_width_mm,
+                                thickness_mm: candidate_thickness_mm,
+                                anchor_width_mm,
+                                anchor_thickness_mm,
+                                width_delta_mm: check.width_delta_mm,
+                                thickness_delta_mm: check.thickness_delta_mm,
+                            });
+                            skipped_materials.push((
+                                master,
+                                state,
+                                format!(
+                                    "PATH_OVERRIDE_REQUIRED: violation={}, width_delta_mm={:.3}, thickness_delta_mm={:.3}",
+                                    check
+                                        .violation_type
+                                        .map(|v| v.to_string())
+                                        .unwrap_or_else(|| "UNKNOWN".to_string()),
+                                    check.width_delta_mm,
+                                    check.thickness_delta_mm
+                                ),
+                            ));
+                            continue;
+                        }
+                        PathRuleStatus::Ok => {
+                            // 继续执行产能门控
+                        }
+                    }
+                }
+            }
 
             // 检查锁定材料不可跳过（锁定材料优先处理）
             if state.sched_state == SchedState::Locked {
@@ -95,6 +223,15 @@ impl CapacityFiller {
                 plan_items.push(plan_item);
                 capacity_pool.used_capacity_t += weight;
                 sequence_no += 1;
+
+                // 入池后更新锚点（宽厚有效时）
+                if dims_valid {
+                    current_anchor = Some(Anchor {
+                        width_mm: candidate_width_mm,
+                        thickness_mm: candidate_thickness_mm,
+                    });
+                    current_anchor_material_id = Some(master.material_id.clone());
+                }
                 continue;
             }
 
@@ -104,15 +241,16 @@ impl CapacityFiller {
                 skipped_materials.push((
                     master,
                     state,
-                    format!("CAPACITY_LIMIT_EXCEEDED: would exceed limit_capacity_t ({} + {} > {})",
-                        capacity_pool.used_capacity_t, weight, capacity_pool.limit_capacity_t)
+                    format!(
+                        "CAPACITY_LIMIT_EXCEEDED: would exceed limit_capacity_t ({} + {} > {})",
+                        capacity_pool.used_capacity_t, weight, capacity_pool.limit_capacity_t
+                    ),
                 ));
                 continue;
             }
 
             // 普通材料：填充至 target，允许填充到 limit
-            let assign_reason = if capacity_pool.used_capacity_t < capacity_pool.target_capacity_t
-            {
+            let assign_reason = if capacity_pool.used_capacity_t < capacity_pool.target_capacity_t {
                 "FILL_TO_TARGET"
             } else if capacity_pool.used_capacity_t < capacity_pool.limit_capacity_t {
                 "FILL_TO_LIMIT"
@@ -121,8 +259,10 @@ impl CapacityFiller {
                 skipped_materials.push((
                     master,
                     state,
-                    format!("TARGET_REACHED: capacity pool is full ({} >= {})",
-                        capacity_pool.used_capacity_t, capacity_pool.limit_capacity_t)
+                    format!(
+                        "TARGET_REACHED: capacity pool is full ({} >= {})",
+                        capacity_pool.used_capacity_t, capacity_pool.limit_capacity_t
+                    ),
                 ));
                 continue;
             };
@@ -140,17 +280,31 @@ impl CapacityFiller {
             plan_items.push(plan_item);
             capacity_pool.used_capacity_t += weight;
             sequence_no += 1;
+
+            // 入池后更新锚点（宽厚有效时）
+            if dims_valid {
+                current_anchor = Some(Anchor {
+                    width_mm: candidate_width_mm,
+                    thickness_mm: candidate_thickness_mm,
+                });
+                current_anchor_material_id = Some(master.material_id.clone());
+            }
         }
 
         // 3. 更新产能池的 overflow_t
         if capacity_pool.used_capacity_t > capacity_pool.limit_capacity_t {
-            capacity_pool.overflow_t =
-                capacity_pool.used_capacity_t - capacity_pool.limit_capacity_t;
+            capacity_pool.overflow_t = capacity_pool.used_capacity_t - capacity_pool.limit_capacity_t;
         } else {
             capacity_pool.overflow_t = 0.0;
         }
 
-        (plan_items, skipped_materials)
+        FillSingleDayResult {
+            plan_items,
+            skipped_materials,
+            path_override_pending,
+            final_anchor: current_anchor,
+            final_anchor_material_id: current_anchor_material_id,
+        }
     }
 
     // ==========================================
@@ -234,6 +388,7 @@ mod tests {
     use super::*;
     use crate::domain::types::{RushLevel, UrgentLevel};
     use chrono::Utc;
+    use crate::engine::path_rule::{PathRuleConfig, PathRuleEngine};
 
     // ==========================================
     // 测试辅助函数
@@ -310,12 +465,35 @@ mod tests {
             scheduled_machine_code: Some(machine_code.to_string()),
             seq_no: None,
             manual_urgent_flag: false,
+            user_confirmed: false,
+            user_confirmed_at: None,
+            user_confirmed_by: None,
+            user_confirmed_reason: None,
             in_frozen_zone: false,
             last_calc_version_id: None,
             updated_at: Utc::now(),
             updated_by: None,
         };
 
+        (master, state)
+    }
+
+    fn create_test_material_with_dims(
+        material_id: &str,
+        machine_code: &str,
+        sched_state: SchedState,
+        urgent_level: UrgentLevel,
+        width_mm: f64,
+        thickness_mm: f64,
+        weight_t: f64,
+        user_confirmed: bool,
+    ) -> (MaterialMaster, MaterialState) {
+        let (mut master, mut state) =
+            create_test_material(material_id, machine_code, sched_state, weight_t);
+        master.width_mm = Some(width_mm);
+        master.thickness_mm = Some(thickness_mm);
+        state.urgent_level = urgent_level;
+        state.user_confirmed = user_confirmed;
         (master, state)
     }
 
@@ -594,5 +772,153 @@ mod tests {
 
         pool.used_capacity_t = 1100.0;
         assert_eq!(pool.overflow_ratio(), 0.0); // 未超限
+    }
+
+    #[test]
+    fn test_path_rule_hard_violation_should_skip() {
+        let filler = CapacityFiller::new();
+        let mut pool = create_test_capacity_pool(
+            "H032",
+            NaiveDate::from_ymd_opt(2026, 1, 20).unwrap(),
+            1000.0,
+            1200.0,
+            0.0,
+        );
+
+        let engine = PathRuleEngine::new(PathRuleConfig {
+            enabled: true,
+            width_tolerance_mm: 0.0,
+            thickness_tolerance_mm: 0.0,
+            override_allowed_urgency_levels: vec![UrgentLevel::L2, UrgentLevel::L3],
+        });
+
+        let candidates = vec![create_test_material_with_dims(
+            "M001",
+            "H032",
+            SchedState::Ready,
+            UrgentLevel::L1,
+            1100.0, // anchor=1000 => violation
+            9.0,
+            100.0,
+            false,
+        )];
+
+        let result = filler.fill_single_day_with_path_rule(
+            &mut pool,
+            candidates,
+            vec![],
+            "version-001",
+            Some(&engine),
+            Some(Anchor {
+                width_mm: 1000.0,
+                thickness_mm: 10.0,
+            }),
+            Some("ANCHOR_M".to_string()),
+        );
+
+        assert_eq!(result.plan_items.len(), 0);
+        assert_eq!(result.skipped_materials.len(), 1);
+        assert!(result.skipped_materials[0].2.contains("PATH_HARD_VIOLATION"));
+    }
+
+    #[test]
+    fn test_path_rule_override_required_should_skip() {
+        let filler = CapacityFiller::new();
+        let mut pool = create_test_capacity_pool(
+            "H032",
+            NaiveDate::from_ymd_opt(2026, 1, 20).unwrap(),
+            1000.0,
+            1200.0,
+            0.0,
+        );
+
+        let engine = PathRuleEngine::new(PathRuleConfig {
+            enabled: true,
+            width_tolerance_mm: 0.0,
+            thickness_tolerance_mm: 0.0,
+            override_allowed_urgency_levels: vec![UrgentLevel::L2, UrgentLevel::L3],
+        });
+
+        let candidates = vec![create_test_material_with_dims(
+            "M001",
+            "H032",
+            SchedState::Ready,
+            UrgentLevel::L2,
+            1100.0, // anchor=1000 => violation but override allowed
+            9.0,
+            100.0,
+            false,
+        )];
+
+        let result = filler.fill_single_day_with_path_rule(
+            &mut pool,
+            candidates,
+            vec![],
+            "version-001",
+            Some(&engine),
+            Some(Anchor {
+                width_mm: 1000.0,
+                thickness_mm: 10.0,
+            }),
+            Some("ANCHOR_M".to_string()),
+        );
+
+        assert_eq!(result.plan_items.len(), 0);
+        assert_eq!(result.skipped_materials.len(), 1);
+        assert!(result.skipped_materials[0].2.contains("PATH_OVERRIDE_REQUIRED"));
+    }
+
+    #[test]
+    fn test_path_rule_user_confirmed_should_pass_and_update_anchor() {
+        let filler = CapacityFiller::new();
+        let mut pool = create_test_capacity_pool(
+            "H032",
+            NaiveDate::from_ymd_opt(2026, 1, 20).unwrap(),
+            1000.0,
+            1200.0,
+            0.0,
+        );
+
+        let engine = PathRuleEngine::new(PathRuleConfig {
+            enabled: true,
+            width_tolerance_mm: 0.0,
+            thickness_tolerance_mm: 0.0,
+            override_allowed_urgency_levels: vec![UrgentLevel::L2, UrgentLevel::L3],
+        });
+
+        let candidates = vec![create_test_material_with_dims(
+            "M001",
+            "H032",
+            SchedState::Ready,
+            UrgentLevel::L2,
+            1100.0, // violates but user_confirmed=true => pass
+            9.0,
+            100.0,
+            true,
+        )];
+
+        let result = filler.fill_single_day_with_path_rule(
+            &mut pool,
+            candidates,
+            vec![],
+            "version-001",
+            Some(&engine),
+            Some(Anchor {
+                width_mm: 1000.0,
+                thickness_mm: 10.0,
+            }),
+            Some("ANCHOR_M".to_string()),
+        );
+
+        assert_eq!(result.plan_items.len(), 1);
+        assert_eq!(result.skipped_materials.len(), 0);
+        assert_eq!(
+            result.final_anchor,
+            Some(Anchor {
+                width_mm: 1100.0,
+                thickness_mm: 9.0,
+            })
+        );
+        assert_eq!(result.final_anchor_material_id.as_deref(), Some("M001"));
     }
 }

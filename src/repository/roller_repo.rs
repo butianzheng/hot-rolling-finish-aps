@@ -6,10 +6,10 @@
 // ==========================================
 
 use crate::domain::roller::RollerCampaign;
-use crate::domain::types::RollStatus;
+use crate::domain::types::{AnchorSource, RollStatus};
 use crate::repository::error::{RepositoryError, RepositoryResult};
 use chrono::NaiveDate;
-use rusqlite::{params, Connection, Result as SqliteResult};
+use rusqlite::{params, Connection, OptionalExtension, Result as SqliteResult};
 use std::sync::{Arc, Mutex};
 
 // ==========================================
@@ -52,8 +52,9 @@ impl RollerCampaignRepository {
                 version_id, machine_code, campaign_no,
                 start_date, end_date,
                 cum_weight_t, suggest_threshold_t, hard_limit_t,
-                status
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                status,
+                path_anchor_material_id, path_anchor_width_mm, path_anchor_thickness_mm, anchor_source
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
             "#,
             params![
                 campaign.version_id,
@@ -65,6 +66,10 @@ impl RollerCampaignRepository {
                 campaign.suggest_threshold_t,
                 campaign.hard_limit_t,
                 format!("{:?}", campaign.status),
+                campaign.path_anchor_material_id,
+                campaign.path_anchor_width_mm,
+                campaign.path_anchor_thickness_mm,
+                campaign.anchor_source.map(|s| s.to_db_str().to_string()),
             ],
         )?;
         Ok(())
@@ -94,7 +99,8 @@ impl RollerCampaignRepository {
                 version_id, machine_code, campaign_no,
                 start_date, end_date,
                 cum_weight_t, suggest_threshold_t, hard_limit_t,
-                status
+                status,
+                path_anchor_material_id, path_anchor_width_mm, path_anchor_thickness_mm, anchor_source
             FROM roller_campaign
             WHERE version_id = ?1 AND machine_code = ?2 AND campaign_no = ?3
             "#,
@@ -114,6 +120,12 @@ impl RollerCampaignRepository {
                 suggest_threshold_t: row.get(6)?,
                 hard_limit_t: row.get(7)?,
                 status: parse_roll_status(&row.get::<_, String>(8)?),
+                path_anchor_material_id: row.get(9)?,
+                path_anchor_width_mm: row.get(10)?,
+                path_anchor_thickness_mm: row.get(11)?,
+                anchor_source: row
+                    .get::<_, Option<String>>(12)?
+                    .map(|s| AnchorSource::from_str(&s)),
             })
         });
 
@@ -143,7 +155,8 @@ impl RollerCampaignRepository {
                 version_id, machine_code, campaign_no,
                 start_date, end_date,
                 cum_weight_t, suggest_threshold_t, hard_limit_t,
-                status
+                status,
+                path_anchor_material_id, path_anchor_width_mm, path_anchor_thickness_mm, anchor_source
             FROM roller_campaign
             WHERE version_id = ?1
             ORDER BY machine_code ASC, campaign_no DESC
@@ -165,6 +178,12 @@ impl RollerCampaignRepository {
                     suggest_threshold_t: row.get(6)?,
                     hard_limit_t: row.get(7)?,
                     status: parse_roll_status(&row.get::<_, String>(8)?),
+                    path_anchor_material_id: row.get(9)?,
+                    path_anchor_width_mm: row.get(10)?,
+                    path_anchor_thickness_mm: row.get(11)?,
+                    anchor_source: row
+                        .get::<_, Option<String>>(12)?
+                        .map(|s| AnchorSource::from_str(&s)),
                 })
             })?
             .collect::<SqliteResult<Vec<_>>>()?;
@@ -194,7 +213,8 @@ impl RollerCampaignRepository {
                 version_id, machine_code, campaign_no,
                 start_date, end_date,
                 cum_weight_t, suggest_threshold_t, hard_limit_t,
-                status
+                status,
+                path_anchor_material_id, path_anchor_width_mm, path_anchor_thickness_mm, anchor_source
             FROM roller_campaign
             WHERE version_id = ?1 AND machine_code = ?2 AND end_date IS NULL
             ORDER BY campaign_no DESC
@@ -216,6 +236,12 @@ impl RollerCampaignRepository {
                 suggest_threshold_t: row.get(6)?,
                 hard_limit_t: row.get(7)?,
                 status: parse_roll_status(&row.get::<_, String>(8)?),
+                path_anchor_material_id: row.get(9)?,
+                path_anchor_width_mm: row.get(10)?,
+                path_anchor_thickness_mm: row.get(11)?,
+                anchor_source: row
+                    .get::<_, Option<String>>(12)?
+                    .map(|s| AnchorSource::from_str(&s)),
             })
         });
 
@@ -249,7 +275,8 @@ impl RollerCampaignRepository {
                 version_id, machine_code, campaign_no,
                 start_date, end_date,
                 cum_weight_t, suggest_threshold_t, hard_limit_t,
-                status
+                status,
+                path_anchor_material_id, path_anchor_width_mm, path_anchor_thickness_mm, anchor_source
             FROM roller_campaign
             WHERE version_id = ?1 AND machine_code = ?2
             ORDER BY campaign_no DESC
@@ -272,6 +299,12 @@ impl RollerCampaignRepository {
                     suggest_threshold_t: row.get(6)?,
                     hard_limit_t: row.get(7)?,
                     status: parse_roll_status(&row.get::<_, String>(8)?),
+                    path_anchor_material_id: row.get(9)?,
+                    path_anchor_width_mm: row.get(10)?,
+                    path_anchor_thickness_mm: row.get(11)?,
+                    anchor_source: row
+                        .get::<_, Option<String>>(12)?
+                        .map(|s| AnchorSource::from_str(&s)),
                 })
             })?
             .collect::<SqliteResult<Vec<_>>>()?;
@@ -298,7 +331,8 @@ impl RollerCampaignRepository {
                 version_id, machine_code, campaign_no,
                 start_date, end_date,
                 cum_weight_t, suggest_threshold_t, hard_limit_t,
-                status
+                status,
+                path_anchor_material_id, path_anchor_width_mm, path_anchor_thickness_mm, anchor_source
             FROM roller_campaign
             WHERE version_id = ?1
               AND end_date IS NULL
@@ -328,6 +362,12 @@ impl RollerCampaignRepository {
                     suggest_threshold_t: row.get(6)?,
                     hard_limit_t: row.get(7)?,
                     status: parse_roll_status(&row.get::<_, String>(8)?),
+                    path_anchor_material_id: row.get(9)?,
+                    path_anchor_width_mm: row.get(10)?,
+                    path_anchor_thickness_mm: row.get(11)?,
+                    anchor_source: row
+                        .get::<_, Option<String>>(12)?
+                        .map(|s| AnchorSource::from_str(&s)),
                 })
             })?
             .collect::<SqliteResult<Vec<_>>>()?;
@@ -435,6 +475,119 @@ impl RollerCampaignRepository {
         Ok(())
     }
 
+    /// 更新换辊周期锚点（宽厚路径规则）
+    pub fn update_campaign_anchor(
+        &self,
+        version_id: &str,
+        machine_code: &str,
+        campaign_no: i32,
+        anchor_material_id: Option<&str>,
+        anchor_width_mm: Option<f64>,
+        anchor_thickness_mm: Option<f64>,
+        anchor_source: AnchorSource,
+    ) -> RepositoryResult<()> {
+        let conn = self.get_conn()?;
+        conn.execute(
+            r#"
+            UPDATE roller_campaign
+            SET
+                path_anchor_material_id = ?4,
+                path_anchor_width_mm = ?5,
+                path_anchor_thickness_mm = ?6,
+                anchor_source = ?7
+            WHERE version_id = ?1 AND machine_code = ?2 AND campaign_no = ?3
+            "#,
+            params![
+                version_id,
+                machine_code,
+                campaign_no,
+                anchor_material_id,
+                anchor_width_mm,
+                anchor_thickness_mm,
+                anchor_source.to_db_str(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// 重置换辊周期（换辊时调用）：关闭当前 active campaign，并创建新 campaign
+    ///
+    /// 注意：Repository 不做业务判定，仅执行必要的表更新/插入。
+    pub fn reset_campaign_for_roll_change(
+        &self,
+        version_id: &str,
+        machine_code: &str,
+        new_campaign_no: i32,
+        start_date: NaiveDate,
+    ) -> RepositoryResult<()> {
+        let conn = self.get_conn()?;
+        let tx = conn.unchecked_transaction()?;
+
+        // 1) 读取当前 active campaign（若存在则关闭并继承阈值）
+        let active: Option<(i32, f64, f64)> = tx
+            .query_row(
+                r#"
+                SELECT campaign_no, suggest_threshold_t, hard_limit_t
+                FROM roller_campaign
+                WHERE version_id = ?1 AND machine_code = ?2 AND end_date IS NULL
+                ORDER BY campaign_no DESC
+                LIMIT 1
+                "#,
+                params![version_id, machine_code],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()?;
+
+        let (suggest_threshold_t, hard_limit_t) = if let Some((active_no, suggest_t, hard_t)) = active {
+            tx.execute(
+                r#"
+                UPDATE roller_campaign
+                SET end_date = ?4
+                WHERE version_id = ?1 AND machine_code = ?2 AND campaign_no = ?3
+                "#,
+                params![version_id, machine_code, active_no, start_date.to_string()],
+            )?;
+            (suggest_t, hard_t)
+        } else {
+            (1500.0, 2500.0)
+        };
+
+        // 2) 插入新 campaign（锚点重置）
+        tx.execute(
+            r#"
+            INSERT INTO roller_campaign (
+                version_id, machine_code, campaign_no,
+                start_date, end_date,
+                cum_weight_t, suggest_threshold_t, hard_limit_t,
+                status,
+                path_anchor_material_id, path_anchor_width_mm, path_anchor_thickness_mm, anchor_source
+            ) VALUES (?1, ?2, ?3, ?4, NULL, 0.0, ?5, ?6, ?7, NULL, NULL, NULL, ?8)
+            "#,
+            params![
+                version_id,
+                machine_code,
+                new_campaign_no,
+                start_date.to_string(),
+                suggest_threshold_t,
+                hard_limit_t,
+                format!("{:?}", RollStatus::Normal),
+                AnchorSource::None.to_db_str(),
+            ],
+        )?;
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// 查询当前活跃的换辊周期（语义别名）
+    pub fn get_active_campaign(
+        &self,
+        version_id: &str,
+        machine_code: &str,
+    ) -> RepositoryResult<Option<RollerCampaign>> {
+        self.find_active_campaign(version_id, machine_code)
+    }
+
     /// 批量插入换辊窗口
     ///
     /// # 参数
@@ -455,8 +608,9 @@ impl RollerCampaignRepository {
                     version_id, machine_code, campaign_no,
                     start_date, end_date,
                     cum_weight_t, suggest_threshold_t, hard_limit_t,
-                    status
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                    status,
+                    path_anchor_material_id, path_anchor_width_mm, path_anchor_thickness_mm, anchor_source
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
                 "#,
                 params![
                     campaign.version_id,
@@ -468,6 +622,10 @@ impl RollerCampaignRepository {
                     campaign.suggest_threshold_t,
                     campaign.hard_limit_t,
                     format!("{:?}", campaign.status),
+                    campaign.path_anchor_material_id,
+                    campaign.path_anchor_width_mm,
+                    campaign.path_anchor_thickness_mm,
+                    campaign.anchor_source.map(|s| s.to_db_str().to_string()),
                 ],
             )?;
             count += 1;

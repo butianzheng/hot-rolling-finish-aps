@@ -10,6 +10,7 @@ const ActionLogQuery = React.lazy(() => import('../components/ActionLogQuery'));
 const CapacityPoolManagement = React.lazy(() => import('../components/CapacityPoolManagement'));
 const MaterialManagement = React.lazy(() => import('../components/MaterialManagement'));
 const StrategyProfilesPanel = React.lazy(() => import('../components/settings/StrategyProfilesPanel'));
+const PathRuleConfigPanel = React.lazy(() => import('../components/settings/PathRuleConfigPanel'));
 const RollCampaignManagementPanel = React.lazy(
   () => import('../components/settings/RollCampaignManagementPanel')
 );
@@ -17,7 +18,17 @@ const RhythmPresetManagementPanel = React.lazy(
   () => import('../components/settings/RhythmPresetManagementPanel')
 );
 
-const TAB_KEYS = ['system', 'machine', 'materials', 'roll', 'rhythm', 'strategy', 'logs', 'preferences'] as const;
+const TAB_KEYS = [
+  'system',
+  'machine',
+  'materials',
+  'roll',
+  'rhythm',
+  'strategy',
+  'path_rule',
+  'logs',
+  'preferences',
+] as const;
 type TabKey = (typeof TAB_KEYS)[number];
 
 function normalizeTabKey(value: string | null): TabKey {
@@ -93,6 +104,15 @@ const SettingsCenter: React.FC = () => {
             children: (
               <React.Suspense fallback={<PageSkeleton />}>
                 <StrategyProfilesPanel />
+              </React.Suspense>
+            ),
+          },
+          {
+            key: 'path_rule',
+            label: '路径规则',
+            children: (
+              <React.Suspense fallback={<PageSkeleton />}>
+                <PathRuleConfigPanel />
               </React.Suspense>
             ),
           },

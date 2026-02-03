@@ -12,6 +12,7 @@ import {
   SettingOutlined,
   UploadOutlined,
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { tableEmptyConfig } from '../CustomEmpty';
 
 import { useConfigManagement } from './useConfigManagement';
@@ -22,11 +23,16 @@ import { EditConfigModal } from './EditConfigModal';
 
 const ConfigManagement: React.FC = () => {
   const state = useConfigManagement();
+  const navigate = useNavigate();
 
   // 表格列配置
   const columns = useMemo(
-    () => createConfigColumns({ onEdit: state.handleEdit }),
-    [state.handleEdit]
+    () =>
+      createConfigColumns({
+        onEdit: state.handleEdit,
+        onOpenPathRulePanel: () => navigate('/settings?tab=path_rule'),
+      }),
+    [navigate, state.handleEdit]
   );
 
   return (

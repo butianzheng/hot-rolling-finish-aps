@@ -110,7 +110,7 @@ impl MaterialImportRepositoryImpl {
     ) -> Result<usize, Box<dyn Error>> {
         let mut stmt = tx.prepare(
             r#"
-            INSERT OR REPLACE INTO material_state (
+            INSERT INTO material_state (
                 material_id, sched_state, lock_flag, force_release_flag,
                 urgent_level, urgent_reason, rush_level, rolling_output_age_days,
                 ready_in_days, earliest_sched_date, stock_age_days,
@@ -120,6 +120,25 @@ impl MaterialImportRepositoryImpl {
             ) VALUES (
                 ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19
             )
+            ON CONFLICT(material_id) DO UPDATE SET
+                sched_state = excluded.sched_state,
+                lock_flag = excluded.lock_flag,
+                force_release_flag = excluded.force_release_flag,
+                urgent_level = excluded.urgent_level,
+                urgent_reason = excluded.urgent_reason,
+                rush_level = excluded.rush_level,
+                rolling_output_age_days = excluded.rolling_output_age_days,
+                ready_in_days = excluded.ready_in_days,
+                earliest_sched_date = excluded.earliest_sched_date,
+                stock_age_days = excluded.stock_age_days,
+                scheduled_date = excluded.scheduled_date,
+                scheduled_machine_code = excluded.scheduled_machine_code,
+                seq_no = excluded.seq_no,
+                manual_urgent_flag = excluded.manual_urgent_flag,
+                in_frozen_zone = excluded.in_frozen_zone,
+                last_calc_version_id = excluded.last_calc_version_id,
+                updated_at = excluded.updated_at,
+                updated_by = excluded.updated_by
             "#,
         )?;
 

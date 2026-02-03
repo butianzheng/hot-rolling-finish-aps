@@ -15,6 +15,8 @@ pub mod events;
 pub mod impact_summary;
 pub mod importer;
 pub mod material_state_derivation;
+pub mod path_rule;
+pub mod anchor_resolver;
 pub mod orchestrator;
 pub mod priority;
 pub mod recalc;
@@ -36,6 +38,8 @@ pub use events::{
 pub use impact_summary::ImpactSummaryEngine;
 pub use importer::MaterialImporter;
 pub use material_state_derivation::MaterialStateDerivationService;
+pub use path_rule::{Anchor, PathRuleConfig, PathRuleEngine, PathRuleResult};
+pub use anchor_resolver::{AnchorResolver, MaterialSummary, ResolvedAnchor, SeedS2Config};
 pub use orchestrator::{ScheduleOrchestrator, ScheduleResult};
 pub use priority::PrioritySorter;
 pub use recalc::{RecalcConfig, RecalcEngine, RecalcResult};

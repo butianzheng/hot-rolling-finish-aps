@@ -50,9 +50,15 @@ pub fn t_with_args(key: &str, args: &[(&str, &str)]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    // rust-i18n 的 locale 为全局状态，且 Rust 测试默认并行执行；
+    // 为避免测试互相干扰，这里对 i18n 相关测试串行化。
+    static LOCALE_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_default_locale() {
+        let _guard = LOCALE_TEST_LOCK.lock().unwrap();
         // 显式设置为默认语言
         set_locale("zh-CN");
         assert_eq!(current_locale(), "zh-CN");
@@ -60,6 +66,7 @@ mod tests {
 
     #[test]
     fn test_set_locale() {
+        let _guard = LOCALE_TEST_LOCK.lock().unwrap();
         // 测试切换语言
         set_locale("zh-CN");
         assert_eq!(current_locale(), "zh-CN");
@@ -73,6 +80,7 @@ mod tests {
 
     #[test]
     fn test_translate_simple() {
+        let _guard = LOCALE_TEST_LOCK.lock().unwrap();
         // 测试中文翻译
         set_locale("zh-CN");
         let msg = t("common.success");
@@ -89,6 +97,7 @@ mod tests {
 
     #[test]
     fn test_translate_with_args() {
+        let _guard = LOCALE_TEST_LOCK.lock().unwrap();
         // 测试中文翻译（带参数）
         set_locale("zh-CN");
         let msg = t_with_args("import.file_not_found", &[("path", "/tmp/test.csv")]);

@@ -389,6 +389,10 @@ mod tests {
             scheduled_machine_code: None,
             seq_no: None,
             manual_urgent_flag: false,
+            user_confirmed: false,
+            user_confirmed_at: None,
+            user_confirmed_by: None,
+            user_confirmed_reason: None,
             in_frozen_zone: false,
             last_calc_version_id: None,
             updated_at: Utc::now(),
@@ -874,6 +878,5 @@ mod tests {
         assert_eq!(results[1].urgent_level, UrgentLevel::L2, "第二个材料应为L2");
     }
 }
-
 
 

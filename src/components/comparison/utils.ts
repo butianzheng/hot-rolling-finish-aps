@@ -42,8 +42,11 @@ export function formatVersionLabel(version: Version): string {
   if (nameCn) return nameCn;
   const no = Number(version.version_no ?? 0);
   if (Number.isFinite(no) && no > 0) return `V${no}`;
-  // 降级显示：UUID前8位
-  return version.version_id.substring(0, 8);
+  // 降级显示：UUID 前 8 位；非 UUID 则保留完整 ID（例如人工命名/测试版本）
+  const id = String(version.version_id ?? '').trim();
+  const isUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  return isUuid ? id.slice(0, 8) : id;
 }
 
 /**
@@ -66,8 +69,13 @@ export function formatVersionLabelWithCode(version: Version): string {
   } else if (Number.isFinite(no) && no > 0) {
     return `V${no}`;
   } else {
-    // 降级显示：UUID前8位
-    return version.version_id.substring(0, 8);
+    // 降级显示：UUID 前 8 位；非 UUID 则保留完整 ID（例如人工命名/测试版本）
+    const id = String(version.version_id ?? '').trim();
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        id
+      );
+    return isUuid ? id.slice(0, 8) : id;
   }
 }
 

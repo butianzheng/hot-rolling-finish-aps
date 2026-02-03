@@ -11,9 +11,11 @@ use crate::domain::material::{MaterialMaster, MaterialState};
 use crate::domain::plan::PlanItem;
 use crate::domain::types::{SchedState, UrgentLevel};
 use crate::engine::{
+    Anchor, PathRuleEngine,
     CapacityFiller, EligibilityEngine, PrioritySorter, StructureCorrector,
     StructureViolationReport, UrgencyEngine,
 };
+use crate::engine::capacity_filler::PathOverridePendingItem;
 use crate::config::strategy_profile::CustomStrategyParameters;
 use crate::engine::strategy::ScheduleStrategy;
 use chrono::NaiveDate;
@@ -41,7 +43,12 @@ pub struct ScheduleResult {
     // Capacity Filler 输出
     pub plan_items: Vec<PlanItem>,
     pub skipped_materials: Vec<(MaterialMaster, MaterialState, String)>,
+    pub path_override_pending: Vec<PathOverridePendingItem>,
     pub updated_capacity_pool: CapacityPool,
+
+    // Path Rule / RollCycle 输出（锚点状态）
+    pub roll_cycle_anchor: Option<Anchor>,
+    pub roll_cycle_anchor_material_id: Option<String>,
 
     // Structure 输出
     pub structure_report: StructureViolationReport,
@@ -131,6 +138,38 @@ where
         deviation_threshold: f64,
         today: NaiveDate,
         version_id: &str,
+    ) -> Result<ScheduleResult, Box<dyn Error>> {
+        self.execute_single_day_schedule_with_path_rule(
+            materials,
+            states,
+            capacity_pool,
+            frozen_items,
+            target_ratio,
+            deviation_threshold,
+            today,
+            version_id,
+            None,
+            None,
+            None,
+        )
+        .await
+    }
+
+    /// 执行完整排产流程（单日单机组）- 支持宽厚路径规则门控
+    #[allow(clippy::too_many_arguments)]
+    pub async fn execute_single_day_schedule_with_path_rule<'a>(
+        &self,
+        materials: Vec<MaterialMaster>,
+        states: Vec<MaterialState>,
+        capacity_pool: &mut CapacityPool,
+        frozen_items: Vec<PlanItem>,
+        target_ratio: &HashMap<String, f64>,
+        deviation_threshold: f64,
+        today: NaiveDate,
+        version_id: &str,
+        path_rule_engine: Option<&'a PathRuleEngine>,
+        initial_anchor: Option<Anchor>,
+        initial_anchor_material_id: Option<String>,
     ) -> Result<ScheduleResult, Box<dyn Error>> {
         info!(
             machine_code = %capacity_pool.machine_code,
@@ -241,12 +280,22 @@ where
         // ==========================================
         debug!("步骤4: 执行产能池填充");
 
-        let (plan_items, skipped_materials) = self.filler.fill_single_day(
+        let fill_result = self.filler.fill_single_day_with_path_rule(
             capacity_pool,
             sorted_materials.clone(),
             frozen_items,
             version_id,
+            path_rule_engine,
+            initial_anchor,
+            initial_anchor_material_id,
         );
+        let crate::engine::capacity_filler::FillSingleDayResult {
+            plan_items,
+            skipped_materials,
+            path_override_pending,
+            final_anchor,
+            final_anchor_material_id,
+        } = fill_result;
 
         info!(
             plan_items_count = plan_items.len(),
@@ -297,7 +346,10 @@ where
             sorted_materials,
             plan_items,
             skipped_materials,
+            path_override_pending,
             updated_capacity_pool: capacity_pool.clone(),
+            roll_cycle_anchor: final_anchor,
+            roll_cycle_anchor_material_id: final_anchor_material_id,
             structure_report,
         })
     }

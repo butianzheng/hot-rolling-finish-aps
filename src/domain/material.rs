@@ -94,6 +94,13 @@ pub struct MaterialState {
     // ===== 人工干预标志 =====
     pub manual_urgent_flag: bool, // 人工红线标志
 
+    // ===== 路径规则人工确认 [v0.6] =====
+    // 依据: migrations/v0.6_path_rule_extension.sql
+    pub user_confirmed: bool, // 路径违规人工确认突破标志
+    pub user_confirmed_at: Option<DateTime<Utc>>, // 确认时间（RFC3339）
+    pub user_confirmed_by: Option<String>, // 确认人
+    pub user_confirmed_reason: Option<String>, // 确认原因（user_confirmed=1 时必填）
+
     // ===== 冻结区标志 =====
     pub in_frozen_zone: bool, // 是否在冻结区
 

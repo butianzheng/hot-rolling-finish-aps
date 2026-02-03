@@ -2,7 +2,7 @@
 
 > **版本**: v0.6
 > **依据规范**: spec/Engine_Specs_v0.3_Integrated.md 章节 14-18
-> **状态**: 待实施
+> **状态**: ✅ 已落地（核心引擎/前端闭环/测试已完成）
 
 ---
 
@@ -31,6 +31,7 @@
 
 | 层级 | 模块 | 优先级 |
 |------|------|--------|
+| Domain | MaterialState 扩展（user_confirmed* 字段对齐） | P0 |
 | Engine | PathRuleEngine | P0 |
 | Engine | AnchorResolver | P0 |
 | Engine | CapacityFiller 集成 | P0 |
@@ -45,6 +46,101 @@
 | Tests | 集成测试 | P1 |
 
 ---
+
+### 1.4 项目扫描结论（2026-02-02）
+
+> 本节基于对当前仓库代码的实际扫描，目的：把“计划”对齐成可以直接开工的 TODO，并标注需要适配的现有结构。
+
+**已验证可复用的现有基础**:
+- 数据模型/枚举：`src/domain/types.rs` 已包含 AnchorSource / PathViolationType / PathRuleStatus
+- 换辊领域模型：`src/domain/roller.rs` 已包含 path_anchor_* 字段与 update/reset 方法
+- 审计动作：`src/domain/action_log.rs` 已包含 PathOverrideConfirm / RollCycleReset
+- 配置体系：`src/config/config_manager.rs` + `src/api/config_api.rs` + 前端配置管理页 `src/components/config-management/*`
+- Tauri 命令层：`src/app/tauri_commands.rs`（snake_case）+ `src/main.rs` 统一注册
+- 排产主流程入口：`src/engine/orchestrator.rs` 调用 `src/engine/capacity_filler.rs::fill_single_day`
+- 测试基座：`tests/` 已存在多类 API/Engine/E2E 测试，可按同风格追加
+
+**当前缺口（Gap）**:
+- Engine：✅ 已实现 `src/engine/path_rule.rs`、`src/engine/anchor_resolver.rs` 并在 `src/engine/mod.rs` 注册导出
+- Domain/Repo 对齐：✅ 已对齐 `material_state.user_confirmed*` 与 `roller_campaign.path_anchor_* / anchor_source` 的映射与仓储方法
+- API/Tauri：✅ 已实现 `src/api/path_rule_api.rs` 并完成 `src/app/state.rs` 注入、`src/app/tauri_commands.rs` 命令包装、`src/main.rs` 注册；前端 `src/api/tauri.ts` / `src/api/ipcSchemas.ts` 已补齐调用与 schema
+- 前端：暂无 PathOverrideConfirmModal / RollCycleAnchorCard；配置管理页未显示 path_rule_* / seed_s2_* 配置键；工作台未集成人工确认闭环
+- 关键设计点：✅ 已采用方案 A（`PATH_OVERRIDE_REQUIRED` 作为 skipped reason），并提供 `PathRuleApi.list_path_override_pending` 查询入口
+
+### 1.5 TODO List（按里程碑推进）
+
+#### M0（P0）数据结构与仓储对齐（先做，避免后续返工）
+
+- [x] Domain 枚举：`src/domain/types.rs`
+- [x] RollerCampaign 锚点字段：`src/domain/roller.rs`
+- [x] ActionType：`src/domain/action_log.rs`
+- [x] 迁移脚本：`migrations/v0.6_path_rule_extension.sql`
+- [x] 对齐 MaterialState：为 `src/domain/material.rs` 增加 `user_confirmed/user_confirmed_at/user_confirmed_by/user_confirmed_reason`
+- [x] 对齐 MaterialStateRepository：更新 `src/repository/material_repo.rs` 的 INSERT/SELECT/快照结构以读写 user_confirmed* 列，并补充“人工确认”写入方法
+- [x] 对齐 RollerCampaignRepository：更新 `src/repository/roller_repo.rs` 的 SELECT/INSERT/UPDATE 以读写 path_anchor_* 与 anchor_source
+- [x] 明确迁移执行方式：补充“如何应用 v0.6 SQL”的说明（如已有脚本/流程，记录到本文或相关 docs）
+
+**迁移执行方式（SQLite）**：
+
+> v0.6 的迁移文件为 `migrations/v0.6_path_rule_extension.sql`，其中 `ALTER TABLE ... ADD COLUMN` **不具备幂等性**（重复执行会报 duplicate column name）。
+
+1) **开发/测试环境（推荐）**：直接重建 DB（避免处理历史脏数据/重复字段）
+- 使用 `scripts/dev_db/schema.sql`（已对齐 v0.6 字段）重建并灌数：
+  - `bash scripts/dev_db/reset_and_seed.sh`
+- 或直接跑二进制（等价）：
+  - `cargo run --bin reset_and_seed_full_scenario_db --`
+
+2) **已有 DB 就地升级（保留历史数据）**
+- 先备份 DB（强烈建议）：
+  - `cp hot_rolling_aps.db backups/hot_rolling_aps.db.bak.$(date +%Y%m%d_%H%M%S)`
+- 执行迁移（只执行一次）：
+  - `sqlite3 hot_rolling_aps.db < migrations/v0.6_path_rule_extension.sql`
+- 验证字段是否存在：
+  - `sqlite3 hot_rolling_aps.db "PRAGMA table_info(material_state);"`
+  - `sqlite3 hot_rolling_aps.db "PRAGMA table_info(roller_campaign);"`
+
+3) **DB 路径说明（避免“改了一个库，应用读另一个库”）**
+- 默认开发运行时 DB 位于用户数据目录 `hot-rolling-aps-dev/hot_rolling_aps.db`（首次启动会从项目根目录 `./hot_rolling_aps.db` 复制种子库）。如需指定 DB 路径，可设置环境变量：
+  - `HOT_ROLLING_APS_DB_PATH=/path/to/hot_rolling_aps.db`
+
+#### M1（P0）核心引擎实现 + 单元测试（不接 UI 也能自证正确）
+
+- [x] 新增 `src/engine/path_rule.rs`：实现 PathRuleEngine（含 PathRuleConfig、Anchor、check 逻辑）
+- [x] 新增 `src/engine/anchor_resolver.rs`：实现 AnchorResolver（优先级 + S2 种子策略）
+- [x] 更新 `src/engine/mod.rs`：注册并导出新模块（便于 orchestrator/测试复用）
+- [x] 单元测试：新增 `tests/path_rule_engine_test.rs`、`tests/anchor_resolver_test.rs`（覆盖文档列出的要点）
+
+#### M2（P0/P1）与排产主流程集成（对齐现有 orchestrator/filler 结构）
+
+- [x] 设计决策：确定 `OVERRIDE_REQUIRED` 在当前系统的承载方式
+  - 方案 A（推荐，改动较小）：作为 `skipped_materials` 的一种 reason（例如 `PATH_OVERRIDE_REQUIRED`），前端从“跳过列表”发起确认；确认后再次重算即可入池
+  - 方案 B（更完整）：扩展 CapacityFiller/Orchestrator 返回结构，单独输出 `pending_confirmation`，并提供持久化/查询入口
+- [x] 修改 `src/engine/capacity_filler.rs::fill_single_day`：在产能门控前增加路径门控（HardViolation→跳过；OverrideRequired→按选定方案输出/暂存；Ok→继续）
+- [x] 锚点生命周期：在每次入池后更新锚点；换辊/重置时清空锚点（依赖 roller_repo 的持久化接口）
+- [x] 审计：人工确认与换辊重置写入 action_log（已具备 ActionType，需补齐落库调用点）
+
+#### M3（P1）API/Tauri 对外能力（支持前端闭环）
+
+- [x] 新增 `src/api/path_rule_api.rs`：提供配置读取/更新、待确认列表、确认突破、锚点查询、换辊重置等接口（按现有 API 风格内置 DTO）
+- [x] 更新 `src/api/mod.rs`：导出 PathRuleApi
+- [x] 更新 `src/app/state.rs`：在 AppState 注入 PathRuleApi（依赖相关 repos/config）
+- [x] 更新 `src/app/tauri_commands.rs`：新增 tauri commands（snake_case）并按既有 map_api_error 返回 JSON
+- [x] 更新 `src/main.rs`：在 invoke_handler 注册新命令
+- [x] 前端接入：更新 `src/api/tauri.ts` + `src/api/ipcSchemas.ts`，补齐调用与 schema 校验
+
+#### M4（P2）前端页面/组件（可视化 + 人工确认）
+
+- [x] 配置管理页扩展：在 `src/components/config-management/types.ts` 增加 path_rule_* / seed_s2_* 的 labels 与 descriptions；如需专用面板再新增 `PathRuleConfigPanel.tsx`
+- [x] 独立设置面板：在 `src/pages/SettingsCenter.tsx` 增加“路径规则”tab 并挂载 `src/components/settings/PathRuleConfigPanel.tsx`；工作台“设置/工具”增加入口
+- [x] 人工确认弹窗：新增 `src/components/path-override-confirm/PathOverrideConfirmModal.tsx`，从待确认列表发起单个/批量确认
+- [x] 锚点状态卡：新增 `src/components/roll-cycle-anchor/RollCycleAnchorCard.tsx`，展示 anchor_source/path_anchor_* 并支持“手动换辊/重置”
+- [x] 工作台集成：`src/pages/PlanningWorkbench.tsx` 集成“待确认提示 → 弹窗确认 → 再次重算/刷新”
+
+#### M5（P1/P2）集成测试与验收（回归现有能力）
+
+- [x] 集成测试：新增 `tests/path_rule_integration_test.rs`（覆盖“门控 + 确认 + 再入池 + 审计”）
+- [x] E2E 测试：新增 `tests/path_rule_e2e_test.rs`（覆盖“重算→待确认→确认→再重算→入池”；换辊重置已在集成测试覆盖）
+- [x] 回归：跑通现有 `tests/*` 中的引擎/接口用例，确保未破坏既有排产流程
 
 ## 二、后端实施计划
 
@@ -413,105 +509,31 @@ impl AnchorResolver {
 **修改要点**:
 
 ```rust
-// 在 CapacityFiller 的 fill 方法中集成 PathRuleEngine
+// 现有入口：fill_single_day（由 src/engine/orchestrator.rs 调用）
+// 目标：在“产能门控”前增加“路径门控”，并维护 roll campaign 的锚点状态。
+//
+// 关键适配点：
+// - 当前函数签名仅返回 (plan_items, skipped_materials)，没有 pending_confirmation；需在实现阶段选定输出方案（见 1.5/M2）。
+// - 锚点解析需要 width/thickness：frozen_items 是 PlanItem 列表，需由 orchestrator 用 material_id 关联到 MaterialMaster/State 后再构造 summary。
 
 impl CapacityFiller {
-    pub fn fill_with_path_rule(
+    pub fn fill_single_day(
         &self,
         capacity_pool: &mut CapacityPool,
-        candidates: Vec<MaterialCandidate>,
-        frozen_items: &[PlanItem],
-        roll_cycle_state: &mut RollerCampaign,
-        path_rule_engine: &PathRuleEngine,
-        anchor_resolver: &AnchorResolver,
-    ) -> FillResult {
-        // 1. 解析初始锚点
-        let resolved_anchor = anchor_resolver.resolve(
-            &self.to_summary_list(frozen_items),
-            &self.get_locked_items(),
-            &self.get_user_confirmed_items(),
-            &self.to_summary_list(&candidates),
-        );
-
-        // 更新 roll_cycle_state
-        if let Some(ref anchor) = resolved_anchor.anchor {
-            roll_cycle_state.update_anchor(
-                resolved_anchor.material_id.clone(),
-                anchor.width_mm,
-                anchor.thickness_mm,
-                resolved_anchor.source,
-            );
-        }
-
-        let mut current_anchor = resolved_anchor.anchor;
-        let mut fill_result = FillResult::default();
-
-        // 2. 遍历候选材料
-        for candidate in candidates {
-            // 路径门控
-            let path_result = path_rule_engine.check(
-                candidate.width_mm,
-                candidate.thickness_mm,
-                candidate.urgent_level,
-                current_anchor.as_ref(),
-                candidate.user_confirmed,
-            );
-
-            match path_result.status {
-                PathRuleStatus::HardViolation => {
-                    fill_result.skipped.push(SkippedMaterial {
-                        material_id: candidate.material_id.clone(),
-                        reason: "PATH_HARD_VIOLATION".to_string(),
-                        violation_type: path_result.violation_type,
-                    });
-                    continue;
-                }
-                PathRuleStatus::OverrideRequired => {
-                    fill_result.pending_confirmation.push(PendingConfirmation {
-                        material_id: candidate.material_id.clone(),
-                        violation_type: path_result.violation_type.unwrap(),
-                        width_delta_mm: path_result.width_delta_mm,
-                        thickness_delta_mm: path_result.thickness_delta_mm,
-                        anchor_width_mm: current_anchor.as_ref().map(|a| a.width_mm),
-                        anchor_thickness_mm: current_anchor.as_ref().map(|a| a.thickness_mm),
-                    });
-                    continue;
-                }
-                PathRuleStatus::Ok => {
-                    // 继续产能门控
-                }
-            }
-
-            // 产能门控
-            if !capacity_pool.can_add(candidate.weight_t) {
-                fill_result.skipped.push(SkippedMaterial {
-                    material_id: candidate.material_id.clone(),
-                    reason: "CAPACITY_EXCEEDED".to_string(),
-                    violation_type: None,
-                });
-                continue;
-            }
-
-            // 添加材料
-            capacity_pool.add(candidate.clone());
-            fill_result.filled.push(FilledMaterial {
-                material_id: candidate.material_id.clone(),
-                violation_flags: path_result.violation_type.map(|v| ViolationFlags {
-                    path_violation: Some(PathViolationDetail {
-                        violation_type: v,
-                        user_confirmed: candidate.user_confirmed,
-                    }),
-                }),
-            });
-
-            // 更新锚点
-            current_anchor = Some(Anchor {
-                width_mm: candidate.width_mm,
-                thickness_mm: candidate.thickness_mm,
-            });
-        }
-
-        fill_result
+        candidates: Vec<(MaterialMaster, MaterialState)>,
+        frozen_items: Vec<PlanItem>,
+        version_id: &str,
+    ) -> (Vec<PlanItem>, Vec<(MaterialMaster, MaterialState, String)>) {
+        // 0) 先把 frozen_items 原样入池，sequence_no 从 frozen_items.len()+1 开始
+        // 1) AnchorResolver.resolve(...) 计算初始锚点（FrozenLast/LockedLast/UserConfirmedLast/SeedS2）
+        // 2) 遍历 candidates（含 Locked）：
+        //    - path_rule_engine.check(width, thickness, state.urgent_level, current_anchor, state.user_confirmed)
+        //      - HardViolation => skipped.push((m, s, "PATH_HARD_VIOLATION: ..."))
+        //      - OverrideRequired => skipped.push((m, s, "PATH_OVERRIDE_REQUIRED: ...")) 或写入 pending 列表
+        //      - Ok => 继续
+        //    - capacity_pool.can_add_material(weight) 等现有逻辑不变（Locked 的产能红线仍优先）
+        //    - 入池后更新 current_anchor（并在需要时持久化到 roller_campaign）
+        todo!()
     }
 }
 ```
@@ -524,39 +546,36 @@ impl CapacityFiller {
 
 **文件**: `src/repository/roller_repo.rs`
 
-**新增方法**:
+**需要新增/扩展的方法**（注意：当前仓储实现内部持有连接，不需要在签名中传入 `&Connection`）:
 
 ```rust
 /// 更新换辊周期锚点
 pub fn update_campaign_anchor(
     &self,
-    conn: &Connection,
     version_id: &str,
     machine_code: &str,
     campaign_no: i32,
     anchor_material_id: Option<&str>,
-    anchor_width_mm: f64,
-    anchor_thickness_mm: f64,
+    anchor_width_mm: Option<f64>,
+    anchor_thickness_mm: Option<f64>,
     anchor_source: AnchorSource,
-) -> Result<(), RepoError>;
+) -> RepositoryResult<()>;
 
 /// 重置换辊周期（换辊时调用）
 pub fn reset_campaign_for_roll_change(
     &self,
-    conn: &Connection,
     version_id: &str,
     machine_code: &str,
     new_campaign_no: i32,
     start_date: NaiveDate,
-) -> Result<(), RepoError>;
+) -> RepositoryResult<()>;
 
-/// 查询当前活跃的换辊周期
-pub fn get_active_campaign(
+/// 查询当前活跃的换辊周期（现有 find_active_campaign 方法需扩展字段映射）
+pub fn find_active_campaign(
     &self,
-    conn: &Connection,
     version_id: &str,
     machine_code: &str,
-) -> Result<Option<RollerCampaign>, RepoError>;
+) -> RepositoryResult<Option<RollerCampaign>>;
 ```
 
 ---
@@ -565,35 +584,29 @@ pub fn get_active_campaign(
 
 **文件**: `src/repository/material_repo.rs`
 
-**新增方法**:
+**需要新增/扩展的方法**（注意：当前仓储实现内部持有连接，不需要在签名中传入 `&Connection`）:
 
 ```rust
 /// 更新材料人工确认状态
 pub fn update_user_confirmation(
     &self,
-    conn: &Connection,
-    version_id: &str,
     material_id: &str,
     confirmed_by: &str,
     reason: &str,
-) -> Result<(), RepoError>;
+) -> RepositoryResult<()>;
 
-/// 查询待人工确认的材料列表
+/// 查询待人工确认的材料列表（版本口径需在实现时明确：material_state 无 version_id，可用 last_calc_version_id 或 join plan_item）
 pub fn list_pending_confirmations(
     &self,
-    conn: &Connection,
-    version_id: &str,
     machine_code: &str,
     plan_date: NaiveDate,
-) -> Result<Vec<MaterialState>, RepoError>;
+) -> RepositoryResult<Vec<MaterialState>>;
 
 /// 批量查询人工确认材料（用于锚点解析）
 pub fn list_user_confirmed_materials(
     &self,
-    conn: &Connection,
-    version_id: &str,
     machine_code: &str,
-) -> Result<Vec<MaterialSummary>, RepoError>;
+) -> RepositoryResult<Vec<MaterialSummary>>;
 ```
 
 ---
@@ -604,67 +617,85 @@ pub fn list_user_confirmed_materials(
 
 **文件**: `src/api/path_rule_api.rs`
 
-**Tauri Commands**:
+**API 方法**（由 `src/app/tauri_commands.rs` 包装为 `#[tauri::command]`）:
 
 ```rust
-// src/api/path_rule_api.rs
+// src/api/path_rule_api.rs（伪代码：展示方法清单；实现风格可参考 src/api/config_api.rs / roller_api.rs）
 
-use tauri::command;
+use crate::api::error::ApiResult;
 
-/// 获取路径规则配置
-#[command]
-pub fn get_path_rule_config() -> Result<PathRuleConfigDto, String>;
+pub struct PathRuleApi {
+    // 典型依赖：ConfigManager / MaterialStateRepository / RollerCampaignRepository / ActionLogRepository ...
+}
 
-/// 更新路径规则配置
-#[command]
-pub fn update_path_rule_config(config: PathRuleConfigDto) -> Result<(), String>;
+impl PathRuleApi {
+    pub fn get_path_rule_config(&self) -> ApiResult<PathRuleConfigDto> {
+        todo!()
+    }
 
-/// 获取待人工确认的路径违规材料
-#[command]
-pub fn list_path_override_pending(
-    version_id: String,
-    machine_code: String,
-    plan_date: String,
-) -> Result<Vec<PathOverridePendingDto>, String>;
+    pub fn update_path_rule_config(
+        &self,
+        config: PathRuleConfigDto,
+        operator: &str,
+        reason: &str,
+    ) -> ApiResult<()> {
+        todo!()
+    }
 
-/// 确认路径违规突破
-#[command]
-pub fn confirm_path_override(
-    version_id: String,
-    material_id: String,
-    confirmed_by: String,
-    reason: String,
-) -> Result<(), String>;
+    pub fn list_path_override_pending(
+        &self,
+        version_id: &str,
+        machine_code: &str,
+        plan_date: chrono::NaiveDate,
+    ) -> ApiResult<Vec<PathOverridePendingDto>> {
+        todo!()
+    }
 
-/// 批量确认路径违规突破
-#[command]
-pub fn batch_confirm_path_override(
-    version_id: String,
-    material_ids: Vec<String>,
-    confirmed_by: String,
-    reason: String,
-) -> Result<BatchConfirmResult, String>;
+    pub fn confirm_path_override(
+        &self,
+        version_id: &str,
+        material_id: &str,
+        confirmed_by: &str,
+        reason: &str,
+    ) -> ApiResult<()> {
+        todo!()
+    }
 
-/// 获取当前换辊周期锚点状态
-#[command]
-pub fn get_roll_cycle_anchor(
-    version_id: String,
-    machine_code: String,
-) -> Result<RollCycleAnchorDto, String>;
+    pub fn batch_confirm_path_override(
+        &self,
+        version_id: &str,
+        material_ids: &[String],
+        confirmed_by: &str,
+        reason: &str,
+    ) -> ApiResult<BatchConfirmResultDto> {
+        todo!()
+    }
 
-/// 手动重置换辊周期
-#[command]
-pub fn reset_roll_cycle(
-    version_id: String,
-    machine_code: String,
-    actor: String,
-) -> Result<(), String>;
+    pub fn get_roll_cycle_anchor(
+        &self,
+        version_id: &str,
+        machine_code: &str,
+    ) -> ApiResult<RollCycleAnchorDto> {
+        todo!()
+    }
+
+    pub fn reset_roll_cycle(
+        &self,
+        version_id: &str,
+        machine_code: &str,
+        actor: &str,
+    ) -> ApiResult<()> {
+        todo!()
+    }
+}
 ```
+
+**Tauri Commands 位置**: `src/app/tauri_commands.rs`（参考 `list_materials` 等：从 `AppState` 调用 `state.path_rule_api.*`，然后 `serde_json::to_string` 返回给前端）。
 
 **DTO 定义**:
 
 ```rust
-// src/api/dto/path_rule_dto.rs
+// src/api/path_rule_api.rs（DTO 可与 API 同文件/同模块定义；当前仓库未使用 dto/ 子模块）
 
 #[derive(Serialize, Deserialize)]
 pub struct PathRuleConfigDto {
@@ -702,6 +733,13 @@ pub struct RollCycleAnchorDto {
     pub anchor_thickness_mm: Option<f64>,
     pub status: String,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct BatchConfirmResultDto {
+    pub success_count: i32,
+    pub fail_count: i32,
+    pub failed_material_ids: Vec<String>,
+}
 ```
 
 ---
@@ -716,13 +754,14 @@ pub struct RollCycleAnchorDto {
 .invoke_handler(tauri::generate_handler![
     // ... 现有命令 ...
     // 路径规则相关
-    api::path_rule_api::get_path_rule_config,
-    api::path_rule_api::update_path_rule_config,
-    api::path_rule_api::list_path_override_pending,
-    api::path_rule_api::confirm_path_override,
-    api::path_rule_api::batch_confirm_path_override,
-    api::path_rule_api::get_roll_cycle_anchor,
-    api::path_rule_api::reset_roll_cycle,
+    // 说明：命令函数定义在 src/app/tauri_commands.rs（由 app/mod.rs 重导出），这里直接注册函数名
+    get_path_rule_config,
+    update_path_rule_config,
+    list_path_override_pending,
+    confirm_path_override,
+    batch_confirm_path_override,
+    get_roll_cycle_anchor,
+    reset_roll_cycle,
 ])
 ```
 
@@ -852,65 +891,73 @@ pub struct RollCycleAnchorDto {
 
 ---
 
-### 3.3 API 客户端
+### 3.3 前端 Tauri API 封装
 
-**文件**: `src/api/pathRuleApi.ts`
+**文件**: `src/api/tauri.ts`
 
 ```typescript
-import { invoke } from '@tauri-apps/api/tauri';
-
-export interface PathRuleConfig {
-  enabled: boolean;
-  widthToleranceMm: number;
-  thicknessToleranceMm: number;
-  overrideAllowedUrgencyLevels: string[];
-  seedS2Percentile: number;
-  seedS2SmallSampleThreshold: number;
-}
-
-export interface PathOverridePending {
-  materialId: string;
-  materialNo: string;
-  widthMm: number;
-  thicknessMm: number;
-  urgentLevel: string;
-  violationType: string;
-  anchorWidthMm: number;
-  anchorThicknessMm: number;
-  widthDeltaMm: number;
-  thicknessDeltaMm: number;
-}
-
-export interface RollCycleAnchor {
-  versionId: string;
-  machineCode: string;
-  campaignNo: number;
-  cumWeightT: number;
-  anchorSource: string;
-  anchorMaterialId?: string;
-  anchorWidthMm?: number;
-  anchorThicknessMm?: number;
-  status: string;
-}
+import { IpcClient } from './ipcClient';
+import { z, zodValidator, PathRuleConfigSchema, PathOverridePendingSchema, RollCycleAnchorSchema } from './ipcSchemas';
 
 export const pathRuleApi = {
-  getConfig: () => invoke<PathRuleConfig>('get_path_rule_config'),
-  updateConfig: (config: PathRuleConfig) => invoke('update_path_rule_config', { config }),
+  getPathRuleConfig() {
+    return IpcClient.call('get_path_rule_config', {}, {
+      validate: zodValidator(PathRuleConfigSchema, 'get_path_rule_config'),
+    });
+  },
 
-  listPendingOverrides: (versionId: string, machineCode: string, planDate: string) =>
-    invoke<PathOverridePending[]>('list_path_override_pending', { versionId, machineCode, planDate }),
+  updatePathRuleConfig(config: any, operator: string, reason: string) {
+    return IpcClient.call('update_path_rule_config', {
+      config,
+      operator,
+      reason,
+    });
+  },
 
-  confirmOverride: (versionId: string, materialId: string, confirmedBy: string, reason: string) =>
-    invoke('confirm_path_override', { versionId, materialId, confirmedBy, reason }),
+  listPendingOverrides(versionId: string, machineCode: string, planDate: string) {
+    return IpcClient.call('list_path_override_pending', {
+      version_id: versionId,
+      machine_code: machineCode,
+      plan_date: planDate,
+    }, {
+      validate: zodValidator(z.array(PathOverridePendingSchema), 'list_path_override_pending'),
+    });
+  },
 
-  batchConfirmOverride: (versionId: string, materialIds: string[], confirmedBy: string, reason: string) =>
-    invoke('batch_confirm_path_override', { versionId, materialIds, confirmedBy, reason }),
+  confirmOverride(versionId: string, materialId: string, confirmedBy: string, reason: string) {
+    return IpcClient.call('confirm_path_override', {
+      version_id: versionId,
+      material_id: materialId,
+      confirmed_by: confirmedBy,
+      reason,
+    });
+  },
 
-  getRollCycleAnchor: (versionId: string, machineCode: string) =>
-    invoke<RollCycleAnchor>('get_roll_cycle_anchor', { versionId, machineCode }),
+  batchConfirmOverride(versionId: string, materialIds: string[], confirmedBy: string, reason: string) {
+    return IpcClient.call('batch_confirm_path_override', {
+      version_id: versionId,
+      material_ids: materialIds,
+      confirmed_by: confirmedBy,
+      reason,
+    });
+  },
 
-  resetRollCycle: (versionId: string, machineCode: string, actor: string) =>
-    invoke('reset_roll_cycle', { versionId, machineCode, actor }),
+  getRollCycleAnchor(versionId: string, machineCode: string) {
+    return IpcClient.call('get_roll_cycle_anchor', {
+      version_id: versionId,
+      machine_code: machineCode,
+    }, {
+      validate: zodValidator(RollCycleAnchorSchema, 'get_roll_cycle_anchor'),
+    });
+  },
+
+  resetRollCycle(versionId: string, machineCode: string, actor: string) {
+    return IpcClient.call('reset_roll_cycle', {
+      version_id: versionId,
+      machine_code: machineCode,
+      actor,
+    });
+  },
 };
 ```
 
@@ -918,11 +965,11 @@ export const pathRuleApi = {
 
 ### 3.4 React Query Hooks
 
-**文件**: `src/hooks/queries/usePathRuleQueries.ts`
+**文件**: `src/hooks/queries/use-path-rule-queries.ts`
 
 ```typescript
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { pathRuleApi } from '@/api/pathRuleApi';
+import { pathRuleApi } from '../../api/tauri';
 
 export const pathRuleKeys = {
   config: ['pathRule', 'config'] as const,
@@ -935,14 +982,14 @@ export const pathRuleKeys = {
 export function usePathRuleConfig() {
   return useQuery({
     queryKey: pathRuleKeys.config,
-    queryFn: () => pathRuleApi.getConfig(),
+    queryFn: () => pathRuleApi.getPathRuleConfig(),
   });
 }
 
 export function useUpdatePathRuleConfig() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: pathRuleApi.updateConfig,
+    mutationFn: ({ config, operator, reason }: any) => pathRuleApi.updatePathRuleConfig(config, operator, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: pathRuleKeys.config });
     },
@@ -1118,15 +1165,15 @@ mod tests {
 
 | 阶段 | 任务 | 估算工作量 | 依赖 |
 |------|------|------------|------|
-| Phase 1 | PathRuleEngine + AnchorResolver | 2-3 天 | 无 |
-| Phase 2 | CapacityFiller 集成 | 1-2 天 | Phase 1 |
-| Phase 3 | Repository 层扩展 | 1 天 | Phase 2 |
-| Phase 4 | API 层 + Tauri 命令 | 1 天 | Phase 3 |
-| Phase 5 | 单元测试 + 集成测试 | 2 天 | Phase 4 |
-| Phase 6 | 前端组件开发 | 2-3 天 | Phase 4 |
-| Phase 7 | 页面集成 + E2E 测试 | 1-2 天 | Phase 6 |
+| Phase 0 | 数据结构/Repo 对齐（MaterialState + RollerCampaign） | 1 天 | 无 |
+| Phase 1 | PathRuleEngine + AnchorResolver | 2-3 天 | Phase 0 |
+| Phase 2 | CapacityFiller/Orchestrator 集成 | 1-2 天 | Phase 1 |
+| Phase 3 | API 层 + Tauri 命令 | 1 天 | Phase 2 |
+| Phase 4 | 单元测试 + 集成测试 | 2 天 | Phase 2 |
+| Phase 5 | 前端组件开发 | 2-3 天 | Phase 3 |
+| Phase 6 | 页面集成 + E2E 测试 | 1-2 天 | Phase 5 |
 
-**总计**: 10-14 天
+**总计**: 10-14 天（若选择“方案 B：pending_confirmation 持久化”，Phase 2/3 可能 +1~2 天）
 
 ---
 
@@ -1139,12 +1186,10 @@ mod tests {
 | `src/engine/path_rule.rs` | PathRuleEngine 实现 |
 | `src/engine/anchor_resolver.rs` | AnchorResolver 实现 |
 | `src/api/path_rule_api.rs` | 路径规则 API |
-| `src/api/dto/path_rule_dto.rs` | DTO 定义 |
 | `src/components/path-override-confirm/PathOverrideConfirmModal.tsx` | 人工确认弹窗 |
 | `src/components/roll-cycle-anchor/RollCycleAnchorCard.tsx` | 锚点状态卡片 |
 | `src/components/config-management/PathRuleConfigPanel.tsx` | 配置面板 |
-| `src/api/pathRuleApi.ts` | 前端 API 客户端 |
-| `src/hooks/queries/usePathRuleQueries.ts` | React Query Hooks |
+| `src/hooks/queries/use-path-rule-queries.ts` | React Query Hooks（可选，按现有 hooks/queries 风格） |
 | `tests/path_rule_engine_test.rs` | 引擎单元测试 |
 | `tests/anchor_resolver_test.rs` | 解析器单元测试 |
 | `tests/path_rule_integration_test.rs` | 集成测试 |
@@ -1154,12 +1199,19 @@ mod tests {
 
 | 文件路径 | 修改内容 |
 |----------|----------|
+| `src/domain/material.rs` | 补齐 user_confirmed* 字段 |
+| `src/app/state.rs` | 注入 PathRuleApi（依赖 repos/config） |
+| `src/app/tauri_commands.rs` | 新增 path rule 相关命令包装（snake_case + map_api_error） |
 | `src/engine/mod.rs` | 添加 path_rule, anchor_resolver 模块 |
-| `src/engine/capacity_filler.rs` | 集成 PathRuleEngine |
-| `src/repository/roller_repo.rs` | 添加锚点管理方法 |
-| `src/repository/material_repo.rs` | 添加人工确认方法 |
+| `src/engine/capacity_filler.rs` | 在 fill_single_day 集成 PathRuleEngine |
+| `src/engine/orchestrator.rs` | （如需）扩展输出/对齐 pending_confirmation 方案 |
+| `src/repository/roller_repo.rs` | 映射并维护锚点字段（path_anchor_* / anchor_source） |
+| `src/repository/material_repo.rs` | 映射 user_confirmed* 并实现人工确认写入 |
 | `src/api/mod.rs` | 添加 path_rule_api 模块 |
 | `src/main.rs` | 注册 Tauri 命令 |
+| `src/api/tauri.ts` | 前端增加 path rule 相关调用 |
+| `src/api/ipcSchemas.ts` | 前端增加对应 schema 校验 |
+| `src/components/config-management/types.ts` | 增加 path_rule_* / seed_s2_* 键的 labels/descriptions |
 | `src/pages/SettingsCenter.tsx` | 添加配置面板 |
 | `src/pages/PlanningWorkbench.tsx` | 集成人工确认流程 |
 

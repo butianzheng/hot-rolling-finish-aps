@@ -110,6 +110,10 @@ CREATE TABLE material_state (
   seq_no INTEGER,
 
   manual_urgent_flag INTEGER NOT NULL DEFAULT 0,
+  user_confirmed INTEGER NOT NULL DEFAULT 0,
+  user_confirmed_at TEXT,
+  user_confirmed_by TEXT,
+  user_confirmed_reason TEXT,
   in_frozen_zone INTEGER NOT NULL DEFAULT 0,
 
   updated_by TEXT,
@@ -136,6 +140,10 @@ CREATE INDEX idx_state_frozen
 CREATE INDEX idx_state_manual_urgent
   ON material_state(manual_urgent_flag)
   WHERE manual_urgent_flag = 1;
+
+CREATE INDEX idx_material_state_user_confirmed
+  ON material_state(user_confirmed)
+  WHERE user_confirmed = 0;
 
 -- ==========================================
 -- Plan / version / items
@@ -268,10 +276,43 @@ CREATE TABLE roller_campaign (
   suggest_threshold_t REAL NOT NULL,
   hard_limit_t REAL NOT NULL,
   status TEXT NOT NULL,
+  path_anchor_material_id TEXT,
+  path_anchor_width_mm REAL,
+  path_anchor_thickness_mm REAL,
+  anchor_source TEXT,
   PRIMARY KEY (version_id, machine_code, campaign_no)
 );
 
 CREATE INDEX idx_campaign_version_machine ON roller_campaign(version_id, machine_code);
+
+CREATE INDEX idx_roller_campaign_anchor_source
+  ON roller_campaign(anchor_source)
+  WHERE anchor_source IS NOT NULL;
+
+-- 路径规则待人工确认（由重算生成；每个 material 在每个版本+机组仅记录一次，plan_date 表示首次遇到 OVERRIDE_REQUIRED 的日期）
+CREATE TABLE path_override_pending (
+  version_id TEXT NOT NULL REFERENCES plan_version(version_id) ON DELETE CASCADE,
+  machine_code TEXT NOT NULL REFERENCES machine_master(machine_code),
+  plan_date TEXT NOT NULL,
+  material_id TEXT NOT NULL REFERENCES material_master(material_id),
+  violation_type TEXT NOT NULL,
+  urgent_level TEXT NOT NULL,
+  width_mm REAL NOT NULL,
+  thickness_mm REAL NOT NULL,
+  anchor_width_mm REAL NOT NULL,
+  anchor_thickness_mm REAL NOT NULL,
+  width_delta_mm REAL NOT NULL,
+  thickness_delta_mm REAL NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (version_id, machine_code, material_id)
+);
+
+CREATE INDEX idx_path_override_pending_version_date_machine
+  ON path_override_pending(version_id, plan_date, machine_code);
+CREATE INDEX idx_path_override_pending_version_machine_date
+  ON path_override_pending(version_id, machine_code, plan_date);
+CREATE INDEX idx_path_override_pending_version_material
+  ON path_override_pending(version_id, material_id);
 
 -- roll_campaign_plan: 换辊时间监控/微调（按版本+机组）
 CREATE TABLE roll_campaign_plan (

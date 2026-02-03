@@ -487,6 +487,16 @@ pub struct MaterialStateSnapshotLite {
     pub seq_no: Option<i32>,
 }
 
+/// 人工确认材料摘要（用于路径规则锚点/队列查询）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserConfirmedMaterialSummary {
+    pub material_id: String,
+    pub width_mm: f64,
+    pub thickness_mm: f64,
+    pub seq_no: Option<i32>,
+    pub user_confirmed_at: Option<String>,
+}
+
 impl MaterialStateRepository {
     /// 创建新的 MaterialStateRepository 实例
     ///
@@ -687,6 +697,7 @@ impl MaterialStateRepository {
                 stock_age_days, scheduled_date, scheduled_machine_code, seq_no,
                 manual_urgent_flag, in_frozen_zone,
                 last_calc_version_id, updated_at, updated_by
+                , user_confirmed, user_confirmed_at, user_confirmed_by, user_confirmed_reason
             FROM material_state
             WHERE material_id = ?1
             "#,
@@ -723,6 +734,12 @@ impl MaterialStateRepository {
                     .parse::<chrono::DateTime<chrono::Utc>>()
                     .unwrap(),
                 updated_by: row.get(18)?,
+                user_confirmed: row.get::<_, Option<i32>>(19)?.unwrap_or(0) != 0,
+                user_confirmed_at: row
+                    .get::<_, Option<String>>(20)?
+                    .and_then(|s| s.parse::<chrono::DateTime<chrono::Utc>>().ok()),
+                user_confirmed_by: row.get(21)?,
+                user_confirmed_reason: row.get(22)?,
             })
         });
 
@@ -842,6 +859,7 @@ impl MaterialStateRepository {
                 ms.stock_age_days, ms.scheduled_date, ms.scheduled_machine_code, ms.seq_no,
                 ms.manual_urgent_flag, ms.in_frozen_zone,
                 ms.last_calc_version_id, ms.updated_at, ms.updated_by
+                , ms.user_confirmed, ms.user_confirmed_at, ms.user_confirmed_by, ms.user_confirmed_reason
             FROM material_state ms
             JOIN material_master mm ON ms.material_id = mm.material_id
             WHERE ms.sched_state = 'READY'
@@ -857,6 +875,7 @@ impl MaterialStateRepository {
                 stock_age_days, scheduled_date, scheduled_machine_code, seq_no,
                 manual_urgent_flag, in_frozen_zone,
                 last_calc_version_id, updated_at, updated_by
+                , user_confirmed, user_confirmed_at, user_confirmed_by, user_confirmed_reason
             FROM material_state
             WHERE sched_state = 'READY'
             ORDER BY urgent_level DESC, stock_age_days DESC
@@ -898,6 +917,7 @@ impl MaterialStateRepository {
                 ms.stock_age_days, ms.scheduled_date, ms.scheduled_machine_code, ms.seq_no,
                 ms.manual_urgent_flag, ms.in_frozen_zone,
                 ms.last_calc_version_id, ms.updated_at, ms.updated_by
+                , ms.user_confirmed, ms.user_confirmed_at, ms.user_confirmed_by, ms.user_confirmed_reason
             FROM material_state ms
             JOIN material_master mm ON ms.material_id = mm.material_id
             WHERE ms.sched_state = 'PENDING_MATURE'
@@ -913,6 +933,7 @@ impl MaterialStateRepository {
                 stock_age_days, scheduled_date, scheduled_machine_code, seq_no,
                 manual_urgent_flag, in_frozen_zone,
                 last_calc_version_id, updated_at, updated_by
+                , user_confirmed, user_confirmed_at, user_confirmed_by, user_confirmed_reason
             FROM material_state
             WHERE sched_state = 'PENDING_MATURE'
             ORDER BY ready_in_days ASC
@@ -958,6 +979,7 @@ impl MaterialStateRepository {
                 stock_age_days, scheduled_date, scheduled_machine_code, seq_no,
                 manual_urgent_flag, in_frozen_zone,
                 last_calc_version_id, updated_at, updated_by
+                , user_confirmed, user_confirmed_at, user_confirmed_by, user_confirmed_reason
             FROM material_state
             WHERE urgent_level IN ({})
             ORDER BY urgent_level DESC, stock_age_days DESC
@@ -1008,6 +1030,7 @@ impl MaterialStateRepository {
                 stock_age_days, scheduled_date, scheduled_machine_code, seq_no,
                 manual_urgent_flag, in_frozen_zone,
                 last_calc_version_id, updated_at, updated_by
+                , user_confirmed, user_confirmed_at, user_confirmed_by, user_confirmed_reason
             FROM material_state
             WHERE scheduled_date IS NULL AND stock_age_days >= ?1
             ORDER BY stock_age_days DESC
@@ -1021,6 +1044,7 @@ impl MaterialStateRepository {
                 stock_age_days, scheduled_date, scheduled_machine_code, seq_no,
                 manual_urgent_flag, in_frozen_zone,
                 last_calc_version_id, updated_at, updated_by
+                , user_confirmed, user_confirmed_at, user_confirmed_by, user_confirmed_reason
             FROM material_state
             WHERE scheduled_date IS NULL
             ORDER BY stock_age_days DESC
@@ -1037,6 +1061,87 @@ impl MaterialStateRepository {
         .collect::<SqliteResult<Vec<MaterialState>>>()?;
 
         Ok(states)
+    }
+
+    /// 更新材料人工确认状态（路径规则突破）
+    pub fn update_user_confirmation(
+        &self,
+        material_id: &str,
+        confirmed_by: &str,
+        reason: &str,
+    ) -> RepositoryResult<()> {
+        let id = material_id.trim();
+        if id.is_empty() {
+            return Err(RepositoryError::ValidationError("material_id 不能为空".to_string()));
+        }
+        let by = confirmed_by.trim();
+        if by.is_empty() {
+            return Err(RepositoryError::ValidationError("confirmed_by 不能为空".to_string()));
+        }
+        let r = reason.trim();
+        if r.is_empty() {
+            return Err(RepositoryError::ValidationError("reason 不能为空".to_string()));
+        }
+
+        let conn = self.get_conn()?;
+        let now = chrono::Utc::now().to_rfc3339();
+
+        conn.execute(
+            r#"
+            UPDATE material_state
+            SET
+                user_confirmed = 1,
+                user_confirmed_at = ?2,
+                user_confirmed_by = ?3,
+                user_confirmed_reason = ?4,
+                updated_at = ?2,
+                updated_by = ?3
+            WHERE material_id = ?1
+            "#,
+            params![id, now, by, r],
+        )?;
+
+        Ok(())
+    }
+
+    /// 查询已人工确认的材料摘要（用于锚点解析/队列展示）
+    pub fn list_user_confirmed_materials(
+        &self,
+        machine_code: &str,
+    ) -> RepositoryResult<Vec<UserConfirmedMaterialSummary>> {
+        let code = machine_code.trim();
+        if code.is_empty() {
+            return Err(RepositoryError::ValidationError("machine_code 不能为空".to_string()));
+        }
+
+        let conn = self.get_conn()?;
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT
+                ms.material_id,
+                COALESCE(mm.width_mm, 0.0) AS width_mm,
+                COALESCE(mm.thickness_mm, 0.0) AS thickness_mm,
+                ms.seq_no,
+                ms.user_confirmed_at
+            FROM material_state ms
+            JOIN material_master mm ON ms.material_id = mm.material_id
+            WHERE ms.user_confirmed = 1
+              AND mm.current_machine_code = ?1
+            ORDER BY ms.user_confirmed_at ASC
+            "#,
+        )?;
+
+        let rows = stmt.query_map(params![code], |row| {
+            Ok(UserConfirmedMaterialSummary {
+                material_id: row.get(0)?,
+                width_mm: row.get::<_, Option<f64>>(1)?.unwrap_or(0.0),
+                thickness_mm: row.get::<_, Option<f64>>(2)?.unwrap_or(0.0),
+                seq_no: row.get(3)?,
+                user_confirmed_at: row.get(4)?,
+            })
+        })?;
+
+        Ok(rows.collect::<SqliteResult<Vec<_>>>()?)
     }
 
     /// 辅助方法：将数据库行映射为 MaterialState
@@ -1068,6 +1173,12 @@ impl MaterialStateRepository {
                 .parse::<chrono::DateTime<chrono::Utc>>()
                 .unwrap_or_else(|_| chrono::Utc::now()),
             updated_by: row.get(18)?,
+            user_confirmed: row.get::<_, Option<i32>>(19)?.unwrap_or(0) != 0,
+            user_confirmed_at: row
+                .get::<_, Option<String>>(20)?
+                .and_then(|s| s.parse::<chrono::DateTime<chrono::Utc>>().ok()),
+            user_confirmed_by: row.get(21)?,
+            user_confirmed_reason: row.get(22)?,
         })
     }
 }

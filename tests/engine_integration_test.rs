@@ -74,6 +74,10 @@ fn create_test_material_state(
         scheduled_machine_code: Some("H032".to_string()), // 设置机组代码以便RiskEngine统计
         seq_no: None,
         manual_urgent_flag: false,
+        user_confirmed: false,
+        user_confirmed_at: None,
+        user_confirmed_by: None,
+        user_confirmed_reason: None,
         in_frozen_zone: false,
         last_calc_version_id: None,
         updated_at: chrono::Utc::now(),

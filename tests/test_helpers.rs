@@ -130,6 +130,10 @@ fn init_schema(conn: &Connection) -> Result<(), Box<dyn Error>> {
             -- 是否已适温(真实库字段,用于 D3 冷料压库口径)
             is_mature INTEGER NOT NULL DEFAULT 0,
             manual_urgent_flag INTEGER NOT NULL DEFAULT 0,
+            user_confirmed INTEGER NOT NULL DEFAULT 0,
+            user_confirmed_at TEXT,
+            user_confirmed_by TEXT,
+            user_confirmed_reason TEXT,
             in_frozen_zone INTEGER NOT NULL DEFAULT 0,
             last_calc_version_id TEXT,
             updated_at TEXT NOT NULL,
@@ -402,6 +406,10 @@ fn init_schema(conn: &Connection) -> Result<(), Box<dyn Error>> {
             suggest_threshold_t REAL NOT NULL,
             hard_limit_t REAL NOT NULL,
             status TEXT NOT NULL,
+            path_anchor_material_id TEXT,
+            path_anchor_width_mm REAL,
+            path_anchor_thickness_mm REAL,
+            anchor_source TEXT,
             PRIMARY KEY (version_id, machine_code, campaign_no)
         )
         "#,

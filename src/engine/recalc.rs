@@ -13,16 +13,18 @@
 use crate::domain::capacity::CapacityPool;
 use crate::domain::material::MaterialState;
 use crate::domain::plan::{PlanItem, PlanVersion};
-use crate::domain::types::{PlanVersionStatus, SchedState};
+use crate::domain::roller::RollerCampaign;
+use crate::domain::types::{AnchorSource, PlanVersionStatus, SchedState, UrgentLevel};
 use crate::engine::events::{OptionalEventPublisher, ScheduleEvent, ScheduleEventPublisher, ScheduleEventType};
 use crate::engine::orchestrator::ScheduleOrchestrator;
-use crate::engine::{CapacityFiller, EligibilityEngine, PrioritySorter, UrgencyEngine};
+use crate::engine::{Anchor, AnchorResolver, CapacityFiller, EligibilityEngine, MaterialSummary, PathRuleConfig, PathRuleEngine, PrioritySorter, SeedS2Config, UrgencyEngine};
 use crate::engine::strategy::ScheduleStrategy;
 use crate::config::{config_keys, ConfigManager};
 use crate::config::strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
 use crate::repository::{
     ActionLogRepository, CapacityPoolRepository, MaterialMasterRepository,
-    MaterialStateRepository, PlanItemRepository, PlanVersionRepository,
+    MaterialStateRepository, PathOverridePendingRecord, PathOverridePendingRepository,
+    PlanItemRepository, PlanVersionRepository, RollerCampaignRepository,
     RiskSnapshotRepository,
 };
 use crate::engine::RiskEngine;
@@ -137,6 +139,8 @@ pub struct RecalcEngine {
     capacity_repo: Arc<CapacityPoolRepository>,
     action_log_repo: Arc<ActionLogRepository>,
     risk_snapshot_repo: Arc<RiskSnapshotRepository>,
+    roller_campaign_repo: Arc<RollerCampaignRepository>,
+    path_override_pending_repo: Arc<PathOverridePendingRepository>,
 
     // 引擎依赖
     eligibility_engine: Arc<EligibilityEngine<ConfigManager>>,
@@ -164,6 +168,8 @@ impl RecalcEngine {
         capacity_repo: Arc<CapacityPoolRepository>,
         action_log_repo: Arc<ActionLogRepository>,
         risk_snapshot_repo: Arc<RiskSnapshotRepository>,
+        roller_campaign_repo: Arc<RollerCampaignRepository>,
+        path_override_pending_repo: Arc<PathOverridePendingRepository>,
         eligibility_engine: Arc<EligibilityEngine<ConfigManager>>,
         urgency_engine: Arc<UrgencyEngine>,
         priority_sorter: Arc<PrioritySorter>,
@@ -186,6 +192,8 @@ impl RecalcEngine {
             capacity_repo,
             action_log_repo,
             risk_snapshot_repo,
+            roller_campaign_repo,
+            path_override_pending_repo,
             eligibility_engine,
             urgency_engine,
             priority_sorter,
@@ -207,6 +215,8 @@ impl RecalcEngine {
         capacity_repo: Arc<CapacityPoolRepository>,
         action_log_repo: Arc<ActionLogRepository>,
         risk_snapshot_repo: Arc<RiskSnapshotRepository>,
+        roller_campaign_repo: Arc<RollerCampaignRepository>,
+        path_override_pending_repo: Arc<PathOverridePendingRepository>,
         eligibility_engine: Arc<EligibilityEngine<ConfigManager>>,
         urgency_engine: Arc<UrgencyEngine>,
         priority_sorter: Arc<PrioritySorter>,
@@ -223,6 +233,8 @@ impl RecalcEngine {
             capacity_repo,
             action_log_repo,
             risk_snapshot_repo,
+            roller_campaign_repo,
+            path_override_pending_repo,
             eligibility_engine,
             urgency_engine,
             priority_sorter,
@@ -268,6 +280,8 @@ impl RecalcEngine {
     pub fn from_repositories(
         repos: crate::engine::repositories::ScheduleRepositories,
         risk_snapshot_repo: Arc<RiskSnapshotRepository>,
+        roller_campaign_repo: Arc<RollerCampaignRepository>,
+        path_override_pending_repo: Arc<PathOverridePendingRepository>,
         eligibility_engine: Arc<EligibilityEngine<ConfigManager>>,
         urgency_engine: Arc<UrgencyEngine>,
         priority_sorter: Arc<PrioritySorter>,
@@ -285,6 +299,8 @@ impl RecalcEngine {
             repos.capacity_repo,
             repos.action_log_repo,
             risk_snapshot_repo,
+            roller_campaign_repo,
+            path_override_pending_repo,
             eligibility_engine,
             urgency_engine,
             priority_sorter,
@@ -468,6 +484,20 @@ impl RecalcEngine {
         } else {
             0
         };
+
+        // 4.1 清理本版本的路径规则待确认（避免复算/局部重排造成脏数据）
+        if !is_dry_run {
+            if let Err(e) = self
+                .path_override_pending_repo
+                .delete_by_version(&new_version.version_id)
+            {
+                tracing::warn!(
+                    version_id = %new_version.version_id,
+                    "清理 path_override_pending 失败(将继续重算): {}",
+                    e
+                );
+            }
+        }
 
         // 5. 执行重排 (计算区)
         let end_date = base_date + chrono::Duration::days(window_days as i64);
@@ -925,13 +955,178 @@ impl RecalcEngine {
         // 跟踪已排产的材料ID，避免重复排产
         let mut scheduled_material_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
+        // 路径规则：待人工确认（由重算生成，按版本+机组+material 去重，plan_date=首次遇到的日期）
+        let mut path_override_pending_records: Vec<PathOverridePendingRecord> = Vec::new();
+
         // 将冻结区材料加入已排产集合
         for item in &frozen_items {
             scheduled_material_ids.insert(item.material_id.clone());
         }
 
+        // ===== PathRule / RollCycle 初始化 =====
+        let parse_bool = |raw: Option<String>, default: bool| -> bool {
+            match raw.as_deref().map(|s| s.trim().to_lowercase()) {
+                Some(v) if matches!(v.as_str(), "1" | "true" | "yes" | "y" | "on") => true,
+                Some(v) if matches!(v.as_str(), "0" | "false" | "no" | "n" | "off") => false,
+                _ => default,
+            }
+        };
+        let parse_f64 = |raw: Option<String>, default: f64| -> f64 {
+            raw.as_deref()
+                .and_then(|s| s.trim().parse::<f64>().ok())
+                .filter(|v| v.is_finite())
+                .unwrap_or(default)
+        };
+        let parse_i32 = |raw: Option<String>, default: i32| -> i32 {
+            raw.as_deref()
+                .and_then(|s| s.trim().parse::<i32>().ok())
+                .unwrap_or(default)
+        };
+        let parse_urgent_levels = |raw: Option<String>, default: Vec<UrgentLevel>| -> Vec<UrgentLevel> {
+            let Some(raw) = raw else {
+                return default;
+            };
+            let mut levels = Vec::new();
+            for token in raw.split(',').map(|s| s.trim().to_uppercase()) {
+                let level = match token.as_str() {
+                    "L0" => Some(UrgentLevel::L0),
+                    "L1" => Some(UrgentLevel::L1),
+                    "L2" => Some(UrgentLevel::L2),
+                    "L3" => Some(UrgentLevel::L3),
+                    _ => None,
+                };
+                if let Some(l) = level {
+                    if !levels.contains(&l) {
+                        levels.push(l);
+                    }
+                }
+            }
+            if levels.is_empty() {
+                default
+            } else {
+                levels
+            }
+        };
+
+        let path_rule_config = PathRuleConfig {
+            enabled: parse_bool(
+                self.config_manager
+                    .get_global_config_value("path_rule_enabled")
+                    .ok()
+                    .flatten(),
+                true,
+            ),
+            width_tolerance_mm: parse_f64(
+                self.config_manager
+                    .get_global_config_value("path_width_tolerance_mm")
+                    .ok()
+                    .flatten(),
+                50.0,
+            ),
+            thickness_tolerance_mm: parse_f64(
+                self.config_manager
+                    .get_global_config_value("path_thickness_tolerance_mm")
+                    .ok()
+                    .flatten(),
+                1.0,
+            ),
+            override_allowed_urgency_levels: parse_urgent_levels(
+                self.config_manager
+                    .get_global_config_value("path_override_allowed_urgency_levels")
+                    .ok()
+                    .flatten(),
+                vec![UrgentLevel::L2, UrgentLevel::L3],
+            ),
+        };
+        let path_rule_engine = PathRuleEngine::new(path_rule_config.clone());
+        let path_rule_engine_ref = if path_rule_config.enabled {
+            Some(&path_rule_engine)
+        } else {
+            None
+        };
+
+        let seed_s2_config = SeedS2Config {
+            percentile: parse_f64(
+                self.config_manager
+                    .get_global_config_value("seed_s2_percentile")
+                    .ok()
+                    .flatten(),
+                0.95,
+            )
+            .clamp(0.0, 1.0),
+            small_sample_threshold: parse_i32(
+                self.config_manager
+                    .get_global_config_value("seed_s2_small_sample_threshold")
+                    .ok()
+                    .flatten(),
+                10,
+            )
+            .max(1),
+        };
+        let anchor_resolver = AnchorResolver::new(seed_s2_config);
+
+        let roll_suggest_threshold_t = parse_f64(
+            self.config_manager
+                .get_global_config_value(config_keys::ROLL_SUGGEST_THRESHOLD_T)
+                .ok()
+                .flatten(),
+            1500.0,
+        );
+        let roll_hard_limit_t = parse_f64(
+            self.config_manager
+                .get_global_config_value(config_keys::ROLL_HARD_LIMIT_T)
+                .ok()
+                .flatten(),
+            2500.0,
+        );
+        let (roll_suggest_threshold_t, roll_hard_limit_t) = if roll_hard_limit_t > roll_suggest_threshold_t
+        {
+            (roll_suggest_threshold_t, roll_hard_limit_t)
+        } else {
+            (1500.0, 2500.0)
+        };
+
         // ===== Step 3: 多日循环 =====
         let (start_date, end_date) = date_range;
+
+        // 为本次版本准备活跃换辊周期（用于持久化锚点）
+        let mut active_campaigns: HashMap<String, RollerCampaign> = HashMap::new();
+        for machine_code in machine_codes {
+            let campaign = if is_dry_run {
+                let mut c = RollerCampaign::new(
+                    version_id.to_string(),
+                    machine_code.clone(),
+                    1,
+                    start_date,
+                    Some(roll_suggest_threshold_t),
+                    Some(roll_hard_limit_t),
+                );
+                c.anchor_source = Some(AnchorSource::None);
+                c
+            } else {
+                match self
+                    .roller_campaign_repo
+                    .find_active_campaign(version_id, machine_code)?
+                {
+                    Some(c) => c,
+                    None => {
+                        let mut c = RollerCampaign::new(
+                            version_id.to_string(),
+                            machine_code.clone(),
+                            1,
+                            start_date,
+                            Some(roll_suggest_threshold_t),
+                            Some(roll_hard_limit_t),
+                        );
+                        c.anchor_source = Some(AnchorSource::None);
+                        self.roller_campaign_repo.create(&c)?;
+                        c
+                    }
+                }
+            };
+            active_campaigns.insert(machine_code.clone(), campaign);
+        }
+
         let mut current_date = start_date;
 
         while current_date <= end_date {
@@ -974,11 +1169,6 @@ impl RecalcEngine {
                 mature_count += ready_count;
                 immature_count += total_materials - ready_count;
 
-                // 如果没有适温材料，跳过本次排产
-                if ready_materials.is_empty() {
-                    continue;
-                }
-
                 // ----- 4.4 查询或创建产能池 -----
                 let mut capacity_pool = self
                     .capacity_repo
@@ -1005,6 +1195,197 @@ impl RecalcEngine {
                     .cloned()
                     .collect();
 
+                // 无候选且无冻结项：跳过本次排产
+                if ready_materials.is_empty() && frozen_for_today.is_empty() {
+                    continue;
+                }
+
+                // ----- 4.5.1 解析当日初始锚点（用于 PathRuleEngine 门控） -----
+                let (initial_anchor, initial_anchor_material_id) = if path_rule_config.enabled {
+                    let campaign = active_campaigns
+                        .get_mut(machine_code.as_str())
+                        .ok_or_else(|| format!("active roll campaign missing: {}", machine_code))?;
+
+                    // A) 若当日存在冻结项，则锚点优先取冻结区最后一块（seq_no 最大）
+                    let mut anchor = None;
+                    let mut anchor_material_id = None;
+
+                    if let Some(last_frozen) = frozen_for_today.iter().max_by_key(|i| i.seq_no) {
+                        if let Some(master) = self
+                            .material_master_repo
+                            .find_by_id(&last_frozen.material_id)?
+                        {
+                            let w = master.width_mm.unwrap_or(0.0);
+                            let t = master.thickness_mm.unwrap_or(0.0);
+                            if w.is_finite() && t.is_finite() && w > 0.0 && t > 0.0 {
+                                anchor = Some(Anchor {
+                                    width_mm: w,
+                                    thickness_mm: t,
+                                });
+                                anchor_material_id = Some(last_frozen.material_id.clone());
+                            }
+                        }
+                    }
+
+                    // B) 否则尝试使用已持久化的 campaign 锚点
+                    if anchor.is_none() && campaign.has_valid_anchor() {
+                        let w = campaign.path_anchor_width_mm.unwrap_or(0.0);
+                        let t = campaign.path_anchor_thickness_mm.unwrap_or(0.0);
+                        if w.is_finite() && t.is_finite() && w > 0.0 && t > 0.0 {
+                            anchor = Some(Anchor {
+                                width_mm: w,
+                                thickness_mm: t,
+                            });
+                            anchor_material_id = campaign.path_anchor_material_id.clone();
+                        }
+                    }
+
+                    // C) 若仍无锚点：按优先级解析（FrozenLast/LockedLast/UserConfirmedLast/SeedS2）
+                    if anchor.is_none() {
+                        // 冻结区最后一块（全量冻结区口径）
+                        let frozen_last = frozen_items
+                            .iter()
+                            .filter(|i| &i.machine_code == machine_code)
+                            .max_by_key(|i| (i.plan_date, i.seq_no));
+                        let frozen_summaries: Vec<MaterialSummary> = match frozen_last {
+                            Some(item) => {
+                                if let Some(m) =
+                                    self.material_master_repo.find_by_id(&item.material_id)?
+                                {
+                                    let w = m.width_mm.unwrap_or(0.0);
+                                    let t = m.thickness_mm.unwrap_or(0.0);
+                                    if w.is_finite() && t.is_finite() && w > 0.0 && t > 0.0 {
+                                        vec![MaterialSummary {
+                                            material_id: item.material_id.clone(),
+                                            width_mm: w,
+                                            thickness_mm: t,
+                                            seq_no: item.seq_no,
+                                            user_confirmed_at: None,
+                                        }]
+                                    } else {
+                                        Vec::new()
+                                    }
+                                } else {
+                                    Vec::new()
+                                }
+                            }
+                            None => Vec::new(),
+                        };
+
+                        // 锁定区最后一块（本日候选中 sched_state=LOCKED）
+                        let locked_summaries: Vec<MaterialSummary> = ready_materials
+                            .iter()
+                            .zip(ready_states.iter())
+                            .filter(|(_, s)| s.sched_state == SchedState::Locked)
+                            .filter_map(|(m, s)| {
+                                let w = m.width_mm.unwrap_or(0.0);
+                                let t = m.thickness_mm.unwrap_or(0.0);
+                                if !(w.is_finite() && t.is_finite() && w > 0.0 && t > 0.0) {
+                                    return None;
+                                }
+                                Some(MaterialSummary {
+                                    material_id: m.material_id.clone(),
+                                    width_mm: w,
+                                    thickness_mm: t,
+                                    seq_no: s.seq_no.unwrap_or(0),
+                                    user_confirmed_at: None,
+                                })
+                            })
+                            .collect();
+
+                        // 人工确认队列（机组口径，按 user_confirmed_at 排序）
+                        let user_confirmed_summaries: Vec<MaterialSummary> = self
+                            .material_state_repo
+                            .list_user_confirmed_materials(machine_code)?
+                            .into_iter()
+                            .filter_map(|u| {
+                                let w = u.width_mm;
+                                let t = u.thickness_mm;
+                                if !(w.is_finite() && t.is_finite() && w > 0.0 && t > 0.0) {
+                                    return None;
+                                }
+                                Some(MaterialSummary {
+                                    material_id: u.material_id,
+                                    width_mm: w,
+                                    thickness_mm: t,
+                                    seq_no: u.seq_no.unwrap_or(0),
+                                    user_confirmed_at: u.user_confirmed_at,
+                                })
+                            })
+                            .collect();
+
+                        // 候选池（用于 SeedS2）
+                        let candidate_summaries: Vec<MaterialSummary> = ready_materials
+                            .iter()
+                            .zip(ready_states.iter())
+                            .filter_map(|(m, _s)| {
+                                let w = m.width_mm.unwrap_or(0.0);
+                                let t = m.thickness_mm.unwrap_or(0.0);
+                                if !(w.is_finite() && t.is_finite() && w > 0.0 && t > 0.0) {
+                                    return None;
+                                }
+                                Some(MaterialSummary {
+                                    material_id: m.material_id.clone(),
+                                    width_mm: w,
+                                    thickness_mm: t,
+                                    seq_no: 0,
+                                    user_confirmed_at: None,
+                                })
+                            })
+                            .collect();
+
+                        let resolved = anchor_resolver.resolve(
+                            &frozen_summaries,
+                            &locked_summaries,
+                            &user_confirmed_summaries,
+                            &candidate_summaries,
+                        );
+
+                        if let Some(a) = resolved.anchor {
+                            campaign.update_anchor(
+                                resolved.material_id.clone(),
+                                a.width_mm,
+                                a.thickness_mm,
+                                resolved.source,
+                            );
+
+                            if !is_dry_run {
+                                self.roller_campaign_repo.update_campaign_anchor(
+                                    version_id,
+                                    machine_code,
+                                    campaign.campaign_no,
+                                    campaign.path_anchor_material_id.as_deref(),
+                                    campaign.path_anchor_width_mm,
+                                    campaign.path_anchor_thickness_mm,
+                                    campaign.anchor_source.unwrap_or(AnchorSource::None),
+                                )?;
+                            }
+
+                            anchor = Some(a);
+                            anchor_material_id = resolved.material_id;
+                        } else {
+                            campaign.reset_anchor();
+                            if !is_dry_run {
+                                self.roller_campaign_repo.update_campaign_anchor(
+                                    version_id,
+                                    machine_code,
+                                    campaign.campaign_no,
+                                    None,
+                                    None,
+                                    None,
+                                    AnchorSource::None,
+                                )?;
+                            }
+                            anchor = None;
+                            anchor_material_id = None;
+                        }
+                    }
+
+                    (anchor, anchor_material_id)
+                } else {
+                    (None, None)
+                };
+
                 // ----- 4.6 查询结构目标配比 -----
                 let target_ratio = self.config_manager.get_target_ratio().await
                     .unwrap_or_else(|e| {
@@ -1019,7 +1400,7 @@ impl RecalcEngine {
 
                 // ----- 4.7 创建编排器并执行单日排产 -----
                 let schedule_result = orchestrator
-                    .execute_single_day_schedule(
+                    .execute_single_day_schedule_with_path_rule(
                         ready_materials,
                         ready_states,
                         &mut capacity_pool,
@@ -1028,8 +1409,59 @@ impl RecalcEngine {
                         deviation_threshold,
                         current_date,
                         version_id,
+                        path_rule_engine_ref,
+                        initial_anchor,
+                        initial_anchor_material_id,
                     )
                     .await?;
+
+                // ----- 4.7.2 收集路径规则待确认（由 CapacityFiller 产生，供上层落库/汇总） -----
+                if !schedule_result.path_override_pending.is_empty() {
+                    for p in &schedule_result.path_override_pending {
+                        path_override_pending_records.push(PathOverridePendingRecord {
+                            version_id: version_id.to_string(),
+                            machine_code: machine_code.clone(),
+                            plan_date: current_date,
+                            material_id: p.material_id.clone(),
+                            violation_type: p.violation_type.clone(),
+                            urgent_level: p.urgent_level.clone(),
+                            width_mm: p.width_mm,
+                            thickness_mm: p.thickness_mm,
+                            anchor_width_mm: p.anchor_width_mm,
+                            anchor_thickness_mm: p.anchor_thickness_mm,
+                            width_delta_mm: p.width_delta_mm,
+                            thickness_delta_mm: p.thickness_delta_mm,
+                        });
+                    }
+                }
+
+                // ----- 4.7.1 持久化 RollCycle 锚点（供后续日期与前端查询使用） -----
+                if path_rule_config.enabled {
+                    if let Some(campaign) = active_campaigns.get_mut(machine_code.as_str()) {
+                        if let Some(anchor) = schedule_result.roll_cycle_anchor {
+                            campaign.path_anchor_width_mm = Some(anchor.width_mm);
+                            campaign.path_anchor_thickness_mm = Some(anchor.thickness_mm);
+                            campaign.path_anchor_material_id =
+                                schedule_result.roll_cycle_anchor_material_id.clone();
+                        }
+
+                        if campaign.anchor_source.is_none() {
+                            campaign.anchor_source = Some(AnchorSource::None);
+                        }
+
+                        if !is_dry_run {
+                            self.roller_campaign_repo.update_campaign_anchor(
+                                version_id,
+                                machine_code,
+                                campaign.campaign_no,
+                                campaign.path_anchor_material_id.as_deref(),
+                                campaign.path_anchor_width_mm,
+                                campaign.path_anchor_thickness_mm,
+                                campaign.anchor_source.unwrap_or(AnchorSource::None),
+                            )?;
+                        }
+                    }
+                }
 
                 // ----- 4.8 收集排产结果 -----
                 // 将新排产的材料ID加入已排产集合，避免后续日期重复排产
@@ -1070,6 +1502,34 @@ impl RecalcEngine {
             }
 
             current_date += chrono::Duration::days(1);
+        }
+
+        // ===== Step 4.11: 持久化路径规则待确认（仅生产模式） =====
+        if !is_dry_run {
+            if let Err(e) = self.path_override_pending_repo.ensure_schema() {
+                tracing::warn!("path_override_pending 表初始化失败(将继续返回重算结果): {}", e);
+            } else if !path_override_pending_records.is_empty() {
+                match self
+                    .path_override_pending_repo
+                    .insert_ignore_many(&path_override_pending_records)
+                {
+                    Ok(inserted) => {
+                        tracing::info!(
+                            version_id = %version_id,
+                            inserted = inserted,
+                            total_collected = path_override_pending_records.len(),
+                            "路径规则待确认已落库"
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            version_id = %version_id,
+                            "路径规则待确认落库失败(将继续返回重算结果): {}",
+                            e
+                        );
+                    }
+                }
+            }
         }
 
         // ===== Step 5: 返回结果 =====

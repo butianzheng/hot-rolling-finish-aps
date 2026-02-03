@@ -28,7 +28,9 @@ mod strategy_draft_persistence_test {
         action_log_repo::ActionLogRepository,
         capacity_repo::CapacityPoolRepository,
         material_repo::{MaterialMasterRepository, MaterialStateRepository},
+        path_override_pending_repo::PathOverridePendingRepository,
         plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository},
+        roller_repo::RollerCampaignRepository,
         risk_repo::RiskSnapshotRepository,
         strategy_draft_repo::{StrategyDraftEntity, StrategyDraftRepository, StrategyDraftStatus},
     };
@@ -50,6 +52,8 @@ mod strategy_draft_persistence_test {
         let strategy_draft_repo = Arc::new(StrategyDraftRepository::new(conn.clone()));
         let risk_snapshot_repo = Arc::new(RiskSnapshotRepository::new(db_path).unwrap());
         let capacity_pool_repo = Arc::new(CapacityPoolRepository::new(db_path.to_string()).unwrap());
+        let roller_campaign_repo = Arc::new(RollerCampaignRepository::new(db_path).unwrap());
+        let path_override_pending_repo = Arc::new(PathOverridePendingRepository::new(conn.clone()));
 
         let config_manager = Arc::new(ConfigManager::new(db_path).unwrap());
         let eligibility_engine = Arc::new(EligibilityEngine::new(config_manager.clone()));
@@ -66,6 +70,8 @@ mod strategy_draft_persistence_test {
             capacity_pool_repo.clone(),
             action_log_repo.clone(),
             risk_snapshot_repo.clone(),
+            roller_campaign_repo.clone(),
+            path_override_pending_repo.clone(),
             eligibility_engine,
             urgency_engine,
             priority_sorter,

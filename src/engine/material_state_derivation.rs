@@ -148,6 +148,10 @@ impl MaterialStateDerivationService {
             scheduled_machine_code: None,
             seq_no: None,
             manual_urgent_flag: false,
+            user_confirmed: false,
+            user_confirmed_at: None,
+            user_confirmed_by: None,
+            user_confirmed_reason: None,
             in_frozen_zone: false,
             last_calc_version_id: None, // 导入阶段未关联计算版本
             updated_at: Utc::now(),
@@ -177,6 +181,10 @@ impl MaterialStateDerivationService {
             scheduled_machine_code: None,
             seq_no: None,
             manual_urgent_flag: false,
+            user_confirmed: false,
+            user_confirmed_at: None,
+            user_confirmed_by: None,
+            user_confirmed_reason: None,
             in_frozen_zone: false,
             last_calc_version_id: None, // BLOCKED 状态未关联计算版本
             updated_at: Utc::now(),

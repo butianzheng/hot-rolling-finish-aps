@@ -20,7 +20,9 @@ mod system_performance_test {
         action_log_repo::ActionLogRepository,
         capacity_repo::CapacityPoolRepository,
         material_repo::{MaterialMasterRepository, MaterialStateRepository},
+        path_override_pending_repo::PathOverridePendingRepository,
         plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository},
+        roller_repo::RollerCampaignRepository,
         risk_repo::RiskSnapshotRepository,
         strategy_draft_repo::StrategyDraftRepository,
     };
@@ -92,6 +94,10 @@ mod system_performance_test {
                 scheduled_machine_code: None,
                 seq_no: None,
                 manual_urgent_flag: i % 50 == 0, // 2%紧急
+                user_confirmed: false,
+                user_confirmed_at: None,
+                user_confirmed_by: None,
+                user_confirmed_reason: None,
                 in_frozen_zone: i % 20 == 0,
                 last_calc_version_id: None,
                 updated_at: Utc::now(),
@@ -136,6 +142,8 @@ mod system_performance_test {
         let strategy_draft_repo = Arc::new(StrategyDraftRepository::new(conn.clone()));
         let risk_snapshot_repo = Arc::new(RiskSnapshotRepository::new(&db_path).unwrap());
         let capacity_pool_repo = Arc::new(CapacityPoolRepository::new(db_path.to_string()).unwrap());
+        let roller_campaign_repo = Arc::new(RollerCampaignRepository::new(&db_path).unwrap());
+        let path_override_pending_repo = Arc::new(PathOverridePendingRepository::new(conn.clone()));
 
         let config_manager = Arc::new(ConfigManager::new(&db_path).unwrap());
         let eligibility_engine = Arc::new(EligibilityEngine::new(config_manager.clone()));
@@ -152,6 +160,8 @@ mod system_performance_test {
             capacity_pool_repo.clone(),
             action_log_repo.clone(),
             risk_snapshot_repo.clone(),
+            roller_campaign_repo.clone(),
+            path_override_pending_repo.clone(),
             eligibility_engine.clone(),
             urgency_engine.clone(),
             priority_sorter.clone(),

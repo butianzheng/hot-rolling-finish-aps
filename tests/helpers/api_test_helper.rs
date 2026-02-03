@@ -19,6 +19,7 @@ use hot_rolling_aps::repository::{
     risk_repo::RiskSnapshotRepository,
     capacity_repo::CapacityPoolRepository,
     roller_repo::RollerCampaignRepository,
+    path_override_pending_repo::PathOverridePendingRepository,
     roll_campaign_plan_repo::RollCampaignPlanRepository,
     strategy_draft_repo::StrategyDraftRepository,
     decision_refresh_repo::DecisionRefreshRepository,
@@ -126,6 +127,12 @@ impl ApiTestEnv {
                 .map_err(|e| format!("无法创建CapacityPoolRepository: {}", e))?
         );
 
+        let roller_campaign_repo = Arc::new(
+            RollerCampaignRepository::new(&db_path)
+                .map_err(|e| format!("无法创建RollerCampaignRepository: {}", e))?
+        );
+        let path_override_pending_repo = Arc::new(PathOverridePendingRepository::new(conn.clone()));
+
         // ==========================================
         // 初始化Engine层
         // ==========================================
@@ -157,6 +164,8 @@ impl ApiTestEnv {
             capacity_pool_repo.clone(),
             action_log_repo.clone(),
             risk_snapshot_repo.clone(),
+            roller_campaign_repo.clone(),
+            path_override_pending_repo.clone(),
             eligibility_engine.clone(),
             urgency_engine.clone(),
             priority_sorter.clone(),
