@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import dayjs from 'dayjs';
 import { message } from 'antd';
 import { useQuery } from '@tanstack/react-query';
@@ -64,34 +64,46 @@ export function useWorkbenchPathOverride(params: {
 
   const pendingCount = useMemo(() => pendingQuery.data?.length ?? 0, [pendingQuery.data]);
 
-  const recalcAfterPathOverride = async (baseDate: string) => {
-    if (!activeVersionId) return;
-    const base = String(baseDate || '').trim() || defaultPlanDate;
-    setRecalculating(true);
-    try {
-      const res = await planApi.recalcFull(
-        activeVersionId,
-        base,
-        undefined,
-        currentUser || 'admin',
-        defaultStrategy || 'balanced'
-      );
-      const nextVersionId = String(res?.version_id ?? '').trim();
-      if (nextVersionId) {
-        setActiveVersion(nextVersionId);
-        message.success(`已重算并切换到新版本：${nextVersionId}`);
-      } else {
-        message.success(String(res?.message || '重算完成'));
+  const recalcAfterPathOverride = useCallback(
+    async (baseDate: string) => {
+      if (!activeVersionId) return;
+      const base = String(baseDate || '').trim() || defaultPlanDate;
+      setRecalculating(true);
+      try {
+        const res = await planApi.recalcFull(
+          activeVersionId,
+          base,
+          undefined,
+          currentUser || 'admin',
+          defaultStrategy || 'balanced'
+        );
+        const nextVersionId = String(res?.version_id ?? '').trim();
+        if (nextVersionId) {
+          setActiveVersion(nextVersionId);
+          message.success(`已重算并切换到新版本：${nextVersionId}`);
+        } else {
+          message.success(String(res?.message || '重算完成'));
+        }
+        bumpRefreshSignal();
+        materialsRefetch();
+      } catch (e: unknown) {
+        console.error('[Workbench] recalcAfterPathOverride failed:', e);
+        message.error(getErrorMessage(e) || '重算失败');
+      } finally {
+        setRecalculating(false);
       }
-      bumpRefreshSignal();
-      materialsRefetch();
-    } catch (e: unknown) {
-      console.error('[Workbench] recalcAfterPathOverride failed:', e);
-      message.error(getErrorMessage(e) || '重算失败');
-    } finally {
-      setRecalculating(false);
-    }
-  };
+    },
+    [
+      activeVersionId,
+      bumpRefreshSignal,
+      currentUser,
+      defaultPlanDate,
+      defaultStrategy,
+      materialsRefetch,
+      setActiveVersion,
+      setRecalculating,
+    ]
+  );
 
   const summaryRange = useMemo(() => {
     return {
@@ -119,15 +131,31 @@ export function useWorkbenchPathOverride(params: {
     return list.reduce((sum, r) => sum + Number(r.pending_count ?? 0), 0);
   }, [summaryQuery.data]);
 
-  return {
-    context,
-    pendingCount,
-    pendingIsFetching: pendingQuery.isFetching,
-    pendingRefetch: () => void pendingQuery.refetch(),
-    summaryRange,
-    pendingTotalCount,
-    summaryIsFetching: summaryQuery.isFetching,
-    summaryRefetch: () => void summaryQuery.refetch(),
-    recalcAfterPathOverride,
-  };
+  const pendingRefetch = useCallback(() => void pendingQuery.refetch(), [pendingQuery.refetch]);
+  const summaryRefetch = useCallback(() => void summaryQuery.refetch(), [summaryQuery.refetch]);
+
+  return useMemo(
+    () => ({
+      context,
+      pendingCount,
+      pendingIsFetching: pendingQuery.isFetching,
+      pendingRefetch,
+      summaryRange,
+      pendingTotalCount,
+      summaryIsFetching: summaryQuery.isFetching,
+      summaryRefetch,
+      recalcAfterPathOverride,
+    }),
+    [
+      context,
+      pendingCount,
+      pendingQuery.isFetching,
+      pendingRefetch,
+      pendingTotalCount,
+      recalcAfterPathOverride,
+      summaryQuery.isFetching,
+      summaryRange,
+      summaryRefetch,
+    ]
+  );
 }

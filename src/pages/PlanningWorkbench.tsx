@@ -13,7 +13,7 @@ import {
   useUserPreferences,
 } from '../stores/use-global-store';
 import type { PlanItemStatusFilter } from '../utils/planItemStatus';
-import type { MaterialPoolSelection } from '../components/workbench/MaterialPool';
+import type { MaterialPoolFilters, MaterialPoolSelection } from '../components/workbench/MaterialPool';
 import WorkbenchTopToolbar from '../components/workbench/WorkbenchTopToolbar';
 import WorkbenchStatusBar from '../components/workbench/WorkbenchStatusBar';
 import DecisionFlowGuide from '../components/flow/DecisionFlowGuide';
@@ -74,6 +74,17 @@ const PlanningWorkbench: React.FC = () => {
 
   const { materialsQuery, materials } = useWorkbenchMaterials({ machineCode: poolSelection.machineCode });
 
+  const refreshAll = useCallback(() => {
+    bumpRefreshSignal();
+    void materialsQuery.refetch();
+  }, [bumpRefreshSignal, materialsQuery.refetch]);
+
+  const openRhythmModal = useCallback(() => setRhythmModalOpen(true), []);
+  const openConditionalSelect = useCallback(() => setConditionalSelectOpen(true), []);
+  const clearSelection = useCallback(() => setSelectedMaterialIds([]), []);
+  const openPathOverrideConfirm = useCallback(() => setPathOverrideModalOpen(true), []);
+  const openPathOverrideCenter = useCallback(() => setPathOverrideCenterOpen(true), []);
+
   const { inspectorOpen, setInspectorOpen, setInspectedMaterialId, inspectedMaterial, openInspector } =
     useWorkbenchInspector({ materials });
 
@@ -127,13 +138,51 @@ const PlanningWorkbench: React.FC = () => {
     materialsRefetch: materialsQuery.refetch,
   });
 
-  const applyWorkbenchMachineCode = (machineCode: string | null) => {
+  const applyWorkbenchMachineCode = useCallback((machineCode: string | null) => {
     setPoolSelection((prev) => {
       if (prev.machineCode === machineCode) return prev;
       return { machineCode, schedState: null };
     });
     setWorkbenchFilters({ machineCode });
-  };
+  }, [setWorkbenchFilters]);
+
+  const poolFilters = useMemo(
+    () => ({
+      urgencyLevel: workbenchFilters.urgencyLevel,
+      lockStatus: workbenchFilters.lockStatus,
+    }),
+    [workbenchFilters.lockStatus, workbenchFilters.urgencyLevel]
+  );
+
+  const handlePoolSelectionChange = useCallback(
+    (next: MaterialPoolSelection) => {
+      setPoolSelection(next);
+      setWorkbenchFilters({ machineCode: next.machineCode });
+    },
+    [setWorkbenchFilters]
+  );
+
+  const handlePoolFiltersChange = useCallback(
+    (next: Partial<MaterialPoolFilters>) => {
+      setWorkbenchFilters(next);
+    },
+    [setWorkbenchFilters]
+  );
+
+  const handleAfterRollCycleReset = useCallback(() => {
+    bumpRefreshSignal();
+    pathOverride.pendingRefetch();
+    message.info('已重置换辊周期：建议执行“一键优化/重算”以刷新排程结果');
+  }, [bumpRefreshSignal, pathOverride.pendingRefetch]);
+
+  const handleBeforeOptimize = useCallback(() => setRecalculating(true), [setRecalculating]);
+  const handleAfterOptimize = useCallback(() => {
+    setRecalculating(false);
+    refreshAll();
+  }, [refreshAll, setRecalculating]);
+
+  const retryMaterials = useCallback(() => void materialsQuery.refetch(), [materialsQuery.refetch]);
+  const retryPlanItems = useCallback(() => void planItemsQuery.refetch(), [planItemsQuery.refetch]);
 
   const selectedMaterials = useMemo(() => {
     const set = new Set(selectedMaterialIds);
@@ -249,30 +298,22 @@ const PlanningWorkbench: React.FC = () => {
           activeVersionId={activeVersionId}
           currentUser={currentUser}
           selectedMaterialIds={selectedMaterialIds}
-          onRefresh={() => {
-            setRefreshSignal((v) => v + 1);
-            materialsQuery.refetch();
-          }}
-          onOpenRhythmModal={() => setRhythmModalOpen(true)}
-          onOpenConditionalSelect={() => setConditionalSelectOpen(true)}
-          onClearSelection={() => setSelectedMaterialIds([])}
+          onRefresh={refreshAll}
+          onOpenRhythmModal={openRhythmModal}
+          onOpenConditionalSelect={openConditionalSelect}
+          onClearSelection={clearSelection}
           openMoveModal={openMoveModal}
           runMaterialOperation={runMaterialOperation}
           runForceReleaseOperation={runForceReleaseOperation}
-          onBeforeOptimize={() => setRecalculating(true)}
-          onAfterOptimize={() => {
-            setRecalculating(false);
-            setRefreshSignal((v) => v + 1);
-            materialsQuery.refetch();
-            planItemsQuery.refetch();
-          }}
+          onBeforeOptimize={handleBeforeOptimize}
+          onAfterOptimize={handleAfterOptimize}
         />
 
         <WorkbenchAlerts
           activeVersionId={activeVersionId}
           pathOverride={pathOverride}
-          onOpenPathOverrideCenter={() => setPathOverrideCenterOpen(true)}
-          onOpenPathOverrideConfirm={() => setPathOverrideModalOpen(true)}
+          onOpenPathOverrideCenter={openPathOverrideCenter}
+          onOpenPathOverrideConfirm={openPathOverrideConfirm}
           materialsIsLoading={materialsQuery.isLoading}
           materialsError={materialsQuery.error}
           materialsCount={materials.length}
@@ -293,26 +334,16 @@ const PlanningWorkbench: React.FC = () => {
           materials={materials}
           materialsLoading={materialsQuery.isLoading}
           materialsError={materialsQuery.error}
-          onRetryMaterials={() => materialsQuery.refetch()}
+          onRetryMaterials={retryMaterials}
           poolSelection={poolSelection}
-          onPoolSelectionChange={(next) => {
-            setPoolSelection(next);
-            setWorkbenchFilters({ machineCode: next.machineCode });
-          }}
-          poolFilters={{
-            urgencyLevel: workbenchFilters.urgencyLevel,
-            lockStatus: workbenchFilters.lockStatus,
-          }}
-          onPoolFiltersChange={(next) => setWorkbenchFilters(next)}
+          onPoolSelectionChange={handlePoolSelectionChange}
+          poolFilters={poolFilters}
+          onPoolFiltersChange={handlePoolFiltersChange}
           selectedMaterialIds={selectedMaterialIds}
           onSelectedMaterialIdsChange={setSelectedMaterialIds}
           onInspectMaterialId={openInspector}
           refreshSignal={refreshSignal}
-          onAfterRollCycleReset={() => {
-            setRefreshSignal((v) => v + 1);
-            pathOverride.pendingRefetch();
-            message.info('已重置换辊周期：建议执行“一键优化/重算”以刷新排程结果');
-          }}
+          onAfterRollCycleReset={handleAfterRollCycleReset}
           workbenchDateRange={workbenchDateRange}
           autoDateRange={autoDateRange}
           onMachineCodeChange={applyWorkbenchMachineCode}
@@ -331,12 +362,12 @@ const PlanningWorkbench: React.FC = () => {
           pathOverridePendingCount={pathOverride.pendingCount}
           pathOverrideContextMachineCode={pathOverride.context.machineCode}
           pathOverrideIsFetching={pathOverride.pendingIsFetching}
-          onOpenPathOverrideModal={() => setPathOverrideModalOpen(true)}
+          onOpenPathOverrideModal={openPathOverrideConfirm}
           planItemsData={planItemsQuery.data}
           planItemsLoading={planItemsQuery.isLoading}
           planItemsError={planItemsQuery.error}
-          onRetryPlanItems={() => planItemsQuery.refetch()}
-          onRequestMoveToCell={(machine, date) => openMoveModalAt(machine, date)}
+          onRetryPlanItems={retryPlanItems}
+          onRequestMoveToCell={openMoveModalAt}
         />
 
         {/* 状态栏 */}
