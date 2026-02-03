@@ -520,44 +520,58 @@ const PlanningWorkbench: React.FC = () => {
             type="warning"
             showIcon
             message={`路径规则待确认（跨日期/跨机组）：${pathOverride.pendingTotalCount} 条`}
-            description={`范围 ${pathOverride.summaryRange.from} ~ ${pathOverride.summaryRange.to}（确认后建议重算生成新版本）`}
-            action={
-              <Space>
-                <Button
-                  size="small"
-                  type="primary"
-                  icon={<InfoCircleOutlined />}
-                  loading={pathOverride.summaryIsFetching}
-                  onClick={() => setPathOverrideCenterOpen(true)}
-                >
-                  待确认中心
-                </Button>
-              </Space>
-            }
-          />
-        ) : null}
+	            description={`范围 ${pathOverride.summaryRange.from} ~ ${pathOverride.summaryRange.to}（确认后建议重算生成新版本）`}
+	            action={
+	              <Space>
+	                <Button
+	                  size="small"
+	                  type="primary"
+	                  icon={<InfoCircleOutlined />}
+	                  loading={pathOverride.summaryIsFetching}
+	                  onClick={() => setPathOverrideCenterOpen(true)}
+	                >
+	                  待确认中心
+	                </Button>
+	                <Button
+	                  size="small"
+	                  icon={<SettingOutlined />}
+	                  onClick={() => navigate('/settings?tab=path_rule')}
+	                >
+	                  路径规则设置
+	                </Button>
+	              </Space>
+	            }
+	          />
+	        ) : null}
 
         {pathOverride.pendingCount > 0 && pathOverride.context.machineCode && pathOverride.context.planDate ? (
           <Alert
             type="warning"
             showIcon
             message={`路径规则待确认：${pathOverride.pendingCount} 条`}
-            description={`机组 ${pathOverride.context.machineCode} · 日期 ${pathOverride.context.planDate}（确认后建议重算生成新版本）`}
-            action={
-              <Space>
-                <Button
-                  size="small"
-                  type="primary"
-                  icon={<InfoCircleOutlined />}
-                  loading={pathOverride.pendingIsFetching}
-                  onClick={() => setPathOverrideModalOpen(true)}
-                >
-                  去确认
-                </Button>
-              </Space>
-            }
-          />
-        ) : null}
+	            description={`机组 ${pathOverride.context.machineCode} · 日期 ${pathOverride.context.planDate}（确认后建议重算生成新版本）`}
+	            action={
+	              <Space>
+	                <Button
+	                  size="small"
+	                  type="primary"
+	                  icon={<InfoCircleOutlined />}
+	                  loading={pathOverride.pendingIsFetching}
+	                  onClick={() => setPathOverrideModalOpen(true)}
+	                >
+	                  去确认
+	                </Button>
+	                <Button
+	                  size="small"
+	                  icon={<SettingOutlined />}
+	                  onClick={() => navigate('/settings?tab=path_rule')}
+	                >
+	                  路径规则设置
+	                </Button>
+	              </Space>
+	            }
+	          />
+	        ) : null}
 
         {!materialsQuery.isLoading && !materialsQuery.error && materials.length === 0 ? (
           <Alert
