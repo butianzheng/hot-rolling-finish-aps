@@ -63,6 +63,7 @@ mod tests {
 
     fn setup_test_use_case() -> ColdStockUseCaseImpl {
         let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
 
         // 创建必要的表
         conn.execute(

@@ -25,8 +25,8 @@ export interface ActionLog {
   action_type: string;
   action_ts: string;
   actor: string;
-  payload_json?: any;
-  impact_summary_json?: any;
+  payload_json?: Record<string, unknown> | null;
+  impact_summary_json?: Record<string, unknown> | null;
   machine_code?: string | null;
   date_range_start?: string | null;
   date_range_end?: string | null;

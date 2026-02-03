@@ -76,6 +76,7 @@ mod tests {
 
     fn setup_test_db() -> Arc<Mutex<Connection>> {
         let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
 
         // 创建必要的表
         conn.execute(
@@ -412,9 +413,12 @@ mod tests {
     fn test_error_handling() {
         // 创建一个无效的数据库连接（已关闭）
         let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
         drop(conn); // 关闭连接
 
-        let invalid_conn = Arc::new(Mutex::new(Connection::open_in_memory().unwrap()));
+        let invalid_conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&invalid_conn).unwrap();
+        let invalid_conn = Arc::new(Mutex::new(invalid_conn));
         let repo = Arc::new(CapacityOpportunityRepository::new(invalid_conn));
         let use_case = CapacityOpportunityUseCaseImpl::new(repo);
 

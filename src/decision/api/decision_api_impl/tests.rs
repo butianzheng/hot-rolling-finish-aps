@@ -10,7 +10,9 @@ use std::sync::{Arc, Mutex};
 
 fn setup_test_api() -> DecisionApiImpl {
     // 创建内存数据库
-    let conn = Arc::new(Mutex::new(Connection::open_in_memory().unwrap()));
+    let conn = Connection::open_in_memory().unwrap();
+    crate::db::configure_sqlite_connection(&conn).unwrap();
+    let conn = Arc::new(Mutex::new(conn));
 
     // 创建 risk_snapshot 表
     {

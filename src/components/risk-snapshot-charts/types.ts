@@ -9,7 +9,7 @@ export interface ReasonItem {
   affected_count?: number;
 }
 
-export interface RiskDaySummary {
+export interface RiskDaySummary extends Record<string, unknown> {
   plan_date: string;
   risk_score: number;
   risk_level: string;

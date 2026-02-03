@@ -92,6 +92,7 @@ mod tests {
 
     fn setup_test_db() -> Arc<Mutex<Connection>> {
         let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
 
         // 创建必要的表
         conn.execute_batch(
@@ -365,7 +366,9 @@ mod tests {
 
     #[test]
     fn test_should_refresh_d2() {
-        let conn = Arc::new(Mutex::new(Connection::open_in_memory().unwrap()));
+        let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
+        let conn = Arc::new(Mutex::new(conn));
         let service = DecisionRefreshService::new(conn);
 
         assert!(service.should_refresh_d2(&RefreshTrigger::PlanItemChanged));
@@ -378,7 +381,9 @@ mod tests {
 
     #[test]
     fn test_should_refresh_d3() {
-        let conn = Arc::new(Mutex::new(Connection::open_in_memory().unwrap()));
+        let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
+        let conn = Arc::new(Mutex::new(conn));
         let service = DecisionRefreshService::new(conn);
 
         assert!(service.should_refresh_d3(&RefreshTrigger::MaterialStateChanged));
@@ -390,7 +395,9 @@ mod tests {
 
     #[test]
     fn test_should_refresh_d5() {
-        let conn = Arc::new(Mutex::new(Connection::open_in_memory().unwrap()));
+        let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
+        let conn = Arc::new(Mutex::new(conn));
         let service = DecisionRefreshService::new(conn);
 
         assert!(service.should_refresh_d5(&RefreshTrigger::RollCampaignChanged));
@@ -403,7 +410,9 @@ mod tests {
 
     #[test]
     fn test_should_refresh_d6() {
-        let conn = Arc::new(Mutex::new(Connection::open_in_memory().unwrap()));
+        let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
+        let conn = Arc::new(Mutex::new(conn));
         let service = DecisionRefreshService::new(conn);
 
         assert!(service.should_refresh_d6(&RefreshTrigger::CapacityPoolChanged));

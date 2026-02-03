@@ -1,7 +1,7 @@
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { useEffect, useRef } from 'react';
 
-type EventHandler = (payload: any) => void;
+type EventHandler = (payload: unknown) => void;
 
 export class EventBus {
   private static listeners: Map<string, UnlistenFn[]> = new Map();
@@ -49,7 +49,7 @@ export function useEvent(eventName: string, handler: EventHandler) {
     let didCleanup = false;
     let unlisten: UnlistenFn | undefined;
 
-    EventBus.subscribe(eventName, (payload: any) => handlerRef.current(payload)).then((fn) => {
+    EventBus.subscribe(eventName, (payload: unknown) => handlerRef.current(payload)).then((fn) => {
       if (didCleanup) {
         // If the component unmounted before the async subscribe finished, immediately cleanup.
         fn();

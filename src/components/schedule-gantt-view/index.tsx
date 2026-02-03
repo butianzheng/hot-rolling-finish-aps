@@ -239,7 +239,7 @@ export default function ScheduleGanttView({
       const res = await capacityApi.getCapacityPools(capacityMachineCodes, dateFrom, dateTo, activeVersionId);
       return Array.isArray(res) ? res : [];
     },
-    staleTime: 30 * 1000,
+    staleTime: 2 * 60 * 1000, // 2分钟缓存（产能数据变化频率较低）
   });
 
   const capacityByMachineDate = useMemo(() => {

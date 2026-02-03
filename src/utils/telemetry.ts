@@ -20,7 +20,7 @@ function truncate(text: string, maxLen: number = MAX_TEXT_LEN): string {
   return `${s.slice(0, maxLen)}...<truncated ${s.length - maxLen} chars>`;
 }
 
-function safeJson(obj: any): any {
+function safeJson(obj: unknown): unknown {
   try {
     return JSON.parse(JSON.stringify(obj));
   } catch {
@@ -28,7 +28,7 @@ function safeJson(obj: any): any {
   }
 }
 
-function normalizeUnknownError(err: any): { name?: string; message: string; stack?: string } {
+function normalizeUnknownError(err: unknown): { name?: string; message: string; stack?: string } {
   if (!err) return { message: 'Unknown error' };
   if (err instanceof Error) {
     return {
@@ -71,7 +71,7 @@ async function reportToBackend(params: {
   actor?: string | null;
   level: FrontendLogLevel | string;
   message: string;
-  payload_json: any;
+  payload_json: Record<string, unknown>;
 }): Promise<void> {
   if (!isTauriRuntime()) return;
 
@@ -95,7 +95,7 @@ async function reportToBackend(params: {
 export async function reportFrontendEvent(
   level: FrontendLogLevel,
   message: string,
-  payload: any = {},
+  payload: unknown = {},
 ): Promise<void> {
   if (sentCount >= MAX_EVENTS_PER_SESSION) return;
 
@@ -134,7 +134,7 @@ export async function reportFrontendEvent(
 
 export async function reportFrontendError(
   error: unknown,
-  context: Record<string, any> = {},
+  context: Record<string, unknown> = {},
 ): Promise<void> {
   const normalized = normalizeUnknownError(error);
 

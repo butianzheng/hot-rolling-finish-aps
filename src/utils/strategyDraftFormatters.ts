@@ -30,7 +30,7 @@ export function clampRange(range: [Dayjs, Dayjs]): [Dayjs, Dayjs] {
 /**
  * 格式化吨数
  */
-export function formatTon(v: any): string {
+export function formatTon(v: unknown): string {
   const n = Number(v);
   if (!Number.isFinite(n)) return '—';
   return n.toFixed(1);
@@ -39,7 +39,7 @@ export function formatTon(v: any): string {
 /**
  * 格式化百分比
  */
-export function formatPercent(v: any): string {
+export function formatPercent(v: unknown): string {
   const n = Number(v);
   if (!Number.isFinite(n)) return '—';
   return `${(n * 100).toFixed(1)}%`;
@@ -68,7 +68,7 @@ export function formatPosition(date?: string | null, machine?: string | null, se
 /**
  * 格式化布尔值
  */
-export function formatBool(v: any): string {
+export function formatBool(v: unknown): string {
   if (v == null) return '—';
   return v ? '是' : '否';
 }
@@ -76,7 +76,7 @@ export function formatBool(v: any): string {
 /**
  * 格式化文本（空值处理）
  */
-export function formatText(v: any): string {
+export function formatText(v: unknown): string {
   if (v == null) return '—';
   const s = String(v).trim();
   return s ? s : '—';
@@ -85,7 +85,7 @@ export function formatText(v: any): string {
 /**
  * 格式化数字
  */
-export function formatNumber(v: any, digits = 2): string {
+export function formatNumber(v: unknown, digits = 2): string {
   const n = Number(v);
   if (!Number.isFinite(n)) return '—';
   return n.toFixed(digits);
@@ -101,14 +101,15 @@ export function isSameNumber(a: number, b: number): boolean {
 /**
  * 规范化物料详情响应
  */
-export function normalizeMaterialDetail(raw: any): MaterialDetailPayload | null {
+export function normalizeMaterialDetail(raw: unknown): MaterialDetailPayload | null {
   if (!raw) return null;
   if (Array.isArray(raw) && raw.length >= 2) {
     return { master: raw[0], state: raw[1] };
   }
-  if (typeof raw === 'object') {
-    const maybeMaster = (raw as any)?.master ?? (raw as any)?.material_master ?? (raw as any)?.[0];
-    const maybeState = (raw as any)?.state ?? (raw as any)?.material_state ?? (raw as any)?.[1];
+  if (typeof raw === 'object' && raw !== null) {
+    const obj = raw as Record<string, unknown>;
+    const maybeMaster = obj?.master ?? obj?.material_master ?? (Array.isArray(raw) ? raw[0] : undefined);
+    const maybeState = obj?.state ?? obj?.material_state ?? (Array.isArray(raw) ? raw[1] : undefined);
     if (maybeMaster && maybeState) return { master: maybeMaster, state: maybeState };
   }
   return null;
@@ -117,7 +118,7 @@ export function normalizeMaterialDetail(raw: any): MaterialDetailPayload | null 
 /**
  * 格式化原因文本（支持 JSON 美化）
  */
-export function prettyReason(value: any): string | null {
+export function prettyReason(value: unknown): string | null {
   const raw = value == null ? '' : String(value).trim();
   if (!raw) return null;
   if ((raw.startsWith('{') && raw.endsWith('}')) || (raw.startsWith('[') && raw.endsWith(']'))) {
@@ -133,7 +134,7 @@ export function prettyReason(value: any): string | null {
 /**
  * 辅助函数：将布尔值转换
  */
-function asBool(v: any): boolean {
+function asBool(v: unknown): boolean {
   return v === true || v === 1 || v === '1' || String(v).toLowerCase() === 'true';
 }
 
@@ -141,7 +142,7 @@ function asBool(v: any): boolean {
  * 构建挤出物料的提示信息
  */
 export function buildSqueezedOutHintSections(
-  state: any,
+  state: Record<string, unknown> | null,
   windowStartDate: string,
   windowEndDate: string
 ): SqueezedHintSection[] {
@@ -154,6 +155,10 @@ export function buildSqueezedOutHintSections(
   ];
 
   sections.push({ title: '含义/范围', lines: notes });
+
+  if (!state) {
+    return sections;
+  }
 
   const key: string[] = [];
   const readyInDays = Number(state?.ready_in_days);

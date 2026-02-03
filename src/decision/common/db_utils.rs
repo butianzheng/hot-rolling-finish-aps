@@ -305,6 +305,7 @@ mod tests {
     #[test]
     fn test_execute_delete_with_in_clause_single_machine() {
         let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
         setup_test_table(&conn);
 
         let machines = vec!["H032".to_string()];
@@ -329,6 +330,7 @@ mod tests {
     #[test]
     fn test_execute_delete_with_in_clause_multiple_machines() {
         let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
         setup_test_table(&conn);
 
         let machines = vec!["H032".to_string(), "H033".to_string()];
@@ -357,6 +359,7 @@ mod tests {
     #[test]
     fn test_execute_delete_with_in_clause_empty_list() {
         let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
         setup_test_table(&conn);
 
         let machines: Vec<String> = vec![];
@@ -381,6 +384,7 @@ mod tests {
     #[test]
     fn test_execute_delete_with_in_clause_version_isolation() {
         let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
         setup_test_table(&conn);
 
         // 删除 V001 的 H032
@@ -437,6 +441,7 @@ mod tests {
     #[test]
     fn test_execute_delete_with_date_range() {
         let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
         setup_test_table_with_dates(&conn);
 
         let machines = vec!["H032".to_string()];
@@ -468,6 +473,7 @@ mod tests {
     #[test]
     fn test_execute_delete_with_date_range_multiple_machines() {
         let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
         setup_test_table_with_dates(&conn);
 
         let machines = vec!["H032".to_string(), "H033".to_string()];
@@ -499,6 +505,7 @@ mod tests {
     #[test]
     fn test_execute_delete_with_date_range_empty_machines() {
         let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
         setup_test_table_with_dates(&conn);
 
         let machines: Vec<String> = vec![];

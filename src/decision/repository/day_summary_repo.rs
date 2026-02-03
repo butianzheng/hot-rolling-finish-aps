@@ -375,6 +375,7 @@ mod tests {
 
     fn setup_test_db() -> Arc<Mutex<Connection>> {
         let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
 
         // 创建 risk_snapshot 表
         conn.execute(

@@ -5,7 +5,7 @@
 import type { PlanItemStatusFilter } from '../../utils/planItemStatus';
 
 // 排产明细类型
-export interface PlanItem {
+export interface PlanItem extends Record<string, unknown> {
   key: string;
   version_id: string;
   material_id: string;

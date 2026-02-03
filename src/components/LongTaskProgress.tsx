@@ -12,16 +12,20 @@ interface TaskProgress {
 export const LongTaskManager: React.FC = () => {
   const [tasks, setTasks] = useState<Map<string, TaskProgress>>(new Map());
 
-  useEvent('long_task_progress', (payload: TaskProgress) => {
-    setTasks(prev => {
-      const next = new Map(prev);
-      if (payload.pct >= 100) {
-        next.delete(payload.task_id);
-      } else {
-        next.set(payload.task_id, payload);
-      }
-      return next;
-    });
+  useEvent('long_task_progress', (payload: unknown) => {
+    // Type guard to ensure payload is TaskProgress
+    const taskProgress = payload as TaskProgress;
+    if (taskProgress?.task_id && typeof taskProgress.pct === 'number') {
+      setTasks(prev => {
+        const next = new Map(prev);
+        if (taskProgress.pct >= 100) {
+          next.delete(taskProgress.task_id);
+        } else {
+          next.set(taskProgress.task_id, taskProgress);
+        }
+        return next;
+      });
+    }
   });
 
   return (

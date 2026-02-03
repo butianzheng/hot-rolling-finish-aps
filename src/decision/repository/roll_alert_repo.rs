@@ -592,6 +592,7 @@ mod tests {
     #[test]
     fn test_refresh_full() {
         let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
 
         // 创建必要的表
         conn.execute(

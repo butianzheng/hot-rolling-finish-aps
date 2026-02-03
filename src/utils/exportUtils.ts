@@ -14,7 +14,7 @@ interface ExportOptions {
 /**
  * 将对象数组导出为 CSV 格式
  */
-function convertToCSV(data: any[]): string {
+function convertToCSV(data: Record<string, unknown>[]): string {
   if (data.length === 0) {
     return '';
   }
@@ -51,12 +51,14 @@ function convertToCSV(data: any[]): string {
           value = String(value);
         }
 
+        // 确保 value 是字符串类型后再调用字符串方法
+        const strValue = String(value);
         // 对包含特殊字符的值进行转义
-        if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-          return `"${value.replace(/"/g, '""')}"`;
+        if (strValue.includes(',') || strValue.includes('"') || strValue.includes('\n')) {
+          return `"${strValue.replace(/"/g, '""')}"`;
         }
 
-        return value;
+        return strValue;
       })
       .join(',');
   });
@@ -67,7 +69,7 @@ function convertToCSV(data: any[]): string {
 /**
  * 将对象数组导出为 TSV 格式
  */
-function convertToTSV(data: any[]): string {
+function convertToTSV(data: Record<string, unknown>[]): string {
   if (data.length === 0) {
     return '';
   }
@@ -93,8 +95,10 @@ function convertToTSV(data: any[]): string {
           value = String(value);
         }
 
+        // 确保 value 是字符串类型后再调用字符串方法
+        const strValue = String(value);
         // 处理制表符和换行符
-        return value.replace(/\t/g, ' ').replace(/\n/g, ' ');
+        return strValue.replace(/\t/g, ' ').replace(/\n/g, ' ');
       })
       .join('\t');
   });
@@ -133,7 +137,7 @@ function buildTimestampedFilename(filename: string, ext: string): string {
  * 导出数据
  */
 export function exportData(
-  data: any[],
+  data: Record<string, unknown>[],
   options: ExportOptions
 ): void {
   if (!data || data.length === 0) {
@@ -172,21 +176,21 @@ export function exportData(
 /**
  * 导出 CSV
  */
-export function exportCSV(data: any[], filename: string): void {
+export function exportCSV(data: Record<string, unknown>[], filename: string): void {
   exportData(data, { filename, format: 'csv' });
 }
 
 /**
  * 导出 JSON
  */
-export function exportJSON(data: any[], filename: string): void {
+export function exportJSON(data: Record<string, unknown>[], filename: string): void {
   exportData(data, { filename, format: 'json' });
 }
 
 /**
  * 导出 TSV
  */
-export function exportTSV(data: any[], filename: string): void {
+export function exportTSV(data: Record<string, unknown>[], filename: string): void {
   exportData(data, { filename, format: 'tsv' });
 }
 
@@ -210,7 +214,7 @@ export function exportHTML(html: string, filename: string): void {
  * 获取导出菜单项
  */
 export function getExportMenuItems(
-  data: any[],
+  data: Record<string, unknown>[],
   filename: string
 ): Array<{ label: string; key: string; onClick: () => void }> {
   return [
@@ -220,8 +224,8 @@ export function getExportMenuItems(
       onClick: () => {
         try {
           exportCSV(data, filename);
-        } catch (error: any) {
-          console.error('导出 CSV 失败:', error.message);
+        } catch (error: unknown) {
+          console.error('导出 CSV 失败:', error instanceof Error ? error.message : String(error));
         }
       },
     },
@@ -231,8 +235,8 @@ export function getExportMenuItems(
       onClick: () => {
         try {
           exportJSON(data, filename);
-        } catch (error: any) {
-          console.error('导出 JSON 失败:', error.message);
+        } catch (error: unknown) {
+          console.error('导出 JSON 失败:', error instanceof Error ? error.message : String(error));
         }
       },
     },
@@ -242,8 +246,8 @@ export function getExportMenuItems(
       onClick: () => {
         try {
           exportTSV(data, filename);
-        } catch (error: any) {
-          console.error('导出 TSV 失败:', error.message);
+        } catch (error: unknown) {
+          console.error('导出 TSV 失败:', error instanceof Error ? error.message : String(error));
         }
       },
     },

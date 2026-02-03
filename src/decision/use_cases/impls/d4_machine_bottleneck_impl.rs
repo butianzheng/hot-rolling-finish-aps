@@ -72,6 +72,7 @@ mod tests {
 
     fn setup_test_use_case() -> MachineBottleneckUseCaseImpl {
         let conn = Connection::open_in_memory().unwrap();
+        crate::db::configure_sqlite_connection(&conn).unwrap();
 
         // 创建 capacity_pool 表
         conn.execute(
