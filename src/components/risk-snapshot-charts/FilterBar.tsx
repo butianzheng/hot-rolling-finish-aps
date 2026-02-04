@@ -8,7 +8,8 @@ import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { Dayjs } from 'dayjs';
 import { formatNumber } from '../../utils/formatters';
 import { exportCSV, exportJSON } from '../../utils/exportUtils';
-import type { RiskDaySummary, VersionOption } from './types';
+import type { DaySummary } from '../../types/decision';
+import type { VersionOption } from './types';
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
@@ -20,7 +21,7 @@ export interface FilterBarProps {
   dateRange: [Dayjs, Dayjs] | null;
   onDateRangeChange: (range: [Dayjs, Dayjs] | null) => void;
   onRefresh: () => void;
-  riskSnapshots: RiskDaySummary[];
+  riskSnapshots: DaySummary[];
 }
 
 export const FilterBar: React.FC<FilterBarProps> = ({
@@ -35,13 +36,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   const handleExportCSV = () => {
     try {
       const data = riskSnapshots.map((snapshot) => ({
-        日期: snapshot.plan_date,
-        风险分数: formatNumber(snapshot.risk_score, 1),
-        风险等级: snapshot.risk_level,
-        产能利用率: formatNumber(snapshot.capacity_util_pct, 1),
-        超载吨数: formatNumber(snapshot.overload_weight_t, 1),
-        紧急失败数: snapshot.urgent_failure_count,
-        涉及机组: (snapshot.involved_machines || []).join(','),
+        日期: snapshot.planDate,
+        风险分数: formatNumber(snapshot.riskScore, 1),
+        风险等级: snapshot.riskLevel,
+        产能利用率: formatNumber(snapshot.capacityUtilPct, 1),
+        超载吨数: formatNumber(snapshot.overloadWeightT, 1),
+        紧急失败数: snapshot.urgentFailureCount,
+        涉及机组: (snapshot.involvedMachines || []).join(','),
       }));
       exportCSV(data, '风险摘要(D1)');
       message.success('导出成功');
@@ -52,7 +53,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
   const handleExportJSON = () => {
     try {
-      exportJSON(riskSnapshots, '风险快照');
+      exportJSON(riskSnapshots as unknown as Record<string, unknown>[], '风险快照');
       message.success('导出成功');
     } catch (error: any) {
       message.error(`导出失败: ${error.message}`);

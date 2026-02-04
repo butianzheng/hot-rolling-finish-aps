@@ -6,7 +6,7 @@ import { Space, Tag } from 'antd';
 import { WarningOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { formatNumber } from '../../utils/formatters';
-import type { RiskDaySummary } from './types';
+import type { DaySummary } from '../../types/decision';
 import { riskLevelColors } from './types';
 
 export interface RiskSnapshotColumnsOptions {
@@ -15,14 +15,14 @@ export interface RiskSnapshotColumnsOptions {
 
 export function createRiskSnapshotColumns(
   options: RiskSnapshotColumnsOptions
-): ColumnsType<RiskDaySummary> {
+): ColumnsType<DaySummary> {
   const { mostRiskyDate } = options;
 
   return [
     {
       title: '日期',
-      dataIndex: 'plan_date',
-      key: 'plan_date',
+      dataIndex: 'planDate',
+      key: 'planDate',
       width: 120,
       render: (date: string) => {
         const isMostRisky = date === mostRiskyDate;
@@ -40,10 +40,10 @@ export function createRiskSnapshotColumns(
     },
     {
       title: '风险分数',
-      dataIndex: 'risk_score',
-      key: 'risk_score',
+      dataIndex: 'riskScore',
+      key: 'riskScore',
       width: 100,
-      sorter: (a, b) => a.risk_score - b.risk_score,
+      sorter: (a, b) => a.riskScore - b.riskScore,
       render: (score: number) => (
         <span style={{ fontWeight: 'bold', color: score > 60 ? '#cf1322' : '#52c41a' }}>
           {score}
@@ -52,8 +52,8 @@ export function createRiskSnapshotColumns(
     },
     {
       title: '风险等级',
-      dataIndex: 'risk_level',
-      key: 'risk_level',
+      dataIndex: 'riskLevel',
+      key: 'riskLevel',
       width: 100,
       render: (level: string) => (
         <Tag color={riskLevelColors[level] || 'default'}>{level}</Tag>
@@ -61,28 +61,28 @@ export function createRiskSnapshotColumns(
     },
     {
       title: '产能利用率(%)',
-      dataIndex: 'capacity_util_pct',
-      key: 'capacity_util_pct',
+      dataIndex: 'capacityUtilPct',
+      key: 'capacityUtilPct',
       width: 100,
       render: (val: number) => formatNumber(val, 1),
     },
     {
       title: '超载吨数(t)',
-      dataIndex: 'overload_weight_t',
-      key: 'overload_weight_t',
+      dataIndex: 'overloadWeightT',
+      key: 'overloadWeightT',
       width: 100,
       render: (val: number) => formatNumber(val, 1),
     },
     {
       title: '紧急单失败数',
-      dataIndex: 'urgent_failure_count',
-      key: 'urgent_failure_count',
+      dataIndex: 'urgentFailureCount',
+      key: 'urgentFailureCount',
       width: 100,
     },
     {
       title: '涉及机组',
-      dataIndex: 'involved_machines',
-      key: 'involved_machines',
+      dataIndex: 'involvedMachines',
+      key: 'involvedMachines',
       width: 100,
       render: (machines: string[]) => (machines && machines.length > 0 ? machines.join(',') : '-'),
     },

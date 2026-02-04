@@ -5,17 +5,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { message } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
-import { dashboardApi, planApi } from '../../api/tauri';
+import { decisionService, planApi } from '../../api/tauri';
 import { useEvent } from '../../api/eventBus';
 import { useActiveVersionId } from '../../stores/use-global-store';
-import type { DecisionDaySummaryResponse, RiskDaySummary, VersionOption } from './types';
+import type { DaySummary } from '../../types/decision';
+import type { VersionOption } from './types';
 
 export interface UseRiskSnapshotChartsReturn {
   // 加载状态
   loading: boolean;
 
   // 数据
-  riskSnapshots: RiskDaySummary[];
+  riskSnapshots: DaySummary[];
   mostRiskyDate: string | null;
   versionOptions: VersionOption[];
 
@@ -42,7 +43,7 @@ export function useRiskSnapshotCharts(): UseRiskSnapshotChartsReturn {
   const [loading, setLoading] = useState(false);
   const [selectedVersion, setSelectedVersion] = useState<string>('');
   const [versionOptions, setVersionOptions] = useState<VersionOption[]>([]);
-  const [rawRiskSnapshots, setRawRiskSnapshots] = useState<RiskDaySummary[]>([]);
+  const [rawRiskSnapshots, setRawRiskSnapshots] = useState<DaySummary[]>([]);
   const [mostRiskyDate, setMostRiskyDate] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [activeTab, setActiveTab] = useState<string>('trend');
@@ -57,18 +58,18 @@ export function useRiskSnapshotCharts(): UseRiskSnapshotChartsReturn {
 
     setLoading(true);
     try {
-      const result = (await dashboardApi.listRiskSnapshots(versionId)) as DecisionDaySummaryResponse;
+      const result = await decisionService.getAllRiskSnapshots(versionId);
       const items = result?.items || [];
       setRawRiskSnapshots(items);
       // mostRiskyDate 可由已加载数据计算，避免额外 IPC 调用
-      const most = items.reduce<RiskDaySummary | null>((best, cur) => {
+      const most = items.reduce<DaySummary | null>((best, cur) => {
         if (!best) return cur;
-        const bestScore = Number(best.risk_score || 0);
-        const curScore = Number(cur.risk_score || 0);
+        const bestScore = Number(best.riskScore || 0);
+        const curScore = Number(cur.riskScore || 0);
         if (curScore !== bestScore) return curScore > bestScore ? cur : best;
-        return String(cur.plan_date || '') < String(best.plan_date || '') ? cur : best;
+        return String(cur.planDate || '') < String(best.planDate || '') ? cur : best;
       }, null);
-      setMostRiskyDate(most?.plan_date || null);
+      setMostRiskyDate(most?.planDate || null);
       message.success(`成功加载 ${items.length} 条风险摘要`);
     } catch (error: any) {
       console.error('加载风险快照失败:', error);
@@ -99,8 +100,8 @@ export function useRiskSnapshotCharts(): UseRiskSnapshotChartsReturn {
   const riskSnapshots = useMemo(() => {
     const base = Array.isArray(rawRiskSnapshots) ? rawRiskSnapshots : [];
     const filtered = dateRange
-      ? base.filter((s: RiskDaySummary) => {
-          const d = dayjs(s.plan_date);
+      ? base.filter((s: DaySummary) => {
+          const d = dayjs(s.planDate);
           return (
             d.isAfter(dateRange[0].startOf('day').subtract(1, 'millisecond')) &&
             d.isBefore(dateRange[1].endOf('day').add(1, 'millisecond'))
@@ -109,7 +110,7 @@ export function useRiskSnapshotCharts(): UseRiskSnapshotChartsReturn {
       : base;
 
     // 确保按日期升序，避免不同后端排序导致图表抖动
-    return [...filtered].sort((a, b) => a.plan_date.localeCompare(b.plan_date));
+    return [...filtered].sort((a, b) => a.planDate.localeCompare(b.planDate));
   }, [rawRiskSnapshots, dateRange]);
 
   // 默认跟随"当前激活版本"；如果用户手动切换到其他版本，则保持其选择不被覆盖。

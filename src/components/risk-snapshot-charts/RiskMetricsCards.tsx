@@ -5,10 +5,10 @@
 import React from 'react';
 import { Card, Col, Row, Statistic } from 'antd';
 import { formatNumber } from '../../utils/formatters';
-import type { RiskDaySummary } from './types';
+import type { DaySummary } from '../../types/decision';
 
 export interface RiskMetricsCardsProps {
-  riskSnapshots: RiskDaySummary[];
+  riskSnapshots: DaySummary[];
   mostRiskyDate: string | null;
 }
 
@@ -19,13 +19,13 @@ export const RiskMetricsCards: React.FC<RiskMetricsCardsProps> = ({
   if (riskSnapshots.length === 0) return null;
 
   const avgRiskScore =
-    riskSnapshots.reduce((sum, s) => sum + s.risk_score, 0) / riskSnapshots.length;
-  const totalUrgentFailures = riskSnapshots.reduce((sum, s) => sum + (s.urgent_failure_count || 0), 0);
-  const totalOverloadT = riskSnapshots.reduce((sum, s) => sum + (s.overload_weight_t || 0), 0);
+    riskSnapshots.reduce((sum, s) => sum + s.riskScore, 0) / riskSnapshots.length;
+  const totalUrgentFailures = riskSnapshots.reduce((sum, s) => sum + (s.urgentFailureCount || 0), 0);
+  const totalOverloadT = riskSnapshots.reduce((sum, s) => sum + (s.overloadWeightT || 0), 0);
 
   // 获取最危险日期的风险分数
-  const mostRiskySnapshot = riskSnapshots.find((s) => s.plan_date === mostRiskyDate);
-  const maxRiskScore = mostRiskySnapshot?.risk_score || 0;
+  const mostRiskySnapshot = riskSnapshots.find((s) => s.planDate === mostRiskyDate);
+  const maxRiskScore = mostRiskySnapshot?.riskScore || 0;
 
   return (
     <Row gutter={16} style={{ marginBottom: 16 }}>

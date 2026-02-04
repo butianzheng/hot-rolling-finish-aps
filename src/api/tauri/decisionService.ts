@@ -315,6 +315,29 @@ export async function getRiskSummaryForRecentDays(
 }
 
 /**
+ * 获取所有风险快照（替代旧 dashboard_api.listRiskSnapshots）
+ *
+ * 默认返回最近90天的风险快照数据，供前端筛选和图表展示使用。
+ * 这是一个宽范围查询，前端可以根据需要进行二次过滤。
+ */
+export async function getAllRiskSnapshots(
+  versionId: string
+): Promise<DecisionDaySummaryResponse> {
+  const today = new Date();
+  const dateFrom = new Date(today);
+  dateFrom.setDate(today.getDate() - 1); // 从昨天开始
+  const dateTo = new Date(today);
+  dateTo.setDate(today.getDate() + 89); // 到未来90天（覆盖最常见的排产周期）
+
+  return getDecisionDaySummary({
+    versionId,
+    dateFrom: dateFrom.toISOString().split('T')[0],
+    dateTo: dateTo.toISOString().split('T')[0],
+    limit: 200, // 足够大的限制，避免遗漏
+  });
+}
+
+/**
  * 获取所有机组的堵塞概况（最近N天）
  */
 export async function getBottleneckForRecentDays(
@@ -489,6 +512,7 @@ export const decisionService = {
   getDecisionDaySummary,
   getMostRiskyDate,
   getRiskSummaryForRecentDays,
+  getAllRiskSnapshots,
 
   // D4: 机组堵塞概况
   getMachineBottleneckProfile,

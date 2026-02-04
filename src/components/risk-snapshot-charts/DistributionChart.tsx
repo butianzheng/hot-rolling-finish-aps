@@ -5,17 +5,17 @@
 import React from 'react';
 import { Card, Col, Row, Statistic } from 'antd';
 import { formatNumber } from '../../utils/formatters';
-import type { RiskDaySummary } from './types';
+import type { DaySummary } from '../../types/decision';
 import { riskLevelColors } from './types';
 
 export interface DistributionChartProps {
-  riskSnapshots: RiskDaySummary[];
+  riskSnapshots: DaySummary[];
 }
 
 export const DistributionChart: React.FC<DistributionChartProps> = ({ riskSnapshots }) => {
   const distribution: Record<string, number> = {};
   riskSnapshots.forEach((snapshot) => {
-    distribution[snapshot.risk_level] = (distribution[snapshot.risk_level] || 0) + 1;
+    distribution[snapshot.riskLevel] = (distribution[snapshot.riskLevel] || 0) + 1;
   });
 
   const total = riskSnapshots.length;

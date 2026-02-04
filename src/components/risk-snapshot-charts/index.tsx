@@ -147,10 +147,10 @@ const RiskSnapshotCharts: React.FC<RiskSnapshotChartsProps> = ({ onNavigateToPla
                 dataSource={state.riskSnapshots}
                 loading={state.loading}
                 pagination={false}
-                rowKey="plan_date"
+                rowKey="planDate"
                 size="small"
                 rowClassName={(record) =>
-                  record.plan_date === state.mostRiskyDate ? 'most-risky-row' : ''
+                  record.planDate === state.mostRiskyDate ? 'most-risky-row' : ''
                 }
               />
               <style>{`

@@ -1,36 +1,26 @@
+// ==========================================
+// Dashboard API（决策刷新管理 + 操作日志）
+// ==========================================
+// 职责分工：
+// - 决策刷新状态管理（getRefreshStatus, manualRefreshDecision）
+// - 操作日志查询（listActionLogs 系列）
+//
+// 注意：D1-D6 决策支持查询请使用 decisionService.ts
+// ==========================================
+
 import { IpcClient } from '../ipcClient';
 import {
   z,
   zodValidator,
-  DecisionDaySummaryResponseSchema,
   DecisionRefreshStatusResponseSchema,
   ManualRefreshDecisionResponseSchema,
   ActionLogSchema,
 } from '../ipcSchemas';
 
 export const dashboardApi = {
-  async listRiskSnapshots(versionId: string): Promise<z.infer<typeof DecisionDaySummaryResponseSchema>> {
-    return IpcClient.call('list_risk_snapshots', { version_id: versionId }, {
-      validate: zodValidator(DecisionDaySummaryResponseSchema, 'list_risk_snapshots'),
-    });
-  },
-
-  async getRiskSnapshot(
-    versionId: string,
-    snapshotDate: string
-  ): Promise<z.infer<typeof DecisionDaySummaryResponseSchema>> {
-    return IpcClient.call(
-      'get_risk_snapshot',
-      {
-        version_id: versionId,
-        snapshot_date: snapshotDate,
-      },
-      {
-        validate: zodValidator(DecisionDaySummaryResponseSchema, 'get_risk_snapshot'),
-      }
-    );
-  },
-
+  /**
+   * 获取决策数据刷新状态
+   */
   async getRefreshStatus(versionId: string): Promise<z.infer<typeof DecisionRefreshStatusResponseSchema>> {
     return IpcClient.call(
       'get_refresh_status',
@@ -43,6 +33,9 @@ export const dashboardApi = {
     );
   },
 
+  /**
+   * 手动触发决策数据刷新
+   */
   async manualRefreshDecision(
     versionId: string,
     operator: string = 'admin'
@@ -59,6 +52,9 @@ export const dashboardApi = {
     );
   },
 
+  /**
+   * 查询操作日志（按时间范围）
+   */
   async listActionLogs(startTime: string, endTime: string): Promise<Array<z.infer<typeof ActionLogSchema>>> {
     return IpcClient.call(
       'list_action_logs',
@@ -72,6 +68,9 @@ export const dashboardApi = {
     );
   },
 
+  /**
+   * 查询操作日志（按物料 ID + 时间范围）
+   */
   async listActionLogsByMaterial(
     materialId: string,
     startTime: string,
@@ -92,6 +91,9 @@ export const dashboardApi = {
     );
   },
 
+  /**
+   * 查询操作日志（按版本）
+   */
   async listActionLogsByVersion(versionId: string): Promise<Array<z.infer<typeof ActionLogSchema>>> {
     return IpcClient.call(
       'list_action_logs_by_version',
@@ -104,6 +106,9 @@ export const dashboardApi = {
     );
   },
 
+  /**
+   * 查询最近操作（支持分页和时间过滤）
+   */
   async getRecentActions(
     limit: number,
     opts?: {
@@ -126,4 +131,3 @@ export const dashboardApi = {
     );
   },
 };
-

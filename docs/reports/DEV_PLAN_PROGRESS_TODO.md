@@ -78,13 +78,29 @@
 
 ### M2（P1/P2）IPC/Schema：单一事实来源（避免漂移）
 
-- [ ] M2-1 决策/计划等 IPC：收敛"入口与 schema 的唯一来源"
+- [x] M2-1 决策/计划等 IPC：收敛"入口与 schema 的唯一来源"（2026-02-04 完成）
   - DoD：前端只有一个 IPC client 层；schema 只维护一份（其余 re-export）
-  - 现状分析完成（2026-02-04）：详见探索报告
+  - **现状分析完成**（2026-02-04 早）：
     - IPC 入口：3 个主要入口（tauri.ts 统一导出，ipcClient.tsx 基础层，decisionService.ts 业务层）
     - Schema 分散：13 个 schema 文件，1368 行定义
-    - 双重 API 冲突：dashboardApi vs decisionService 存在功能重复
-    - 建议：统一迁移到 decisionService 或创建通用包装
+    - 双重 API 冲突：dashboardApi vs decisionService 存在功能重复（D1-D6）
+    - 消费者分析：dashboardApi 仅用于 listRiskSnapshots + 操作日志
+  - **Phase 1 完成**（2026-02-04 晚，commit 待定）：
+    - ✅ 新增 decisionService.getAllRiskSnapshots()：替代 dashboardApi.listRiskSnapshots()
+    - ✅ 迁移 useRiskSnapshotCharts：dashboardApi → decisionService
+    - ✅ 迁移 risk-snapshot-charts 组件树（7 个文件）：snake_case → camelCase 字段
+    - ✅ 清理 dashboardApi：移除 listRiskSnapshots/getRiskSnapshot 函数
+    - ✅ 添加 API 层职责文档：dashboardApi（决策刷新 + 操作日志），decisionService（D1-D6 查询）
+  - **API 层职责边界（重构后）**：
+    - ✅ dashboardApi：决策刷新状态管理 + 操作日志查询（专注后端管理功能）
+    - ✅ decisionService：D1-D6 决策支持查询 + 参数转换（camelCase ↔ snake_case）
+    - ✅ 其他 API：保持现有职责（materialApi, planApi, capacityApi 等）
+  - **成果**：
+    - 消除了 dashboardApi 与 decisionService 在 D1 风险快照查询上的重复
+    - decisionService 成为 D1-D6 的唯一入口（15 个函数）
+    - 代码行数减少：~30 行（移除重复函数）
+    - 类型安全提升：统一使用 camelCase 类型系统
+  - 回归测试：✓ 60 frontend tests passed + ✓ build success
 - [x] M2-2 降低 `any`：优先治理 `src/api/tauri.ts` 与 Workbench 链路（2026-02-04 完成）
   - DoD：高频路径不出现 `any`/`as any`（除非隔离在边界层并有 runtime 校验）
   - **Phase 1 完成**（2026-02-04，commit 3f2c4dd）：
@@ -307,6 +323,32 @@
 ---
 
 ## 4. 进度日志（建议每次提交追加）
+
+### 2026-02-04（晚上 3）
+
+- 🎯 **M2-1 完成**：IPC/Schema 单一事实来源（commit 待定）
+  - **API 层职责划分明确化**：
+    - ✅ dashboardApi 职责收敛：决策刷新管理 + 操作日志查询（6 个函数）
+    - ✅ decisionService 职责扩展：D1-D6 完整决策支持（15 个函数）
+    - ✅ 新增 getAllRiskSnapshots()：替代旧 listRiskSnapshots，90天宽范围查询
+  - **消费者迁移**（useRiskSnapshotCharts → decisionService）：
+    - ✅ 迁移 7 个组件文件：useRiskSnapshotCharts, riskSnapshotColumns, index, FilterBar, RiskMetricsCards, DistributionChart, TrendChart
+    - ✅ 字段 snake_case → camelCase：plan_date → planDate, risk_score → riskScore 等
+    - ✅ 类型迁移：RiskDaySummary → DaySummary（从 types/decision 导入）
+  - **废弃代码清理**：
+    - ✅ 移除 dashboardApi.listRiskSnapshots()
+    - ✅ 移除 dashboardApi.getRiskSnapshot()
+    - ✅ 移除 DecisionDaySummaryResponseSchema 导入（dashboardApi 不再需要）
+  - **文档/注释**：
+    - ✅ dashboardApi 添加文件头注释：职责说明 + decisionService 指引
+    - ✅ getAllRiskSnapshots 添加 JSDoc：替代说明 + 使用场景
+  - **回归测试**：
+    - ✓ 前端：60 tests passed
+    - ✓ 前端构建：成功 (6.54s)
+  - **效果总结**：
+    - 架构清晰度：dashboardApi 与 decisionService 职责边界明确
+    - 代码减少：~30 行重复 API 函数
+    - 类型统一：D1 查询统一返回 camelCase 的 DaySummary 类型
 
 ### 2026-02-04（晚上 2）
 

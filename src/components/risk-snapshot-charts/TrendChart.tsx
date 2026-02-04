@@ -4,24 +4,24 @@
 
 import React from 'react';
 import dayjs from 'dayjs';
-import type { RiskDaySummary } from './types';
+import type { DaySummary } from '../../types/decision';
 
 export interface TrendChartProps {
-  riskSnapshots: RiskDaySummary[];
+  riskSnapshots: DaySummary[];
 }
 
 export const TrendChart: React.FC<TrendChartProps> = ({ riskSnapshots }) => {
-  const maxScore = Math.max(...riskSnapshots.map((s) => s.risk_score), 0);
+  const maxScore = Math.max(...riskSnapshots.map((s) => s.riskScore), 0);
 
   return (
     <div style={{ padding: '20px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', height: '300px', gap: '10px' }}>
         {riskSnapshots.map((snapshot, index) => {
-          const height = maxScore > 0 ? (snapshot.risk_score / maxScore) * 100 : 0;
+          const height = maxScore > 0 ? (snapshot.riskScore / maxScore) * 100 : 0;
           const color =
-            snapshot.risk_score > 60
+            snapshot.riskScore > 60
               ? '#cf1322'
-              : snapshot.risk_score > 40
+              : snapshot.riskScore > 40
               ? '#fa8c16'
               : '#52c41a';
 
@@ -43,7 +43,7 @@ export const TrendChart: React.FC<TrendChartProps> = ({ riskSnapshots }) => {
                   color: color,
                 }}
               >
-                {snapshot.risk_score}
+                {snapshot.riskScore}
               </div>
               <div
                 style={{
@@ -54,7 +54,7 @@ export const TrendChart: React.FC<TrendChartProps> = ({ riskSnapshots }) => {
                   transition: 'all 0.3s',
                   cursor: 'pointer',
                 }}
-                title={`${snapshot.plan_date}: ${snapshot.risk_score}`}
+                title={`${snapshot.planDate}: ${snapshot.riskScore}`}
               />
               <div
                 style={{
@@ -64,7 +64,7 @@ export const TrendChart: React.FC<TrendChartProps> = ({ riskSnapshots }) => {
                   whiteSpace: 'nowrap',
                 }}
               >
-                {dayjs(snapshot.plan_date).format('MM-DD')}
+                {dayjs(snapshot.planDate).format('MM-DD')}
               </div>
             </div>
           );
