@@ -58,6 +58,7 @@
 周期性的工作总结、质量评估、进度报告。
 
 **最新报告**
+- **[回归测试报告（2026-02-04）](./reports/REGRESSION_TEST_REPORT_2026-02-04.md)** - 前后端全量回归结果、覆盖率、性能用例口径说明
 - **[工作台联动功能总结](./reports/WORKBENCH_LINKAGE_FEATURES.md)** - 工作台业务联动系统实施总结 (v1.1.0)
 - **[开发计划与进度追踪（持续更新）](./reports/DEV_PLAN_PROGRESS_TODO.md)** - 当前 Roadmap / 进度 / TODO（用于日常推进与跟踪）
 - **[最终工作总结](./reports/FINAL_WORK_SUMMARY.md)** - 本周期完成的工作、成果、质量指标
