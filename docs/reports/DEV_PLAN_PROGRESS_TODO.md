@@ -3,7 +3,7 @@
 > 用途：把"架构/维护/稳定/性能"的持续演进落成可执行任务，并在每次提交后更新状态与进度日志，方便后续开发与跟踪。
 
 最后更新：2026-02-04
-当前基线：`main@da5a6e5`
+当前基线：`main@ef4cf62`
 
 ---
 
@@ -85,7 +85,7 @@
     - Schema 分散：13 个 schema 文件，1368 行定义
     - 双重 API 冲突：dashboardApi vs decisionService 存在功能重复（D1-D6）
     - 消费者分析：dashboardApi 仅用于 listRiskSnapshots + 操作日志
-  - **Phase 1 完成**（2026-02-04 晚，commit 待定）：
+  - **Phase 1 完成**（2026-02-04 晚，commit ef4cf62）：
     - ✅ 新增 decisionService.getAllRiskSnapshots()：替代 dashboardApi.listRiskSnapshots()
     - ✅ 迁移 useRiskSnapshotCharts：dashboardApi → decisionService
     - ✅ 迁移 risk-snapshot-charts 组件树（7 个文件）：snake_case → camelCase 字段
@@ -326,7 +326,7 @@
 
 ### 2026-02-04（晚上 3）
 
-- 🎯 **M2-1 完成**：IPC/Schema 单一事实来源（commit 待定）
+- 🎯 **M2-1 完成**：IPC/Schema 单一事实来源（commit ef4cf62）
   - **API 层职责划分明确化**：
     - ✅ dashboardApi 职责收敛：决策刷新管理 + 操作日志查询（6 个函数）
     - ✅ decisionService 职责扩展：D1-D6 完整决策支持（15 个函数）
