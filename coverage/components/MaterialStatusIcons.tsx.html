@@ -3,15 +3,15 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for components/comparison/types.ts</title>
+    <title>Code coverage report for components/MaterialStatusIcons.tsx</title>
     <meta charset="utf-8" />
-    <link rel="stylesheet" href="../../prettify.css" />
-    <link rel="stylesheet" href="../../base.css" />
-    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style type='text/css'>
         .coverage-summary .sorter {
-            background-image: url(../../sort-arrow-sprite.png);
+            background-image: url(../sort-arrow-sprite.png);
         }
     </style>
 </head>
@@ -19,34 +19,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../../index.html">All files</a> / <a href="index.html">components/comparison</a> types.ts</h1>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">components</a> MaterialStatusIcons.tsx</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/0</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/0</span>
+                <span class='fraction'>1/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
@@ -105,7 +105,14 @@
 <a name='L40'></a><a href='#L40'>40</a>
 <a name='L41'></a><a href='#L41'>41</a>
 <a name='L42'></a><a href='#L42'>42</a>
-<a name='L43'></a><a href='#L43'>43</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -123,6 +130,13 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -147,48 +161,55 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
- * 共享类型定义文件
- * 用于版本对比相关的本地计算类型
- */
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// ==========================================
+// 材料状态图标组件
+// ==========================================
+// 显示锁定、温度等状态图标
+// 使用 React.memo 优化性能
+// ==========================================
 &nbsp;
-export interface Plan {
-  plan_id: string;
-  plan_name: string;
-  created_by: string;
-  created_at: string;
+import React from 'react';
+import { Tooltip, Space } from 'antd';
+import { LockOutlined, FireOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { STATE_COLORS } from '../theme';
+import { isScheduled } from '../utils/schedState';
+&nbsp;
+interface MaterialStatusIconsProps {
+  lockFlag: boolean;
+  schedState: string;
+  tempIssue?: boolean;
 }
 &nbsp;
-export interface Version {
-  version_id: string;
-  version_no: number;
-  status: string;
-  recalc_window_days?: number | null;
-  created_at: string;
-  config_snapshot_json?: string | null;
-}
+const MaterialStatusIconsComponent: React.FC&lt;MaterialStatusIconsProps&gt; = ({
+  lockFlag,
+  schedState,
+  tempIssue = false,
+}) =&gt; {
+  return (
+    &lt;Space size={4}&gt;
+      {lockFlag &amp;&amp; (
+        &lt;Tooltip title="已锁定 - 不可自动调整"&gt;
+          &lt;LockOutlined style={{ color: STATE_COLORS.FROZEN_LOCKED, fontSize: 14 }} /&gt;
+        &lt;/Tooltip&gt;
+      )}
 &nbsp;
-export type LocalVersionDiffSummary = {
-  totalChanges: number;
-  addedCount: number;
-  removedCount: number;
-  modifiedCount: number;
-  movedCount: number;
+      {tempIssue &amp;&amp; (
+        &lt;Tooltip title="温度问题 - 需要冷却"&gt;
+          &lt;FireOutlined style={{ color: STATE_COLORS.TEMP_ISSUE, fontSize: 14 }} /&gt;
+        &lt;/Tooltip&gt;
+      )}
+&nbsp;
+      {isScheduled(schedState) &amp;&amp; (
+        &lt;Tooltip title="已排产"&gt;
+          &lt;CheckCircleOutlined style={{ color: STATE_COLORS.READY, fontSize: 14 }} /&gt;
+        &lt;/Tooltip&gt;
+      )}
+    &lt;/Space&gt;
+  );
 };
 &nbsp;
-export type LocalCapacityDeltaRow = {
-  machine_code: string;
-  date: string;
-  used_a: number;
-  used_b: number;
-  delta: number;
-  target_a: number | null;
-  limit_a: number | null;
-  target_b: number | null;
-  limit_b: number | null;
-};
-&nbsp;
-export const RETROSPECTIVE_NOTE_KEY_PREFIX = 'aps_retrospective_note';
+// 使用 React.memo 优化，只在 props 改变时重新渲染
+export const MaterialStatusIcons = React.memo(MaterialStatusIconsComponent);
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -198,14 +219,14 @@ export const RETROSPECTIVE_NOTE_KEY_PREFIX = 'aps_retrospective_note';
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
                 at 2026-02-04T06:14:07.761Z
             </div>
-        <script src="../../prettify.js"></script>
+        <script src="../prettify.js"></script>
         <script>
             window.onload = function () {
                 prettyPrint();
             };
         </script>
-        <script src="../../sorter.js"></script>
-        <script src="../../block-navigation.js"></script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
     </body>
 </html>
     
