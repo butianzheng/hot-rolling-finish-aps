@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -142,7 +142,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -158,7 +158,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -174,7 +174,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -188,7 +188,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -204,11 +204,11 @@ import type { RedLineViolation } from './types';
 /**
  * 创建冻结区保护违规
  */
-export function <span class="fstat-no" title="function not covered" >createFrozenZoneViolation(</span>
+export function createFrozenZoneViolation(
   materialNos: string[],
   message?: string
 ): RedLineViolation {
-<span class="cstat-no" title="statement not covered" >  return {</span>
+  return {
     type: 'FROZEN_ZONE_PROTECTION',
     message: message || '该操作涉及冻结材料，已被系统阻止',
     severity: 'error',
@@ -220,11 +220,11 @@ export function <span class="fstat-no" title="function not covered" >createFroze
 /**
  * 创建适温约束违规
  */
-export function <span class="fstat-no" title="function not covered" >createMaturityViolation(</span>
+export function createMaturityViolation(
   materialNos: string[],
   daysToReady: number
 ): RedLineViolation {
-<span class="cstat-no" title="statement not covered" >  return {</span>
+  return {
     type: 'MATURITY_CONSTRAINT',
     message: '材料未适温，无法排产',
     severity: 'warning',
@@ -236,11 +236,11 @@ export function <span class="fstat-no" title="function not covered" >createMatur
 /**
  * 创建容量约束违规
  */
-export function <span class="fstat-no" title="function not covered" >createCapacityViolation(</span>
+export function createCapacityViolation(
   message: string,
   details?: string
 ): RedLineViolation {
-<span class="cstat-no" title="statement not covered" >  return {</span>
+  return {
     type: 'CAPACITY_FIRST',
     message,
     severity: 'error',
@@ -251,10 +251,10 @@ export function <span class="fstat-no" title="function not covered" >createCapac
 /**
  * 创建可解释性违规
  */
-export function <span class="fstat-no" title="function not covered" >createExplainabilityViolation(</span>
+export function createExplainabilityViolation(
   message: string
 ): RedLineViolation {
-<span class="cstat-no" title="statement not covered" >  return {</span>
+  return {
     type: 'EXPLAINABILITY',
     message,
     severity: 'warning',
@@ -268,7 +268,7 @@ export function <span class="fstat-no" title="function not covered" >createExpla
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-02-04T06:14:07.761Z
+                at 2026-02-04T07:36:20.422Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">81.89% </span>
+                <span class="strong">93.96% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>95/116</span>
+                <span class='fraction'>109/116</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">67.66% </span>
+                <span class="strong">79.64% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>113/167</span>
+                <span class='fraction'>133/167</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">88.23% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>15/17</span>
+                <span class='fraction'>17/17</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">84.94% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>79/93</span>
+                <span class='fraction'>93/93</span>
             </div>
         
             
@@ -321,17 +321,17 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">15x</span>
 <span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">15x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -360,23 +360,23 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -532,8 +532,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
  * 版本对比的共享辅助函数
@@ -567,7 +567,7 @@ export function extractVersionNameCn(version: any): string | null {
     if (typeof v === 'string' &amp;&amp; v.trim()) return v.trim();
     return null;
   } catch {
-<span class="cstat-no" title="statement not covered" >    return null;</span>
+    return null;
   }
 }
 &nbsp;
@@ -595,24 +595,24 @@ export function formatVersionLabel(version: Version): string {
  * - 只有版本号: "V12"
  * - 都没有: "31c46b4d"（UUID前8位）
  */
-export function <span class="fstat-no" title="function not covered" >formatVersionLabelWithCode(v</span>ersion: Version): string {
-  const nameCn = <span class="cstat-no" title="statement not covered" >extractVersionNameCn(version);</span>
-  const no = <span class="cstat-no" title="statement not covered" >Number(version.version_no ?? 0);</span>
+export function formatVersionLabelWithCode(version: Version): string {
+  const nameCn = extractVersionNameCn(version);
+  const no = Number(version.version_no ?? 0);
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  if (nameCn &amp;&amp; Number.isFinite(no) &amp;&amp; no &gt; 0) {</span>
-<span class="cstat-no" title="statement not covered" >    return `${nameCn} (V${no})`;</span>
-<span class="cstat-no" title="statement not covered" >  } else if (nameCn) {</span>
-<span class="cstat-no" title="statement not covered" >    return nameCn;</span>
-<span class="cstat-no" title="statement not covered" >  } else if (Number.isFinite(no) &amp;&amp; no &gt; 0) {</span>
-<span class="cstat-no" title="statement not covered" >    return `V${no}`;</span>
+  if (nameCn &amp;&amp; Number.isFinite(no) &amp;&amp; no &gt; 0) {
+    return `${nameCn} (V${no})`;
+  } else if (nameCn) {
+    return nameCn;
+  } else if (Number.isFinite(no) &amp;&amp; no &gt; 0) {
+    return `V${no}`;
   } else {
     // 降级显示：UUID 前 8 位；非 UUID 则保留完整 ID（例如人工命名/测试版本）
-    const id = <span class="cstat-no" title="statement not covered" >String(version.version_id ?? '').trim();</span>
+    const id = String(version.version_id ?? <span class="branch-1 cbranch-no" title="branch not covered" >'')</span>.trim();
     const isUuid =
-<span class="cstat-no" title="statement not covered" >      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(</span>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         id
       );
-<span class="cstat-no" title="statement not covered" >    return isUuid ? id.slice(0, 8) : id;</span>
+    return isUuid ? id.slice(0, 8) : id;
   }
 }
 &nbsp;
@@ -767,9 +767,9 @@ export function computeDailyTotals(items: PlanItemSnapshot[]): Map&lt;string, nu
 /**
  * 生成回顾性笔记的存储键
  */
-export function <span class="fstat-no" title="function not covered" >makeRetrospectiveKey(v</span>ersionIdA: string, versionIdB: string): string {
-  const [a, b] = <span class="cstat-no" title="statement not covered" >[String(versionIdA || ''), String(versionIdB || '')].sort();</span>
-<span class="cstat-no" title="statement not covered" >  return `${RETROSPECTIVE_NOTE_KEY_PREFIX}__${a}__${b}`;</span>
+export function makeRetrospectiveKey(versionIdA: string, versionIdB: string): string {
+  const [a, b] = [String(versionIdA || ''), String(versionIdB || '')].sort();
+  return `${RETROSPECTIVE_NOTE_KEY_PREFIX}__${a}__${b}`;
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -778,7 +778,7 @@ export function <span class="fstat-no" title="function not covered" >makeRetrosp
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-02-04T06:14:07.761Z
+                at 2026-02-04T07:36:20.422Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
