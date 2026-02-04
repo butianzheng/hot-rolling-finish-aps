@@ -16,10 +16,10 @@
 |---------|--------|--------|------|
 | MaterialStatusIcons.test.tsx | 10 | 100% | ✅ |
 | PageSkeleton.test.tsx | 5 | 100% | ✅ |
-| ErrorBoundary.test.tsx | 12 | 100% (83.33% 分支) | ✅ |
-| RedLineGuard.test.tsx | 12 | 100% 核心 | ✅ |
+| ErrorBoundary.test.tsx | 11 | 100% (83.33% 分支) | ✅ |
+| RedLineGuard.test.tsx | 13 | 100% 核心 | ✅ |
 
-**总计**: 39 个新测试，所有核心组件 100% 行覆盖
+**总计**: 39 个新测试 (10+5+11+13)，所有核心组件 100% 行覆盖
 
 ---
 

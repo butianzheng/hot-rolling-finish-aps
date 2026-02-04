@@ -21,8 +21,8 @@
 **新增测试文件**:
 1. `src/components/MaterialStatusIcons.test.tsx` (10 tests)
 2. `src/components/PageSkeleton.test.tsx` (5 tests)
-3. `src/components/ErrorBoundary.test.tsx` (12 tests)
-4. `src/components/guards/RedLineGuard.test.tsx` (12 tests)
+3. `src/components/ErrorBoundary.test.tsx` (11 tests)
+4. `src/components/guards/RedLineGuard.test.tsx` (13 tests)
 
 **组件覆盖率提升**:
 - MaterialStatusIcons: 0% → 100% ✅
@@ -156,13 +156,13 @@
     - 页面骨架屏组件测试
     - 100% 覆盖率
 
-13. **src/components/ErrorBoundary.test.tsx** (12 tests)
-    - 错误边界组件测试（错误捕获、用户交互）
-    - 100% 覆盖率
+13. **src/components/ErrorBoundary.test.tsx** (11 tests)
+    - 错误边界组件测试（错误捕获、用户交互、遥测上报）
+    - 100% 行覆盖率（83.33% 分支覆盖）
 
-14. **src/components/guards/RedLineGuard.test.tsx** (12 tests)
-    - 工业红线防护组件测试（紧凑/详细模式、5种红线类型）
-    - 100% 覆盖率
+14. **src/components/guards/RedLineGuard.test.tsx** (13 tests)
+    - 工业红线防护组件测试（紧凑/详细模式、5种红线类型、边界情况）
+    - 100% 核心覆盖率
 
 ### 1.3 代码覆盖率详情
 
