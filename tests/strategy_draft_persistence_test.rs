@@ -38,6 +38,7 @@ mod strategy_draft_persistence_test {
     use std::sync::{Arc, Mutex};
     use uuid::Uuid;
 
+    use crate::test_helpers;
     use crate::test_helpers::create_test_db;
 
     fn build_plan_api(db_path: &str) -> Arc<PlanApi> {

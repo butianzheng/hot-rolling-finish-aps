@@ -31,6 +31,7 @@ mod system_performance_test {
     use std::time::Instant;
     use tempfile::NamedTempFile;
 
+    use crate::test_helpers;
     use crate::test_helpers::create_test_db;
 
     // ==========================================

@@ -601,6 +601,14 @@ mod tests {
 
         conn.execute_batch(
             r#"
+            CREATE TABLE config_kv (
+                scope_id TEXT NOT NULL,
+                key TEXT NOT NULL,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (scope_id, key)
+            );
+
             CREATE TABLE plan_version (
                 version_id TEXT PRIMARY KEY
             );

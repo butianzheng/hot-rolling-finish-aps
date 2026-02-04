@@ -21,6 +21,7 @@ mod decision_e2e_test {
     use std::sync::{Arc, Mutex};
 
     // 导入测试辅助函数
+    use crate::test_helpers;
     use crate::test_helpers::create_test_db;
     use tempfile::NamedTempFile;
 

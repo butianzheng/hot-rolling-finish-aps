@@ -32,6 +32,7 @@ mod concurrent_control_test {
     use std::time::Duration;
     use tempfile::NamedTempFile;
 
+    use crate::test_helpers;
     use crate::test_helpers::create_test_db;
 
     // ==========================================

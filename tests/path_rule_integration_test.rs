@@ -15,6 +15,7 @@ mod helpers;
 #[cfg(test)]
 mod path_rule_integration_test {
     use crate::helpers::test_data_builder::{CapacityPoolBuilder, MaterialBuilder, MaterialStateBuilder};
+    use crate::test_helpers;
     use crate::test_helpers::create_test_db;
     use chrono::NaiveDate;
     use hot_rolling_aps::api::PathRuleApi;

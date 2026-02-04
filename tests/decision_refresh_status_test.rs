@@ -21,6 +21,7 @@ mod decision_refresh_status_test {
     use std::sync::{Arc, Mutex};
     use uuid::Uuid;
 
+    use crate::test_helpers;
     use crate::test_helpers::create_test_db;
 
     struct StubDecisionApi;

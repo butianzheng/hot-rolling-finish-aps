@@ -25,6 +25,7 @@ mod dashboard_api_e2e_test {
     use hot_rolling_aps::decision::services::{DecisionRefreshService, RefreshScope, RefreshTrigger};
     use hot_rolling_aps::decision::use_cases::impls::*;
 
+    use crate::test_helpers;
     use crate::test_helpers::create_test_db;
     use tempfile::NamedTempFile;
 

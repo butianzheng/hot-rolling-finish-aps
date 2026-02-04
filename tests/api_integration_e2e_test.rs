@@ -10,6 +10,7 @@ mod test_helpers;
 
 #[cfg(test)]
 mod api_integration_e2e_test {
+    use crate::test_helpers;
     use crate::test_helpers::create_test_db;
     use chrono::Duration;
     use hot_rolling_aps::api::{DashboardApi, MaterialApi, PlanApi, ValidationMode};

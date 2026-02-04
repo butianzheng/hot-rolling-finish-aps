@@ -16,6 +16,7 @@ mod helpers;
 #[cfg(test)]
 mod path_rule_e2e_test {
     use crate::helpers::test_data_builder::{MaterialBuilder, MaterialStateBuilder};
+    use crate::test_helpers;
     use crate::test_helpers::create_test_db;
     use chrono::{Duration, NaiveDate};
     use hot_rolling_aps::api::{PathRuleApi, PlanApi};
