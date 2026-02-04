@@ -54,6 +54,11 @@
 - **[前端重构方案](./frontend/REFACTOR_PLAN.md)** - 前端架构优化计划、组件分解
 - **[前端说明](./frontend/README.md)** - 前端项目结构、模块说明
 
+**Workbench 工作台文档** (`docs/frontend/workbench/`)
+- **[交互设计方案](./frontend/workbench/INTERACTION_DESIGN.md)** - 工作台业务联动和状态可视化设计
+- **[快速修复方案](./frontend/workbench/QUICK_FIX.md)** - 工作台联动失效最小侵入修复方案
+- **[重构指南](./frontend/workbench/REFACTOR_GUIDE.md)** - 工作台架构重构指南
+
 ### 📊 项目报告 (`docs/reports/`)
 周期性的工作总结、质量评估、进度报告。
 
@@ -62,14 +67,20 @@
 - **[工作台联动功能总结](./reports/WORKBENCH_LINKAGE_FEATURES.md)** - 工作台业务联动系统实施总结 (v1.1.0)
 - **[开发计划与进度追踪（持续更新）](./reports/DEV_PLAN_PROGRESS_TODO.md)** - 当前 Roadmap / 进度 / TODO（用于日常推进与跟踪）
 - **[最终工作总结](./reports/FINAL_WORK_SUMMARY.md)** - 本周期完成的工作、成果、质量指标
-- **[单元测试报告](./reports/TEST_REPORT.md)** - 测试执行结果、覆盖率、性能指标
-- **[P1 进展](./reports/P1_PROGRESS.md)** - 技术债务修复进度总结
-  - P1-3: API 类型验证完成总结
-  - P1-4: 组件分解完成总结
 - **[P0 修复总结](./reports/P0_FIXES_SUMMARY.md)** - 关键问题修复清单
 
+**测试报告** (`docs/reports/testing/`)
+- **[测试评估报告](./reports/testing/TEST_EVALUATION_REPORT.md)** - 前端测试执行结果、覆盖率、质量指标（持续更新）
+- **[Rust 测试覆盖分析](./reports/testing/RUST_TEST_COVERAGE_ANALYSIS.md)** - 后端 Rust 测试覆盖率分析报告
+
+**Phase 系列报告** (`docs/reports/phases/`)
+- **[Phase 3 总结](./reports/phases/PHASE_3_SUMMARY.md)** - Phase 3 UI 组件与工具函数测试扩展总结
+- **[Phase 3.5 分支覆盖优化](./reports/phases/PHASE_3.5_BRANCH_COVERAGE_OPTIMIZATION.md)** - 分支覆盖率优化方案与实施
+- **[Phase 3.6 工具函数测试](./reports/phases/PHASE_3.6_WORKBENCH_UTILS_TESTS.md)** - Workbench 工具函数测试补充
+
 **质量评估**
-- **[质量指标](./reports/QUALITY_METRICS.md)** - 代码质量评估、审计结果汇总
+- **[代码质量分析](./reports/CODE_QUALITY_ANALYSIS.md)** - 代码质量评估、审计结果汇总
+- **[方案总结](./reports/SOLUTION_SUMMARY.md)** - 工作台联动修复方案对比与选择
 
 ### 📚 使用指南 (`docs/guides/`)
 特定功能或组件的使用说明。
@@ -85,6 +96,7 @@
   - UNIT_TEST_PLAN.md - 单元测试补充计划（已完成）
   - REFACTOR_TODO.md - 重构进度清单（已完成）
   - REVIEW_FIX_TODO.md - 修复任务清单（已完成）
+  - DOCUMENTATION_PLAN.md - 文档整理计划（已部分完成）
 
 - **[审计报告](./archived/audit_reports/)** - 历史审计与代码评估报告
 - **[会议记录](./archived/meeting_notes/)** - 历史会议议程和记录
@@ -104,7 +116,7 @@
 **👨‍💻 前端开发者**
 → 必读: [CLAUDE.md](../CLAUDE.md)（开发约束）
 → 然后: [开发指南](./core/DEVELOPMENT_GUIDE.md), [前端重构方案](./frontend/REFACTOR_PLAN.md)
-→ 参考: [系统架构](./core/ARCHITECTURE.md), [API 参考](./core/API_REFERENCE.md)
+→ 参考: [系统架构](./core/ARCHITECTURE.md), [API 参考](./core/API_REFERENCE.md), [Workbench 文档](./frontend/workbench/)
 
 **🔧 后端开发者**
 → 必读: [CLAUDE.md](../CLAUDE.md)（开发约束）
@@ -113,8 +125,8 @@
 
 **🧪 测试人员 / QA**
 → 必读: [测试流程](./process/TESTING_PROCESS.md)
-→ 然后: [测试数据指南](./guides/TEST_DATA_GUIDE.md), [单元测试报告](./reports/TEST_REPORT.md)
-→ 参考: [系统架构](./core/ARCHITECTURE.md)
+→ 然后: [测试数据指南](./guides/TEST_DATA_GUIDE.md), [测试评估报告](./reports/testing/TEST_EVALUATION_REPORT.md)
+→ 参考: [系统架构](./core/ARCHITECTURE.md), [Phase 系列报告](./reports/phases/)
 
 **📋 代码审查人**
 → 必读: [CLAUDE.md](../CLAUDE.md)（开发约束）
@@ -132,6 +144,8 @@
 
 | 日期 | 文档 | 版本 | 变更摘要 |
 |------|------|------|--------|
+| 2026-02-04 | 项目文档结构 | 2.0 | 全面重组：Phase 系列、Workbench 系列、测试报告归类；claude.md→CLAUDE.md |
+| 2026-02-04 | docs/INDEX.md | 1.2 | 更新文档导航，新增子目录结构索引 |
 | 2026-01-31 | docs/reports/WORKBENCH_LINKAGE_FEATURES.md | 1.0 | 新建工作台联动功能总结 (v1.1.0) |
 | 2026-01-31 | README.md | 1.1.0 | 更新代码统计和最新功能 |
 | 2026-01-31 | docs/core/ARCHITECTURE.md | 1.2 | 更新架构文档和代码统计 |
@@ -169,10 +183,8 @@
 
 **项目根目录**
 - [README.md](../README.md) - 项目简介
-- [CLAUDE.md](../CLAUDE.md) - 开发规范
+- [CLAUDE.md](../CLAUDE.md) - 开发规范（项目宪法）
 - [CONTRIBUTING.md](../CONTRIBUTING.md) - 贡献指南
-- [ARCHITECTURE.md](../ARCHITECTURE.md) - 系统架构
-- [DOCUMENTATION_PLAN.md](../DOCUMENTATION_PLAN.md) - 文档整理计划
 
 **GitHub & 版本控制**
 - 主分支: `main`
@@ -187,6 +199,6 @@
 
 ---
 
-**文档导航索引版本**: 1.1
-**上次更新**: 2026-01-31
+**文档导航索引版本**: 1.2
+**上次更新**: 2026-02-04
 **维护者**: 代码质量团队
