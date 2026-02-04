@@ -8,10 +8,12 @@ import {
   normalizeDateOnly,
   extractVersionNameCn,
   formatVersionLabel,
+  formatVersionLabelWithCode,
   normalizePlanItem,
   computeVersionDiffs,
   computeCapacityMap,
   computeDailyTotals,
+  makeRetrospectiveKey,
 } from '../comparison/utils';
 import type { Version } from '../comparison/types';
 
@@ -90,6 +92,18 @@ describe('comparison/utils', () => {
         config_snapshot_json: JSON.stringify({
           __meta_version_name_cn: '   ', // 空白
         }),
+      };
+      expect(extractVersionNameCn(version)).toBeNull();
+    });
+
+    it('JSON 解析错误时应返回 null', () => {
+      const version: Version = {
+        version_id: 'v1',
+        version_no: 1,
+        status: 'ACTIVE',
+        recalc_window_days: 30,
+        created_at: '2026-01-30',
+        config_snapshot_json: 'invalid json {',
       };
       expect(extractVersionNameCn(version)).toBeNull();
     });
@@ -345,6 +359,134 @@ describe('comparison/utils', () => {
     it('空列表应返回空 map', () => {
       const map = computeDailyTotals([]);
       expect(map.size).toBe(0);
+    });
+  });
+
+  describe('formatVersionLabelWithCode', () => {
+    it('有中文名称和版本号时应返回完整格式', () => {
+      const version: Version = {
+        version_id: 'v123',
+        version_no: 10,
+        status: 'ACTIVE',
+        recalc_window_days: 30,
+        created_at: '2026-01-30',
+        config_snapshot_json: JSON.stringify({
+          __meta_version_name_cn: '重排产优化',
+        }),
+      };
+      const result = formatVersionLabelWithCode(version);
+      expect(result).toBe('重排产优化 (V10)');
+    });
+
+    it('只有中文名称时应返回中文名称', () => {
+      const version: Version = {
+        version_id: 'v123',
+        version_no: null,
+        status: 'ACTIVE',
+        recalc_window_days: 30,
+        created_at: '2026-01-30',
+        config_snapshot_json: JSON.stringify({
+          __meta_version_name_cn: '测试方案A',
+        }),
+      };
+      const result = formatVersionLabelWithCode(version);
+      expect(result).toBe('测试方案A');
+    });
+
+    it('只有版本号时应返回版本号', () => {
+      const version: Version = {
+        version_id: 'v123',
+        version_no: 12,
+        status: 'ACTIVE',
+        recalc_window_days: 30,
+        created_at: '2026-01-30',
+        config_snapshot_json: null,
+      };
+      const result = formatVersionLabelWithCode(version);
+      expect(result).toBe('V12');
+    });
+
+    it('版本号为 0 或负数时应忽略版本号', () => {
+      const version: Version = {
+        version_id: 'v123',
+        version_no: 0,
+        status: 'ACTIVE',
+        recalc_window_days: 30,
+        created_at: '2026-01-30',
+        config_snapshot_json: null,
+      };
+      // 应该降级到 UUID 前8位
+      expect(formatVersionLabelWithCode(version).length).toBeGreaterThan(0);
+    });
+
+    it('UUID 格式的 ID 应返回前 8 位', () => {
+      const version: Version = {
+        version_id: '31c46b4d-1234-5678-9abc-def012345678',
+        version_no: null,
+        status: 'ACTIVE',
+        recalc_window_days: 30,
+        created_at: '2026-01-30',
+        config_snapshot_json: null,
+      };
+      const result = formatVersionLabelWithCode(version);
+      expect(result).toBe('31c46b4d');
+    });
+
+    it('非 UUID 格式的 ID 应返回完整 ID', () => {
+      const version: Version = {
+        version_id: 'test_version_custom_name',
+        version_no: null,
+        status: 'ACTIVE',
+        recalc_window_days: 30,
+        created_at: '2026-01-30',
+        config_snapshot_json: null,
+      };
+      const result = formatVersionLabelWithCode(version);
+      expect(result).toBe('test_version_custom_name');
+    });
+
+    it('应该忽略无效的版本号', () => {
+      const version: Version = {
+        version_id: 'test-id',
+        version_no: NaN as any,
+        status: 'ACTIVE',
+        recalc_window_days: 30,
+        created_at: '2026-01-30',
+        config_snapshot_json: null,
+      };
+      // NaN 不是有限数，应该降级显示 ID
+      expect(formatVersionLabelWithCode(version)).toBe('test-id');
+    });
+  });
+
+  describe('makeRetrospectiveKey', () => {
+    it('应该生成正确的存储键', () => {
+      const key = makeRetrospectiveKey('v1', 'v2');
+      expect(key).toContain('v1');
+      expect(key).toContain('v2');
+      expect(key).toContain('aps_retrospective_note');
+    });
+
+    it('应该保证键的顺序一致性', () => {
+      const key1 = makeRetrospectiveKey('v1', 'v2');
+      const key2 = makeRetrospectiveKey('v2', 'v1');
+      // 无论输入顺序如何，生成的键应该相同
+      expect(key1).toBe(key2);
+    });
+
+    it('应该处理空值输入', () => {
+      const key = makeRetrospectiveKey('', '');
+      expect(key).toContain('aps_retrospective_note');
+      // 空字符串应该被排序和拼接
+      expect(key).toBe('aps_retrospective_note____');
+    });
+
+    it('应该处理 null/undefined 输入', () => {
+      const key1 = makeRetrospectiveKey(null as any, 'v1');
+      const key2 = makeRetrospectiveKey('v1', undefined as any);
+      // null/undefined 应该被转换为空字符串
+      expect(key1).toContain('v1');
+      expect(key2).toContain('v1');
     });
   });
 });

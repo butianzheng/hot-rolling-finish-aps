@@ -241,6 +241,40 @@ describe('exportHelpers', () => {
       expect(exportMarkdown).toHaveBeenCalled();
       expect(message.success).toHaveBeenCalledWith('已导出（Markdown）');
     });
+
+    it('错误时应该显示错误信息', async () => {
+      vi.mocked(exportMarkdown).mockImplementationOnce(() => {
+        throw new Error('Markdown export failed');
+      });
+
+      const context: ExportContext = {
+        compareResult: mockCompareResult,
+        currentUser: 'test',
+        localDiffResult: null,
+        localCapacityRows: null,
+        retrospectiveNote: '',
+      };
+
+      await exportReportMarkdown(context);
+      expect(message.error).toHaveBeenCalledWith('Markdown export failed');
+    });
+
+    it('非 Error 对象错误时应该显示通用错误信息', async () => {
+      vi.mocked(exportMarkdown).mockImplementationOnce(() => {
+        throw '导出失败';
+      });
+
+      const context: ExportContext = {
+        compareResult: mockCompareResult,
+        currentUser: 'test',
+        localDiffResult: null,
+        localCapacityRows: null,
+        retrospectiveNote: '',
+      };
+
+      await exportReportMarkdown(context);
+      expect(message.error).toHaveBeenCalledWith('导出失败');
+    });
   });
 
   describe('exportReportHTML', () => {
@@ -281,6 +315,93 @@ describe('exportHelpers', () => {
       await exportReportHTML(context);
       expect(exportHTML).toHaveBeenCalled();
       expect(message.success).toHaveBeenCalledWith('已导出（HTML）');
+    });
+
+    it('应该渲染配置变化和物料变更明细', async () => {
+      const context: ExportContext = {
+        compareResult: {
+          ...mockCompareResult,
+          config_changes: [
+            { key: 'max_capacity', value_a: '1000', value_b: '1200' },
+            { key: 'min_tonnage', value_a: '50', value_b: '60' },
+          ] as any,
+        },
+        currentUser: 'test_user',
+        localDiffResult: {
+          diffs: [
+            {
+              materialId: 'M001',
+              changeType: 'MOVED',
+              previousState: { material_id: 'M001', machine_code: 'MA', plan_date: '2026-01-30', seq_no: 1 },
+              currentState: { material_id: 'M001', machine_code: 'MB', plan_date: '2026-01-31', seq_no: 2 },
+            },
+            {
+              materialId: 'M002',
+              changeType: 'REMOVED',
+              previousState: { material_id: 'M002', machine_code: 'MA', plan_date: '2026-01-30', seq_no: 3 },
+              currentState: null,
+            },
+            {
+              materialId: 'M003',
+              changeType: 'ADDED',
+              previousState: null,
+              currentState: { material_id: 'M003', machine_code: 'MC', plan_date: '2026-02-01', seq_no: 1 },
+            },
+          ],
+          summary: { totalChanges: 3, movedCount: 1, modifiedCount: 0, addedCount: 1, removedCount: 1 },
+        },
+        localCapacityRows: null,
+        retrospectiveNote: '配置和物料都有变化',
+      };
+
+      await exportReportHTML(context);
+      expect(exportHTML).toHaveBeenCalled();
+      const html = (exportHTML as any).mock.calls[0][0];
+
+      // 验证配置变化表格被渲染
+      expect(html).toContain('<table>');
+      expect(html).toContain('max_capacity');
+      expect(html).toContain('1000');
+      expect(html).toContain('1200');
+      expect(html).toContain('min_tonnage');
+
+      // 验证物料变更明细被渲染
+      expect(html).toContain('M001');
+      expect(html).toContain('M002');
+      expect(html).toContain('M003');
+      expect(html).toContain('MOVED');
+      expect(html).toContain('REMOVED');
+      expect(html).toContain('ADDED');
+
+      // 验证状态信息被渲染
+      expect(html).toContain('MA/2026-01-30/序1');
+      expect(html).toContain('MB/2026-01-31/序2');
+      expect(html).toContain('MC/2026-02-01/序1');
+    });
+
+    it('应该处理空的配置变化和物料差异', async () => {
+      const context: ExportContext = {
+        compareResult: {
+          ...mockCompareResult,
+          config_changes: [] as any,
+        },
+        currentUser: 'test',
+        localDiffResult: {
+          diffs: [],
+          summary: { totalChanges: 0, movedCount: 0, modifiedCount: 0, addedCount: 0, removedCount: 0 },
+        },
+        localCapacityRows: null,
+        retrospectiveNote: '',
+      };
+
+      await exportReportHTML(context);
+      expect(exportHTML).toHaveBeenCalled();
+      const html = (exportHTML as any).mock.calls[0][0];
+
+      // 验证显示"无配置变化"
+      expect(html).toContain('无配置变化');
+      // 验证显示"无变更或未加载"（空物料列表的提示文本）
+      expect(html).toContain('无变更或未加载');
     });
 
     it('错误时应该显示错误信息', async () => {
