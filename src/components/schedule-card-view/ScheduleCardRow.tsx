@@ -1,3 +1,4 @@
+import React from 'react';
 import { Tooltip, Typography } from 'antd';
 import { RightOutlined, DownOutlined, ClusterOutlined, CalendarOutlined } from '@ant-design/icons';
 import { FONT_FAMILIES } from '../../theme';
@@ -13,7 +14,7 @@ export type ScheduleCardRowProps = {
 };
 
 /** 状态占比堆叠横条 */
-const StatusBar: React.FC<{ status: DateStatusSummary; total: number }> = ({ status, total }) => {
+const StatusBar: React.FC<{ status: DateStatusSummary; total: number }> = React.memo(({ status, total }) => {
   if (total === 0) return null;
   const segments: { count: number; color: string; label: string }[] = [
     { count: status.lockedCount, color: '#722ed1', label: '冻结' },
@@ -53,9 +54,9 @@ const StatusBar: React.FC<{ status: DateStatusSummary; total: number }> = ({ sta
       </div>
     </Tooltip>
   );
-};
+});
 
-export const ScheduleCardRow: React.FC<ScheduleCardRowProps> = ({
+export const ScheduleCardRow: React.FC<ScheduleCardRowProps> = React.memo(({
   row,
   style,
   onToggleMachine,
@@ -139,4 +140,4 @@ export const ScheduleCardRow: React.FC<ScheduleCardRowProps> = ({
       </div>
     </div>
   );
-};
+});

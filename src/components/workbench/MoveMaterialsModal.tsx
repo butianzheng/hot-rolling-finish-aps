@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Alert, Button, DatePicker, Divider, Input, InputNumber, Modal, Segmented, Select, Space, Table, Tag, Typography } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import { DEFAULT_MOVE_REASON, QUICK_MOVE_REASONS } from '../../pages/workbench/constants';
 import type { MoveImpactRow, MoveSeqMode, MoveValidationMode } from '../../pages/workbench/types';
 import type { MoveModalState, MoveModalActions } from '../../pages/workbench/hooks/useWorkbenchMoveModal';
@@ -31,6 +32,69 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
   selectedMaterialIds,
   machineOptions,
 }) => {
+  // 使用 useMemo 稳定列定义，避免每次渲染都创建新对象和函数
+  const impactTableColumns = useMemo<ColumnsType<MoveImpactRow>>(() => [
+    { title: '机组', dataIndex: 'machine_code', width: 90 },
+    { title: '日期', dataIndex: 'date', width: 120 },
+    {
+      title: '操作前(t)',
+      dataIndex: 'before_t',
+      width: 120,
+      render: (v) => (
+        <span style={{ fontFamily: 'monospace' }}>{Number(v).toFixed(1)}</span>
+      ),
+    },
+    {
+      title: '变化(t)',
+      dataIndex: 'delta_t',
+      width: 110,
+      render: (v) => {
+        const n = Number(v);
+        const color = n > 0 ? 'green' : n < 0 ? 'red' : 'default';
+        const label = `${n >= 0 ? '+' : ''}${n.toFixed(1)}`;
+        return <Tag color={color}>{label}</Tag>;
+      },
+    },
+    {
+      title: '操作后(t)',
+      dataIndex: 'after_t',
+      width: 120,
+      render: (v) => (
+        <span style={{ fontFamily: 'monospace' }}>{Number(v).toFixed(1)}</span>
+      ),
+    },
+    {
+      title: '目标/限制(t)',
+      key: 'cap',
+      render: (_, r) => {
+        const target = r.target_capacity_t;
+        const limit = r.limit_capacity_t;
+        if (target == null && limit == null) return <span>-</span>;
+        if (limit != null && target != null && Math.abs(limit - target) < 1e-9) {
+          return <span style={{ fontFamily: 'monospace' }}>{target.toFixed(0)}</span>;
+        }
+        return (
+          <span style={{ fontFamily: 'monospace' }}>
+            {(target ?? 0).toFixed(0)} / {(limit ?? 0).toFixed(0)}
+          </span>
+        );
+      },
+    },
+    {
+      title: '风险',
+      key: 'risk',
+      width: 110,
+      render: (_, r) => {
+        const limit = r.limit_capacity_t;
+        if (limit == null || limit <= 0) return <Tag>未知</Tag>;
+        const pct = (r.after_t / limit) * 100;
+        if (pct > 100) return <Tag color="red">超限 {pct.toFixed(0)}%</Tag>;
+        if (pct > 90) return <Tag color="orange">偏高 {pct.toFixed(0)}%</Tag>;
+        return <Tag color="green">正常 {pct.toFixed(0)}%</Tag>;
+      },
+    },
+  ], []); // 空依赖数组：列定义不依赖任何 props/state
+
   return (
     <Modal
       title="移动到..."
@@ -206,67 +270,7 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
                 pagination={false}
                 rowKey={(r) => `${r.machine_code}__${r.date}`}
                 dataSource={state.impactPreview.rows}
-                columns={[
-                  { title: '机组', dataIndex: 'machine_code', width: 90 },
-                  { title: '日期', dataIndex: 'date', width: 120 },
-                  {
-                    title: '操作前(t)',
-                    dataIndex: 'before_t',
-                    width: 120,
-                    render: (v) => (
-                      <span style={{ fontFamily: 'monospace' }}>{Number(v).toFixed(1)}</span>
-                    ),
-                  },
-                  {
-                    title: '变化(t)',
-                    dataIndex: 'delta_t',
-                    width: 110,
-                    render: (v) => {
-                      const n = Number(v);
-                      const color = n > 0 ? 'green' : n < 0 ? 'red' : 'default';
-                      const label = `${n >= 0 ? '+' : ''}${n.toFixed(1)}`;
-                      return <Tag color={color}>{label}</Tag>;
-                    },
-                  },
-                  {
-                    title: '操作后(t)',
-                    dataIndex: 'after_t',
-                    width: 120,
-                    render: (v) => (
-                      <span style={{ fontFamily: 'monospace' }}>{Number(v).toFixed(1)}</span>
-                    ),
-                  },
-                  {
-                    title: '目标/限制(t)',
-                    key: 'cap',
-                    render: (_, r) => {
-                      const target = r.target_capacity_t;
-                      const limit = r.limit_capacity_t;
-                      if (target == null && limit == null) return <span>-</span>;
-                      if (limit != null && target != null && Math.abs(limit - target) < 1e-9) {
-                        return <span style={{ fontFamily: 'monospace' }}>{target.toFixed(0)}</span>;
-                      }
-                      return (
-                        <span style={{ fontFamily: 'monospace' }}>
-                          {(target ?? 0).toFixed(0)} / {(limit ?? 0).toFixed(0)}
-                        </span>
-                      );
-                    },
-                  },
-                  {
-                    title: '风险',
-                    key: 'risk',
-                    width: 110,
-                    render: (_, r) => {
-                      const limit = r.limit_capacity_t;
-                      if (limit == null || limit <= 0) return <Tag>未知</Tag>;
-                      const pct = (r.after_t / limit) * 100;
-                      if (pct > 100) return <Tag color="red">超限 {pct.toFixed(0)}%</Tag>;
-                      if (pct > 90) return <Tag color="orange">偏高 {pct.toFixed(0)}%</Tag>;
-                      return <Tag color="green">正常 {pct.toFixed(0)}%</Tag>;
-                    },
-                  },
-                ]}
+                columns={impactTableColumns}
                 scroll={{ y: 240 }}
               />
             </>
@@ -277,4 +281,4 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
   );
 };
 
-export default MoveMaterialsModal;
+export default React.memo(MoveMaterialsModal);

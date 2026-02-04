@@ -55,7 +55,7 @@ const ScheduleCardView: React.FC<ScheduleCardViewProps> = ({
         type="error"
         showIcon
         message="排程数据加载失败"
-        description={String((query.error as any)?.message || query.error)}
+        description={query.error instanceof Error ? query.error.message : String(query.error)}
         action={
           <a onClick={() => query.refetch()} style={{ padding: '0 8px' }}>
             重试
