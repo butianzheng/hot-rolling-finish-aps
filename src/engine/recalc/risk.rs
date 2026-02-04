@@ -1,6 +1,5 @@
 use super::RecalcEngine;
 use crate::config::config_keys;
-use crate::domain::capacity::CapacityPool;
 use crate::domain::material::MaterialState;
 use crate::domain::plan::PlanItem;
 use chrono::NaiveDate;
@@ -90,17 +89,8 @@ impl RecalcEngine {
                 let pool = self
                     .capacity_repo
                     .find_by_machine_and_date(version_id, machine_code, current_date)?
-                    .unwrap_or_else(|| CapacityPool {
-                        version_id: version_id.to_string(),
-                        machine_code: machine_code.clone(),
-                        plan_date: current_date,
-                        target_capacity_t: 1800.0,
-                        limit_capacity_t: 2000.0,
-                        used_capacity_t: 0.0,
-                        overflow_t: 0.0,
-                        frozen_capacity_t: 0.0,
-                        accumulated_tonnage_t: 0.0,
-                        roll_campaign_id: None,
+                    .unwrap_or_else(|| {
+                        Self::create_default_capacity_pool(version_id, machine_code, current_date)
                     });
 
                 // 筛选当日当机组的排产明细

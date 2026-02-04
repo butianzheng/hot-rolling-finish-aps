@@ -240,5 +240,28 @@ impl RecalcEngine {
     pub fn get_frozen_days_before_today(&self) -> i32 {
         self.config.frozen_days_before_today
     }
+
+    /// 创建默认产能池
+    ///
+    /// 当数据库中不存在指定版本/机组/日期的产能池时，使用此方法创建默认值。
+    /// 默认值：target=1800t, limit=2000t, 其余字段为 0 或 None。
+    pub(super) fn create_default_capacity_pool(
+        version_id: &str,
+        machine_code: &str,
+        plan_date: chrono::NaiveDate,
+    ) -> crate::domain::CapacityPool {
+        crate::domain::CapacityPool {
+            version_id: version_id.to_string(),
+            machine_code: machine_code.to_string(),
+            plan_date,
+            target_capacity_t: 1800.0,
+            limit_capacity_t: 2000.0,
+            used_capacity_t: 0.0,
+            overflow_t: 0.0,
+            frozen_capacity_t: 0.0,
+            accumulated_tonnage_t: 0.0,
+            roll_campaign_id: None,
+        }
+    }
 }
 

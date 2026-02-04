@@ -73,7 +73,17 @@ function stableKey(v: PathRuleConfigFormValues): string {
 
 const URGENCY_OPTIONS = ['L0', 'L1', 'L2', 'L3'].map((v) => ({ label: v, value: v }));
 
-const PathRuleConfigPanel: React.FC = () => {
+export type PathRuleConfigPanelProps = {
+  /** 来自工作台的上下文机组 */
+  contextMachineCode?: string;
+  /** 来自工作台的上下文日期 */
+  contextPlanDate?: string;
+};
+
+const PathRuleConfigPanel: React.FC<PathRuleConfigPanelProps> = ({
+  contextMachineCode,
+  contextPlanDate,
+}) => {
   const currentUser = useCurrentUser();
   const [form] = Form.useForm<PathRuleConfigFormValues>();
 
@@ -184,11 +194,38 @@ const PathRuleConfigPanel: React.FC = () => {
       }
     >
       <Space direction="vertical" style={{ width: '100%' }} size={12}>
+        {(contextMachineCode || contextPlanDate) && (
+          <Alert
+            type="success"
+            showIcon
+            message="来自工作台的上下文"
+            description={
+              <Space size={8}>
+                {contextMachineCode && (
+                  <>
+                    <span>机组:</span>
+                    <Tag color="blue">{contextMachineCode}</Tag>
+                  </>
+                )}
+                {contextPlanDate && (
+                  <>
+                    <span>日期:</span>
+                    <Tag>{contextPlanDate}</Tag>
+                  </>
+                )}
+                <span style={{ color: '#999' }}>
+                  （此配置为全局生效，不针对特定机组/日期）
+                </span>
+              </Space>
+            }
+          />
+        )}
+
         <Alert
           type="info"
           showIcon
           message="说明"
-          description="该配置影响“由宽到窄、由厚到薄”的排产门控；保存后建议执行“一键优化/重算”生成新版本以生效。"
+          description='该配置影响"由宽到窄、由厚到薄"的排产门控；保存后建议执行"一键优化/重算"生成新版本以生效。'
         />
 
         {loadError ? (

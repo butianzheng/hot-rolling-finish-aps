@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Checkbox, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { ReloadOutlined } from '@ant-design/icons';
+import { ReloadOutlined, SettingOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { pathRuleApi } from '../../api/tauri';
 
 type SummaryRow = {
@@ -70,6 +71,7 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
   operator,
   onConfirmed,
 }) => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [rows, setRows] = useState<SummaryRow[]>([]);
@@ -81,8 +83,8 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
   const [detailError, setDetailError] = useState<string | null>(null);
 
   const [reason, setReason] = useState('');
-  const [autoRecalc, setAutoRecalc] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [recalcFailed, setRecalcFailed] = useState(false);
 
   const canQuery = !!versionId;
 
@@ -180,7 +182,7 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
   useEffect(() => {
     if (!open) return;
     setReason('');
-    setAutoRecalc(true);
+    setRecalcFailed(false);
     setSelectedGroup(null);
     setDetailRows([]);
     setDetailError(null);
@@ -194,6 +196,64 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMachineCodes]);
 
+  const confirmAndRecalc = async () => {
+    if (!versionId) return;
+    const cleanReason = String(reason || '').trim();
+    if (!cleanReason) {
+      message.warning('请输入确认原因');
+      return;
+    }
+
+    setSubmitting(true);
+    setRecalcFailed(false);
+    try {
+      // Step 1: 批量确认
+      const res = await pathRuleApi.batchConfirmPathOverrideByRange({
+        versionId,
+        planDateFrom,
+        planDateTo,
+        machineCodes: selectedMachineCodes.length > 0 ? selectedMachineCodes : undefined,
+        confirmedBy: operator || 'system',
+        reason: cleanReason,
+      });
+      const ok = Number(res?.success_count ?? 0);
+      const fail = Number(res?.fail_count ?? 0);
+
+      if (ok > 0) message.success(`已确认 ${ok} 条突破`);
+      if (fail > 0) {
+        const failed = Array.isArray(res?.failed_material_ids) ? res.failed_material_ids : [];
+        Modal.info({
+          title: '部分确认失败',
+          content: (
+            <div>
+              <p style={{ marginBottom: 8 }}>成功 {ok} 条，失败 {fail} 条。</p>
+              {failed.length > 0 ? (
+                <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
+                  {failed.filter(Boolean).join('\n')}
+                </pre>
+              ) : null}
+            </div>
+          ),
+        });
+      }
+
+      // Step 2: 自动触发重算
+      onConfirmed?.({ confirmedCount: ok, autoRecalc: true, recalcBaseDate: earliestPendingDate });
+
+      await loadSummary();
+      if (selectedGroup) {
+        await loadDetail(selectedGroup.machineCode, selectedGroup.planDate);
+      }
+    } catch (e: unknown) {
+      console.error('[PathOverridePendingCenterModal] confirmAndRecalc failed:', e);
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      message.error(errorMessage || '批量确认失败');
+      setRecalcFailed(true);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const confirmAll = async () => {
     if (!versionId) return;
     const cleanReason = String(reason || '').trim();
@@ -203,6 +263,7 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
     }
 
     setSubmitting(true);
+    setRecalcFailed(false);
     try {
       const res = await pathRuleApi.batchConfirmPathOverrideByRange({
         versionId,
@@ -232,7 +293,7 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
         });
       }
 
-      onConfirmed?.({ confirmedCount: ok, autoRecalc, recalcBaseDate: earliestPendingDate });
+      onConfirmed?.({ confirmedCount: ok, autoRecalc: false, recalcBaseDate: earliestPendingDate });
       await loadSummary();
 
       if (selectedGroup) {
@@ -369,14 +430,36 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
             </Button>
             <Button
               type="primary"
-              onClick={confirmAll}
+              onClick={confirmAndRecalc}
               disabled={!canQuery || totalPendingCount === 0 || submitting}
               loading={submitting}
             >
-              全部确认 ({totalPendingCount})
+              确认并重算 ({totalPendingCount})
+            </Button>
+            <Button
+              onClick={confirmAll}
+              disabled={!canQuery || totalPendingCount === 0 || submitting}
+            >
+              仅确认（不重算）
             </Button>
           </Space>
-          <Button onClick={onClose}>关闭</Button>
+          <Space>
+            <Button
+              icon={<SettingOutlined />}
+              onClick={() => {
+                const params = new URLSearchParams({ tab: 'path_rule' });
+                // 携带上下文：如果有选中的组合，使用它；否则使用范围的第一个日期
+                const contextDate = selectedGroup?.planDate || earliestPendingDate;
+                const contextMachine = selectedGroup?.machineCode || (rows.length > 0 ? rows[0].machine_code : undefined);
+                if (contextMachine) params.set('machine_code', contextMachine);
+                if (contextDate) params.set('plan_date', contextDate);
+                navigate(`/settings?${params.toString()}`);
+              }}
+            >
+              配置路径规则
+            </Button>
+            <Button onClick={onClose}>关闭</Button>
+          </Space>
         </Space>
       }
     >
@@ -387,7 +470,16 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
           type="info"
           showIcon
           message="说明"
-          description="此处展示“最近一次重算”落库的 PATH_OVERRIDE_REQUIRED 待确认清单（按首次遇到日期汇总）。确认后建议执行“一键优化/重算”生成新版本以生效。"
+          description={
+            <div>
+              <p style={{ marginBottom: 4 }}>
+                此处展示"最近一次重算"落库的 PATH_OVERRIDE_REQUIRED 待确认清单（按首次遇到日期汇总）。
+              </p>
+              <p style={{ marginBottom: 0 }}>
+                <strong>快捷流程</strong>：点击"确认并重算"可一键完成确认+重算+版本切换，适合大部分场景。
+              </p>
+            </div>
+          }
         />
 
         <Space wrap size={10}>
@@ -457,9 +549,15 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
           maxLength={200}
           showCount
         />
-        <Checkbox checked={autoRecalc} onChange={(e) => setAutoRecalc(e.target.checked)}>
-          确认后自动重算（生成新版本并切换）
-        </Checkbox>
+
+        {recalcFailed && (
+          <Alert
+            type="warning"
+            showIcon
+            message="重算失败"
+            description='确认已保存，但重算失败。请稍后在工作台手动执行"一键优化"或联系管理员。'
+          />
+        )}
       </Space>
     </Modal>
   );

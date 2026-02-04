@@ -76,7 +76,10 @@ pub struct ResolvedStrategyProfile {
 impl ResolvedStrategyProfile {
     pub fn parameters_json(&self) -> JsonValue {
         match &self.parameters {
-            Some(p) => serde_json::to_value(p).unwrap_or(JsonValue::Null),
+            Some(p) => serde_json::to_value(p).unwrap_or_else(|e| {
+                tracing::warn!(error = %e, "参数序列化失败，返回 Null");
+                JsonValue::Null
+            }),
             None => JsonValue::Null,
         }
     }

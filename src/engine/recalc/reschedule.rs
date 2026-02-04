@@ -1,7 +1,6 @@
 use super::{RecalcEngine, RescheduleResult};
 use crate::config::config_keys;
 use crate::config::strategy_profile::CustomStrategyParameters;
-use crate::domain::capacity::CapacityPool;
 use crate::domain::material::MaterialState;
 use crate::domain::plan::PlanItem;
 use crate::domain::roller::RollerCampaign;
@@ -335,17 +334,8 @@ impl RecalcEngine {
                 let mut capacity_pool = self
                     .capacity_repo
                     .find_by_machine_and_date(version_id, machine_code, current_date)?
-                    .unwrap_or_else(|| CapacityPool {
-                        version_id: version_id.to_string(),
-                        machine_code: machine_code.clone(),
-                        plan_date: current_date,
-                        target_capacity_t: 1800.0, // 默认值
-                        limit_capacity_t: 2000.0,  // 默认值
-                        used_capacity_t: 0.0,
-                        overflow_t: 0.0,
-                        frozen_capacity_t: 0.0,
-                        accumulated_tonnage_t: 0.0,
-                        roll_campaign_id: None,
+                    .unwrap_or_else(|| {
+                        Self::create_default_capacity_pool(version_id, machine_code, current_date)
                     });
 
                 // ----- 4.5 提取当日冻结项 -----

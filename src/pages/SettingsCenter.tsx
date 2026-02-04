@@ -40,6 +40,12 @@ const SettingsCenter: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeKey = useMemo(() => normalizeTabKey(searchParams.get('tab')), [searchParams]);
 
+  // 提取上下文参数（用于跳转携带上下文）
+  const contextParams = useMemo(() => ({
+    machineCode: searchParams.get('machine_code') || undefined,
+    planDate: searchParams.get('plan_date') || undefined,
+  }), [searchParams]);
+
   const handleTabChange = (key: string) => {
     const next = new URLSearchParams(searchParams);
     next.set('tab', key);
@@ -112,7 +118,10 @@ const SettingsCenter: React.FC = () => {
             label: '路径规则',
             children: (
               <React.Suspense fallback={<PageSkeleton />}>
-                <PathRuleConfigPanel />
+                <PathRuleConfigPanel
+                  contextMachineCode={contextParams.machineCode}
+                  contextPlanDate={contextParams.planDate}
+                />
               </React.Suspense>
             ),
           },
