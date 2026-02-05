@@ -39,6 +39,7 @@ export const MaterialMasterSchema = z
     due_date: DateString.nullable().optional(),
     stock_age_days: z.number().nullable().optional(),
     output_age_days_raw: z.number().nullable().optional(),
+    rolling_output_date: DateString.nullable().optional(), // v0.7: 轧制产出日期（动态计算基准）
     status_updated_at: z.string().nullable().optional(),
     contract_no: z.string().nullable().optional(),
     contract_nature: z.string().nullable().optional(),

@@ -55,7 +55,39 @@ MVP 以“材料（卷/板）”为主实体，推荐最小标准字段如下：
 - 否则
   → rolling_output_age_days = output_age_days_raw
 
-说明：rolling_output_age_days 为“适温判断用的等效轧制产出时间口径”。
+说明：rolling_output_age_days 为"适温判断用的等效轧制产出时间口径"。
+
+---
+
+## 3.1.5 轧制产出日期（v0.7 新增）
+
+**字段名称**: `rolling_output_date`
+
+**派生规则**:
+```
+rolling_output_date = import_date - output_age_days_raw
+```
+
+**说明**:
+- `rolling_output_date` 是材料轧制产出的固定日期（ISO DATE, YYYY-MM-DD）
+- 用于解决 `output_age_days_raw` 静态快照问题，实现动态适温判定
+- 导入时计算一次，后续通过 `today - rolling_output_date` 动态计算实际产出天数
+
+**示例**:
+```
+2025-01-14 导入：output_age_days_raw = 1
+                rolling_output_date = 2025-01-14 - 1天 = 2025-01-13
+
+2025-01-20 重排产：actual_age_days = 2025-01-20 - 2025-01-13 = 7天（动态计算✅）
+```
+
+**向后兼容**:
+- 历史数据缺少 `rolling_output_date` 时，使用 `rolling_output_age_days` 作为 fallback
+- 新导入数据必须填充 `rolling_output_date`
+
+**数据质量**:
+- 若 `output_age_days_raw` 缺失或非法（<0），则 `rolling_output_date = NULL`
+- `rolling_output_date` 不应晚于导入日期（数据完整性约束）
 
 ---
 

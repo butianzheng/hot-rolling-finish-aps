@@ -40,7 +40,8 @@
 | current_machine_code | TEXT | 当前机组代码 | 计算：COALESCE(rework_machine_code, next_machine_code) |
 | width_mm / thickness_mm | REAL | 宽/厚 | mm |
 | weight_t | REAL | 重量（吨） | 应用层保留 3 位小数 |
-| output_age_days_raw | INTEGER | 产出时间(天) | 用于反推适温相关天数 |
+| output_age_days_raw | INTEGER | 产出时间(天) | 导入时刻静态快照 |
+| rolling_output_date | TEXT | 轧制产出日期 | ISO DATE（YYYY-MM-DD）；v0.7 新增；用于动态计算实际产出天数 |
 | stock_age_days | INTEGER | 状态时间(天) | 库存压力主口径 |
 | status_updated_at | TEXT | 状态修改时间 | 用于增量导入 |
 
@@ -72,6 +73,7 @@
 
 ## 4. 索引建议（MVP）
 - material_master(current_machine_code), material_master(due_date), material_master(status_updated_at)
+- material_master(rolling_output_date) - v0.7 新增，支持适温查询优化
 - plan_item(version_id, machine_code, plan_date, seq_no)
 - capacity_pool(machine_code, plan_date)
 - risk_snapshot(version_id, plan_date)
