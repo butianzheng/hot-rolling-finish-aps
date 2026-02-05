@@ -2,7 +2,7 @@
  * 排产明细可视化状态管理 Hook
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { message, Modal } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -80,7 +80,9 @@ export function usePlanItemVisualization(
 ): UsePlanItemVisualizationReturn {
   const {
     machineCode,
+    machineOptions: externalMachineOptions,
     urgentLevel,
+    defaultDateRange,
     statusFilter = 'ALL',
     focusRequest,
     selectedMaterialIds: controlledSelectedMaterialIds,
@@ -91,14 +93,79 @@ export function usePlanItemVisualization(
   const currentUser = useCurrentUser();
   const queryClient = useQueryClient();
 
-  // 使用 React Query 获取排产数据
+  // 筛选状态
+  const [selectedMachine, setSelectedMachine] = useState<string>(() => machineCode ?? 'all');
+  const [selectedUrgentLevel, setSelectedUrgentLevel] = useState<string>(() => urgentLevel ?? 'all');
+  const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(() => defaultDateRange ?? null);
+  const [searchText, setSearchText] = useState('');
+
+  // 跟随外部默认范围（Workbench 联动），除非用户已手动调整
+  const lastDefaultRangeKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!defaultDateRange) return;
+    const nextKey = `${formatDate(defaultDateRange[0])}_${formatDate(defaultDateRange[1])}`;
+    const prevKey = lastDefaultRangeKeyRef.current;
+    lastDefaultRangeKeyRef.current = nextKey;
+
+    const currentKey = dateRange ? `${formatDate(dateRange[0])}_${formatDate(dateRange[1])}` : null;
+    const userHasCustomRange = !!currentKey && !!prevKey && currentKey !== prevKey;
+    if (!selectedDate && (!dateRange || !userHasCustomRange)) {
+      setDateRange(defaultDateRange);
+    }
+  }, [defaultDateRange, dateRange, selectedDate]);
+
+  const queryPlanDateFrom = useMemo(() => {
+    if (selectedDate) return formatDate(selectedDate);
+    if (dateRange?.[0]) return formatDate(dateRange[0]);
+    if (defaultDateRange?.[0]) return formatDate(defaultDateRange[0]);
+    return formatDate(dayjs().subtract(3, 'day'));
+  }, [defaultDateRange, dateRange, selectedDate]);
+
+  const queryPlanDateTo = useMemo(() => {
+    if (selectedDate) return formatDate(selectedDate);
+    if (dateRange?.[1]) return formatDate(dateRange[1]);
+    if (defaultDateRange?.[1]) return formatDate(defaultDateRange[1]);
+    return formatDate(dayjs().add(10, 'day'));
+  }, [defaultDateRange, dateRange, selectedDate]);
+
+  // 使用 React Query 获取排产数据（按范围/分页）
   const planItemsQuery = useQuery({
-    queryKey: workbenchQueryKeys.planItems.byVersion(activeVersionId),
+    queryKey: workbenchQueryKeys.planItems.list({
+      version_id: activeVersionId,
+      machine_code: selectedMachine !== 'all' ? selectedMachine : undefined,
+      plan_date_from: queryPlanDateFrom,
+      plan_date_to: queryPlanDateTo,
+    }),
     enabled: !!activeVersionId,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!activeVersionId) return [];
-      const result = await planApi.listPlanItems(activeVersionId);
-      return (Array.isArray(result) ? result : []).map((item: any) => ({
+
+      const pageSize = 5000;
+      const maxItems = 200_000;
+      let offset = 0;
+      const all: any[] = [];
+
+      while (true) {
+        if (signal?.aborted) {
+          throw new DOMException('Aborted', 'AbortError');
+        }
+
+        const page = await planApi.listPlanItems(activeVersionId, {
+          machine_code: selectedMachine !== 'all' ? selectedMachine : undefined,
+          plan_date_from: queryPlanDateFrom,
+          plan_date_to: queryPlanDateTo,
+          limit: pageSize,
+          offset,
+        });
+
+        all.push(...page);
+        if (page.length < pageSize) break;
+        offset += pageSize;
+        if (offset >= maxItems) break;
+      }
+
+      return all.map((item: any) => ({
         key: String(item.material_id ?? ''),
         ...item,
       }));
@@ -114,13 +181,6 @@ export function usePlanItemVisualization(
   const [statusSummary, setStatusSummary] = useState<PlanItemStatusSummary>(() =>
     summarizePlanItemStatus([])
   );
-
-  // 筛选状态
-  const [selectedMachine, setSelectedMachine] = useState<string>('all');
-  const [selectedUrgentLevel, setSelectedUrgentLevel] = useState<string>('all');
-  const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
-  const [searchText, setSearchText] = useState('');
 
   // 选中状态
   const [internalSelectedMaterialIds, setInternalSelectedMaterialIds] = useState<string[]>([]);
@@ -158,13 +218,20 @@ export function usePlanItemVisualization(
 
   // 计算机组选项
   const machineOptions = useMemo(() => {
+    const external = (externalMachineOptions ?? [])
+      .map((s) => String(s).trim())
+      .filter(Boolean);
+    if (external.length > 0) {
+      return Array.from(new Set(external)).sort();
+    }
+
     const codes = new Set<string>();
     planItems.forEach((it) => {
       const code = String(it.machine_code ?? '').trim();
       if (code) codes.add(code);
     });
     return Array.from(codes).sort();
-  }, [planItems]);
+  }, [externalMachineOptions, planItems]);
 
   // 计算统计信息
   const calculateStatistics = useCallback((items: PlanItem[]) => {
@@ -392,9 +459,9 @@ export function usePlanItemVisualization(
     setSelectedMachine('all');
     setSelectedUrgentLevel('all');
     setSelectedDate(null);
-    setDateRange(null);
+    setDateRange(defaultDateRange ?? null);
     setSearchText('');
-  }, []);
+  }, [defaultDateRange]);
 
   // 订阅 plan_updated 事件（使用 React Query invalidate）
   useEvent('plan_updated', () => {

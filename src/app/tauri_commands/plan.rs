@@ -395,6 +395,32 @@ pub async fn cleanup_expired_strategy_drafts(
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
 
+/// 查询排产明细日期边界（min/max）及数量（用于 Workbench AUTO 日期范围）
+#[tauri::command(rename_all = "snake_case")]
+pub async fn get_plan_item_date_bounds(
+    state: tauri::State<'_, AppState>,
+    version_id: String,
+    machine_code: Option<String>,
+) -> Result<String, String> {
+    let machine_code = machine_code
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+
+    let plan_api = state.plan_api.clone();
+    let version_id_clone = version_id.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let _perf = crate::perf::PerfGuard::new("ipc.get_plan_item_date_bounds");
+        plan_api.get_plan_item_date_bounds(&version_id_clone, machine_code.as_deref())
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
+}
+
 /// 查询排产明细
 #[tauri::command(rename_all = "snake_case")]
 pub async fn list_plan_items(
@@ -434,6 +460,7 @@ pub async fn list_plan_items(
 
     let plan_api = state.plan_api.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
+        let _perf = crate::perf::PerfGuard::new("ipc.list_plan_items");
         if has_filters {
             plan_api.list_plan_items_filtered(
                 &version_id,
@@ -466,6 +493,7 @@ pub async fn list_items_by_date(
     let plan_api = state.plan_api.clone();
     let version_id_clone = version_id.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
+        let _perf = crate::perf::PerfGuard::new("ipc.list_items_by_date");
         plan_api.list_items_by_date(&version_id_clone, date)
     })
     .await
@@ -484,6 +512,7 @@ pub async fn compare_versions(
 ) -> Result<String, String> {
     let plan_api = state.plan_api.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
+        let _perf = crate::perf::PerfGuard::new("ipc.compare_versions");
         plan_api.compare_versions(&version_id_a, &version_id_b)
     })
     .await
@@ -502,6 +531,7 @@ pub async fn compare_versions_kpi(
 ) -> Result<String, String> {
     let plan_api = state.plan_api.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
+        let _perf = crate::perf::PerfGuard::new("ipc.compare_versions_kpi");
         plan_api.compare_versions_kpi(&version_id_a, &version_id_b)
     })
     .await

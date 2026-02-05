@@ -2,6 +2,7 @@
  * MaterialPool 类型定义
  */
 
+import type { DataNode } from 'antd/es/tree';
 import type { WorkbenchLockStatusFilter } from '../../stores/use-global-store';
 
 export interface MaterialPoolMaterial {
@@ -33,6 +34,14 @@ export interface MaterialPoolProps {
   loading?: boolean;
   error?: unknown;
   onRetry?: () => void;
+
+  // 树（建议使用后端汇总数据生成，避免大数据量下依赖“当前页 materials”推导数量）
+  treeData?: DataNode[] | null;
+
+  // 分页/增量加载（可选）
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 
   selection: MaterialPoolSelection;
   onSelectionChange: (next: MaterialPoolSelection) => void;

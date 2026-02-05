@@ -100,6 +100,33 @@ impl PlanApi {
             .map_err(|e| ApiError::DatabaseError(e.to_string()))
     }
 
+    /// 查询版本排产日期边界（min/max）及数量
+    ///
+    /// 用途：
+    /// - Workbench AUTO 日期范围计算（避免拉取全量 plan_item）
+    pub fn get_plan_item_date_bounds(
+        &self,
+        version_id: &str,
+        machine_code: Option<&str>,
+    ) -> ApiResult<PlanItemDateBoundsResponse> {
+        if version_id.trim().is_empty() {
+            return Err(ApiError::InvalidInput("版本ID不能为空".to_string()));
+        }
+
+        let (min_date, max_date, total_count) = self
+            .plan_item_repo
+            .get_plan_date_bounds(version_id, machine_code)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        Ok(PlanItemDateBoundsResponse {
+            version_id: version_id.to_string(),
+            machine_code: machine_code.map(|s| s.to_string()),
+            min_plan_date: min_date,
+            max_plan_date: max_date,
+            total_count,
+        })
+    }
+
     /// 从 material_state 和 material_master 批量补充排产明细的快照字段
     ///
     /// 补充字段：urgent_level, sched_state (来自 material_state)，steel_grade (来自 material_master.steel_mark)

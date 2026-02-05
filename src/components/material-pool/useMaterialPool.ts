@@ -3,6 +3,7 @@
  */
 
 import { useMemo, useState } from 'react';
+import type { DataNode } from 'antd/es/tree';
 import type {
   MaterialPoolFilters,
   MaterialPoolMaterial,
@@ -16,6 +17,7 @@ import { normalizeSchedState } from '../../utils/schedState';
 
 interface UseMaterialPoolOptions {
   materials: MaterialPoolMaterial[];
+  treeDataOverride?: DataNode[] | null;
   selection: MaterialPoolSelection;
   filters?: MaterialPoolFilters;
   selectedMaterialIds: string[];
@@ -24,6 +26,7 @@ interface UseMaterialPoolOptions {
 
 export function useMaterialPool({
   materials,
+  treeDataOverride,
   selection,
   filters,
   selectedMaterialIds,
@@ -38,7 +41,10 @@ export function useMaterialPool({
     L0: false,
   });
 
-  const treeData = useMemo(() => buildTreeData(materials), [materials]);
+  const treeData = useMemo(
+    () => (treeDataOverride && treeDataOverride.length > 0 ? treeDataOverride : buildTreeData(materials)),
+    [materials, treeDataOverride]
+  );
   const selectedTreeKey = selectionToTreeKey(selection);
 
   const filtered = useMemo(() => {

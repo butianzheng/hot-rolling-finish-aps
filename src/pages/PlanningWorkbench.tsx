@@ -69,7 +69,11 @@ const PlanningWorkbench: React.FC = () => {
     return [dayjs().subtract(3, 'day'), dayjs().add(10, 'day')];
   });
 
-  const { materialsQuery, materials } = useWorkbenchMaterials({ machineCode: poolSelection.machineCode });
+  const { materialsQuery, materials, poolTreeData } = useWorkbenchMaterials({
+    selection: poolSelection,
+    urgencyLevel: workbenchFilters.urgencyLevel,
+    lockStatus: workbenchFilters.lockStatus,
+  });
 
   const openRhythmModal = useCallback(() => openModal('rhythm'), [openModal]);
   const openConditionalSelect = useCallback(() => openModal('conditionalSelect'), [openModal]);
@@ -110,13 +114,17 @@ const PlanningWorkbench: React.FC = () => {
     setWorkbenchViewMode,
   });
 
-  const { planItemsQuery, planItems } = useWorkbenchPlanItems({ activeVersionId });
+  const { planItemsQuery, planItems } = useWorkbenchPlanItems({
+    activeVersionId,
+    machineCode: poolSelection.machineCode,
+    dateRange: workbenchDateRange,
+  });
 
   const { refreshAll, refreshPlanItems, refreshMaterials } = useWorkbenchRefreshActions();
 
-  // AUTO 日期范围（基于当前机组的排程数据）
+  // AUTO 日期范围（基于当前机组的排程日期边界）
   const { autoDateRange, applyWorkbenchDateRange, resetWorkbenchDateRangeToAuto } = useWorkbenchAutoDateRange({
-    planItems,
+    activeVersionId,
     machineCode: poolSelection.machineCode,
     dateRangeMode,
     setDateRangeMode,
@@ -299,6 +307,10 @@ const PlanningWorkbench: React.FC = () => {
           onResetDateRangeToAuto={resetWorkbenchDateRangeToAuto}
           materials={materials}
           materialsLoading={materialsQuery.isLoading}
+          materialsHasMore={materialsQuery.hasNextPage}
+          materialsLoadingMore={materialsQuery.isFetchingNextPage}
+          onLoadMoreMaterials={() => void materialsQuery.fetchNextPage()}
+          materialTreeData={poolTreeData}
           materialsError={materialsQuery.error}
           onRetryMaterials={refreshMaterials}
           poolSelection={poolSelection}

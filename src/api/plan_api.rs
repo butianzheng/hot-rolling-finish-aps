@@ -396,6 +396,16 @@ pub struct StrategyPreset {
     pub default_parameters: Value,
 }
 
+/// 排产明细日期边界（用于 Workbench AUTO 日期范围）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanItemDateBoundsResponse {
+    pub version_id: String,
+    pub machine_code: Option<String>,
+    pub min_plan_date: Option<NaiveDate>,
+    pub max_plan_date: Option<NaiveDate>,
+    pub total_count: i64,
+}
+
 /// 单个策略草案摘要（用于并排对比）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StrategyDraftSummary {

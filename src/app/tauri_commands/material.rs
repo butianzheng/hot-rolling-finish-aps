@@ -13,13 +13,47 @@ pub async fn list_materials(
     state: tauri::State<'_, AppState>,
     machine_code: Option<String>,
     steel_grade: Option<String>,
+    sched_state: Option<String>,
+    urgent_level: Option<String>,
+    lock_status: Option<String>,
+    query_text: Option<String>,
     limit: i32,
     offset: i32,
 ) -> Result<String, String> {
-    let result = state
-        .material_api
-        .list_materials(machine_code, steel_grade, limit, offset)
-        .map_err(map_api_error)?;
+    let material_api = state.material_api.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let _perf = crate::perf::PerfGuard::new("ipc.list_materials");
+        material_api.list_materials(
+            machine_code,
+            steel_grade,
+            sched_state,
+            urgent_level,
+            lock_status,
+            query_text,
+            limit,
+            offset,
+        )
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
+}
+
+/// 物料池树形汇总（机组 × 状态）
+#[tauri::command(rename_all = "snake_case")]
+pub async fn get_material_pool_summary(
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    let material_api = state.material_api.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let _perf = crate::perf::PerfGuard::new("ipc.get_material_pool_summary");
+        material_api.get_material_pool_summary()
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
@@ -219,4 +253,3 @@ pub async fn list_materials_by_urgent_level(
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
-

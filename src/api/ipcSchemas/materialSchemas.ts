@@ -79,3 +79,25 @@ export const MaterialDetailResponseSchema = z
     state: MaterialStateSchema.nullable().optional(),
   })
   .passthrough();
+
+export const MaterialPoolStateSummarySchema = z
+  .object({
+    sched_state: z.string(),
+    count: z.number(),
+  })
+  .passthrough();
+
+export const MaterialPoolMachineSummarySchema = z
+  .object({
+    machine_code: z.string(),
+    total_count: z.number(),
+    states: z.array(MaterialPoolStateSummarySchema),
+  })
+  .passthrough();
+
+export const MaterialPoolSummaryResponseSchema = z
+  .object({
+    total_count: z.number(),
+    machines: z.array(MaterialPoolMachineSummarySchema),
+  })
+  .passthrough();

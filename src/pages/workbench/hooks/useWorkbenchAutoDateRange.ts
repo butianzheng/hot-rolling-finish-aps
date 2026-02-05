@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import dayjs from 'dayjs';
+import { useQuery } from '@tanstack/react-query';
+import { planApi } from '../../../api/tauri';
 import { formatDate } from '../../../utils/formatters';
 import type { WorkbenchDateRangeMode } from '../types';
-
-type PlanItemLike = {
-  machine_code: string;
-  plan_date: string;
-};
+import { workbenchQueryKeys } from '../queryKeys';
 
 export function useWorkbenchAutoDateRange(params: {
-  planItems: PlanItemLike[];
+  activeVersionId: string | null;
   machineCode: string | null;
   dateRangeMode: WorkbenchDateRangeMode;
   setDateRangeMode: Dispatch<SetStateAction<WorkbenchDateRangeMode>>;
@@ -20,34 +18,36 @@ export function useWorkbenchAutoDateRange(params: {
   applyWorkbenchDateRange: (next: [dayjs.Dayjs, dayjs.Dayjs]) => void;
   resetWorkbenchDateRangeToAuto: () => void;
 } {
-  const { planItems, machineCode, dateRangeMode, setDateRangeMode, setWorkbenchDateRange } = params;
+  const { activeVersionId, machineCode, dateRangeMode, setDateRangeMode, setWorkbenchDateRange } = params;
+
+  const normalizedMachineCode =
+    machineCode && machineCode !== 'all' ? String(machineCode).trim() : undefined;
+
+  const boundsQuery = useQuery({
+    queryKey: workbenchQueryKeys.planItems.dateBounds(activeVersionId, normalizedMachineCode ?? null),
+    enabled: !!activeVersionId,
+    queryFn: async () => {
+      if (!activeVersionId) return null;
+      return planApi.getPlanItemDateBounds(activeVersionId, normalizedMachineCode);
+    },
+    staleTime: 30 * 1000,
+  });
 
   const autoDateRange = useMemo<[dayjs.Dayjs, dayjs.Dayjs]>(() => {
-    const filteredItems = (planItems || []).filter(
-      (item) => !machineCode || machineCode === 'all' || item.machine_code === machineCode
-    );
+    const fallback: [dayjs.Dayjs, dayjs.Dayjs] = [dayjs().subtract(3, 'day'), dayjs().add(10, 'day')];
 
-    if (filteredItems.length === 0) {
-      // 默认日期范围：今天前 3 天到后 10 天
-      return [dayjs().subtract(3, 'day'), dayjs().add(10, 'day')];
-    }
+    const minStr = boundsQuery.data?.min_plan_date || null;
+    const maxStr = boundsQuery.data?.max_plan_date || null;
+    if (!minStr || !maxStr) return fallback;
 
-    // 提取所有排程日期
-    const dates = filteredItems
-      .map((item) => dayjs(item.plan_date))
-      .filter((d) => d.isValid());
+    const min = dayjs(minStr);
+    const max = dayjs(maxStr);
+    if (!min.isValid() || !max.isValid()) return fallback;
 
-    if (dates.length === 0) {
-      return [dayjs().subtract(3, 'day'), dayjs().add(10, 'day')];
-    }
-
-    // 找到最早和最晚的日期
-    const sortedDates = dates.sort((a, b) => a.valueOf() - b.valueOf());
-    const minDate = sortedDates[0].subtract(1, 'day'); // 前面留 1 天余量
-    const maxDate = sortedDates[sortedDates.length - 1].add(3, 'day'); // 后面留 3 天余量
-
+    const minDate = min.subtract(1, 'day'); // 前面留 1 天余量
+    const maxDate = max.add(3, 'day'); // 后面留 3 天余量
     return [minDate, maxDate];
-  }, [machineCode, planItems]);
+  }, [boundsQuery.data?.max_plan_date, boundsQuery.data?.min_plan_date]);
 
   useEffect(() => {
     if (dateRangeMode !== 'AUTO') return;

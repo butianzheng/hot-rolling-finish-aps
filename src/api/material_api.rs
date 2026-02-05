@@ -42,6 +42,26 @@ pub struct MaterialWithState {
     pub manual_urgent_flag: bool,
 }
 
+/// 物料池树形汇总（机组 × 状态）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MaterialPoolStateSummary {
+    pub sched_state: String,
+    pub count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MaterialPoolMachineSummary {
+    pub machine_code: String,
+    pub total_count: i64,
+    pub states: Vec<MaterialPoolStateSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MaterialPoolSummaryResponse {
+    pub total_count: i64,
+    pub machines: Vec<MaterialPoolMachineSummary>,
+}
+
 // ==========================================
 // MaterialApi - 材料 API
 // ==========================================
@@ -109,80 +129,133 @@ impl MaterialApi {
         &self,
         machine_code: Option<String>,
         _steel_grade: Option<String>,
-        _limit: i32,
-        _offset: i32,
+        sched_state: Option<String>,
+        urgent_level: Option<String>,
+        lock_status: Option<String>,
+        query_text: Option<String>,
+        limit: i32,
+        offset: i32,
     ) -> ApiResult<Vec<MaterialWithState>> {
         // 参数验证
-        if let Some(ref code) = machine_code {
-            if code.trim().is_empty() {
-                return Err(ApiError::InvalidInput("机组代码不能为空".to_string()));
-            }
+        let machine_code = machine_code
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
+
+        let sched_state = sched_state
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
+
+        let urgent_level = urgent_level
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
+
+        let lock_status = lock_status
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
+
+        let query_text = query_text
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
+
+        let limit = if limit <= 0 { 1000 } else { limit };
+        if limit > 20_000 {
+            return Err(ApiError::InvalidInput("limit必须在1-20000之间".to_string()));
+        }
+        if offset < 0 {
+            return Err(ApiError::InvalidInput("offset不能为负数".to_string()));
         }
 
-        // 查询主数据
-        let materials = if let Some(ref code) = machine_code {
-            self.material_master_repo
-                .find_by_machine(code)
-                .map_err(|e| ApiError::DatabaseError(e.to_string()))?
-        } else {
-            // 查询所有材料（不过滤机组）
-            self.material_master_repo
-                .list_all(_limit, _offset)
-                .map_err(|e| ApiError::DatabaseError(e.to_string()))?
-        };
+        let rows = self
+            .material_master_repo
+            .list_with_state_filtered_paged(
+                machine_code.as_deref(),
+                sched_state.as_deref(),
+                urgent_level.as_deref(),
+                lock_status.as_deref(),
+                query_text.as_deref(),
+                limit as i64,
+                offset as i64,
+            )
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
-        // 组合主数据和状态信息
-        let mut result = Vec::new();
-        for master in materials {
-            // 查询对应的状态信息
-            if let Some(state) = self
-                .material_state_repo
-                .find_by_id(&master.material_id)
-                .map_err(|e| ApiError::DatabaseError(e.to_string()))?
-            {
-                let material_with_state = MaterialWithState {
-                    material_id: master.material_id.clone(),
-                    machine_code: master.next_machine_code.or(master.current_machine_code),
-                    weight_t: master.weight_t,
-                    width_mm: master.width_mm,
-                    thickness_mm: master.thickness_mm,
-                    steel_mark: master.steel_mark,
-                    sched_state: state.sched_state.to_string(),
-                    urgent_level: state.urgent_level.to_string(),
-                    lock_flag: state.lock_flag,
-                    manual_urgent_flag: state.manual_urgent_flag,
-                };
+        let result: Vec<MaterialWithState> = rows
+            .into_iter()
+            .map(|r| MaterialWithState {
+                material_id: r.material_id,
+                machine_code: r.machine_code,
+                weight_t: r.weight_t,
+                width_mm: r.width_mm,
+                thickness_mm: r.thickness_mm,
+                steel_mark: r.steel_mark,
+                sched_state: r.sched_state,
+                urgent_level: r.urgent_level,
+                lock_flag: r.lock_flag,
+                manual_urgent_flag: r.manual_urgent_flag,
+            })
+            .collect();
 
-                // 调试日志：打印第一条数据
-                if result.is_empty() {
-                    debug!(
-                        material_id = %material_with_state.material_id,
-                        lock_flag = %material_with_state.lock_flag,
-                        sched_state = %material_with_state.sched_state,
-                        urgent_level = %material_with_state.urgent_level,
-                        "第一条材料数据"
-                    );
-                }
-
-                result.push(material_with_state);
-            } else {
-                // 如果没有状态信息，使用默认值
-                result.push(MaterialWithState {
-                    material_id: master.material_id.clone(),
-                    machine_code: master.next_machine_code.or(master.current_machine_code),
-                    weight_t: master.weight_t,
-                    width_mm: master.width_mm,
-                    thickness_mm: master.thickness_mm,
-                    steel_mark: master.steel_mark,
-                    sched_state: "UNKNOWN".to_string(),
-                    urgent_level: "L0".to_string(),
-                    lock_flag: false,
-                    manual_urgent_flag: false,
-                });
-            }
+        // 调试日志：打印第一条数据
+        if let Some(first) = result.first() {
+            debug!(
+                material_id = %first.material_id,
+                lock_flag = %first.lock_flag,
+                sched_state = %first.sched_state,
+                urgent_level = %first.urgent_level,
+                "第一条材料数据"
+            );
         }
 
         Ok(result)
+    }
+
+    /// 物料池树形汇总（机组 × 状态）
+    pub fn get_material_pool_summary(&self) -> ApiResult<MaterialPoolSummaryResponse> {
+        let rows = self
+            .material_master_repo
+            .summarize_by_machine_and_state()
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        let mut map: std::collections::BTreeMap<String, std::collections::BTreeMap<String, i64>> =
+            std::collections::BTreeMap::new();
+        let mut total_count: i64 = 0;
+
+        for (machine_code, sched_state, cnt) in rows {
+            total_count += cnt;
+            let state_map = map.entry(machine_code).or_default();
+            state_map.insert(sched_state, cnt);
+        }
+
+        let machines: Vec<MaterialPoolMachineSummary> = map
+            .into_iter()
+            .map(|(machine_code, states)| {
+                let total = states.values().copied().sum::<i64>();
+                let states_vec = states
+                    .into_iter()
+                    .map(|(sched_state, count)| MaterialPoolStateSummary { sched_state, count })
+                    .collect::<Vec<_>>();
+
+                MaterialPoolMachineSummary {
+                    machine_code,
+                    total_count: total,
+                    states: states_vec,
+                }
+            })
+            .collect();
+
+        Ok(MaterialPoolSummaryResponse {
+            total_count,
+            machines,
+        })
     }
 
     /// 查询材料详情（主数据 + 状态）

@@ -23,6 +23,10 @@ const MaterialPool: React.FC<MaterialPoolProps> = ({
   loading,
   error,
   onRetry,
+  treeData,
+  hasMore,
+  loadingMore,
+  onLoadMore,
   selection,
   onSelectionChange,
   filters,
@@ -34,6 +38,7 @@ const MaterialPool: React.FC<MaterialPoolProps> = ({
 }) => {
   const pool = useMaterialPool({
     materials,
+    treeDataOverride: treeData,
     selection,
     filters,
     selectedMaterialIds,
@@ -116,9 +121,21 @@ const MaterialPool: React.FC<MaterialPoolProps> = ({
 
       <div style={{ flex: 1, minHeight: 260 }}>
         <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            显示 {pool.filtered.length} 条
-          </Text>
+          <Space size={8}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              显示 {pool.filtered.length} 条
+            </Text>
+            {hasMore ? (
+              <Button
+                size="small"
+                loading={!!loadingMore}
+                disabled={!onLoadMore || !!loadingMore}
+                onClick={onLoadMore}
+              >
+                加载更多
+              </Button>
+            ) : null}
+          </Space>
           <Text type="secondary" style={{ fontSize: 12 }}>
             已选 {selectedMaterialIds.length} 条
           </Text>

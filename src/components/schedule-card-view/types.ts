@@ -20,7 +20,7 @@ export interface ScheduleCardViewProps {
   machineCode?: string | null;
   urgentLevel?: string | null;
   // 受控日期范围（工作台多视图联动）
-  dateRange?: [Dayjs, Dayjs];
+  dateRange: [Dayjs, Dayjs];
   // 排程状态快速筛选（已排/冻结/强放/可调）
   statusFilter?: PlanItemStatusFilter;
   onStatusFilterChange?: (next: PlanItemStatusFilter) => void;

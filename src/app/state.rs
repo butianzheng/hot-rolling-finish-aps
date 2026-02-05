@@ -124,6 +124,9 @@ impl AppState {
         if let Err(e) = ensure_action_log_indexes(&conn) {
             tracing::warn!("action_log 索引初始化失败(将继续启动): {}", e);
         }
+        if let Err(e) = ensure_workbench_indexes(&conn) {
+            tracing::warn!("workbench 索引初始化失败(将继续启动): {}", e);
+        }
 
         // 明确要求：若数据库版本过低，直接失败并给出修复指引（避免后续运行期大量 DATABASE_ERROR）。
         // 说明：生产环境升级应先人工执行 migrations；开发环境可直接重置并全量 seed。
@@ -485,6 +488,16 @@ fn ensure_action_log_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
         CREATE INDEX IF NOT EXISTS idx_action_actor_ts ON action_log(actor, action_ts);
         CREATE INDEX IF NOT EXISTS idx_action_machine_ts ON action_log(machine_code, action_ts);
         CREATE INDEX IF NOT EXISTS idx_action_date_range ON action_log(date_range_start, date_range_end);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn ensure_workbench_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
+    conn.execute_batch(
+        r#"
+        -- material list queries use next_machine_code heavily; keep this fast for large datasets.
+        CREATE INDEX IF NOT EXISTS idx_material_next_machine ON material_master(next_machine_code);
         "#,
     )?;
     Ok(())

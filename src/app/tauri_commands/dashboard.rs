@@ -105,6 +105,7 @@ pub async fn get_refresh_status(
 ) -> Result<String, String> {
     // 该查询应当“非常快”，且在重算/发布期间前端会高频轮询。
     // 若放进 spawn_blocking，可能在 blocking pool 被长任务占满时排队，从而触发前端 Timeout。
+    let _perf = crate::perf::PerfGuard::new("ipc.get_refresh_status");
     let result = state
         .dashboard_api
         .get_refresh_status(&version_id)
@@ -122,6 +123,7 @@ pub async fn manual_refresh_decision(
 ) -> Result<String, String> {
     let plan_api = state.plan_api.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
+        let _perf = crate::perf::PerfGuard::new("ipc.manual_refresh_decision");
         plan_api.manual_refresh_decision(&version_id, &operator)
     })
     .await

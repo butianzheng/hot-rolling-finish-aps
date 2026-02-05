@@ -77,6 +77,7 @@ CREATE TABLE material_master (
 );
 
 CREATE INDEX idx_material_machine ON material_master(current_machine_code);
+CREATE INDEX idx_material_next_machine ON material_master(next_machine_code);
 CREATE INDEX idx_material_due ON material_master(due_date);
 CREATE INDEX idx_material_status_updated ON material_master(status_updated_at);
 CREATE INDEX idx_material_rush_fields

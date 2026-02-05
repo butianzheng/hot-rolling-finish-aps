@@ -231,6 +231,96 @@ impl PlanItemRepository {
         Ok(items)
     }
 
+    /// 查询版本内排产日期边界（min/max）及数量
+    ///
+    /// 用途：
+    /// - Workbench AUTO 日期范围计算（避免拉取全量 plan_item）
+    /// - 大数据量下“先取边界/总数，再按范围分页拉取”
+    pub fn get_plan_date_bounds(
+        &self,
+        version_id: &str,
+        machine_code: Option<&str>,
+    ) -> RepositoryResult<(Option<NaiveDate>, Option<NaiveDate>, i64)> {
+        let conn = self.get_conn()?;
+
+        let (min_str, max_str, count): (Option<String>, Option<String>, i64) = if let Some(code) =
+            machine_code.map(str::trim).filter(|s| !s.is_empty())
+        {
+            conn.query_row(
+                r#"
+                SELECT MIN(plan_date), MAX(plan_date), COUNT(*)
+                FROM plan_item
+                WHERE version_id = ?1 AND machine_code = ?2
+                "#,
+                params![version_id, code],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )?
+        } else {
+            conn.query_row(
+                r#"
+                SELECT MIN(plan_date), MAX(plan_date), COUNT(*)
+                FROM plan_item
+                WHERE version_id = ?1
+                "#,
+                params![version_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )?
+        };
+
+        let parse_date = |s: Option<String>| -> Option<NaiveDate> {
+            s.and_then(|v| NaiveDate::parse_from_str(v.trim(), "%Y-%m-%d").ok())
+        };
+
+        Ok((parse_date(min_str), parse_date(max_str), count))
+    }
+
+    /// 统计版本明细数量（可选过滤）
+    pub fn count_by_filters(
+        &self,
+        version_id: &str,
+        machine_code: Option<&str>,
+        start_date: Option<NaiveDate>,
+        end_date: Option<NaiveDate>,
+    ) -> RepositoryResult<i64> {
+        let conn = self.get_conn()?;
+
+        let mut sql = String::from(
+            r#"SELECT COUNT(*)
+               FROM plan_item
+               WHERE version_id = ?1"#,
+        );
+
+        let mut values: Vec<Value> = vec![Value::from(version_id.to_string())];
+        let mut idx: i32 = 2;
+
+        if let Some(code) = machine_code.map(str::trim).filter(|s| !s.is_empty()) {
+            sql.push_str(&format!(" AND machine_code = ?{}", idx));
+            values.push(Value::from(code.to_string()));
+            idx += 1;
+        }
+
+        match (start_date, end_date) {
+            (Some(from), Some(to)) => {
+                sql.push_str(&format!(" AND plan_date BETWEEN ?{} AND ?{}", idx, idx + 1));
+                values.push(Value::from(from.format("%Y-%m-%d").to_string()));
+                values.push(Value::from(to.format("%Y-%m-%d").to_string()));
+            }
+            (Some(from), None) => {
+                sql.push_str(&format!(" AND plan_date >= ?{}", idx));
+                values.push(Value::from(from.format("%Y-%m-%d").to_string()));
+            }
+            (None, Some(to)) => {
+                sql.push_str(&format!(" AND plan_date <= ?{}", idx));
+                values.push(Value::from(to.format("%Y-%m-%d").to_string()));
+            }
+            (None, None) => {}
+        }
+
+        let mut stmt = conn.prepare(&sql)?;
+        let count: i64 = stmt.query_row(params_from_iter(values), |row| row.get(0))?;
+        Ok(count)
+    }
+
     /// 查询版本中所有 (machine_code, plan_date) 组合（去重）
     ///
     /// 用途：

@@ -1,52 +1,82 @@
 import { useMemo } from 'react';
-import type { UseQueryResult } from '@tanstack/react-query';
-import { useQuery } from '@tanstack/react-query';
+import type { InfiniteData, UseInfiniteQueryResult, UseQueryResult } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import type { DataNode } from 'antd/es/tree';
 
 import { materialApi } from '../../../api/tauri';
 import type { MaterialPoolMaterial } from '../../../components/workbench/MaterialPool';
+import type { MaterialPoolSelection } from '../../../components/workbench/MaterialPool';
+import type { WorkbenchLockStatusFilter } from '../../../stores/use-global-store';
 import { normalizeSchedState } from '../../../utils/schedState';
 import { workbenchQueryKeys } from '../queryKeys';
+import { buildTreeDataFromSummary } from '../../../components/material-pool/utils';
 
 type IpcMaterialWithState = Awaited<ReturnType<typeof materialApi.listMaterials>>[number];
+type IpcMaterialPoolSummary = Awaited<ReturnType<typeof materialApi.getMaterialPoolSummary>>;
 
-type MaterialQueryParams = {
-  machine_code?: string;
-  limit: number;
-  offset: number;
-};
+const MATERIAL_PAGE_SIZE = 1000;
 
 /**
  * Workbench materials 数据查询
  *
  * 使用统一的 queryKey，通过 invalidateQueries 触发刷新
  */
-export function useWorkbenchMaterials(params: { machineCode: string | null }): {
-  materialQueryParams: MaterialQueryParams;
-  materialsQuery: UseQueryResult<IpcMaterialWithState[], unknown>;
+export function useWorkbenchMaterials(params: {
+  selection: MaterialPoolSelection;
+  urgencyLevel: string | null;
+  lockStatus: WorkbenchLockStatusFilter;
+}): {
+  materialsQuery: UseInfiniteQueryResult<InfiniteData<IpcMaterialWithState[], unknown>, Error>;
   materials: MaterialPoolMaterial[];
+  poolSummaryQuery: UseQueryResult<IpcMaterialPoolSummary, Error>;
+  poolTreeData: DataNode[];
 } {
-  const { machineCode } = params;
+  const { selection, urgencyLevel, lockStatus } = params;
 
-  // P2-2 修复：queryKey 包含筛选参数，避免缓存污染
-  // 注意：暂保留 limit=1000 硬编码，待后续实施 useInfiniteQuery 分页优化
-  const materialQueryParams = useMemo<MaterialQueryParams>(() => {
+  const baseParams = useMemo(() => {
+    const machineCode = selection.machineCode && selection.machineCode !== 'all'
+      ? String(selection.machineCode).trim()
+      : undefined;
+    const schedState = selection.schedState ? String(selection.schedState).trim() : undefined;
+    const urgent = urgencyLevel ? String(urgencyLevel).trim() : undefined;
+    const lock = lockStatus && lockStatus !== 'ALL' ? lockStatus : undefined;
+
     return {
-      machine_code: machineCode && machineCode !== 'all' ? machineCode : undefined,
-      limit: 1000,
-      offset: 0,
+      machine_code: machineCode || undefined,
+      sched_state: schedState || undefined,
+      urgent_level: urgent || undefined,
+      lock_status: lock || undefined,
+      limit: MATERIAL_PAGE_SIZE,
     };
-  }, [machineCode]);
+  }, [lockStatus, selection.machineCode, selection.schedState, urgencyLevel]);
 
-  const materialsQuery = useQuery({
-    queryKey: workbenchQueryKeys.materials.list(materialQueryParams),
-    queryFn: async () => {
-      return materialApi.listMaterials(materialQueryParams);
+  const materialsQuery = useInfiniteQuery({
+    queryKey: workbenchQueryKeys.materials.infiniteList(baseParams),
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      const offset = typeof pageParam === 'number' ? pageParam : 0;
+      return materialApi.listMaterials({ ...baseParams, offset });
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      if (!Array.isArray(lastPage) || lastPage.length < MATERIAL_PAGE_SIZE) return undefined;
+      return allPages.length * MATERIAL_PAGE_SIZE;
     },
     staleTime: 30 * 1000,
   });
 
+  const poolSummaryQuery = useQuery({
+    queryKey: workbenchQueryKeys.materials.poolSummary(),
+    queryFn: async () => materialApi.getMaterialPoolSummary(),
+    staleTime: 30 * 1000,
+  });
+
+  const poolTreeData = useMemo(() => {
+    return buildTreeDataFromSummary(poolSummaryQuery.data);
+  }, [poolSummaryQuery.data]);
+
   const materials = useMemo<MaterialPoolMaterial[]>(() => {
-    const raw: IpcMaterialWithState[] = materialsQuery.data ?? [];
+    const pages = materialsQuery.data?.pages ?? [];
+    const raw: IpcMaterialWithState[] = pages.flatMap((p) => (Array.isArray(p) ? p : []));
     return raw.map((m) => {
       const sched = normalizeSchedState(m.sched_state);
       const is_mature =
@@ -68,8 +98,7 @@ export function useWorkbenchMaterials(params: { machineCode: string | null }): {
         is_mature,
       };
     });
-  }, [materialsQuery.data]);
+  }, [materialsQuery.data?.pages]);
 
-  return { materialQueryParams, materialsQuery, materials };
+  return { materialsQuery, materials, poolSummaryQuery, poolTreeData };
 }
-

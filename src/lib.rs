@@ -31,6 +31,9 @@ pub mod config;
 // 数据库基础设施（连接初始化/PRAGMA 统一）
 pub mod db;
 
+// 性能与诊断（SQL 慢查询/计数）
+pub mod perf;
+
 // 日志系统
 pub mod logging;
 

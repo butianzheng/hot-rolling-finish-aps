@@ -11,6 +11,7 @@ import {
   ListStrategyDraftsResponseSchema,
   CleanupStrategyDraftsResponseSchema,
   PlanItemSchema,
+  PlanItemDateBoundsResponseSchema,
   VersionComparisonResultSchema,
   VersionComparisonKpiResultSchema,
   MoveItemsResponseSchema,
@@ -249,6 +250,23 @@ export const planApi = {
       },
       {
         validate: zodValidator(CleanupStrategyDraftsResponseSchema, 'cleanup_expired_strategy_drafts'),
+      }
+    );
+  },
+
+  async getPlanItemDateBounds(
+    versionId: string,
+    machineCode?: string
+  ): Promise<z.infer<typeof PlanItemDateBoundsResponseSchema>> {
+    return IpcClient.call(
+      'get_plan_item_date_bounds',
+      {
+        version_id: versionId,
+        machine_code: machineCode,
+      },
+      {
+        validate: zodValidator(PlanItemDateBoundsResponseSchema, 'get_plan_item_date_bounds'),
+        timeout: 60000,
       }
     );
   },

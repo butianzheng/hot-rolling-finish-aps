@@ -49,9 +49,10 @@ fn main() {
             cancel_import_batch,
 
             // ==========================================
-            // 材料相关命令 (7个)
+            // 材料相关命令 (8个)
             // ==========================================
             list_materials,
+            get_material_pool_summary,
             get_material_detail,
             list_ready_materials,
             batch_lock_materials,
@@ -60,7 +61,7 @@ fn main() {
             list_materials_by_urgent_level,
 
             // ==========================================
-            // 排产方案相关命令 (18个)
+            // 排产方案相关命令 (19个)
             // ==========================================
             create_plan,
             list_plans,
@@ -80,6 +81,7 @@ fn main() {
             get_strategy_draft_detail,
             list_strategy_drafts,
             cleanup_expired_strategy_drafts,
+            get_plan_item_date_bounds,
             list_plan_items,
             list_items_by_date,
             compare_versions,

@@ -1,21 +1,62 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import type { Dayjs } from 'dayjs';
 import { planApi } from '../../api/tauri';
 import { useActiveVersionId } from '../../stores/use-global-store';
 import { workbenchQueryKeys } from '../../pages/workbench/queryKeys';
+import { formatDate } from '../../utils/formatters';
 import type { PlanItemRow } from './types';
 
-export const usePlanItems = (machineCode?: string | null) => {
+export const usePlanItems = (machineCode: string | null | undefined, dateRange: [Dayjs, Dayjs]) => {
   const activeVersionId = useActiveVersionId();
 
+  const planDateFrom = useMemo(() => formatDate(dateRange[0]), [dateRange]);
+  const planDateTo = useMemo(() => formatDate(dateRange[1]), [dateRange]);
+  const normalizedMachineCode = useMemo(() => {
+    const code = String(machineCode || '').trim();
+    return code && code !== 'all' ? code : undefined;
+  }, [machineCode]);
+
+  const queryParams = useMemo(
+    () => ({
+      version_id: activeVersionId,
+      machine_code: normalizedMachineCode,
+      plan_date_from: planDateFrom,
+      plan_date_to: planDateTo,
+    }),
+    [activeVersionId, normalizedMachineCode, planDateFrom, planDateTo]
+  );
+
   const query = useQuery({
-    queryKey: workbenchQueryKeys.planItems.byVersion(activeVersionId),
+    queryKey: workbenchQueryKeys.planItems.list(queryParams),
     enabled: !!activeVersionId,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!activeVersionId) return [];
-      const res = await planApi.listPlanItems(activeVersionId, {
-        machine_code: machineCode && machineCode !== 'all' ? machineCode : undefined,
-      });
-      return Array.isArray(res) ? res : [];
+      const pageSize = 5000;
+      const maxItems = 200_000;
+      let offset = 0;
+      const all: any[] = [];
+
+      while (true) {
+        if (signal?.aborted) {
+          throw new DOMException('Aborted', 'AbortError');
+        }
+
+        const page = await planApi.listPlanItems(activeVersionId, {
+          machine_code: normalizedMachineCode,
+          plan_date_from: planDateFrom,
+          plan_date_to: planDateTo,
+          limit: pageSize,
+          offset,
+        });
+
+        all.push(...page);
+        if (page.length < pageSize) break;
+        offset += pageSize;
+        if (offset >= maxItems) break;
+      }
+
+      return all;
     },
     staleTime: 30 * 1000,
   });

@@ -1,7 +1,8 @@
 use crate::db::open_sqlite_connection;
 use crate::domain::material::MaterialMaster;
 use crate::repository::error::{RepositoryError, RepositoryResult};
-use rusqlite::{params, Connection, Result as SqliteResult};
+use rusqlite::{params, params_from_iter, Connection, Result as SqliteResult};
+use rusqlite::types::Value;
 use std::sync::{Arc, Mutex};
 
 // ==========================================
@@ -12,6 +13,21 @@ pub struct MaterialSpecLite {
     pub steel_mark: Option<String>,
     pub width_mm: Option<f64>,
     pub thickness_mm: Option<f64>,
+}
+
+/// material_master + material_state 的轻量查询行（用于列表分页）
+#[derive(Debug, Clone)]
+pub struct MaterialWithStateRow {
+    pub material_id: String,
+    pub machine_code: Option<String>,
+    pub weight_t: Option<f64>,
+    pub width_mm: Option<f64>,
+    pub thickness_mm: Option<f64>,
+    pub steel_mark: Option<String>,
+    pub sched_state: String,
+    pub urgent_level: String,
+    pub lock_flag: bool,
+    pub manual_urgent_flag: bool,
 }
 
 /// 材料主数据仓储
@@ -393,6 +409,208 @@ impl MaterialMasterRepository {
             .collect::<SqliteResult<Vec<MaterialMaster>>>()?;
 
         Ok(materials)
+    }
+
+    /// 查询材料列表（主数据 + 状态）- 可选过滤 + 分页
+    ///
+    /// 说明：
+    /// - 用于 Workbench / MaterialManagement 等高频列表，避免 N+1 查询。
+    /// - machine_code 口径与旧实现保持一致：优先 next_machine_code，若为空则使用 current_machine_code。
+    pub fn list_with_state_filtered_paged(
+        &self,
+        machine_code: Option<&str>,
+        sched_state: Option<&str>,
+        urgent_level: Option<&str>,
+        lock_status: Option<&str>,
+        query_text: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> RepositoryResult<Vec<MaterialWithStateRow>> {
+        if limit <= 0 {
+            return Err(RepositoryError::ValidationError("limit 必须为正数".to_string()));
+        }
+        if offset < 0 {
+            return Err(RepositoryError::ValidationError("offset 不能为负数".to_string()));
+        }
+
+        let conn = self.get_conn()?;
+
+        let mut sql = String::from(
+            r#"
+            SELECT
+                mm.material_id,
+                COALESCE(mm.next_machine_code, mm.current_machine_code) AS machine_code,
+                mm.weight_t,
+                mm.width_mm,
+                mm.thickness_mm,
+                mm.steel_mark,
+                COALESCE(ms.sched_state, 'UNKNOWN') AS sched_state,
+                COALESCE(ms.urgent_level, 'L0') AS urgent_level,
+                COALESCE(ms.lock_flag, 0) AS lock_flag,
+                COALESCE(ms.manual_urgent_flag, 0) AS manual_urgent_flag
+            FROM material_master mm
+            LEFT JOIN material_state ms ON ms.material_id = mm.material_id
+            WHERE 1=1
+            "#,
+        );
+
+        let mut values: Vec<Value> = Vec::new();
+        let mut idx: i32 = 1;
+
+        if let Some(code) = machine_code.map(str::trim).filter(|s| !s.is_empty()) {
+            // 等价于：COALESCE(next_machine_code, current_machine_code) = code
+            // 但避免表达式索引依赖，拆成 next 优先 + NULL 回退。
+            sql.push_str(&format!(
+                " AND (mm.next_machine_code = ?{} OR (mm.next_machine_code IS NULL AND mm.current_machine_code = ?{}))",
+                idx, idx
+            ));
+            values.push(Value::from(code.to_string()));
+            idx += 1;
+        }
+
+        if let Some(state) = sched_state.map(str::trim).filter(|s| !s.is_empty()) {
+            // 注意：ms.sched_state 可能为 NULL（旧数据）；此处按显式值过滤。
+            sql.push_str(&format!(" AND ms.sched_state = ?{}", idx));
+            values.push(Value::from(state.to_string()));
+            idx += 1;
+        }
+
+        if let Some(level) = urgent_level.map(str::trim).filter(|s| !s.is_empty()) {
+            sql.push_str(&format!(" AND ms.urgent_level = ?{}", idx));
+            values.push(Value::from(level.to_string()));
+            idx += 1;
+        }
+
+        if let Some(lock) = lock_status.map(str::trim).filter(|s| !s.is_empty()) {
+            match lock {
+                "LOCKED" => sql.push_str(" AND COALESCE(ms.lock_flag, 0) = 1"),
+                "UNLOCKED" => sql.push_str(" AND COALESCE(ms.lock_flag, 0) = 0"),
+                _ => {}
+            }
+        }
+
+        if let Some(q) = query_text.map(str::trim).filter(|s| !s.is_empty()) {
+            sql.push_str(&format!(" AND mm.material_id LIKE ?{}", idx));
+            values.push(Value::from(format!("%{}%", q)));
+            idx += 1;
+        }
+
+        // 稳定排序：机组(主) + 紧急度(主) + material_id
+        // - urgent_level 为 L0/L1/L2/L3，文本排序可满足 L3 > L2 > L1 > L0
+        sql.push_str(" ORDER BY machine_code, urgent_level DESC, mm.material_id");
+
+        sql.push_str(&format!(" LIMIT ?{} OFFSET ?{}", idx, idx + 1));
+        values.push(Value::from(limit));
+        values.push(Value::from(offset));
+
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(params_from_iter(values), |row| {
+            Ok(MaterialWithStateRow {
+                material_id: row.get(0)?,
+                machine_code: row.get(1)?,
+                weight_t: row.get(2)?,
+                width_mm: row.get(3)?,
+                thickness_mm: row.get(4)?,
+                steel_mark: row.get(5)?,
+                sched_state: row.get(6)?,
+                urgent_level: row.get(7)?,
+                lock_flag: row.get::<_, i32>(8)? != 0,
+                manual_urgent_flag: row.get::<_, i32>(9)? != 0,
+            })
+        })?;
+
+        Ok(rows.collect::<SqliteResult<Vec<_>>>()?)
+    }
+
+    /// 统计材料数量（与 list_with_state_filtered_paged 过滤口径一致）
+    pub fn count_with_state_filtered(
+        &self,
+        machine_code: Option<&str>,
+        sched_state: Option<&str>,
+        urgent_level: Option<&str>,
+        lock_status: Option<&str>,
+        query_text: Option<&str>,
+    ) -> RepositoryResult<i64> {
+        let conn = self.get_conn()?;
+
+        let mut sql = String::from(
+            r#"
+            SELECT COUNT(*)
+            FROM material_master mm
+            LEFT JOIN material_state ms ON ms.material_id = mm.material_id
+            WHERE 1=1
+            "#,
+        );
+
+        let mut values: Vec<Value> = Vec::new();
+        let mut idx: i32 = 1;
+
+        if let Some(code) = machine_code.map(str::trim).filter(|s| !s.is_empty()) {
+            sql.push_str(&format!(
+                " AND (mm.next_machine_code = ?{} OR (mm.next_machine_code IS NULL AND mm.current_machine_code = ?{}))",
+                idx, idx
+            ));
+            values.push(Value::from(code.to_string()));
+            idx += 1;
+        }
+
+        if let Some(state) = sched_state.map(str::trim).filter(|s| !s.is_empty()) {
+            sql.push_str(&format!(" AND ms.sched_state = ?{}", idx));
+            values.push(Value::from(state.to_string()));
+            idx += 1;
+        }
+
+        if let Some(level) = urgent_level.map(str::trim).filter(|s| !s.is_empty()) {
+            sql.push_str(&format!(" AND ms.urgent_level = ?{}", idx));
+            values.push(Value::from(level.to_string()));
+            idx += 1;
+        }
+
+        if let Some(lock) = lock_status.map(str::trim).filter(|s| !s.is_empty()) {
+            match lock {
+                "LOCKED" => sql.push_str(" AND COALESCE(ms.lock_flag, 0) = 1"),
+                "UNLOCKED" => sql.push_str(" AND COALESCE(ms.lock_flag, 0) = 0"),
+                _ => {}
+            }
+        }
+
+        if let Some(q) = query_text.map(str::trim).filter(|s| !s.is_empty()) {
+            sql.push_str(&format!(" AND mm.material_id LIKE ?{}", idx));
+            values.push(Value::from(format!("%{}%", q)));
+        }
+
+        let mut stmt = conn.prepare(&sql)?;
+        let count: i64 = stmt.query_row(params_from_iter(values), |row| row.get(0))?;
+        Ok(count)
+    }
+
+    /// 汇总：机组 × 排产状态 的材料数量（用于物料池树）
+    pub fn summarize_by_machine_and_state(
+        &self,
+    ) -> RepositoryResult<Vec<(String, String, i64)>> {
+        let conn = self.get_conn()?;
+
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT
+                COALESCE(mm.next_machine_code, mm.current_machine_code, 'UNKNOWN') AS machine_code,
+                COALESCE(ms.sched_state, 'UNKNOWN') AS sched_state,
+                COUNT(*) AS cnt
+            FROM material_master mm
+            LEFT JOIN material_state ms ON ms.material_id = mm.material_id
+            GROUP BY machine_code, sched_state
+            ORDER BY machine_code, sched_state
+            "#,
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            let machine_code: String = row.get(0)?;
+            let sched_state: String = row.get(1)?;
+            let cnt: i64 = row.get(2)?;
+            Ok((machine_code, sched_state, cnt))
+        })?;
+
+        Ok(rows.collect::<SqliteResult<Vec<_>>>()?)
     }
 
     /// 批量查询材料的出钢记号（steel_mark → 前端称为 steel_grade）

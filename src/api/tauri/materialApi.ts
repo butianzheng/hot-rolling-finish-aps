@@ -1,11 +1,22 @@
 import { IpcClient } from '../ipcClient';
-import { z, zodValidator, ImpactSummarySchema, MaterialWithStateSchema, MaterialDetailResponseSchema } from '../ipcSchemas';
+import {
+  z,
+  zodValidator,
+  ImpactSummarySchema,
+  MaterialWithStateSchema,
+  MaterialDetailResponseSchema,
+  MaterialPoolSummaryResponseSchema,
+} from '../ipcSchemas';
 
 export const materialApi = {
   async listMaterials(params: {
     // 仅支持 snake_case 风格（与 Rust 后端对齐）
     machine_code?: string;
     steel_grade?: string;
+    sched_state?: string;
+    urgent_level?: string;
+    lock_status?: string;
+    query_text?: string;
     limit: number;
     offset: number;
   }): Promise<Array<z.infer<typeof MaterialWithStateSchema>>> {
@@ -14,6 +25,10 @@ export const materialApi = {
       {
         machine_code: params.machine_code,
         steel_grade: params.steel_grade,
+        sched_state: params.sched_state,
+        urgent_level: params.urgent_level,
+        lock_status: params.lock_status,
+        query_text: params.query_text,
         limit: params.limit,
         offset: params.offset,
       },
@@ -21,6 +36,13 @@ export const materialApi = {
         validate: zodValidator(z.array(MaterialWithStateSchema), 'list_materials'),
       }
     );
+  },
+
+  async getMaterialPoolSummary(): Promise<z.infer<typeof MaterialPoolSummaryResponseSchema>> {
+    return IpcClient.call('get_material_pool_summary', {}, {
+      validate: zodValidator(MaterialPoolSummaryResponseSchema, 'get_material_pool_summary'),
+      timeout: 60000,
+    });
   },
 
   async getMaterialDetail(materialId: string): Promise<z.infer<typeof MaterialDetailResponseSchema>> {
@@ -113,4 +135,3 @@ export const materialApi = {
     );
   },
 };
-

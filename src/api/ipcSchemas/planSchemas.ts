@@ -54,6 +54,16 @@ export const PlanItemSchema = z
   })
   .passthrough();
 
+export const PlanItemDateBoundsResponseSchema = z
+  .object({
+    version_id: z.string(),
+    machine_code: z.string().nullable().optional(),
+    min_plan_date: DateString.nullable().optional(),
+    max_plan_date: DateString.nullable().optional(),
+    total_count: z.number(),
+  })
+  .passthrough();
+
 export const StrategyPresetSchema = z
   .object({
     strategy: z.string(),

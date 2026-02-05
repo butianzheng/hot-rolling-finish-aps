@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import type { Dayjs } from 'dayjs';
 import { Button, Card, Space, Tag } from 'antd';
+import type { DataNode } from 'antd/es/tree';
 
 import RollCycleAnchorCard from '../roll-cycle-anchor/RollCycleAnchorCard';
 import { CapacityTimelineContainer } from '../CapacityTimelineContainer';
@@ -35,6 +36,10 @@ const WorkbenchMainLayout: React.FC<{
   // 左侧：物料池
   materials: MaterialPoolMaterial[];
   materialsLoading: boolean;
+  materialsHasMore?: boolean;
+  materialsLoadingMore?: boolean;
+  onLoadMoreMaterials?: () => void;
+  materialTreeData?: DataNode[] | null;
   materialsError: unknown;
   onRetryMaterials: () => void;
   poolSelection: MaterialPoolSelection;
@@ -96,6 +101,10 @@ const WorkbenchMainLayout: React.FC<{
 
   materials,
   materialsLoading,
+  materialsHasMore,
+  materialsLoadingMore,
+  onLoadMoreMaterials,
+  materialTreeData,
   materialsError,
   onRetryMaterials,
   poolSelection,
@@ -177,6 +186,10 @@ const WorkbenchMainLayout: React.FC<{
         <MaterialPool
           materials={materials}
           loading={materialsLoading}
+          treeData={materialTreeData}
+          hasMore={materialsHasMore}
+          loadingMore={materialsLoadingMore}
+          onLoadMore={onLoadMoreMaterials}
           error={materialsError}
           onRetry={onRetryMaterials}
           selection={poolSelection}
@@ -276,7 +289,9 @@ const WorkbenchMainLayout: React.FC<{
               <React.Suspense fallback={<PageSkeleton />}>
                 <PlanItemVisualization
                   machineCode={poolSelection.machineCode}
+                  machineOptions={machineOptions}
                   urgentLevel={poolFilters.urgencyLevel}
+                  defaultDateRange={workbenchDateRange}
                   statusFilter={scheduleStatusFilter}
                   onStatusFilterChange={setScheduleStatusFilter}
                   focusRequest={matrixFocusRequest}

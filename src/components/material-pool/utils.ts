@@ -10,6 +10,15 @@ import { normalizeSchedState, getSchedStateLabel } from '../../utils/schedState'
 
 const { Text } = Typography;
 
+export type MaterialPoolSummary = {
+  total_count: number;
+  machines: Array<{
+    machine_code: string;
+    total_count: number;
+    states: Array<{ sched_state: string; count: number }>;
+  }>;
+};
+
 /**
  * 构建树形数据结构
  */
@@ -55,6 +64,71 @@ export function buildTreeData(materials: MaterialPoolMaterial[]): DataNode[] {
           return {
             key: `machine:${machine}/state:${state}`,
             title: React.createElement(Space, { size: 8 },
+              React.createElement(Text, null, getSchedStateLabel(state)),
+              React.createElement(Text, { type: 'secondary' }, `(${count})`)
+            ),
+            isLeaf: true,
+          };
+        }),
+      };
+    }),
+  ];
+}
+
+/**
+ * 从后端汇总数据构建树形数据结构
+ *
+ * 用途：
+ * - 大数据量下避免依赖“当前页 materials”推导树节点数量（会失真）
+ */
+export function buildTreeDataFromSummary(summary: MaterialPoolSummary | null | undefined): DataNode[] {
+  const total = Number(summary?.total_count ?? 0);
+  const machinesRaw = Array.isArray(summary?.machines) ? summary!.machines : [];
+
+  const preferredStates = ['READY', 'PENDING_MATURE', 'FORCE_RELEASE', 'LOCKED', 'SCHEDULED', 'BLOCKED'];
+  const machines = [...machinesRaw].sort((a, b) => String(a.machine_code).localeCompare(String(b.machine_code)));
+
+  return [
+    {
+      key: 'all',
+      title: React.createElement(
+        Space,
+        { size: 8 },
+        React.createElement(Text, { strong: true }, '全部机组'),
+        React.createElement(Text, { type: 'secondary' }, `(${total})`)
+      ),
+      isLeaf: true,
+    },
+    ...machines.map((m) => {
+      const machineCode = String(m.machine_code || '').trim() || 'UNKNOWN';
+      const statesRaw = Array.isArray(m.states) ? m.states : [];
+      const states = [...statesRaw].sort((a, b) => {
+        const sa = normalizeSchedState(a.sched_state);
+        const sb = normalizeSchedState(b.sched_state);
+        const ai = preferredStates.indexOf(sa);
+        const bi = preferredStates.indexOf(sb);
+        if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+        return sa.localeCompare(sb);
+      });
+
+      const machineTotal = Number(m.total_count ?? states.reduce((sum, s) => sum + Number(s.count || 0), 0));
+
+      return {
+        key: `machine:${machineCode}`,
+        title: React.createElement(
+          Space,
+          { size: 8 },
+          React.createElement(Text, { strong: true }, machineCode),
+          React.createElement(Text, { type: 'secondary' }, `(${machineTotal})`)
+        ),
+        children: states.map((s) => {
+          const state = normalizeSchedState(s.sched_state);
+          const count = Number(s.count || 0);
+          return {
+            key: `machine:${machineCode}/state:${state}`,
+            title: React.createElement(
+              Space,
+              { size: 8 },
               React.createElement(Text, null, getSchedStateLabel(state)),
               React.createElement(Text, { type: 'secondary' }, `(${count})`)
             ),

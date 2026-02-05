@@ -40,8 +40,10 @@ pub fn configure_sqlite_connection(conn: &Connection) -> rusqlite::Result<()> {
 
 /// 打开 SQLite 连接并应用统一配置
 pub fn open_sqlite_connection(db_path: &str) -> rusqlite::Result<Connection> {
-    let conn = Connection::open(db_path)?;
+    let mut conn = Connection::open(db_path)?;
     configure_sqlite_connection(&conn)?;
+    // Best-effort: attach perf tracing (no-op if disabled).
+    crate::perf::install_sqlite_tracing(&mut conn);
     Ok(conn)
 }
 

@@ -2,6 +2,7 @@
  * 排产明细可视化 - 类型定义和常量
  */
 
+import type { Dayjs } from 'dayjs';
 import type { PlanItemStatusFilter } from '../../utils/planItemStatus';
 
 // 排产明细类型
@@ -37,7 +38,9 @@ export interface Statistics {
 export interface PlanItemVisualizationProps {
   onNavigateToPlan?: () => void;
   machineCode?: string | null;
+  machineOptions?: string[];
   urgentLevel?: string | null;
+  defaultDateRange?: [Dayjs, Dayjs] | null;
   statusFilter?: PlanItemStatusFilter;
   onStatusFilterChange?: (next: PlanItemStatusFilter) => void;
   focusRequest?: { machine?: string; date: string; nonce: string | number } | null;

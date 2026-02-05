@@ -38,27 +38,36 @@ pub async fn get_capacity_pools(
     let end_date = NaiveDate::parse_from_str(&date_to, "%Y-%m-%d")
         .map_err(|e| format!("结束日期格式错误（应为YYYY-MM-DD）: {}", e))?;
 
-    // 获取版本ID（如未提供则使用当前激活版本）
-    let vid = match version_id.as_ref() {
-        Some(v) => v.clone(),
-        None => state.plan_api.get_latest_active_version_id()
-            .map_err(|e| format!("获取激活版本失败: {}", e))?
-            .ok_or_else(|| "当前没有激活版本".to_string())?,
-    };
+    let plan_api = state.plan_api.clone();
+    let capacity_pool_repo = state.capacity_pool_repo.clone();
 
-    // 收集所有机组的产能池
-    let mut all_pools = Vec::new();
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<crate::domain::capacity::CapacityPool>, String> {
+        let _perf = crate::perf::PerfGuard::new("ipc.get_capacity_pools");
 
-    for code in &codes {
-        let pools = state
-            .capacity_pool_repo
-            .find_by_date_range(&vid, code, start_date, end_date)
-            .map_err(|e| format!("查询产能池失败: {}", e))?;
-        all_pools.extend(pools);
-    }
+        // 获取版本ID（如未提供则使用当前激活版本）
+        let vid = match version_id.as_ref() {
+            Some(v) => v.clone(),
+            None => plan_api
+                .get_latest_active_version_id()
+                .map_err(|e| format!("获取激活版本失败: {}", e))?
+                .ok_or_else(|| "当前没有激活版本".to_string())?,
+        };
+
+        // 收集所有机组的产能池
+        let mut all_pools = Vec::new();
+        for code in &codes {
+            let pools = capacity_pool_repo
+                .find_by_date_range(&vid, code, start_date, end_date)
+                .map_err(|e| format!("查询产能池失败: {}", e))?;
+            all_pools.extend(pools);
+        }
+        Ok(all_pools)
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))??;
 
     // 序列化返回
-    serde_json::to_string(&all_pools).map_err(|e| format!("序列化失败: {}", e))
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
 
 /// 更新产能池参数

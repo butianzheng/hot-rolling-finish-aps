@@ -12,15 +12,28 @@ export const workbenchQueryKeys = {
   /** planItems 相关查询 */
   planItems: {
     all: ['workbench', 'planItems'] as const,
-    byVersion: (versionId: string | null) =>
-      ['workbench', 'planItems', versionId] as const,
+    list: (params: {
+      version_id: string | null;
+      machine_code?: string;
+      plan_date_from?: string;
+      plan_date_to?: string;
+    }) => ['workbench', 'planItems', 'list', params] as const,
+    dateBounds: (versionId: string | null, machineCode: string | null) =>
+      ['workbench', 'planItems', 'bounds', versionId, machineCode] as const,
   },
 
   /** materials 相关查询 */
   materials: {
     all: ['workbench', 'materials'] as const,
-    list: (params: { machine_code?: string; limit: number; offset: number }) =>
-      ['workbench', 'materials', params] as const,
+    infiniteList: (params: {
+      machine_code?: string;
+      sched_state?: string;
+      urgent_level?: string;
+      lock_status?: string;
+      query_text?: string;
+      limit: number;
+    }) => ['workbench', 'materials', 'infinite', params] as const,
+    poolSummary: () => ['workbench', 'materials', 'poolSummary'] as const,
   },
 
   /** pathOverride 相关查询 */
