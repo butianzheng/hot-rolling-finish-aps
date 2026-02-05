@@ -81,6 +81,7 @@ fn create_test_material_master(material_id: &str, steel_mark: Option<&str>) -> M
         due_date: None,
         stock_age_days: Some(10),
         output_age_days_raw: Some(5),
+        rolling_output_date: None,  // v0.7
         status_updated_at: None,
         contract_no: None,
         contract_nature: None,

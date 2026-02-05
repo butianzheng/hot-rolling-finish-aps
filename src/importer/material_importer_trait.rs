@@ -222,6 +222,25 @@ pub trait DerivationService: Send + Sync {
         machine_code: &str,
     ) -> i32;
 
+    /// 派生 rolling_output_date（阶段 3.5 - v0.7 新增）
+    ///
+    /// # 规则
+    /// - rolling_output_date = import_date - output_age_days_raw
+    /// - 若 output_age_days_raw 缺失或非法（<0），则返回 None
+    ///
+    /// # 参数
+    /// - import_date: 导入日期（当前日期）
+    /// - output_age_days_raw: 产出时间快照（天）
+    ///
+    /// # 返回
+    /// - Some(NaiveDate): 派生成功
+    /// - None: output_age_days_raw 缺失或非法
+    fn derive_rolling_output_date(
+        &self,
+        import_date: chrono::NaiveDate,
+        output_age_days_raw: Option<i32>,
+    ) -> Option<chrono::NaiveDate>;
+
     /// 派生 rush_level（阶段 5）
     ///
     /// # 规则（3层判定）

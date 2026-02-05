@@ -152,7 +152,7 @@ impl MaterialMasterRepository {
                 next_machine_code, rework_machine_code, current_machine_code,
                 width_mm, thickness_mm, length_m, weight_t, available_width_mm,
                 steel_mark, slab_id, material_status_code_src, status_updated_at,
-                output_age_days_raw, stock_age_days,
+                output_age_days_raw, rolling_output_date, stock_age_days,
                 contract_nature, weekly_delivery_flag, export_flag,
                 created_at, updated_at
             FROM material_master
@@ -184,16 +184,19 @@ impl MaterialMasterRepository {
                     .and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
                     .map(|dt| dt.with_timezone(&chrono::Utc)),
                 output_age_days_raw: row.get(16)?,
-                stock_age_days: row.get(17)?,
-                contract_nature: row.get(18)?,
-                weekly_delivery_flag: row.get(19)?,
-                export_flag: row.get(20)?,
+                rolling_output_date: row
+                    .get::<_, Option<String>>(17)?
+                    .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
+                stock_age_days: row.get(18)?,
+                contract_nature: row.get(19)?,
+                weekly_delivery_flag: row.get(20)?,
+                export_flag: row.get(21)?,
                 created_at: row
-                    .get::<_, String>(21)?
+                    .get::<_, String>(22)?
                     .parse::<chrono::DateTime<chrono::Utc>>()
                     .unwrap_or_else(|_| chrono::Utc::now()),
                 updated_at: row
-                    .get::<_, String>(22)?
+                    .get::<_, String>(23)?
                     .parse::<chrono::DateTime<chrono::Utc>>()
                     .unwrap_or_else(|_| chrono::Utc::now()),
             })
@@ -262,7 +265,7 @@ impl MaterialMasterRepository {
                 next_machine_code, rework_machine_code, current_machine_code,
                 width_mm, thickness_mm, length_m, weight_t, available_width_mm,
                 steel_mark, slab_id, material_status_code_src, status_updated_at,
-                output_age_days_raw, stock_age_days,
+                output_age_days_raw, rolling_output_date, stock_age_days,
                 contract_nature, weekly_delivery_flag, export_flag,
                 created_at, updated_at
             FROM material_master
@@ -296,16 +299,19 @@ impl MaterialMasterRepository {
                         .and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
                         .map(|dt| dt.with_timezone(&chrono::Utc)),
                     output_age_days_raw: row.get(16)?,
-                    stock_age_days: row.get(17)?,
-                    contract_nature: row.get(18)?,
-                    weekly_delivery_flag: row.get(19)?,
-                    export_flag: row.get(20)?,
+                    rolling_output_date: row
+                        .get::<_, Option<String>>(17)?
+                        .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
+                    stock_age_days: row.get(18)?,
+                    contract_nature: row.get(19)?,
+                    weekly_delivery_flag: row.get(20)?,
+                    export_flag: row.get(21)?,
                     created_at: row
-                        .get::<_, String>(21)?
+                        .get::<_, String>(22)?
                         .parse::<chrono::DateTime<chrono::Utc>>()
                         .unwrap(),
                     updated_at: row
-                        .get::<_, String>(22)?
+                        .get::<_, String>(23)?
                         .parse::<chrono::DateTime<chrono::Utc>>()
                         .unwrap(),
                 })
@@ -340,7 +346,7 @@ impl MaterialMasterRepository {
                     next_machine_code, rework_machine_code, current_machine_code,
                     width_mm, thickness_mm, length_m, weight_t, available_width_mm,
                     steel_mark, slab_id, material_status_code_src, status_updated_at,
-                    output_age_days_raw, stock_age_days,
+                    output_age_days_raw, rolling_output_date, stock_age_days,
                     contract_nature, weekly_delivery_flag, export_flag,
                     created_at, updated_at
                 FROM material_master
@@ -357,7 +363,7 @@ impl MaterialMasterRepository {
                 next_machine_code, rework_machine_code, current_machine_code,
                 width_mm, thickness_mm, length_m, weight_t, available_width_mm,
                 steel_mark, slab_id, material_status_code_src, status_updated_at,
-                output_age_days_raw, stock_age_days,
+                output_age_days_raw, rolling_output_date, stock_age_days,
                 contract_nature, weekly_delivery_flag, export_flag,
                 created_at, updated_at
             FROM material_master
@@ -392,16 +398,19 @@ impl MaterialMasterRepository {
                         .and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
                         .map(|dt| dt.with_timezone(&chrono::Utc)),
                     output_age_days_raw: row.get(16)?,
-                    stock_age_days: row.get(17)?,
-                    contract_nature: row.get(18)?,
-                    weekly_delivery_flag: row.get(19)?,
-                    export_flag: row.get(20)?,
+                    rolling_output_date: row
+                        .get::<_, Option<String>>(17)?
+                        .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
+                    stock_age_days: row.get(18)?,
+                    contract_nature: row.get(19)?,
+                    weekly_delivery_flag: row.get(20)?,
+                    export_flag: row.get(21)?,
                     created_at: row
-                        .get::<_, String>(21)?
+                        .get::<_, String>(22)?
                         .parse::<chrono::DateTime<chrono::Utc>>()
                         .unwrap(),
                     updated_at: row
-                        .get::<_, String>(22)?
+                        .get::<_, String>(23)?
                         .parse::<chrono::DateTime<chrono::Utc>>()
                         .unwrap(),
                 })

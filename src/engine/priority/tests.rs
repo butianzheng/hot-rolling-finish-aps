@@ -36,6 +36,7 @@ fn create_test_material(
         due_date,
         stock_age_days: Some(stock_age_days),
         output_age_days_raw: None,
+        rolling_output_date: None,  // v0.7
         status_updated_at: None,
         contract_no: None,
         contract_nature: None,

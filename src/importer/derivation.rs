@@ -44,6 +44,30 @@ impl DerivationServiceTrait for DerivationService {
         }
     }
 
+    /// 派生 rolling_output_date（阶段 3.5 - v0.7 新增）
+    ///
+    /// # 规则
+    /// - rolling_output_date = import_date - output_age_days_raw
+    /// - 若 output_age_days_raw 缺失或非法（<0），则返回 None
+    ///
+    /// # 示例
+    /// ```
+    /// // 2025-01-14 导入，产出天数 = 1
+    /// // → rolling_output_date = 2025-01-14 - 1天 = 2025-01-13
+    /// ```
+    fn derive_rolling_output_date(
+        &self,
+        import_date: chrono::NaiveDate,
+        output_age_days_raw: Option<i32>,
+    ) -> Option<chrono::NaiveDate> {
+        match output_age_days_raw {
+            Some(days) if days >= 0 => {
+                Some(import_date - chrono::Duration::days(days as i64))
+            }
+            _ => None,
+        }
+    }
+
     /// 派生 rush_level（阶段 5）
     ///
     /// # 规则（3层判定）
@@ -125,6 +149,42 @@ mod tests {
         // 非标准机组：+4 偏移
         assert_eq!(service.derive_rolling_output_age_days(5, "H030"), 9);
         assert_eq!(service.derive_rolling_output_age_days(5, "H035"), 9);
+    }
+
+    #[test]
+    fn test_derive_rolling_output_date() {
+        let service = DerivationService;
+
+        // 正常情况：2025-01-14 导入，产出天数=1 → 2025-01-13
+        let import_date = chrono::NaiveDate::from_ymd_opt(2025, 1, 14).unwrap();
+        assert_eq!(
+            service.derive_rolling_output_date(import_date, Some(1)),
+            Some(chrono::NaiveDate::from_ymd_opt(2025, 1, 13).unwrap())
+        );
+
+        // 边界情况：当天产出（days=0）→ 产出日期 = 导入日期
+        assert_eq!(
+            service.derive_rolling_output_date(import_date, Some(0)),
+            Some(import_date)
+        );
+
+        // 长时间跨度：50天前产出
+        assert_eq!(
+            service.derive_rolling_output_date(import_date, Some(50)),
+            Some(chrono::NaiveDate::from_ymd_opt(2024, 11, 25).unwrap())
+        );
+
+        // 错误情况：output_age_days_raw 缺失 → None
+        assert_eq!(
+            service.derive_rolling_output_date(import_date, None),
+            None
+        );
+
+        // 错误情况：负值（非法）→ None
+        assert_eq!(
+            service.derive_rolling_output_date(import_date, Some(-1)),
+            None
+        );
     }
 
     #[test]

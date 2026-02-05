@@ -509,6 +509,15 @@ impl ImportApi {
         let current_machine_code = record.rework_machine_code.clone()
             .or_else(|| record.next_machine_code.clone());
 
+        // 派生 rolling_output_date (v0.7)
+        let import_date = chrono::Local::now().date_naive();
+        let rolling_output_date = match record.output_age_days_raw {
+            Some(days) if days >= 0 => {
+                Some(import_date - chrono::Duration::days(days as i64))
+            }
+            _ => None,
+        };
+
         MaterialMaster {
             material_id: record.material_id.unwrap_or_default(),
             manufacturing_order_id: record.manufacturing_order_id,
@@ -526,6 +535,7 @@ impl ImportApi {
             due_date: record.due_date,
             stock_age_days: record.stock_age_days,
             output_age_days_raw: record.output_age_days_raw,
+            rolling_output_date,  // v0.7 新增字段
             status_updated_at: record.status_updated_at,
             contract_no: record.contract_no,
             contract_nature: record.contract_nature,

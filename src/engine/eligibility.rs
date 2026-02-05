@@ -85,12 +85,21 @@ where
         let standard_machines = self.config.get_standard_finishing_machines().await?;
         let offset_days = self.config.get_machine_offset_days().await?;
 
-        // === 步骤 3: 调用 EligibilityCore 计算 rolling_output_age_days ===
-        let rolling_output_age_days = EligibilityCore::calculate_rolling_output_age_days(
+        // === 步骤 3: 计算静态快照值（用于 fallback，向后兼容）===
+        let rolling_output_age_days_static = EligibilityCore::calculate_rolling_output_age_days(
             output_age_raw,
             current_machine,
             &standard_machines,
             offset_days,
+        );
+
+        // === 步骤 3.5: 计算实际产出天数（动态版本，v0.7）===
+        // 若 material.rolling_output_date 存在，则动态计算 (today - rolling_output_date)
+        // 否则使用静态快照值（历史数据 fallback）
+        let actual_output_age_days = EligibilityCore::calculate_actual_output_age_days(
+            material.rolling_output_date,
+            today,
+            rolling_output_age_days_static,
         );
 
         // === 步骤 4: 判定季节 ===
@@ -111,7 +120,7 @@ where
 
         // === 步骤 6: 计算适温状态 ===
         let ready_in_days = EligibilityCore::calculate_ready_in_days(
-            rolling_output_age_days,
+            actual_output_age_days,
             min_temp_days,
         );
         let earliest_sched_date = EligibilityCore::calculate_earliest_sched_date(
@@ -157,7 +166,7 @@ where
         updated_state.sched_state = sched_state;
         updated_state.urgent_level = urgent_level;
         updated_state.rush_level = rush_level;
-        updated_state.rolling_output_age_days = rolling_output_age_days;
+        updated_state.rolling_output_age_days = actual_output_age_days;
         updated_state.ready_in_days = ready_in_days;
         updated_state.earliest_sched_date = Some(earliest_sched_date);
         updated_state.updated_at = Utc::now();
@@ -282,6 +291,7 @@ mod tests {
             due_date: None,
             stock_age_days: Some(10),
             output_age_days_raw: Some(5),
+            rolling_output_date: None,  // v0.7
             status_updated_at: None,
             contract_no: None,
             contract_nature: None,

@@ -361,6 +361,7 @@ mod tests {
             due_date: Some(NaiveDate::from_ymd_opt(2026, 1, 25).unwrap()),
             stock_age_days: Some(10),
             output_age_days_raw: Some(5),
+            rolling_output_date: None,  // v0.7
             status_updated_at: Some(Utc::now()),
             contract_no: Some("C001".to_string()),
             contract_nature: Some("A".to_string()),

@@ -66,6 +66,7 @@ CREATE TABLE material_master (
   material_status_code_src TEXT,
   status_updated_at TEXT,
   output_age_days_raw INTEGER,
+  rolling_output_date TEXT,  -- 轧制产出日期（ISO DATE）- v0.7 新增
   stock_age_days INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -78,6 +79,7 @@ CREATE TABLE material_master (
 
 CREATE INDEX idx_material_machine ON material_master(current_machine_code);
 CREATE INDEX idx_material_next_machine ON material_master(next_machine_code);
+CREATE INDEX idx_material_rolling_output_date ON material_master(rolling_output_date);  -- v0.7 新增
 CREATE INDEX idx_material_due ON material_master(due_date);
 CREATE INDEX idx_material_status_updated ON material_master(status_updated_at);
 CREATE INDEX idx_material_rush_fields

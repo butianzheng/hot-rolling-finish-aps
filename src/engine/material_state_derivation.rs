@@ -62,14 +62,21 @@ impl MaterialStateDerivationService {
             }
         };
 
-        // === 步骤 2: 派生 rolling_output_age_days ===
+        // === 步骤 2: 派生 rolling_output_age_days（静态快照值）===
         let standard_machines = config.get_standard_finishing_machines().await?;
         let offset_days = config.get_machine_offset_days().await?;
-        let rolling_output_age_days = EligibilityCore::calculate_rolling_output_age_days(
+        let rolling_output_age_days_static = EligibilityCore::calculate_rolling_output_age_days(
             output_age_raw,
             current_machine,
             &standard_machines,
             offset_days,
+        );
+
+        // === 步骤 2.5: 计算实际产出天数（动态版本，v0.7）===
+        let actual_output_age_days = EligibilityCore::calculate_actual_output_age_days(
+            material.rolling_output_date,
+            today,
+            rolling_output_age_days_static,
         );
 
         // === 步骤 3: 判定季节 ===
@@ -90,7 +97,7 @@ impl MaterialStateDerivationService {
 
         // === 步骤 5: 计算适温状态 ===
         let ready_in_days = EligibilityCore::calculate_ready_in_days(
-            rolling_output_age_days,
+            actual_output_age_days,
             min_temp_days,
         );
         let earliest_sched_date = EligibilityCore::calculate_earliest_sched_date(
@@ -140,7 +147,7 @@ impl MaterialStateDerivationService {
             urgent_level,
             urgent_reason: Some(serde_json::to_string(&urgent_reasons)?),
             rush_level,
-            rolling_output_age_days,
+            rolling_output_age_days: actual_output_age_days,
             ready_in_days,
             earliest_sched_date: Some(earliest_sched_date),
             stock_age_days: material.stock_age_days.unwrap_or(0),
@@ -277,6 +284,7 @@ mod tests {
             due_date: None,
             stock_age_days: Some(10),
             output_age_days_raw: Some(5),
+            rolling_output_date: None,  // v0.7
             status_updated_at: None,
             contract_no: None,
             contract_nature: None,

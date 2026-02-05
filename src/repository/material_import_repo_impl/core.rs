@@ -49,11 +49,11 @@ impl MaterialImportRepositoryImpl {
                 steel_mark, slab_id, next_machine_code, rework_machine_code,
                 current_machine_code, width_mm, thickness_mm, length_m, weight_t,
                 available_width_mm, due_date, stock_age_days, output_age_days_raw,
-                status_updated_at, contract_no, contract_nature, weekly_delivery_flag,
-                export_flag, created_at, updated_at
+                rolling_output_date, status_updated_at, contract_no, contract_nature,
+                weekly_delivery_flag, export_flag, created_at, updated_at
             ) VALUES (
                 ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12,
-                ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23
+                ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24
             )
             "#,
         )?;
@@ -77,6 +77,7 @@ impl MaterialImportRepositoryImpl {
                 material.due_date,
                 material.stock_age_days,
                 material.output_age_days_raw,
+                material.rolling_output_date.map(|d| d.format("%Y-%m-%d").to_string()),
                 material.status_updated_at,
                 material.contract_no,
                 material.contract_nature,

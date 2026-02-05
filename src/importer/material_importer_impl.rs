@@ -561,6 +561,9 @@ where
         &self,
         records: Vec<RawMaterialRecord>,
     ) -> Vec<MaterialMaster> {
+        // 获取当前导入时间（用于 rolling_output_date 计算）
+        let import_date = chrono::Local::now().date_naive();
+
         records
             .into_iter()
             .map(|record| {
@@ -568,6 +571,12 @@ where
                 let current_machine_code = self.derivation_service.derive_current_machine_code(
                     record.rework_machine_code.clone(),
                     record.next_machine_code.clone(),
+                );
+
+                // 派生 rolling_output_date（v0.7 新增）
+                let rolling_output_date = self.derivation_service.derive_rolling_output_date(
+                    import_date,
+                    record.output_age_days_raw,
                 );
 
                 MaterialMaster {
@@ -587,6 +596,7 @@ where
                     due_date: record.due_date,
                     stock_age_days: record.stock_age_days,
                     output_age_days_raw: record.output_age_days_raw,
+                    rolling_output_date,  // v0.7 新增字段
                     status_updated_at: record.status_updated_at,
                     contract_no: record.contract_no,
                     contract_nature: record.contract_nature,

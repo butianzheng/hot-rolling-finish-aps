@@ -43,7 +43,8 @@ pub struct MaterialMaster {
     // ===== 时间信息 =====
     pub due_date: Option<NaiveDate>,           // 合同交货期（ISO DATE）
     pub stock_age_days: Option<i32>,           // 状态时间（天）- 库存压力主口径
-    pub output_age_days_raw: Option<i32>,      // 产出时间（天）- 适温反推基础
+    pub output_age_days_raw: Option<i32>,      // 产出时间（天）- 适温反推基础（导入时刻静态快照）
+    pub rolling_output_date: Option<NaiveDate>, // 轧制产出日期（ISO DATE）- v0.7 新增，动态计算基准
     pub status_updated_at: Option<DateTime<Utc>>, // 物料状态修改时间
 
     // ===== 合同影子字段（用于催料计算）=====

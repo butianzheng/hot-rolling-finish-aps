@@ -406,12 +406,14 @@ where
     ///
     /// # 派生规则(依据 Field_Mapping_Spec_v0.3)
     /// - current_machine_code = COALESCE(rework_machine_code, next_machine_code)
+    /// - rolling_output_date = import_date - output_age_days_raw (v0.7)
     fn map_to_material_master(
         &self,
         records: Vec<RawMaterialRecord>,
     ) -> Result<Vec<MaterialMaster>, Box<dyn Error>> {
         let mut masters = Vec::new();
         let now = Utc::now();
+        let import_date = chrono::Local::now().date_naive();
 
         for record in records {
             // 派生 current_machine_code
@@ -419,6 +421,14 @@ where
                 .rework_machine_code
                 .clone()
                 .or(record.next_machine_code.clone());
+
+            // 派生 rolling_output_date (v0.7)
+            let rolling_output_date = match record.output_age_days_raw {
+                Some(days) if days >= 0 => {
+                    Some(import_date - chrono::Duration::days(days as i64))
+                }
+                _ => None,
+            };
 
             let master = MaterialMaster {
                 material_id: record.material_id.unwrap_or_default(),
@@ -437,6 +447,7 @@ where
                 due_date: record.due_date,
                 stock_age_days: record.stock_age_days,
                 output_age_days_raw: record.output_age_days_raw,
+                rolling_output_date,  // v0.7 新增字段
                 status_updated_at: record.status_updated_at,
                 contract_no: record.contract_no,
                 contract_nature: record.contract_nature,

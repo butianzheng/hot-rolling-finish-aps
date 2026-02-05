@@ -39,6 +39,50 @@ impl EligibilityCore {
         }
     }
 
+    /// 计算实际产出天数（动态版本，v0.7 新增）
+    ///
+    /// # 规则
+    /// - 若 rolling_output_date 存在 → (today - rolling_output_date).num_days()
+    /// - 否则 → 使用 rolling_output_age_days_fallback（静态快照值）
+    ///
+    /// # 参数
+    /// - rolling_output_date: 轧制产出日期（固定基准，v0.7 新增）
+    /// - today: 当前日期
+    /// - rolling_output_age_days_fallback: 静态快照值（向后兼容）
+    ///
+    /// # 返回
+    /// - i32: 实际产出天数
+    ///
+    /// # 示例
+    /// ```
+    /// // 产出日期 2025-01-13，今天 2025-01-20 → 7天
+    /// let output_date = chrono::NaiveDate::from_ymd_opt(2025, 1, 13).unwrap();
+    /// let today = chrono::NaiveDate::from_ymd_opt(2025, 1, 20).unwrap();
+    /// let age_days = EligibilityCore::calculate_actual_output_age_days(
+    ///     Some(output_date),
+    ///     today,
+    ///     1,  // fallback 值（不会使用）
+    /// );
+    /// assert_eq!(age_days, 7);
+    /// ```
+    pub fn calculate_actual_output_age_days(
+        rolling_output_date: Option<NaiveDate>,
+        today: NaiveDate,
+        rolling_output_age_days_fallback: i32,
+    ) -> i32 {
+        match rolling_output_date {
+            Some(output_date) => {
+                // 新逻辑：动态计算
+                let duration = today.signed_duration_since(output_date);
+                duration.num_days() as i32
+            }
+            None => {
+                // Fallback：使用静态快照值（向后兼容历史数据）
+                rolling_output_age_days_fallback
+            }
+        }
+    }
+
     /// 计算距离适温还需天数
     ///
     /// # 规则
@@ -372,6 +416,68 @@ mod tests {
             0,
         );
         assert_eq!(result, 10); // 偏移为0
+    }
+
+    // ==========================================
+    // 测试 1.5: 实际产出天数计算（动态版本，v0.7）
+    // ==========================================
+
+    #[test]
+    fn test_calculate_actual_output_age_days_with_date() {
+        // 正常情况：有 rolling_output_date，动态计算
+        let output_date = NaiveDate::from_ymd_opt(2025, 1, 13).unwrap();
+        let today = NaiveDate::from_ymd_opt(2025, 1, 20).unwrap();
+
+        let result = EligibilityCore::calculate_actual_output_age_days(
+            Some(output_date),
+            today,
+            999,  // fallback 值（不应被使用）
+        );
+
+        assert_eq!(result, 7);  // 7天产出 (2025-01-20 - 2025-01-13)
+    }
+
+    #[test]
+    fn test_calculate_actual_output_age_days_same_day() {
+        // 边界情况：当天产出
+        let today = NaiveDate::from_ymd_opt(2025, 1, 14).unwrap();
+
+        let result = EligibilityCore::calculate_actual_output_age_days(
+            Some(today),
+            today,
+            999,
+        );
+
+        assert_eq!(result, 0);  // 0天产出
+    }
+
+    #[test]
+    fn test_calculate_actual_output_age_days_long_duration() {
+        // 长时间跨度：50天前产出
+        let output_date = NaiveDate::from_ymd_opt(2024, 11, 25).unwrap();
+        let today = NaiveDate::from_ymd_opt(2025, 1, 14).unwrap();
+
+        let result = EligibilityCore::calculate_actual_output_age_days(
+            Some(output_date),
+            today,
+            999,
+        );
+
+        assert_eq!(result, 50);  // 50天产出
+    }
+
+    #[test]
+    fn test_calculate_actual_output_age_days_fallback() {
+        // Fallback 情况：无 rolling_output_date（历史数据）
+        let today = NaiveDate::from_ymd_opt(2025, 1, 20).unwrap();
+
+        let result = EligibilityCore::calculate_actual_output_age_days(
+            None,
+            today,
+            5,  // fallback 值（静态快照）
+        );
+
+        assert_eq!(result, 5);  // 使用 fallback 值
     }
 
     // ==========================================
