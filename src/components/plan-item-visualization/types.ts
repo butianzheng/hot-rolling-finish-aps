@@ -14,6 +14,8 @@ export interface PlanItem extends Record<string, unknown> {
   seq_no: number;
   weight_t: number;
   steel_grade?: string;
+  width_mm?: number | null;
+  thickness_mm?: number | null;
   urgent_level?: string;
   source_type: string;
   locked_in_plan: boolean;

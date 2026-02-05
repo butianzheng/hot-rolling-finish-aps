@@ -294,6 +294,65 @@ impl CapacityPoolRepository {
         Ok(rows)
     }
 
+    /// 批量更新 used_capacity_t + overflow_t（不读取全量 capacity_pool）
+    ///
+    /// 说明：
+    /// - 用于“版本激活后同步刷新产能池”；
+    /// - overflow_t 由 used_capacity_t 与 limit_capacity_t 直接计算；
+    /// - 该方法不会创建缺失的 capacity_pool 行（若缺失会记录告警）。
+    pub fn update_used_and_overflow_batch(
+        &self,
+        version_id: &str,
+        updates: &[(String, NaiveDate, f64)],
+    ) -> RepositoryResult<usize> {
+        if updates.is_empty() {
+            return Ok(0);
+        }
+
+        let mut conn = self.get_conn()?;
+        let tx = conn.transaction()?;
+
+        let mut updated = 0usize;
+        {
+            let mut stmt = tx.prepare(
+                r#"
+                UPDATE capacity_pool
+                SET
+                    used_capacity_t = ?1,
+                    overflow_t = CASE
+                        WHEN ?1 > limit_capacity_t THEN ?1 - limit_capacity_t
+                        ELSE 0.0
+                    END
+                WHERE version_id = ?2 AND machine_code = ?3 AND plan_date = ?4
+                "#,
+            )?;
+
+            for (machine_code, plan_date, used_capacity_t) in updates {
+                let plan_date_str = plan_date.format("%Y-%m-%d").to_string();
+                let affected = stmt.execute(params![
+                    used_capacity_t,
+                    version_id,
+                    machine_code,
+                    plan_date_str
+                ])?;
+
+                if affected == 0 {
+                    tracing::warn!(
+                        "capacity_pool 行缺失，无法同步 used_capacity_t: version_id={}, machine_code={}, plan_date={}",
+                        version_id,
+                        machine_code,
+                        plan_date
+                    );
+                }
+
+                updated += affected as usize;
+            }
+        }
+
+        tx.commit()?;
+        Ok(updated)
+    }
+
     /// 查询指定版本超限产能池列表（overflow_t > 0）
     ///
     /// # 参数

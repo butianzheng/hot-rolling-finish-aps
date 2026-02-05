@@ -18,12 +18,28 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::error::Error;
 use std::sync::{Arc, Mutex};
+use std::sync::RwLock;
+
+#[derive(Debug, Default)]
+struct ParsedConfigCache {
+    season_mode: Option<SeasonMode>,
+    manual_season: Option<Season>,
+    winter_months: Option<Vec<u32>>,
+    min_temp_days_winter: Option<i32>,
+    min_temp_days_summer: Option<i32>,
+    standard_finishing_machines: Option<Vec<String>>,
+    machine_offset_days: Option<i32>,
+    urgent_n1_days: Option<i32>,
+    urgent_n2_days: Option<i32>,
+}
 
 // ==========================================
 // ConfigManager - 配置管理器
 // ==========================================
 pub struct ConfigManager {
     conn: Arc<Mutex<Connection>>,
+    cache: RwLock<HashMap<String, Option<String>>>,
+    parsed_cache: RwLock<ParsedConfigCache>,
 }
 
 impl ConfigManager {
@@ -36,6 +52,8 @@ impl ConfigManager {
 
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
+            cache: RwLock::new(HashMap::new()),
+            parsed_cache: RwLock::new(ParsedConfigCache::default()),
         })
     }
 
@@ -48,7 +66,11 @@ impl ConfigManager {
             crate::db::configure_sqlite_connection(&conn_guard)?;
         }
 
-        Ok(Self { conn })
+        Ok(Self {
+            conn,
+            cache: RwLock::new(HashMap::new()),
+            parsed_cache: RwLock::new(ParsedConfigCache::default()),
+        })
     }
 
     /// 从 config_kv 表读取配置值（scope_id='global'）
@@ -60,6 +82,12 @@ impl ConfigManager {
     /// - Some(String): 配置值
     /// - None: 配置不存在
     fn get_config_value(&self, key: &str) -> Result<Option<String>, Box<dyn Error>> {
+        if let Ok(cache) = self.cache.read() {
+            if let Some(v) = cache.get(key) {
+                return Ok(v.clone());
+            }
+        }
+
         let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         let result = conn.query_row(
@@ -68,10 +96,26 @@ impl ConfigManager {
             |row| row.get::<_, String>(0),
         );
 
-        match result {
-            Ok(value) => Ok(Some(value)),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Err(e) => Err(Box::new(e)),
+        let value = match result {
+            Ok(value) => Some(value),
+            Err(rusqlite::Error::QueryReturnedNoRows) => None,
+            Err(e) => return Err(Box::new(e)),
+        };
+
+        if let Ok(mut cache) = self.cache.write() {
+            cache.insert(key.to_string(), value.clone());
+        }
+
+        Ok(value)
+    }
+
+    /// 失效缓存（配置写入后调用，确保后续读取拿到最新值）
+    pub fn invalidate_cache_all(&self) {
+        if let Ok(mut cache) = self.cache.write() {
+            cache.clear();
+        }
+        if let Ok(mut parsed) = self.parsed_cache.write() {
+            *parsed = ParsedConfigCache::default();
         }
     }
 
@@ -183,6 +227,9 @@ impl ConfigManager {
         // 提交事务
         conn.execute("COMMIT", [])?;
 
+        // 配置被写入后，清理缓存，避免读到旧值
+        self.invalidate_cache_all();
+
         Ok(count)
     }
 
@@ -228,24 +275,54 @@ impl ImportConfigReader for ConfigManager {
     // ===== 季节与适温配置 =====
 
     async fn get_season_mode(&self) -> Result<SeasonMode, Box<dyn Error>> {
-        let value = self.get_config_or_default("season_mode", "AUTO")?;
-        match value.to_uppercase().as_str() {
-            "AUTO" => Ok(SeasonMode::Auto),
-            "MANUAL" => Ok(SeasonMode::Manual),
-            _ => Ok(SeasonMode::Auto), // 默认 AUTO
+        if let Ok(parsed) = self.parsed_cache.read() {
+            if let Some(mode) = parsed.season_mode {
+                return Ok(mode);
+            }
         }
+
+        let value = self.get_config_or_default("season_mode", "AUTO")?;
+        let mode = match value.to_uppercase().as_str() {
+            "AUTO" => SeasonMode::Auto,
+            "MANUAL" => SeasonMode::Manual,
+            _ => SeasonMode::Auto, // 默认 AUTO
+        };
+
+        if let Ok(mut parsed) = self.parsed_cache.write() {
+            parsed.season_mode = Some(mode);
+        }
+
+        Ok(mode)
     }
 
     async fn get_manual_season(&self) -> Result<Season, Box<dyn Error>> {
-        let value = self.get_config_or_default("manual_season", "WINTER")?;
-        match value.to_uppercase().as_str() {
-            "WINTER" => Ok(Season::Winter),
-            "SUMMER" => Ok(Season::Summer),
-            _ => Ok(Season::Winter), // 默认 WINTER
+        if let Ok(parsed) = self.parsed_cache.read() {
+            if let Some(season) = parsed.manual_season {
+                return Ok(season);
+            }
         }
+
+        let value = self.get_config_or_default("manual_season", "WINTER")?;
+        let season = match value.to_uppercase().as_str() {
+            "WINTER" => Season::Winter,
+            "SUMMER" => Season::Summer,
+            _ => Season::Winter, // 默认 WINTER
+        };
+
+        if let Ok(mut parsed) = self.parsed_cache.write() {
+            parsed.manual_season = Some(season);
+        }
+
+        Ok(season)
     }
 
     async fn get_winter_months(&self) -> Result<Vec<u32>, Box<dyn Error>> {
+        if let Ok(parsed) = self.parsed_cache.read() {
+            if let Some(months) = parsed.winter_months.as_ref() {
+                return Ok(months.clone());
+            }
+        }
+
         let value = self.get_config_or_default("winter_months", "11,12,1,2,3")?;
 
         let months: Vec<u32> = value
@@ -254,21 +331,51 @@ impl ImportConfigReader for ConfigManager {
             .filter(|&m| m >= 1 && m <= 12)
             .collect();
 
-        if months.is_empty() {
-            Ok(vec![11, 12, 1, 2, 3]) // 默认值
+        let months = if months.is_empty() {
+            vec![11, 12, 1, 2, 3] // 默认值
         } else {
-            Ok(months)
+            months
+        };
+
+        if let Ok(mut parsed) = self.parsed_cache.write() {
+            parsed.winter_months = Some(months.clone());
         }
+
+        Ok(months)
     }
 
     async fn get_min_temp_days_winter(&self) -> Result<i32, Box<dyn Error>> {
+        if let Ok(parsed) = self.parsed_cache.read() {
+            if let Some(v) = parsed.min_temp_days_winter {
+                return Ok(v);
+            }
+        }
+
         let value = self.get_config_or_default("min_temp_days_winter", "3")?;
-        Ok(value.parse::<i32>().unwrap_or(3))
+        let v = value.parse::<i32>().unwrap_or(3);
+
+        if let Ok(mut parsed) = self.parsed_cache.write() {
+            parsed.min_temp_days_winter = Some(v);
+        }
+
+        Ok(v)
     }
 
     async fn get_min_temp_days_summer(&self) -> Result<i32, Box<dyn Error>> {
+        if let Ok(parsed) = self.parsed_cache.read() {
+            if let Some(v) = parsed.min_temp_days_summer {
+                return Ok(v);
+            }
+        }
+
         let value = self.get_config_or_default("min_temp_days_summer", "4")?;
-        Ok(value.parse::<i32>().unwrap_or(4))
+        let v = value.parse::<i32>().unwrap_or(4);
+
+        if let Ok(mut parsed) = self.parsed_cache.write() {
+            parsed.min_temp_days_summer = Some(v);
+        }
+
+        Ok(v)
     }
 
     async fn get_current_min_temp_days(
@@ -304,6 +411,12 @@ impl ImportConfigReader for ConfigManager {
     // ===== 机组代码配置 =====
 
     async fn get_standard_finishing_machines(&self) -> Result<Vec<String>, Box<dyn Error>> {
+        if let Ok(parsed) = self.parsed_cache.read() {
+            if let Some(machines) = parsed.standard_finishing_machines.as_ref() {
+                return Ok(machines.clone());
+            }
+        }
+
         let value = self.get_config_or_default("standard_finishing_machines", "H032,H033,H034")?;
 
         let machines: Vec<String> = value
@@ -312,28 +425,70 @@ impl ImportConfigReader for ConfigManager {
             .filter(|s| !s.is_empty())
             .collect();
 
-        if machines.is_empty() {
-            Ok(vec!["H032".to_string(), "H033".to_string(), "H034".to_string()])
+        let machines = if machines.is_empty() {
+            vec!["H032".to_string(), "H033".to_string(), "H034".to_string()]
         } else {
-            Ok(machines)
+            machines
+        };
+
+        if let Ok(mut parsed) = self.parsed_cache.write() {
+            parsed.standard_finishing_machines = Some(machines.clone());
         }
+
+        Ok(machines)
     }
 
     async fn get_machine_offset_days(&self) -> Result<i32, Box<dyn Error>> {
+        if let Ok(parsed) = self.parsed_cache.read() {
+            if let Some(v) = parsed.machine_offset_days {
+                return Ok(v);
+            }
+        }
+
         let value = self.get_config_or_default("machine_offset_days", "4")?;
-        Ok(value.parse::<i32>().unwrap_or(4))
+        let v = value.parse::<i32>().unwrap_or(4);
+
+        if let Ok(mut parsed) = self.parsed_cache.write() {
+            parsed.machine_offset_days = Some(v);
+        }
+
+        Ok(v)
     }
 
     // ===== 紧急等级阈值配置 =====
 
     async fn get_n1_threshold_days(&self) -> Result<i32, Box<dyn Error>> {
+        if let Ok(parsed) = self.parsed_cache.read() {
+            if let Some(v) = parsed.urgent_n1_days {
+                return Ok(v);
+            }
+        }
+
         let value = self.get_config_or_default(config_keys::URGENT_N1_DAYS, "3")?;
-        Ok(value.parse::<i32>().unwrap_or(3))
+        let v = value.parse::<i32>().unwrap_or(3);
+
+        if let Ok(mut parsed) = self.parsed_cache.write() {
+            parsed.urgent_n1_days = Some(v);
+        }
+
+        Ok(v)
     }
 
     async fn get_n2_threshold_days(&self) -> Result<i32, Box<dyn Error>> {
+        if let Ok(parsed) = self.parsed_cache.read() {
+            if let Some(v) = parsed.urgent_n2_days {
+                return Ok(v);
+            }
+        }
+
         let value = self.get_config_or_default(config_keys::URGENT_N2_DAYS, "7")?;
-        Ok(value.parse::<i32>().unwrap_or(7))
+        let v = value.parse::<i32>().unwrap_or(7);
+
+        if let Ok(mut parsed) = self.parsed_cache.write() {
+            parsed.urgent_n2_days = Some(v);
+        }
+
+        Ok(v)
     }
 
     // ===== 数据质量配置 =====

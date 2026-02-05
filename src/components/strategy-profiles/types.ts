@@ -6,6 +6,7 @@ export type StrategyPresetRow = {
   strategy: string;
   title: string;
   description: string;
+  default_parameters?: unknown | null;
 };
 
 export type CustomStrategyProfile = {
@@ -30,14 +31,14 @@ export const BASE_STRATEGY_LABEL: Record<string, string> = {
   balanced: '均衡方案',
   urgent_first: '紧急优先',
   capacity_first: '产能优先',
-  cold_stock_first: '冷坨消化',
+  cold_stock_first: '冷料消化',
 };
 
 export const DEFAULT_PRESETS: StrategyPresetRow[] = [
   { strategy: 'balanced', title: '均衡方案', description: '在交付/产能/库存之间保持均衡' },
   { strategy: 'urgent_first', title: '紧急优先', description: '优先保障 L3/L2 紧急订单' },
   { strategy: 'capacity_first', title: '产能优先', description: '优先提升产能利用率，减少溢出' },
-  { strategy: 'cold_stock_first', title: '冷坨消化', description: '优先消化冷坨/压库物料' },
+  { strategy: 'cold_stock_first', title: '冷料消化', description: '优先消化冷料/压库物料' },
 ];
 
 export function makeCustomStrategyKey(strategyId: string): string {

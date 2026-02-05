@@ -74,8 +74,8 @@ const severityOrder: Record<ProblemSeverity, number> = { P0: 0, P1: 1, P2: 2, P3
 
 function formatTonnage(t: number): string {
   const v = Number.isFinite(t) ? t : 0;
-  if (Math.abs(v) >= 1000) return `${(v / 1000).toFixed(1)}kt`;
-  return `${v.toFixed(1)}t`;
+  if (Math.abs(v) >= 1000) return `${(v / 1000).toFixed(2)}kt`;
+  return `${v.toFixed(2)}t`;
 }
 
 function getWorstRiskDay(days: DaySummary[]): DaySummary | null {

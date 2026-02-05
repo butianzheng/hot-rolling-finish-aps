@@ -23,7 +23,10 @@ const StrategyProfilesPanel: React.FC = () => {
         description={
           <div>
             <div>自定义策略用于沉淀"可复用的策略模板"（复制预设 → 调参 → 保存）。</div>
-            <div>注意：当前版本自定义策略的参数仅做保存与展示；草案试算仍按"基于预设策略"执行（参数将在后续引擎支持后生效）。</div>
+            <div>
+              注意：草案试算/发布时若选择 <code>custom:*</code> 策略，会在“等级内排序”阶段按参数加权评分生效；
+              同分时回落到基于预设策略的稳定排序（更可解释）。
+            </div>
           </div>
         }
       />
@@ -50,6 +53,7 @@ const StrategyProfilesPanel: React.FC = () => {
         saving={workflow.saving}
         form={workflow.form}
         baseStrategyOptions={workflow.baseStrategyOptions}
+        presetsByKey={workflow.presetsByKey}
         onSave={workflow.handleSave}
         onCancel={workflow.closeModal}
       />

@@ -129,12 +129,20 @@ impl PlanApi {
             }
         }
 
-        // 2. 从 material_master 获取 steel_mark → steel_grade
-        if let Ok(steel_map) = self.material_master_repo.find_steel_marks_by_ids(&material_ids) {
+        // 2. 从 material_master 获取 steel_mark/宽度/厚度（用于前端展示完整规格信息）
+        if let Ok(spec_map) = self.material_master_repo.find_spec_lite_by_ids(&material_ids) {
             for item in items.iter_mut() {
-                if item.steel_grade.is_none() {
-                    if let Some(mark) = steel_map.get(&item.material_id) {
-                        item.steel_grade = Some(mark.clone());
+                if let Some(spec) = spec_map.get(&item.material_id) {
+                    if item.steel_grade.is_none() {
+                        if let Some(mark) = spec.steel_mark.as_ref() {
+                            item.steel_grade = Some(mark.clone());
+                        }
+                    }
+                    if item.width_mm.is_none() {
+                        item.width_mm = spec.width_mm;
+                    }
+                    if item.thickness_mm.is_none() {
+                        item.thickness_mm = spec.thickness_mm;
                     }
                 }
             }

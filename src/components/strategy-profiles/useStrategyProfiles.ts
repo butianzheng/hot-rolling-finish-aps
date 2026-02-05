@@ -38,7 +38,7 @@ export function useStrategyProfiles() {
         { value: 'balanced', label: '均衡方案' },
         { value: 'urgent_first', label: '紧急优先' },
         { value: 'capacity_first', label: '产能优先' },
-        { value: 'cold_stock_first', label: '冷坨消化' },
+        { value: 'cold_stock_first', label: '冷料消化' },
       ];
     }
     return keys.map((k) => ({
@@ -61,6 +61,7 @@ export function useStrategyProfiles() {
               strategy: String(p?.strategy ?? ''),
               title: String(p?.title ?? ''),
               description: String(p?.description ?? ''),
+              default_parameters: p?.default_parameters ?? null,
             }))
             .filter((p) => p.strategy && p.title)
         : [];
@@ -186,6 +187,7 @@ export function useStrategyProfiles() {
     // 状态
     loading,
     presets,
+    presetsByKey,
     customProfiles,
     modalOpen,
     modalMode,

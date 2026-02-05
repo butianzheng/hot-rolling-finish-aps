@@ -340,7 +340,7 @@ export const D3ColdStock: React.FC<D3ColdStockProps> = ({ embedded, onOpenDrilld
           <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="冷料总重量"
-              value={globalStats.totalWeight.toFixed(1)}
+              value={globalStats.totalWeight.toFixed(2)}
               suffix="吨"
               valueStyle={{
                 color: globalStats.totalWeight > 1000 ? '#faad14' : '#52c41a',
@@ -408,7 +408,7 @@ export const D3ColdStock: React.FC<D3ColdStockProps> = ({ embedded, onOpenDrilld
               {selectedMachineData.totalCount}个
             </Descriptions.Item>
             <Descriptions.Item label="冷料总重量">
-              {selectedMachineData.totalWeight.toFixed(1)}吨
+              {selectedMachineData.totalWeight.toFixed(2)}吨
             </Descriptions.Item>
             <Descriptions.Item label="平均库龄">
               {selectedMachineData.avgAge.toFixed(1)}天
@@ -453,7 +453,7 @@ export const D3ColdStock: React.FC<D3ColdStockProps> = ({ embedded, onOpenDrilld
                     {AGE_BIN_LABELS[bucket.ageBin]}
                   </div>
                   <div>数量: {bucket.count}个</div>
-                  <div>重量: {bucket.weightT.toFixed(1)}吨</div>
+                  <div>重量: {bucket.weightT.toFixed(2)}吨</div>
                   <div>
                     压力:
                     <Tag
@@ -579,7 +579,7 @@ const MachineStatsTable: React.FC<MachineStatsTableProps> = ({ data, onRowClick 
       dataIndex: 'totalWeight',
       key: 'totalWeight',
       width: 120,
-      render: (weight: number) => weight.toFixed(1),
+      render: (weight: number) => weight.toFixed(2),
       sorter: (a, b) => a.totalWeight - b.totalWeight,
     },
     {

@@ -155,6 +155,8 @@ impl PlanApi {
                 sched_state: original_item.sched_state.clone(),
                 assign_reason: Some("MANUAL_MOVE".to_string()),
                 steel_grade: original_item.steel_grade.clone(),
+                width_mm: original_item.width_mm,
+                thickness_mm: original_item.thickness_mm,
             };
 
             items_to_update.push(updated_item);

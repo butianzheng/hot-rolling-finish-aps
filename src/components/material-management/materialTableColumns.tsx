@@ -125,6 +125,32 @@ export function createMaterialTableColumns(options: MaterialTableColumnsOptions)
       ),
     },
     {
+      title: '厚度(mm)',
+      dataIndex: 'thickness_mm',
+      key: 'thickness_mm',
+      width: 100,
+      align: 'right',
+      search: false,
+      render: (val: any) => (
+        <span style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>
+          {val == null || !Number.isFinite(Number(val)) ? '-' : Number(val).toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      title: '宽度(mm)',
+      dataIndex: 'width_mm',
+      key: 'width_mm',
+      width: 100,
+      align: 'right',
+      search: false,
+      render: (val: any) => (
+        <span style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>
+          {val == null || !Number.isFinite(Number(val)) ? '-' : Number(val).toFixed(2)}
+        </span>
+      ),
+    },
+    {
       title: '钢种',
       dataIndex: 'steel_mark',
       key: 'steel_mark',

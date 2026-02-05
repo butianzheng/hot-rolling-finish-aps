@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { Alert, Button, DatePicker, Modal, Select, Space, Typography } from 'antd';
+import { Alert, Button, DatePicker, InputNumber, Modal, Select, Space, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import type { OptimizeStrategy, SimulateResult } from './types';
 import { STRATEGY_OPTIONS } from './types';
@@ -13,6 +13,7 @@ interface PreviewModalProps {
   strategyLabel: string;
   strategy: OptimizeStrategy;
   baseDate: Dayjs;
+  windowDaysOverride: number | null;
   simulateLoading: boolean;
   executeLoading: boolean;
   simulateResult: SimulateResult | null;
@@ -22,6 +23,7 @@ interface PreviewModalProps {
   onSimulate: () => void;
   onBaseDateChange: (date: Dayjs) => void;
   onStrategyChange: (strategy: OptimizeStrategy) => void;
+  onWindowDaysOverrideChange: (v: number | null) => void;
 }
 
 export const PreviewModal: React.FC<PreviewModalProps> = ({
@@ -29,6 +31,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   strategyLabel,
   strategy,
   baseDate,
+  windowDaysOverride,
   simulateLoading,
   executeLoading,
   simulateResult,
@@ -38,6 +41,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   onSimulate,
   onBaseDateChange,
   onStrategyChange,
+  onWindowDaysOverrideChange,
 }) => {
   return (
     <Modal
@@ -54,7 +58,18 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
           type="info"
           showIcon
           message="说明"
-          description={`试算（simulate_recalc）仅返回排产数量等摘要，不落库、不写日志；执行重算会落库并触发 plan_updated 事件。当前策略：${strategyLabel}`}
+          description={
+            <div>
+              <div>
+                试算（simulate_recalc）仅返回排产数量等摘要，不落库、不写日志；执行重算会落库并触发
+                plan_updated 事件。
+              </div>
+              <div style={{ marginTop: 4 }}>
+                当前策略：{strategyLabel}；窗口天数：
+                {windowDaysOverride != null ? String(windowDaysOverride) : '跟随版本配置'}
+              </div>
+            </div>
+          }
         />
 
         <Space wrap>
@@ -65,6 +80,21 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
             style={{ minWidth: 160 }}
             options={STRATEGY_OPTIONS}
           />
+        </Space>
+
+        <Space wrap>
+          <span>窗口天数</span>
+          <InputNumber
+            min={1}
+            max={60}
+            value={windowDaysOverride ?? undefined}
+            onChange={(v) => onWindowDaysOverrideChange(v == null ? null : Number(v))}
+            placeholder="跟随版本"
+            style={{ width: 160 }}
+          />
+          <Button size="small" onClick={() => onWindowDaysOverrideChange(null)}>
+            跟随版本
+          </Button>
         </Space>
 
         <Space wrap>

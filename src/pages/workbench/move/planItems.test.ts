@@ -98,7 +98,7 @@ describe('planItems', () => {
     it('应该跳过没有 material_id 的项', () => {
       const items: IpcPlanItem[] = [
         { material_id: 'M001', plan_date: '2026-02-04' } as IpcPlanItem,
-        { material_id: null, plan_date: '2026-02-05' } as IpcPlanItem,
+        ({ material_id: null, plan_date: '2026-02-05' } as unknown as IpcPlanItem),
         { material_id: '', plan_date: '2026-02-06' } as IpcPlanItem,
         { material_id: '  ', plan_date: '2026-02-07' } as IpcPlanItem,
       ];

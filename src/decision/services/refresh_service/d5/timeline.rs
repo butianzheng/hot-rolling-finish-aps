@@ -196,13 +196,18 @@ pub(super) fn simulate_to_as_of(
             if campaign_active && suggest_threshold_t > 0.0 {
                 let remaining_to_soft = suggest_threshold_t - state.cum_weight_t;
                 if remaining_to_soft >= 0.0 && state.remaining_weight_t >= remaining_to_soft {
-                    let sec_to_soft =
-                        (remaining_to_soft / rate_t_per_sec).round().max(0.0) as i64;
+                    let sec_to_soft_f = remaining_to_soft / rate_t_per_sec;
+                    let sec_to_soft = sec_to_soft_f.ceil().max(1.0) as i64;
                     let soft_time = seg_start + chrono::Duration::seconds(sec_to_soft);
                     if soft_time < next_event_time {
                         next_event_time = soft_time;
                     }
                 }
+            }
+
+            if next_event_time <= seg_start && seg_start < as_of {
+                let forced = seg_start + chrono::Duration::seconds(1);
+                next_event_time = if forced > as_of { as_of } else { forced };
             }
 
             let delta_seconds = (next_event_time - seg_start).num_seconds().max(0);
@@ -261,4 +266,34 @@ pub(super) fn simulate_to_as_of(
 
     state.current_time = as_of;
     state
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    #[test]
+    fn simulate_to_as_of_does_not_hang_when_soft_reach_rounds_to_zero() {
+        let t0 = NaiveDateTime::parse_from_str("2026-02-01 00:00:00", "%Y-%m-%d %H:%M:%S")
+            .unwrap();
+        let as_of = t0 + chrono::Duration::seconds(20);
+
+        let items = vec![PlanItemLite {
+            earliest_start_at: t0,
+            weight_t: 100.0,
+        }];
+
+        let (tx, rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let state = simulate_to_as_of(&items, 1.0, t0, 10.1, 0, as_of);
+            let _ = tx.send(state);
+        });
+
+        let state = rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("simulate_to_as_of hung");
+        assert_eq!(state.current_time, as_of);
+    }
 }

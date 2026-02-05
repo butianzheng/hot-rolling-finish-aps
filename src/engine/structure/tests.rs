@@ -57,6 +57,8 @@ fn create_test_plan_item(
         sched_state: Some("READY".to_string()),
         assign_reason: Some("TEST".to_string()),
         steel_grade: None,
+        width_mm: None,
+        thickness_mm: None,
     }
 }
 

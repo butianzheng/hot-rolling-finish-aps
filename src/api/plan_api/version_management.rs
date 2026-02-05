@@ -351,61 +351,31 @@ impl PlanApi {
             version_id, frozen_date, end_date
         );
 
-        // 3. 查询该版本的所有 plan_item 并按 (machine_code, plan_date) 聚合
-        let items = self.plan_item_repo.find_by_version(version_id)
+        // 3. 使用 SQL 聚合按 (machine_code, plan_date) 统计吨位，避免拉取全量 plan_item（50k+ 性能瓶颈）
+        let updates = self
+            .plan_item_repo
+            .sum_weight_by_machine_and_date_range(version_id, frozen_date, end_date)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
-        // 4. 按 (machine_code, plan_date) 聚合计算 used_capacity_t
-        let mut capacity_updates: HashMap<(String, String), f64> = HashMap::new();
-        for item in items {
-            let key = (item.machine_code.clone(), item.plan_date.to_string());
-            *capacity_updates.entry(key).or_insert(0.0) += item.weight_t;
-        }
+        tracing::info!(
+            "产能池同步：version_id={}, date_range=[{}, {}], agg_rows={}",
+            version_id,
+            frozen_date,
+            end_date,
+            updates.len()
+        );
 
-        tracing::info!("产能池同步：version_id={}, 涉及 {} 个(机组,日期)组合",
-            version_id, capacity_updates.len());
+        // 4. 批量更新 capacity_pool 的 used_capacity_t + overflow_t（不读取全量 capacity_pool）
+        let updated_rows = self
+            .capacity_repo
+            .update_used_and_overflow_batch(version_id, &updates)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
-        // 5. 查询现有产能池，更新 used_capacity_t 和 overflow_t
-        for ((machine_code, plan_date_str), used_weight) in capacity_updates {
-            let plan_date = NaiveDate::parse_from_str(&plan_date_str, "%Y-%m-%d")
-                .map_err(|_| ApiError::InvalidInput(format!("日期格式错误: {}", plan_date_str)))?;
-
-            // 查询现有产能池
-            let mut capacity_pool = self.capacity_repo
-                .find_by_machine_and_date(version_id, &machine_code, plan_date)
-                .map_err(|e| ApiError::DatabaseError(e.to_string()))?
-                .unwrap_or_else(|| {
-                    // 如果不存在，创建默认产能池
-                    tracing::debug!("产能池不存在，创建默认值: version_id={}, machine={}, date={}",
-                        version_id, machine_code, plan_date);
-                    CapacityPool {
-                        version_id: version_id.to_string(),
-                        machine_code: machine_code.clone(),
-                        plan_date,
-                        target_capacity_t: 0.0,
-                        limit_capacity_t: 0.0,
-                        used_capacity_t: 0.0,
-                        overflow_t: 0.0,
-                        frozen_capacity_t: 0.0,
-                        accumulated_tonnage_t: 0.0,
-                        roll_campaign_id: None,
-                    }
-                });
-
-            // 更新 used_capacity_t
-            capacity_pool.used_capacity_t = used_weight;
-
-            // 重新计算 overflow_t
-            capacity_pool.overflow_t = if used_weight > capacity_pool.limit_capacity_t {
-                used_weight - capacity_pool.limit_capacity_t
-            } else {
-                0.0
-            };
-
-            // 持久化
-            self.capacity_repo.upsert_single(&capacity_pool)
-                .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
-        }
+        tracing::info!(
+            "产能池同步完成: version_id={}, updated_rows={}",
+            version_id,
+            updated_rows
+        );
 
         Ok(())
     }
@@ -418,17 +388,9 @@ impl PlanApi {
         &self,
         version_id: &str,
     ) -> ApiResult<Vec<(String, NaiveDate)>> {
-        let items = self
-            .plan_item_repo
-            .find_by_version(version_id)
-            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
-
-        let mut keys = std::collections::HashSet::new();
-        for item in items {
-            keys.insert((item.machine_code, item.plan_date));
-        }
-
-        Ok(keys.into_iter().collect())
+        self.plan_item_repo
+            .list_machine_date_keys(version_id)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))
     }
 
     /// 重置产能池（将 used_capacity_t 和 overflow_t 清零）

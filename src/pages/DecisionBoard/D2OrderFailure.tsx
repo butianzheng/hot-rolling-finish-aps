@@ -468,13 +468,13 @@ export const D2OrderFailure: React.FC<D2OrderFailureProps> = ({ embedded, onOpen
             </Descriptions.Item>
             <Descriptions.Item label="机组">{selectedOrder.machineCode}</Descriptions.Item>
             <Descriptions.Item label="总重量">
-              {selectedOrder.totalWeightT.toFixed(1)}吨
+              {selectedOrder.totalWeightT.toFixed(2)}吨
             </Descriptions.Item>
             <Descriptions.Item label="已排产重量">
-              {selectedOrder.scheduledWeightT.toFixed(1)}吨
+              {selectedOrder.scheduledWeightT.toFixed(2)}吨
             </Descriptions.Item>
             <Descriptions.Item label="未排产重量">
-              {selectedOrder.unscheduledWeightT.toFixed(1)}吨
+              {selectedOrder.unscheduledWeightT.toFixed(2)}吨
             </Descriptions.Item>
           </Descriptions>
 
@@ -599,7 +599,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, isSelected }) => 
 
         {/* 重量信息 */}
         <div style={{ fontSize: '12px' }}>
-          未排产: <span style={{ color: '#ff4d4f', fontWeight: 'bold' }}>{order.unscheduledWeightT.toFixed(1)}</span>吨 / 总计: {order.totalWeightT.toFixed(1)}吨
+          未排产: <span style={{ color: '#ff4d4f', fontWeight: 'bold' }}>{order.unscheduledWeightT.toFixed(2)}</span>吨 / 总计: {order.totalWeightT.toFixed(2)}吨
         </div>
 
         {/* 机组 */}

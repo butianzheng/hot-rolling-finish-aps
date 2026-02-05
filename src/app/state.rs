@@ -6,7 +6,7 @@
 // ==========================================
 
 use std::sync::{Arc, Mutex};
-use rusqlite::Connection;
+use rusqlite::{Connection, OpenFlags};
 
 use crate::api::{ConfigApi, ImportApi, ManualOperationValidator, MaterialApi, PathRuleApi, PlanApi, DashboardApi, RollerApi, RhythmApi};
 use crate::db::open_sqlite_connection;
@@ -125,23 +125,28 @@ impl AppState {
             tracing::warn!("action_log 索引初始化失败(将继续启动): {}", e);
         }
 
-        match crate::db::read_schema_version(&conn) {
-            Ok(Some(v)) if v < crate::db::CURRENT_SCHEMA_VERSION => {
-                tracing::warn!(
-                    "数据库 schema_version={} 低于当前要求 {}，可能需要执行迁移 (migrations/ v0.*.sql) 或重置开发库",
+        // 明确要求：若数据库版本过低，直接失败并给出修复指引（避免后续运行期大量 DATABASE_ERROR）。
+        // 说明：生产环境升级应先人工执行 migrations；开发环境可直接重置并全量 seed。
+        let schema_version = crate::db::read_schema_version(&conn)
+            .map_err(|e| format!("读取 schema_version 失败: {}", e))?;
+        match schema_version {
+            Some(v) if v < crate::db::CURRENT_SCHEMA_VERSION => {
+                return Err(format!(
+                    "数据库 schema_version={} 低于当前要求 {}。\n\
+请先执行迁移(migrations/v0.*.sql)或重置开发库。\n\
+开发库重置示例：bash scripts/dev_db/reset_and_seed.sh \"$HOME/Library/Application Support/hot-rolling-aps-dev/hot_rolling_aps.db\" 30000\n\
+也可通过环境变量 HOT_ROLLING_APS_DB_PATH 指向新库。",
                     v,
                     crate::db::CURRENT_SCHEMA_VERSION
+                ));
+            }
+            None => {
+                return Err(
+                    "数据库缺少/未初始化 schema_version，无法判断版本；请先执行迁移或重置开发库。"
+                        .to_string(),
                 );
             }
-            Ok(None) => {
-                tracing::warn!(
-                    "数据库缺少 schema_version 表，无法判断版本；如为旧库请先执行迁移或重置开发库"
-                );
-            }
-            Ok(Some(_)) => {}
-            Err(e) => {
-                tracing::warn!("读取 schema_version 失败(将继续启动): {}", e);
-            }
+            Some(_) => {}
         }
         let conn = Arc::new(Mutex::new(conn));
 
@@ -212,7 +217,17 @@ impl AppState {
         let risk_engine = Arc::new(RiskEngine::new());
 
         // 决策视图刷新队列和事件适配器
-        let decision_refresh_service = Arc::new(DecisionRefreshService::new(conn.clone()));
+        let refresh_worker_conn: Arc<Mutex<Connection>> = match open_sqlite_connection(&db_path) {
+            Ok(c) => Arc::new(Mutex::new(c)),
+            Err(e) => {
+                tracing::warn!(
+                    "无法创建决策刷新独立连接(将退回共享连接): {}",
+                    e
+                );
+                conn.clone()
+            }
+        };
+        let decision_refresh_service = Arc::new(DecisionRefreshService::new(refresh_worker_conn));
         let event_publisher: Option<Arc<dyn ScheduleEventPublisher>> =
             match RefreshQueue::new(conn.clone(), decision_refresh_service) {
             Ok(queue) => {
@@ -389,7 +404,17 @@ impl AppState {
         ));
 
         // 驾驶舱API（封装 DecisionApi）
-        let decision_refresh_repo = Arc::new(DecisionRefreshRepository::new(conn.clone()));
+        let refresh_read_conn: Arc<Mutex<Connection>> = match open_sqlite_connection(&db_path) {
+            Ok(c) => Arc::new(Mutex::new(c)),
+            Err(e) => {
+                tracing::warn!(
+                    "无法创建决策刷新状态独立连接(将退回共享连接): {}",
+                    e
+                );
+                conn.clone()
+            }
+        };
+        let decision_refresh_repo = Arc::new(DecisionRefreshRepository::new(refresh_read_conn));
         let dashboard_api = Arc::new(DashboardApi::new(
             decision_api.clone(),
             action_log_repo.clone(),
@@ -512,14 +537,38 @@ pub fn get_default_db_path() -> String {
             if !path.exists() {
                 let seed = PathBuf::from("./hot_rolling_aps.db");
                 if seed.exists() {
-                    // best-effort: 复制失败不应阻塞启动（后续会自动创建空库并建表）
-                    let _ = std::fs::copy(seed, &path);
+                    // 避免复制“旧版本 seed DB”导致 schema_version 过低，从而运行期出现 no such column 等数据库错误。
+                    // 兼容策略：
+                    // - seed 版本 >= CURRENT_SCHEMA_VERSION：复制（提供更好开箱体验）
+                    // - seed 版本过旧/缺失：跳过复制，后续会自动创建空库并建表（不会报错）
+                    if can_copy_seed_db(&seed) {
+                        // best-effort: 复制失败不应阻塞启动（后续会自动创建空库并建表）
+                        let _ = std::fs::copy(seed, &path);
+                    } else {
+                        tracing::warn!(
+                            "跳过复制 seed DB：{}（seed 版本过旧/不可用，避免 schema 不匹配）",
+                            seed.to_string_lossy()
+                        );
+                    }
                 }
             }
         }
     }
 
     path.to_string_lossy().to_string()
+}
+
+#[cfg(debug_assertions)]
+fn can_copy_seed_db(seed_path: &std::path::Path) -> bool {
+    let conn = match Connection::open_with_flags(seed_path, OpenFlags::SQLITE_OPEN_READ_ONLY) {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+
+    match crate::db::read_schema_version(&conn) {
+        Ok(Some(v)) => v >= crate::db::CURRENT_SCHEMA_VERSION,
+        _ => false,
+    }
 }
 
 #[cfg(test)]

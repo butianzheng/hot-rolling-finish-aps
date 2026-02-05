@@ -29,6 +29,7 @@ export function useOneClickOptimize({
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [baseDate, setBaseDate] = useState<Dayjs>(dayjs());
+  const [windowDaysOverride, setWindowDaysOverride] = useState<number | null>(null);
   const [simulateLoading, setSimulateLoading] = useState(false);
   const [executeLoading, setExecuteLoading] = useState(false);
   const [simulateResult, setSimulateResult] = useState<SimulateResult | null>(null);
@@ -38,6 +39,16 @@ export function useOneClickOptimize({
   const [postActionLoading, setPostActionLoading] = useState<'switch' | 'activate' | null>(null);
 
   const strategyLabel = getStrategyLabel(strategy);
+
+  const changeBaseDate = (date: Dayjs) => {
+    setBaseDate(date);
+    setSimulateResult(null);
+  };
+
+  const changeWindowDaysOverride = (v: number | null) => {
+    setWindowDaysOverride(v);
+    setSimulateResult(null);
+  };
 
   const runSimulate = async () => {
     if (!activeVersionId) {
@@ -52,7 +63,8 @@ export function useOneClickOptimize({
         formatDate(baseDate),
         undefined,
         operator,
-        strategy
+        strategy,
+        windowDaysOverride ?? undefined
       );
       setSimulateResult(res);
       message.success('试算完成');
@@ -79,7 +91,8 @@ export function useOneClickOptimize({
         formatDate(baseDate),
         undefined,
         operator,
-        strategy
+        strategy,
+        windowDaysOverride ?? undefined
       );
       message.success(String(res?.message || '重算完成'));
       const newVersionId = String(res?.version_id ?? '').trim();
@@ -155,7 +168,8 @@ export function useOneClickOptimize({
     // 状态
     previewOpen,
     baseDate,
-    setBaseDate,
+    changeBaseDate,
+    windowDaysOverride,
     simulateLoading,
     executeLoading,
     simulateResult,
@@ -173,6 +187,7 @@ export function useOneClickOptimize({
     closePreview,
     closePostCreate,
     changeStrategy,
+    changeWindowDaysOverride,
     openPreview,
     openPreviewWithStrategy,
   };

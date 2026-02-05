@@ -61,6 +61,26 @@ export function createPlanItemColumns(options: PlanItemColumnsOptions): ColumnsT
       width: 100,
     },
     {
+      title: '厚度(mm)',
+      dataIndex: 'thickness_mm',
+      key: 'thickness_mm',
+      width: 100,
+      align: 'right',
+      sorter: (a, b) => Number(a.thickness_mm ?? 0) - Number(b.thickness_mm ?? 0),
+      render: (value: number | null | undefined) =>
+        value == null || !Number.isFinite(Number(value)) ? '-' : Number(value).toFixed(2),
+    },
+    {
+      title: '宽度(mm)',
+      dataIndex: 'width_mm',
+      key: 'width_mm',
+      width: 100,
+      align: 'right',
+      sorter: (a, b) => Number(a.width_mm ?? 0) - Number(b.width_mm ?? 0),
+      render: (value: number | null | undefined) =>
+        value == null || !Number.isFinite(Number(value)) ? '-' : Number(value).toFixed(2),
+    },
+    {
       title: '吨位',
       dataIndex: 'weight_t',
       key: 'weight_t',

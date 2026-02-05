@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { Button, Card, Space } from 'antd';
+import { Button, Card, Collapse, Space, Typography } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { StrategyPresetRow } from './types';
 import { DEFAULT_PRESETS } from './types';
@@ -24,6 +24,28 @@ export const PresetsCard: React.FC<PresetsCardProps> = ({
   onCreateNew,
 }) => {
   const displayPresets = presets.length ? presets : DEFAULT_PRESETS;
+  const collapseItems = displayPresets.map((p) => ({
+    key: String(p.strategy),
+    label: `${p.title}（${p.strategy}）`,
+    children: (
+      <div>
+        <Typography.Text type="secondary">{p.description}</Typography.Text>
+        <pre style={{
+          marginTop: 8,
+          padding: 8,
+          borderRadius: 6,
+          background: '#fafafa',
+          border: '1px solid #f0f0f0',
+          maxHeight: 220,
+          overflow: 'auto',
+          fontSize: 12,
+        }}
+        >
+          {p.default_parameters ? JSON.stringify(p.default_parameters, null, 2) : '—'}
+        </pre>
+      </div>
+    ),
+  }));
 
   return (
     <Card
@@ -46,6 +68,10 @@ export const PresetsCard: React.FC<PresetsCardProps> = ({
           新建自定义策略
         </Button>
       </Space>
+
+      <div style={{ marginTop: 12 }}>
+        <Collapse size="small" items={collapseItems} />
+      </div>
     </Card>
   );
 };

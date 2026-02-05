@@ -64,10 +64,13 @@ pub async fn delete_plan(
     plan_id: String,
     operator: String,
 ) -> Result<String, String> {
-    state
-        .plan_api
-        .delete_plan(&plan_id, &operator)
-        .map_err(map_api_error)?;
+    let plan_api = state.plan_api.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        plan_api.delete_plan(&plan_id, &operator)
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
 
     Ok("{}".to_string())
 }
@@ -79,10 +82,13 @@ pub async fn delete_version(
     version_id: String,
     operator: String,
 ) -> Result<String, String> {
-    state
-        .plan_api
-        .delete_version(&version_id, &operator)
-        .map_err(map_api_error)?;
+    let plan_api = state.plan_api.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        plan_api.delete_version(&version_id, &operator)
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
 
     Ok("{}".to_string())
 }
@@ -101,10 +107,13 @@ pub async fn create_version(
         .map(|s| parse_date(&s))
         .transpose()?;
 
-    let result = state
-        .plan_api
-        .create_version(plan_id, window_days, frozen_date, note, created_by)
-        .map_err(map_api_error)?;
+    let plan_api = state.plan_api.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        plan_api.create_version(plan_id, window_days, frozen_date, note, created_by)
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
@@ -131,10 +140,15 @@ pub async fn activate_version(
     version_id: String,
     operator: String,
 ) -> Result<String, String> {
-    state
-        .plan_api
-        .activate_version(&version_id, &operator)
-        .map_err(map_api_error)?;
+    let plan_api = state.plan_api.clone();
+    let version_id_clone = version_id.clone();
+    let operator_clone = operator.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        plan_api.activate_version(&version_id_clone, &operator_clone)
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
 
     // 版本切换后，多个页面需要联动刷新（plan items / decision read models / KPI）。
     emit_frontend_event(&app, "plan_updated", serde_json::json!({ "version_id": version_id }));
@@ -153,10 +167,22 @@ pub async fn rollback_version(
     operator: String,
     reason: String,
 ) -> Result<String, String> {
-    let result = state
-        .plan_api
-        .rollback_version(&plan_id, &target_version_id, &operator, &reason)
-        .map_err(map_api_error)?;
+    let plan_api = state.plan_api.clone();
+    let plan_id_clone = plan_id.clone();
+    let target_version_id_clone = target_version_id.clone();
+    let operator_clone = operator.clone();
+    let reason_clone = reason.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        plan_api.rollback_version(
+            &plan_id_clone,
+            &target_version_id_clone,
+            &operator_clone,
+            &reason_clone,
+        )
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
 
     // 回滚后，多个页面需要联动刷新（plan items / decision read models / KPI）。
     emit_frontend_event(
@@ -178,6 +204,7 @@ pub async fn simulate_recalc(
     frozen_date: Option<String>,
     operator: String,
     strategy: Option<String>,
+    window_days_override: Option<i32>,
 ) -> Result<String, String> {
     let base_date = parse_date(&base_date)?;
     let frozen_date = frozen_date.map(|s| parse_date(&s)).transpose()?;
@@ -188,10 +215,20 @@ pub async fn simulate_recalc(
         .parse::<ScheduleStrategy>()
         .map_err(|e| format!("策略类型解析失败: {}", e))?;
 
-    let result = state
-        .plan_api
-        .simulate_recalc_with_strategy(&version_id, base_date, frozen_date, &operator, strategy)
-        .map_err(map_api_error)?;
+    let plan_api = state.plan_api.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        plan_api.simulate_recalc_with_strategy(
+            &version_id,
+            base_date,
+            frozen_date,
+            &operator,
+            strategy,
+            window_days_override,
+        )
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
@@ -206,6 +243,7 @@ pub async fn recalc_full(
     frozen_date: Option<String>,
     operator: String,
     strategy: Option<String>,
+    window_days_override: Option<i32>,
 ) -> Result<String, String> {
     let base_date = parse_date(&base_date)?;
     let frozen_date = frozen_date.map(|s| parse_date(&s)).transpose()?;
@@ -216,10 +254,20 @@ pub async fn recalc_full(
         .parse::<ScheduleStrategy>()
         .map_err(|e| format!("策略类型解析失败: {}", e))?;
 
-    let result = state
-        .plan_api
-        .recalc_full_with_strategy(&version_id, base_date, frozen_date, &operator, strategy)
-        .map_err(map_api_error)?;
+    let plan_api = state.plan_api.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        plan_api.recalc_full_with_strategy(
+            &version_id,
+            base_date,
+            frozen_date,
+            &operator,
+            strategy,
+            window_days_override,
+        )
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
 
     let version_id_for_event = result.version_id.clone();
     emit_frontend_event(
@@ -258,10 +306,13 @@ pub async fn generate_strategy_drafts(
     let from = parse_date(&plan_date_from)?;
     let to = parse_date(&plan_date_to)?;
 
-    let result = state
-        .plan_api
-        .generate_strategy_drafts(&base_version_id, from, to, strategies, &operator)
-        .map_err(map_api_error)?;
+    let plan_api = state.plan_api.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        plan_api.generate_strategy_drafts(&base_version_id, from, to, strategies, &operator)
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
@@ -274,10 +325,15 @@ pub async fn apply_strategy_draft(
     draft_id: String,
     operator: String,
 ) -> Result<String, String> {
-    let result = state
-        .plan_api
-        .apply_strategy_draft(&draft_id, &operator)
-        .map_err(map_api_error)?;
+    let plan_api = state.plan_api.clone();
+    let draft_id_clone = draft_id.clone();
+    let operator_clone = operator.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        plan_api.apply_strategy_draft(&draft_id_clone, &operator_clone)
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
 
     let version_id_for_event = result.version_id.clone();
     emit_frontend_event(
@@ -376,10 +432,10 @@ pub async fn list_plan_items(
         || limit.is_some()
         || offset.is_some();
 
-    let result = if has_filters {
-        state
-            .plan_api
-            .list_plan_items_filtered(
+    let plan_api = state.plan_api.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        if has_filters {
+            plan_api.list_plan_items_filtered(
                 &version_id,
                 machine_code.as_deref(),
                 from,
@@ -387,13 +443,13 @@ pub async fn list_plan_items(
                 limit,
                 offset,
             )
-            .map_err(map_api_error)?
-    } else {
-        state
-            .plan_api
-            .list_plan_items(&version_id)
-            .map_err(map_api_error)?
-    };
+        } else {
+            plan_api.list_plan_items(&version_id)
+        }
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
@@ -407,10 +463,14 @@ pub async fn list_items_by_date(
 ) -> Result<String, String> {
     let date = parse_date(&plan_date)?;
 
-    let result = state
-        .plan_api
-        .list_items_by_date(&version_id, date)
-        .map_err(map_api_error)?;
+    let plan_api = state.plan_api.clone();
+    let version_id_clone = version_id.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        plan_api.list_items_by_date(&version_id_clone, date)
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
@@ -422,10 +482,13 @@ pub async fn compare_versions(
     version_id_a: String,
     version_id_b: String,
 ) -> Result<String, String> {
-    let result = state
-        .plan_api
-        .compare_versions(&version_id_a, &version_id_b)
-        .map_err(map_api_error)?;
+    let plan_api = state.plan_api.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        plan_api.compare_versions(&version_id_a, &version_id_b)
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
@@ -437,10 +500,13 @@ pub async fn compare_versions_kpi(
     version_id_a: String,
     version_id_b: String,
 ) -> Result<String, String> {
-    let result = state
-        .plan_api
-        .compare_versions_kpi(&version_id_a, &version_id_b)
-        .map_err(map_api_error)?;
+    let plan_api = state.plan_api.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        plan_api.compare_versions_kpi(&version_id_a, &version_id_b)
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
@@ -476,10 +542,22 @@ pub async fn move_items(
         _ => ValidationMode::Strict,
     };
 
-    let result = state
-        .plan_api
-        .move_items(&version_id, move_requests, validation_mode, &operator, reason.as_deref())
-        .map_err(map_api_error)?;
+    let plan_api = state.plan_api.clone();
+    let version_id_clone = version_id.clone();
+    let operator_clone = operator.clone();
+    let reason_clone = reason.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        plan_api.move_items(
+            &version_id_clone,
+            move_requests,
+            validation_mode,
+            &operator_clone,
+            reason_clone.as_deref(),
+        )
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
 
     emit_frontend_event(
         &app,
@@ -490,4 +568,3 @@ pub async fn move_items(
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
-

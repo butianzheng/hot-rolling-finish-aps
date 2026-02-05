@@ -170,8 +170,8 @@ impl MaterialStateRepository {
         let tx = conn.unchecked_transaction()?;
 
         let mut count = 0;
-        for state in states {
-            tx.execute(
+        {
+            let mut stmt = tx.prepare(
                 r#"
                 INSERT INTO material_state (
                     material_id, sched_state, lock_flag, force_release_flag,
@@ -204,29 +204,34 @@ impl MaterialStateRepository {
                     updated_at = excluded.updated_at,
                     updated_by = excluded.updated_by
                 "#,
-                params![
-                    state.material_id,
-                    Self::sched_state_to_str(&state.sched_state),
-                    state.lock_flag as i32,
-                    state.force_release_flag as i32,
-                    Self::urgent_level_to_str(&state.urgent_level),
-                    state.urgent_reason,
-                    Self::rush_level_to_str(&state.rush_level),
-                    state.rolling_output_age_days,
-                    state.ready_in_days,
-                    state.earliest_sched_date.map(|d| d.to_string()),
-                    state.stock_age_days,
-                    state.scheduled_date.map(|d| d.to_string()),
-                    state.scheduled_machine_code,
-                    state.seq_no,
-                    state.manual_urgent_flag as i32,
-                    state.in_frozen_zone as i32,
-                    state.last_calc_version_id,
-                    state.updated_at.to_rfc3339(),
-                    state.updated_by,
-                ],
             )?;
-            count += 1;
+
+            for state in states {
+                stmt.execute(
+                    params![
+                        state.material_id,
+                        Self::sched_state_to_str(&state.sched_state),
+                        state.lock_flag as i32,
+                        state.force_release_flag as i32,
+                        Self::urgent_level_to_str(&state.urgent_level),
+                        state.urgent_reason,
+                        Self::rush_level_to_str(&state.rush_level),
+                        state.rolling_output_age_days,
+                        state.ready_in_days,
+                        state.earliest_sched_date.map(|d| d.to_string()),
+                        state.stock_age_days,
+                        state.scheduled_date.map(|d| d.to_string()),
+                        state.scheduled_machine_code,
+                        state.seq_no,
+                        state.manual_urgent_flag as i32,
+                        state.in_frozen_zone as i32,
+                        state.last_calc_version_id,
+                        state.updated_at.to_rfc3339(),
+                        state.updated_by,
+                    ],
+                )?;
+                count += 1;
+            }
         }
 
         tx.commit()?;
@@ -304,6 +309,42 @@ impl MaterialStateRepository {
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e.into()),
         }
+    }
+
+    /// 按机组代码查询材料状态（用于排产重算的批量读，避免 N+1 查询）
+    ///
+    /// # 参数
+    /// - machine_code: 机组代码（material_master.current_machine_code）
+    ///
+    /// # 返回
+    /// - Ok(Vec<MaterialState>): 该机组下所有材料状态
+    /// - Err: 数据库错误
+    pub fn list_by_machine_code(&self, machine_code: &str) -> RepositoryResult<Vec<MaterialState>> {
+        let code = machine_code.trim();
+        if code.is_empty() {
+            return Err(RepositoryError::ValidationError("machine_code 不能为空".to_string()));
+        }
+
+        let conn = self.get_conn()?;
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT
+                ms.material_id, ms.sched_state, ms.lock_flag, ms.force_release_flag,
+                ms.urgent_level, ms.urgent_reason, ms.rush_level,
+                ms.rolling_output_age_days, ms.ready_in_days, ms.earliest_sched_date,
+                ms.stock_age_days, ms.scheduled_date, ms.scheduled_machine_code, ms.seq_no,
+                ms.manual_urgent_flag, ms.in_frozen_zone,
+                ms.last_calc_version_id, ms.updated_at, ms.updated_by
+                , ms.user_confirmed, ms.user_confirmed_at, ms.user_confirmed_by, ms.user_confirmed_reason
+            FROM material_state ms
+            JOIN material_master mm ON ms.material_id = mm.material_id
+            WHERE mm.current_machine_code = ?1
+            ORDER BY ms.material_id
+            "#,
+        )?;
+
+        let rows = stmt.query_map(params![code], Self::map_row_to_state)?;
+        Ok(rows.collect::<SqliteResult<Vec<_>>>()?)
     }
 
     /// 批量查询材料状态快照（按 material_id 列表）

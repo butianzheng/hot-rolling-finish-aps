@@ -126,7 +126,7 @@ export const CapacityImpactPanel: React.FC<CapacityImpactPanelProps> = ({
 
           <Statistic
             title="变化量"
-            value={Math.abs(capacityDelta).toFixed(1)}
+            value={Math.abs(capacityDelta).toFixed(2)}
             suffix="t"
             prefix={capacityDelta < 0 ? <ArrowDownOutlined /> : <ArrowUpOutlined />}
             valueStyle={{
@@ -153,13 +153,13 @@ export const CapacityImpactPanel: React.FC<CapacityImpactPanelProps> = ({
         {materialDetails.length > 0 && (
           <div>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              选中 {materialDetails.length} 件物料，合计 {affectedWeight.toFixed(1)}t
+              选中 {materialDetails.length} 件物料，合计 {affectedWeight.toFixed(2)}t
             </Text>
             <div style={{ marginTop: 4 }}>
               {materialDetails.slice(0, 3).map((m, idx) => (
                 <Tooltip
                   key={idx}
-                  title={`${m.material_id} - ${m.weight_t.toFixed(1)}t - ${m.urgent_level} - ${m.status}`}
+                  title={`${m.material_id} - ${m.weight_t.toFixed(2)}t - ${m.urgent_level} - ${m.status}`}
                 >
                   <Tag
                     style={{
@@ -168,7 +168,7 @@ export const CapacityImpactPanel: React.FC<CapacityImpactPanelProps> = ({
                       marginBottom: 4,
                     }}
                   >
-                    {m.material_id} ({m.weight_t.toFixed(1)}t)
+                    {m.material_id} ({m.weight_t.toFixed(2)}t)
                   </Tag>
                 </Tooltip>
               ))}

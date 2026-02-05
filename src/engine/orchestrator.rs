@@ -19,7 +19,7 @@ use crate::engine::capacity_filler::PathOverridePendingItem;
 use crate::config::strategy_profile::CustomStrategyParameters;
 use crate::engine::strategy::ScheduleStrategy;
 use chrono::NaiveDate;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::sync::Arc;
 use tracing::{debug, info};
@@ -282,7 +282,7 @@ where
 
         let fill_result = self.filler.fill_single_day_with_path_rule(
             capacity_pool,
-            sorted_materials.clone(),
+            &sorted_materials,
             frozen_items,
             version_id,
             path_rule_engine,
@@ -309,16 +309,18 @@ where
         // ==========================================
         debug!("步骤5: 执行结构违规检查");
 
-        // 构建材料和状态的 HashMap
-        let materials_map: HashMap<String, MaterialMaster> = sorted_materials
-            .iter()
-            .map(|(m, _)| (m.material_id.clone(), m.clone()))
-            .collect();
-
-        let states_map: HashMap<String, MaterialState> = sorted_materials
-            .iter()
-            .map(|(m, s)| (m.material_id.clone(), s.clone()))
-            .collect();
+        // 构建材料和状态的 HashMap（仅包含 plan_items 中引用的 material_id，避免对全量候选做无效 clone）
+        let mut materials_map: HashMap<String, MaterialMaster> = HashMap::new();
+        let mut states_map: HashMap<String, MaterialState> = HashMap::new();
+        if !plan_items.is_empty() {
+            let ids: HashSet<&str> = plan_items.iter().map(|i| i.material_id.as_str()).collect();
+            for (m, s) in &sorted_materials {
+                if ids.contains(m.material_id.as_str()) {
+                    materials_map.insert(m.material_id.clone(), m.clone());
+                    states_map.insert(m.material_id.clone(), s.clone());
+                }
+            }
+        }
 
         let structure_report = self.structure.check_structure_violation(
             capacity_pool,

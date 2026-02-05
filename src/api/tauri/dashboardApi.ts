@@ -29,6 +29,7 @@ export const dashboardApi = {
       },
       {
         validate: zodValidator(DecisionRefreshStatusResponseSchema, 'get_refresh_status'),
+        timeout: 60000,
       }
     );
   },
@@ -48,6 +49,7 @@ export const dashboardApi = {
       },
       {
         validate: zodValidator(ManualRefreshDecisionResponseSchema, 'manual_refresh_decision'),
+        timeout: 300000,
       }
     );
   },

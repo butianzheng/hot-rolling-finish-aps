@@ -186,7 +186,7 @@ export function computeRiskBadges(
   if (context?.capacityOverflow && context.capacityOverflow > 0) {
     badges.push({
       type: 'CAPACITY_OVERFLOW',
-      label: `超产能 +${context.capacityOverflow.toFixed(1)}t`,
+      label: `超产能 +${context.capacityOverflow.toFixed(2)}t`,
       severity: 'HIGH',
       tooltip: '该日期产能已溢出，建议移动',
     });

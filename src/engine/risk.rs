@@ -475,6 +475,8 @@ mod tests {
                 sched_state: Some("SCHEDULED".to_string()),
                 assign_reason: Some("Test".to_string()),
                 steel_grade: None,
+                width_mm: None,
+                thickness_mm: None,
             },
             PlanItem {
                 version_id: "v1".to_string(),
@@ -491,6 +493,8 @@ mod tests {
                 sched_state: Some("SCHEDULED".to_string()),
                 assign_reason: Some("Test".to_string()),
                 steel_grade: None,
+                width_mm: None,
+                thickness_mm: None,
             },
         ]
     }

@@ -31,6 +31,8 @@ pub struct MaterialWithState {
     pub material_id: String,
     pub machine_code: Option<String>,
     pub weight_t: Option<f64>,
+    pub width_mm: Option<f64>,
+    pub thickness_mm: Option<f64>,
     pub steel_mark: Option<String>,
 
     // 状态字段
@@ -142,6 +144,8 @@ impl MaterialApi {
                     material_id: master.material_id.clone(),
                     machine_code: master.next_machine_code.or(master.current_machine_code),
                     weight_t: master.weight_t,
+                    width_mm: master.width_mm,
+                    thickness_mm: master.thickness_mm,
                     steel_mark: master.steel_mark,
                     sched_state: state.sched_state.to_string(),
                     urgent_level: state.urgent_level.to_string(),
@@ -167,6 +171,8 @@ impl MaterialApi {
                     material_id: master.material_id.clone(),
                     machine_code: master.next_machine_code.or(master.current_machine_code),
                     weight_t: master.weight_t,
+                    width_mm: master.width_mm,
+                    thickness_mm: master.thickness_mm,
                     steel_mark: master.steel_mark,
                     sched_state: "UNKNOWN".to_string(),
                     urgent_level: "L0".to_string(),

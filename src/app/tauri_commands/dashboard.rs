@@ -103,6 +103,8 @@ pub async fn get_refresh_status(
     state: tauri::State<'_, AppState>,
     version_id: String,
 ) -> Result<String, String> {
+    // 该查询应当“非常快”，且在重算/发布期间前端会高频轮询。
+    // 若放进 spawn_blocking，可能在 blocking pool 被长任务占满时排队，从而触发前端 Timeout。
     let result = state
         .dashboard_api
         .get_refresh_status(&version_id)
@@ -118,10 +120,13 @@ pub async fn manual_refresh_decision(
     version_id: String,
     operator: String,
 ) -> Result<String, String> {
-    let result = state
-        .plan_api
-        .manual_refresh_decision(&version_id, &operator)
-        .map_err(map_api_error)?;
+    let plan_api = state.plan_api.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        plan_api.manual_refresh_decision(&version_id, &operator)
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?
+    .map_err(map_api_error)?;
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
@@ -237,4 +242,3 @@ pub async fn get_recent_actions(
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
-

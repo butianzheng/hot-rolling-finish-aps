@@ -114,7 +114,7 @@ export const BottleneckContent: React.FC<BottleneckContentProps> = ({
             <Descriptions.Item label="堵塞分数">{selectedPoint.bottleneckScore.toFixed(1)}</Descriptions.Item>
             <Descriptions.Item label="容量利用率">{selectedPoint.capacityUtilPct.toFixed(1)}%</Descriptions.Item>
             <Descriptions.Item label="缺口材料数(≤当日)">{selectedPoint.pendingMaterialCount}</Descriptions.Item>
-            <Descriptions.Item label="缺口重量(≤当日)">{selectedPoint.pendingWeightT.toFixed(1)}t</Descriptions.Item>
+            <Descriptions.Item label="缺口重量(≤当日)">{selectedPoint.pendingWeightT.toFixed(2)}t</Descriptions.Item>
           </Descriptions>
 
           {Array.isArray(selectedPoint.bottleneckTypes) && selectedPoint.bottleneckTypes.length > 0 ? (

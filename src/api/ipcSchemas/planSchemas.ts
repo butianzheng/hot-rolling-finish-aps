@@ -49,6 +49,8 @@ export const PlanItemSchema = z
     sched_state: z.string().nullable().optional(),
     assign_reason: z.string().nullable().optional(),
     steel_grade: z.string().nullable().optional(),
+    width_mm: z.number().nullable().optional(),
+    thickness_mm: z.number().nullable().optional(),
   })
   .passthrough();
 
@@ -118,4 +120,3 @@ export const RecalcResponseSchema = z
     message: z.string(),
   })
   .passthrough();
-

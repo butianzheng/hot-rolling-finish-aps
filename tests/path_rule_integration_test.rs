@@ -168,9 +168,10 @@ mod path_rule_integration_test {
             .target(1000.0)
             .limit(1200.0)
             .build();
+        let candidates = vec![(candidate_master.clone(), candidate_state.clone())];
         let res = filler.fill_single_day_with_path_rule(
             &mut pool,
-            vec![(candidate_master.clone(), candidate_state.clone())],
+            &candidates,
             vec![],
             version_id,
             Some(&engine),
@@ -213,9 +214,10 @@ mod path_rule_integration_test {
             .target(1000.0)
             .limit(1200.0)
             .build();
+        let candidates2 = vec![(candidate_master, confirmed_state)];
         let res2 = filler.fill_single_day_with_path_rule(
             &mut pool2,
-            vec![(candidate_master, confirmed_state)],
+            &candidates2,
             vec![],
             version_id,
             Some(&engine),

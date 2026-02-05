@@ -586,25 +586,104 @@ impl PlanApi {
                 strategy: ScheduleStrategy::Balanced,
                 title: "均衡方案".to_string(),
                 description: "在交付/产能/库存之间保持均衡".to_string(),
-                default_parameters: serde_json::json!({}),
+                default_parameters: serde_json::json!({
+                    "order_keys": [
+                        { "key": "sched_state", "order": "FORCE_RELEASE > LOCKED", "note": "红线：强制放行/锁定优先" },
+                        { "key": "stock_age_days", "order": "desc", "note": "库龄大优先（冷料优先）" },
+                        { "key": "rolling_output_age_days", "order": "desc", "note": "出炉更久优先" },
+                        { "key": "due_date", "order": "asc", "note": "交期更早优先" },
+                    ],
+                    "parameter_template": {
+                        "urgent_weight": 10,
+                        "capacity_weight": 3,
+                        "cold_stock_weight": 2,
+                        "due_date_weight": 2,
+                        "rolling_output_age_weight": 1,
+                        "cold_stock_age_threshold_days": 30,
+                        "overflow_tolerance_pct": null,
+                    },
+                    "notes": [
+                        "预设策略按固定排序规则执行，不读取 parameter_template。",
+                        "自定义策略 custom:* 若设置参数，会在等级内排序中按加权评分排序；同分时回落到基于预设策略排序。",
+                    ],
+                }),
             },
             StrategyPreset {
                 strategy: ScheduleStrategy::UrgentFirst,
                 title: "紧急优先".to_string(),
                 description: "优先保障 L3/L2 紧急订单".to_string(),
-                default_parameters: serde_json::json!({}),
+                default_parameters: serde_json::json!({
+                    "order_keys": [
+                        { "key": "sched_state", "order": "FORCE_RELEASE > LOCKED", "note": "红线：强制放行/锁定优先" },
+                        { "key": "urgent_level", "order": "desc", "note": "L3 > L2 > L1 > L0" },
+                        { "key": "due_date", "order": "asc", "note": "交期更早优先" },
+                        { "key": "stock_age_days", "order": "desc", "note": "库龄大优先（冷料兜底）" },
+                        { "key": "rolling_output_age_days", "order": "desc", "note": "出炉更久优先" },
+                    ],
+                    "parameter_template": {
+                        "urgent_weight": 60,
+                        "capacity_weight": 1,
+                        "cold_stock_weight": 2,
+                        "due_date_weight": 10,
+                        "rolling_output_age_weight": 1,
+                        "cold_stock_age_threshold_days": 0,
+                        "overflow_tolerance_pct": null,
+                    },
+                    "notes": [
+                        "预设策略按 fixed order_keys 执行，适合紧急单保障。",
+                        "若你需要更细粒度的“紧急内排序”，可复制 parameter_template 作为自定义策略起点。",
+                    ],
+                }),
             },
             StrategyPreset {
                 strategy: ScheduleStrategy::CapacityFirst,
                 title: "产能优先".to_string(),
                 description: "优先提升产能利用率，减少溢出".to_string(),
-                default_parameters: serde_json::json!({}),
+                default_parameters: serde_json::json!({
+                    "order_keys": [
+                        { "key": "sched_state", "order": "FORCE_RELEASE > LOCKED", "note": "红线：强制放行/锁定优先" },
+                        { "key": "weight_t", "order": "desc", "note": "吨位更大优先（更容易填满产能）" },
+                        { "key": "due_date", "order": "asc", "note": "交期兜底" },
+                        { "key": "stock_age_days", "order": "desc", "note": "库龄兜底（冷料）" },
+                    ],
+                    "parameter_template": {
+                        "urgent_weight": 5,
+                        "capacity_weight": 20,
+                        "cold_stock_weight": 1,
+                        "due_date_weight": 3,
+                        "rolling_output_age_weight": 0,
+                        "cold_stock_age_threshold_days": 0,
+                        "overflow_tolerance_pct": null,
+                    },
+                    "notes": [
+                        "预设策略更偏“快速吃满产能”，适用于产能压力较大时。",
+                    ],
+                }),
             },
             StrategyPreset {
                 strategy: ScheduleStrategy::ColdStockFirst,
-                title: "冷坨消化".to_string(),
-                description: "优先消化冷坨/压库物料".to_string(),
-                default_parameters: serde_json::json!({}),
+                title: "冷料消化".to_string(),
+                description: "优先消化冷料/压库物料".to_string(),
+                default_parameters: serde_json::json!({
+                    "order_keys": [
+                        { "key": "sched_state", "order": "FORCE_RELEASE > LOCKED", "note": "红线：强制放行/锁定优先" },
+                        { "key": "stock_age_days", "order": "desc", "note": "库龄大优先（冷料优先）" },
+                        { "key": "rolling_output_age_days", "order": "desc", "note": "出炉更久优先" },
+                        { "key": "due_date", "order": "asc", "note": "交期兜底" },
+                    ],
+                    "parameter_template": {
+                        "urgent_weight": 3,
+                        "capacity_weight": 1,
+                        "cold_stock_weight": 10,
+                        "due_date_weight": 1,
+                        "rolling_output_age_weight": 5,
+                        "cold_stock_age_threshold_days": 60,
+                        "overflow_tolerance_pct": null,
+                    },
+                    "notes": [
+                        "预设策略更偏“去库龄/去压库”，适用于库存消化专项。",
+                    ],
+                }),
             },
         ])
     }
@@ -633,64 +712,75 @@ impl PlanApi {
         const MAX_DIFF_ITEMS: usize = 5000;
 
         // 逻辑保持与 compare_versions 一致：只统计 moved/added/removed/squeezed_out
-        let map_a: HashMap<String, &PlanItem> = items_a
-            .iter()
-            .map(|item| (item.material_id.clone(), item))
-            .collect();
-        let map_b: HashMap<String, &PlanItem> = items_b
-            .iter()
-            .map(|item| (item.material_id.clone(), item))
-            .collect();
+        //
+        // 性能注意：
+        // - 在 50k+ 数据量下，diff_items_total 可能非常大；
+        // - 若先收集全量 diff_items 再 sort/截断，会导致明显的 CPU 与内存放大；
+        // - 这里采用“计数全量 + 仅保留前 MAX_DIFF_ITEMS 作为明细预览”的策略。
+        let map_a: HashMap<String, &PlanItem> =
+            items_a.iter().map(|item| (item.material_id.clone(), item)).collect();
+        let map_b: HashMap<String, &PlanItem> =
+            items_b.iter().map(|item| (item.material_id.clone(), item)).collect();
 
         let mut moved_count = 0usize;
         let mut added_count = 0usize;
         let mut squeezed_out_count = 0usize;
         let mut diff_items: Vec<StrategyDraftDiffItem> = Vec::new();
+        diff_items.reserve(MAX_DIFF_ITEMS.min(items_a.len().saturating_add(items_b.len())));
 
-        for (material_id, item_a) in map_a.iter() {
+        // moved/squeezed_out：按 items_a 的顺序遍历，保证明细预览稳定
+        for item_a in items_a.iter() {
+            let material_id = item_a.material_id.as_str();
             if let Some(item_b) = map_b.get(material_id) {
-                if item_a.plan_date != item_b.plan_date || item_a.machine_code != item_b.machine_code
-                {
+                if item_a.plan_date != item_b.plan_date || item_a.machine_code != item_b.machine_code {
                     moved_count += 1;
-                    diff_items.push(StrategyDraftDiffItem {
-                        material_id: material_id.clone(),
-                        change_type: "MOVED".to_string(),
-                        from_plan_date: Some(item_a.plan_date),
-                        from_machine_code: Some(item_a.machine_code.clone()),
-                        from_seq_no: Some(item_a.seq_no),
-                        to_plan_date: Some(item_b.plan_date),
-                        to_machine_code: Some(item_b.machine_code.clone()),
-                        to_seq_no: Some(item_b.seq_no),
-                        to_assign_reason: item_b.assign_reason.clone(),
-                        to_urgent_level: item_b.urgent_level.clone(),
-                        to_sched_state: item_b.sched_state.clone(),
-                        material_state_snapshot: None,
-                    });
+                    if diff_items.len() < MAX_DIFF_ITEMS {
+                        diff_items.push(StrategyDraftDiffItem {
+                            material_id: material_id.to_string(),
+                            change_type: "MOVED".to_string(),
+                            from_plan_date: Some(item_a.plan_date),
+                            from_machine_code: Some(item_a.machine_code.clone()),
+                            from_seq_no: Some(item_a.seq_no),
+                            to_plan_date: Some(item_b.plan_date),
+                            to_machine_code: Some(item_b.machine_code.clone()),
+                            to_seq_no: Some(item_b.seq_no),
+                            to_assign_reason: item_b.assign_reason.clone(),
+                            to_urgent_level: item_b.urgent_level.clone(),
+                            to_sched_state: item_b.sched_state.clone(),
+                            material_state_snapshot: None,
+                        });
+                    }
                 }
             } else {
                 squeezed_out_count += 1;
-                diff_items.push(StrategyDraftDiffItem {
-                    material_id: material_id.clone(),
-                    change_type: "SQUEEZED_OUT".to_string(),
-                    from_plan_date: Some(item_a.plan_date),
-                    from_machine_code: Some(item_a.machine_code.clone()),
-                    from_seq_no: Some(item_a.seq_no),
-                    to_plan_date: None,
-                    to_machine_code: None,
-                    to_seq_no: None,
-                    to_assign_reason: None,
-                    to_urgent_level: None,
-                    to_sched_state: None,
-                    material_state_snapshot: None,
-                });
+                if diff_items.len() < MAX_DIFF_ITEMS {
+                    diff_items.push(StrategyDraftDiffItem {
+                        material_id: material_id.to_string(),
+                        change_type: "SQUEEZED_OUT".to_string(),
+                        from_plan_date: Some(item_a.plan_date),
+                        from_machine_code: Some(item_a.machine_code.clone()),
+                        from_seq_no: Some(item_a.seq_no),
+                        to_plan_date: None,
+                        to_machine_code: None,
+                        to_seq_no: None,
+                        to_assign_reason: None,
+                        to_urgent_level: None,
+                        to_sched_state: None,
+                        material_state_snapshot: None,
+                    });
+                }
             }
         }
 
-        for (material_id, item_b) in map_b.iter() {
-            if !map_a.contains_key(material_id) {
-                added_count += 1;
+        // added：按 items_b 的顺序遍历，保证明细预览稳定
+        for item_b in items_b.iter() {
+            if map_a.contains_key(item_b.material_id.as_str()) {
+                continue;
+            }
+            added_count += 1;
+            if diff_items.len() < MAX_DIFF_ITEMS {
                 diff_items.push(StrategyDraftDiffItem {
-                    material_id: material_id.clone(),
+                    material_id: item_b.material_id.clone(),
                     change_type: "ADDED".to_string(),
                     from_plan_date: None,
                     from_machine_code: None,
@@ -706,7 +796,7 @@ impl PlanApi {
             }
         }
 
-        // 固定排序：变更类型 -> 日期 -> 机组 -> material_id
+        // 固定排序：变更类型 -> 日期 -> 机组 -> material_id（仅对预览明细排序，避免全量 sort）
         let type_rank = |t: &str| match t {
             "MOVED" => 0i32,
             "ADDED" => 1i32,
@@ -744,11 +834,8 @@ impl PlanApi {
             a.material_id.cmp(&b.material_id)
         });
 
-        let diff_items_total = diff_items.len();
+        let diff_items_total = moved_count + added_count + squeezed_out_count;
         let diff_items_truncated = diff_items_total > MAX_DIFF_ITEMS;
-        if diff_items_truncated {
-            diff_items.truncate(MAX_DIFF_ITEMS);
-        }
 
         let removed_count = squeezed_out_count;
         (

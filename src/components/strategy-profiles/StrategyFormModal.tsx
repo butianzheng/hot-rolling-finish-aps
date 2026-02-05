@@ -3,9 +3,9 @@
  */
 
 import React from 'react';
-import { Alert, Card, Form, Input, InputNumber, Modal, Select, Space, Typography } from 'antd';
+import { Alert, Button, Card, Form, Input, InputNumber, Modal, Select, Space, Typography } from 'antd';
 import type { FormInstance } from 'antd';
-import type { ModalMode } from './types';
+import type { ModalMode, StrategyPresetRow } from './types';
 
 interface StrategyFormModalProps {
   open: boolean;
@@ -13,6 +13,7 @@ interface StrategyFormModalProps {
   saving: boolean;
   form: FormInstance;
   baseStrategyOptions: { value: string; label: string }[];
+  presetsByKey: Record<string, StrategyPresetRow>;
   onSave: () => void;
   onCancel: () => void;
 }
@@ -23,6 +24,7 @@ export const StrategyFormModal: React.FC<StrategyFormModalProps> = ({
   saving,
   form,
   baseStrategyOptions,
+  presetsByKey,
   onSave,
   onCancel,
 }) => {
@@ -30,7 +32,13 @@ export const StrategyFormModal: React.FC<StrategyFormModalProps> = ({
     ? '编辑自定义策略'
     : mode === 'copy'
       ? '复制自定义策略'
-      : '新建自定义策略';
+    : '新建自定义策略';
+
+  const baseStrategyKey = Form.useWatch('base_strategy', form);
+  const basePreset = presetsByKey?.[String(baseStrategyKey || '').trim()];
+  const defaultParameters = basePreset?.default_parameters ?? null;
+  const parameterTemplate = (defaultParameters as any)?.parameter_template;
+  const canApplyTemplate = parameterTemplate && typeof parameterTemplate === 'object';
 
   return (
     <Modal
@@ -71,6 +79,42 @@ export const StrategyFormModal: React.FC<StrategyFormModalProps> = ({
         >
           <Select options={baseStrategyOptions} style={{ width: 240 }} />
         </Form.Item>
+
+        <Card
+          size="small"
+          title="预设参数（只读）"
+          extra={(
+            <Button
+              size="small"
+              disabled={!canApplyTemplate}
+              onClick={() => {
+                if (!canApplyTemplate) return;
+                form.setFieldsValue({ parameters: parameterTemplate });
+              }}
+            >
+              填入模板
+            </Button>
+          )}
+          style={{ marginBottom: 12 }}
+        >
+          <Typography.Text type="secondary">
+            {basePreset?.title || String(baseStrategyKey || '') || '—'}
+            {basePreset?.description ? `：${basePreset.description}` : ''}
+          </Typography.Text>
+          <pre style={{
+            marginTop: 8,
+            padding: 8,
+            borderRadius: 6,
+            background: '#fafafa',
+            border: '1px solid #f0f0f0',
+            maxHeight: 220,
+            overflow: 'auto',
+            fontSize: 12,
+          }}
+          >
+            {defaultParameters ? JSON.stringify(defaultParameters, null, 2) : '—'}
+          </pre>
+        </Card>
 
         <Card size="small" title="参数（综合评分：分数越高越优先）" style={{ marginBottom: 12 }}>
           <Alert

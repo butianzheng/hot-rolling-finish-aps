@@ -9,6 +9,8 @@ export interface Material {
   material_id: string;
   machine_code?: string | null;
   weight_t?: number | null;
+  width_mm?: number | null;
+  thickness_mm?: number | null;
   steel_mark?: string | null;
   sched_state: string;
   urgent_level: string;

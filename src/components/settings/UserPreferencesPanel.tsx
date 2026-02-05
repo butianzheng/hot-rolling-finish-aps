@@ -15,7 +15,7 @@ const STRATEGY_OPTIONS: Array<{ value: StrategyType; label: string }> = [
   { value: 'balanced', label: '均衡方案' },
   { value: 'urgent_first', label: '紧急优先' },
   { value: 'capacity_first', label: '产能优先' },
-  { value: 'cold_stock_first', label: '冷坨消化' },
+  { value: 'cold_stock_first', label: '冷料消化' },
   { value: 'manual', label: '手动调整' },
 ];
 

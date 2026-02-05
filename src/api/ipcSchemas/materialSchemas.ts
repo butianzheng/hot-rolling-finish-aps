@@ -11,6 +11,8 @@ export const MaterialWithStateSchema = z
     material_id: z.string(),
     machine_code: z.string().nullable().optional(),
     weight_t: z.number().nullable().optional(),
+    width_mm: z.number().nullable().optional(),
+    thickness_mm: z.number().nullable().optional(),
     steel_mark: z.string().nullable().optional(),
     sched_state: z.string(),
     urgent_level: z.string(),
@@ -77,4 +79,3 @@ export const MaterialDetailResponseSchema = z
     state: MaterialStateSchema.nullable().optional(),
   })
   .passthrough();
-

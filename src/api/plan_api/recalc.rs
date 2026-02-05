@@ -36,6 +36,7 @@ impl PlanApi {
             _frozen_date,
             operator,
             ScheduleStrategy::Balanced,
+            None,
         )
     }
 
@@ -47,6 +48,7 @@ impl PlanApi {
         _frozen_date: Option<NaiveDate>,
         operator: &str,
         strategy: ScheduleStrategy,
+        window_days_override: Option<i32>,
     ) -> ApiResult<RecalcResponse> {
         // 参数验证
         if version_id.trim().is_empty() {
@@ -60,8 +62,18 @@ impl PlanApi {
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?
             .ok_or_else(|| ApiError::NotFound(format!("版本{}不存在", version_id)))?;
 
-        // 获取窗口天数
-        let window_days = version.recalc_window_days.unwrap_or(30);
+        // 获取窗口天数（允许前端在本次试算/重算中覆盖版本配置，便于评估“窗口大小”对排程的影响）
+        let window_days = match window_days_override {
+            Some(v) => {
+                if v <= 0 || v > 60 {
+                    return Err(ApiError::InvalidInput(
+                        "window_days_override 必须在 1-60 之间".to_string(),
+                    ));
+                }
+                v
+            }
+            None => version.recalc_window_days.unwrap_or(30),
+        };
 
         // 调用RecalcEngine执行试算（dry-run模式）
         let result = self
@@ -121,6 +133,7 @@ impl PlanApi {
             frozen_date,
             operator,
             ScheduleStrategy::Balanced,
+            None,
         )
     }
 
@@ -132,6 +145,7 @@ impl PlanApi {
         frozen_date: Option<NaiveDate>,
         operator: &str,
         strategy: ScheduleStrategy,
+        window_days_override: Option<i32>,
     ) -> ApiResult<RecalcResponse> {
         // 参数验证
         if version_id.trim().is_empty() {
@@ -148,8 +162,18 @@ impl PlanApi {
         // 红线1预检: 设置冻结日期
         let _frozen_from_date = frozen_date.or(version.frozen_from_date);
 
-        // 获取窗口天数（如果版本没有设置，使用默认值30天）
-        let window_days = version.recalc_window_days.unwrap_or(30);
+        // 获取窗口天数（允许覆盖版本配置，便于“一键优化/重算”选择不同计算窗口）
+        let window_days = match window_days_override {
+            Some(v) => {
+                if v <= 0 || v > 60 {
+                    return Err(ApiError::InvalidInput(
+                        "window_days_override 必须在 1-60 之间".to_string(),
+                    ));
+                }
+                v
+            }
+            None => version.recalc_window_days.unwrap_or(30),
+        };
 
         // 调用RecalcEngine执行重算
         tracing::info!(

@@ -41,7 +41,7 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
       dataIndex: 'before_t',
       width: 120,
       render: (v) => (
-        <span style={{ fontFamily: 'monospace' }}>{Number(v).toFixed(1)}</span>
+        <span style={{ fontFamily: 'monospace' }}>{Number(v).toFixed(2)}</span>
       ),
     },
     {
@@ -51,7 +51,7 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
       render: (v) => {
         const n = Number(v);
         const color = n > 0 ? 'green' : n < 0 ? 'red' : 'default';
-        const label = `${n >= 0 ? '+' : ''}${n.toFixed(1)}`;
+        const label = `${n >= 0 ? '+' : ''}${n.toFixed(2)}`;
         return <Tag color={color}>{label}</Tag>;
       },
     },
@@ -60,7 +60,7 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
       dataIndex: 'after_t',
       width: 120,
       render: (v) => (
-        <span style={{ fontFamily: 'monospace' }}>{Number(v).toFixed(1)}</span>
+        <span style={{ fontFamily: 'monospace' }}>{Number(v).toFixed(2)}</span>
       ),
     },
     {
@@ -71,11 +71,11 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
         const limit = r.limit_capacity_t;
         if (target == null && limit == null) return <span>-</span>;
         if (limit != null && target != null && Math.abs(limit - target) < 1e-9) {
-          return <span style={{ fontFamily: 'monospace' }}>{target.toFixed(0)}</span>;
+          return <span style={{ fontFamily: 'monospace' }}>{target.toFixed(2)}</span>;
         }
         return (
           <span style={{ fontFamily: 'monospace' }}>
-            {(target ?? 0).toFixed(0)} / {(limit ?? 0).toFixed(0)}
+            {(target ?? 0).toFixed(2)} / {(limit ?? 0).toFixed(2)}
           </span>
         );
       },

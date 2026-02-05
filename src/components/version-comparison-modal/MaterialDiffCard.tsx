@@ -185,7 +185,7 @@ export const MaterialDiffCard: React.FC<MaterialDiffCardProps> = ({
                 render: (_, r) => {
                   const w = r.currentState?.weight_t ?? r.previousState?.weight_t ?? null;
                   if (w == null || !Number.isFinite(Number(w))) return '-';
-                  return `${Number(w).toFixed(3)}t`;
+                  return `${Number(w).toFixed(2)}t`;
                 },
               },
             ]}

@@ -32,7 +32,7 @@ impl ScheduleStrategy {
             ScheduleStrategy::Balanced => "均衡方案",
             ScheduleStrategy::UrgentFirst => "紧急优先",
             ScheduleStrategy::CapacityFirst => "产能优先",
-            ScheduleStrategy::ColdStockFirst => "冷坨消化",
+            ScheduleStrategy::ColdStockFirst => "冷料消化",
         }
     }
 }

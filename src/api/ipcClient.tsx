@@ -53,10 +53,19 @@ export class IpcClient {
           ? params as Record<string, unknown>
           : {};
 
+        const timeoutError: IpcError = {
+          code: 'Timeout',
+          message: 'Timeout',
+          details: {
+            command,
+            timeout_ms: timeout,
+          },
+        };
+
         const result = await Promise.race([
           invoke(command, invokeParams),
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Timeout')), timeout)
+            setTimeout(() => reject(timeoutError), timeout)
           )
         ]);
         if (DEBUG_IPC) console.log(`[IPC Debug] Success! Result:`, result);

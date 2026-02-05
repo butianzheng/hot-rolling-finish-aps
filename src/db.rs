@@ -26,7 +26,14 @@ pub const CURRENT_SCHEMA_VERSION: i64 = 6;
 /// - foreign_keys 需要“每个连接”单独开启
 /// - busy_timeout 需要“每个连接”单独配置
 pub fn configure_sqlite_connection(conn: &Connection) -> rusqlite::Result<()> {
-    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+    conn.execute_batch(
+        r#"
+        PRAGMA foreign_keys = ON;
+        PRAGMA journal_mode = WAL;
+        PRAGMA synchronous = NORMAL;
+        PRAGMA temp_store = MEMORY;
+        "#,
+    )?;
     conn.busy_timeout(Duration::from_millis(DEFAULT_BUSY_TIMEOUT_MS))?;
     Ok(())
 }

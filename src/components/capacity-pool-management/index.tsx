@@ -6,7 +6,7 @@
 
 import React, { useMemo } from 'react';
 import { Alert, Button, Card, Col, Row, Space, Table } from 'antd';
-import { EditOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CheckSquareOutlined, EditOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { tableEmptyConfig } from '../CustomEmpty';
 import NoActiveVersionGuide from '../NoActiveVersionGuide';
@@ -52,6 +52,18 @@ const CapacityPoolManagement: React.FC<CapacityPoolManagementProps> = ({ onNavig
           <Space>
             <Button icon={<ReloadOutlined />} onClick={state.loadCapacityPools}>
               刷新
+            </Button>
+            <Button
+              icon={<CheckSquareOutlined />}
+              disabled={state.capacityPools.length === 0}
+              onClick={() => {
+                const keys = state.capacityPools.map((p) => `${p.machine_code}-${p.plan_date}`);
+                state.setSelectedRowKeys(keys);
+                state.setSelectedPools(state.capacityPools);
+                state.openBatchModal();
+              }}
+            >
+              批量调整(查询结果){state.capacityPools.length > 0 ? `(${state.capacityPools.length})` : ''}
             </Button>
             <Button
               icon={<EditOutlined />}

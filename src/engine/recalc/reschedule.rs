@@ -1,7 +1,7 @@
 use super::{RecalcEngine, RescheduleResult};
 use crate::config::config_keys;
 use crate::config::strategy_profile::CustomStrategyParameters;
-use crate::domain::material::MaterialState;
+use crate::domain::material::{MaterialMaster, MaterialState};
 use crate::domain::plan::PlanItem;
 use crate::domain::roller::RollerCampaign;
 use crate::domain::types::{AnchorSource, SchedState, UrgentLevel};
@@ -12,7 +12,7 @@ use crate::engine::{
 };
 use crate::repository::PathOverridePendingRecord;
 use chrono::NaiveDate;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
 impl RecalcEngine {
@@ -94,6 +94,16 @@ impl RecalcEngine {
     ) -> Result<RescheduleResult, Box<dyn Error>> {
         // ===== Step 1: 查询冻结区材料（冻结区保护红线） =====
         let frozen_items = self.item_repo.find_frozen_items(version_id)?;
+        let mut frozen_by_date_machine: HashMap<NaiveDate, HashMap<String, Vec<PlanItem>>> =
+            HashMap::new();
+        for item in &frozen_items {
+            frozen_by_date_machine
+                .entry(item.plan_date)
+                .or_default()
+                .entry(item.machine_code.clone())
+                .or_default()
+                .push(item.clone());
+        }
 
         let orchestrator = match strategy_params {
             Some(params) => ScheduleOrchestrator::new_with_strategy_parameters(
@@ -112,8 +122,7 @@ impl RecalcEngine {
         let mut overflow_days = 0;
 
         // 跟踪已排产的材料ID，避免重复排产
-        let mut scheduled_material_ids: std::collections::HashSet<String> =
-            std::collections::HashSet::new();
+        let mut scheduled_material_ids: HashSet<String> = HashSet::new();
 
         // 路径规则：待人工确认（由重算生成，按版本+机组+material 去重，plan_date=首次遇到的日期）
         let mut path_override_pending_records: Vec<PathOverridePendingRecord> = Vec::new();
@@ -250,6 +259,24 @@ impl RecalcEngine {
         // ===== Step 3: 多日循环 =====
         let (start_date, end_date) = date_range;
 
+        // 结构校正配置：每次重算只需加载一次（避免日循环内反复查库）
+        let target_ratio = self
+            .config_manager
+            .get_target_ratio()
+            .await
+            .unwrap_or_else(|e| {
+                tracing::warn!("加载目标配比配置失败: {}, 使用空配置", e);
+                HashMap::new()
+            });
+        let deviation_threshold = self
+            .config_manager
+            .get_deviation_threshold()
+            .await
+            .unwrap_or_else(|e| {
+                tracing::warn!("加载偏差阈值配置失败: {}, 使用默认值 0.1", e);
+                0.1
+            });
+
         // 为本次版本准备活跃换辊周期（用于持久化锚点）
         let mut active_campaigns: HashMap<String, RollerCampaign> = HashMap::new();
         for machine_code in machine_codes {
@@ -288,47 +315,105 @@ impl RecalcEngine {
             active_campaigns.insert(machine_code.clone(), campaign);
         }
 
+        // 预加载机组材料与状态，避免在多日循环中重复查库（尤其是 dry-run 草案多策略对比）
+        let mut materials_by_machine: HashMap<String, Vec<MaterialMaster>> = HashMap::new();
+        let mut state_map_by_machine: HashMap<String, HashMap<String, MaterialState>> =
+            HashMap::new();
+        let mut user_confirmed_summaries_by_machine: HashMap<String, Vec<MaterialSummary>> =
+            HashMap::new();
+
+        for machine_code in machine_codes {
+            let materials = self.material_master_repo.find_by_machine(machine_code)?;
+            let states = self.material_state_repo.list_by_machine_code(machine_code)?;
+            let mut state_map: HashMap<String, MaterialState> = HashMap::with_capacity(states.len());
+            for s in states {
+                state_map.insert(s.material_id.clone(), s);
+            }
+
+            materials_by_machine.insert(machine_code.clone(), materials);
+            state_map_by_machine.insert(machine_code.clone(), state_map);
+
+            if path_rule_config.enabled {
+                let summaries: Vec<MaterialSummary> = self
+                    .material_state_repo
+                    .list_user_confirmed_materials(machine_code)?
+                    .into_iter()
+                    .filter_map(|u| {
+                        let w = u.width_mm;
+                        let t = u.thickness_mm;
+                        if !(w.is_finite() && t.is_finite() && w > 0.0 && t > 0.0) {
+                            return None;
+                        }
+                        Some(MaterialSummary {
+                            material_id: u.material_id,
+                            width_mm: w,
+                            thickness_mm: t,
+                            seq_no: u.seq_no.unwrap_or(0),
+                            user_confirmed_at: u.user_confirmed_at,
+                        })
+                    })
+                    .collect();
+                user_confirmed_summaries_by_machine.insert(machine_code.clone(), summaries);
+            }
+        }
+
         let mut current_date = start_date;
 
         while current_date <= end_date {
+            // 适温/产出时间等“随时间推进而变化”的字段需要按排产日期动态推进：
+            // - output_age_days_raw 是“截至 base_date”的原始天数口径；
+            // - 当排产日期向后推进 N 天时，应使用 output_age_days_raw + N 参与 Eligibility 判定；
+            // 否则会出现：材料今天未适温 → 未来也永远未适温 的错误。
+            let delta_days_i32: i32 = (current_date - start_date)
+                .num_days()
+                .clamp(0, i32::MAX as i64) as i32;
+
             // ===== Step 4: 多机组循环 =====
             for machine_code in machine_codes {
                 // ----- 4.1 查询候选材料 -----
-                let materials = self.material_master_repo.find_by_machine(machine_code)?;
+                let materials = materials_by_machine
+                    .get(machine_code)
+                    .map(Vec::as_slice)
+                    .unwrap_or(&[]);
+                let state_map = state_map_by_machine
+                    .get(machine_code)
+                    .ok_or_else(|| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("状态缓存缺失: machine_code={}", machine_code),
+                        )
+                    })?;
 
-                // ----- 4.2 查询材料状态 -----
-                let states: Vec<MaterialState> = materials
-                    .iter()
-                    .filter_map(|m| {
-                        self.material_state_repo
-                            .find_by_id(&m.material_id)
-                            .ok()
-                            .flatten()
-                    })
-                    .collect();
+                // ----- 4.3 过滤候选材料 -----
+                // - 排除已排产材料，避免重复排产；
+                // - READY/LOCKED/FORCE_RELEASE：直接进入候选；
+                // - PENDING_MATURE：当排产日期推进到其 ready_in_days 覆盖范围后，才能进入候选；
+                //   （同时配合 output_age_days_raw 的动态推进，确保 Eligibility 判定正确）
+                let mut candidate_materials: Vec<MaterialMaster> = Vec::new();
+                let mut candidate_states: Vec<MaterialState> = Vec::new();
+                for material in materials.iter() {
+                    if scheduled_material_ids.contains(&material.material_id) {
+                        continue;
+                    }
+                    let Some(state) = state_map.get(&material.material_id) else {
+                        continue;
+                    };
+                    let allow = match state.sched_state {
+                        SchedState::Ready | SchedState::Locked | SchedState::ForceRelease => true,
+                        SchedState::PendingMature => state.ready_in_days <= delta_days_i32,
+                        _ => false,
+                    };
+                    if !allow {
+                        continue;
+                    }
 
-                // ----- 4.3 过滤适温材料（适温约束红线） -----
-                // 同时排除已排产的材料，避免重复排产
-                let total_materials = materials.len();
-                let (ready_materials, ready_states): (Vec<_>, Vec<_>) = materials
-                    .into_iter()
-                    .zip(states.into_iter())
-                    .filter(|(material, state)| {
-                        // 排除已排产的材料
-                        if scheduled_material_ids.contains(&material.material_id) {
-                            return false;
-                        }
-                        // 只有READY, LOCKED, FORCE_RELEASE可以排产
-                        state.sched_state == SchedState::Ready
-                            || state.sched_state == SchedState::Locked
-                            || state.sched_state == SchedState::ForceRelease
-                    })
-                    .unzip();
-
-                // 统计成熟/未成熟数量
-                let ready_count = ready_materials.len();
-                mature_count += ready_count;
-                immature_count += total_materials - ready_count;
+                    let mut m = material.clone();
+                    if let Some(raw) = m.output_age_days_raw {
+                        m.output_age_days_raw = Some(raw.saturating_add(delta_days_i32));
+                    }
+                    candidate_materials.push(m);
+                    candidate_states.push(state.clone());
+                }
 
                 // ----- 4.4 查询或创建产能池 -----
                 let mut capacity_pool = self
@@ -339,16 +424,23 @@ impl RecalcEngine {
                     });
 
                 // ----- 4.5 提取当日冻结项 -----
-                let frozen_for_today: Vec<PlanItem> = frozen_items
-                    .iter()
-                    .filter(|item| item.plan_date == current_date && &item.machine_code == machine_code)
+                let frozen_for_today: Vec<PlanItem> = frozen_by_date_machine
+                    .get(&current_date)
+                    .and_then(|m| m.get(machine_code))
                     .cloned()
-                    .collect();
+                    .unwrap_or_default();
 
                 // 无候选且无冻结项：跳过本次排产
-                if ready_materials.is_empty() && frozen_for_today.is_empty() {
+                if candidate_materials.is_empty() && frozen_for_today.is_empty() {
                     continue;
                 }
+
+                // 产能池 used/overflow 属于“计划明细的派生读模型”，重算时必须以当次计算结果为准：
+                // - 避免局部重排/多次重算导致 used_capacity_t 叠加（历史残留）；
+                // - 冻结区吨位由 CapacityFiller 根据 frozen_for_today 自动计入。
+                capacity_pool.used_capacity_t = 0.0;
+                capacity_pool.overflow_t = 0.0;
+                capacity_pool.frozen_capacity_t = 0.0;
 
                 // ----- 4.5.1 解析当日初始锚点（用于 PathRuleEngine 门控） -----
                 let (initial_anchor, initial_anchor_material_id) = if path_rule_config.enabled {
@@ -421,9 +513,9 @@ impl RecalcEngine {
                         };
 
                         // 锁定区最后一块（本日候选中 sched_state=LOCKED）
-                        let locked_summaries: Vec<MaterialSummary> = ready_materials
+                        let locked_summaries: Vec<MaterialSummary> = candidate_materials
                             .iter()
-                            .zip(ready_states.iter())
+                            .zip(candidate_states.iter())
                             .filter(|(_, s)| s.sched_state == SchedState::Locked)
                             .filter_map(|(m, s)| {
                                 let w = m.width_mm.unwrap_or(0.0);
@@ -441,31 +533,17 @@ impl RecalcEngine {
                             })
                             .collect();
 
-                        // 人工确认队列（机组口径，按 user_confirmed_at 排序）
-                        let user_confirmed_summaries: Vec<MaterialSummary> = self
-                            .material_state_repo
-                            .list_user_confirmed_materials(machine_code)?
-                            .into_iter()
-                            .filter_map(|u| {
-                                let w = u.width_mm;
-                                let t = u.thickness_mm;
-                                if !(w.is_finite() && t.is_finite() && w > 0.0 && t > 0.0) {
-                                    return None;
-                                }
-                                Some(MaterialSummary {
-                                    material_id: u.material_id,
-                                    width_mm: w,
-                                    thickness_mm: t,
-                                    seq_no: u.seq_no.unwrap_or(0),
-                                    user_confirmed_at: u.user_confirmed_at,
-                                })
-                            })
-                            .collect();
+                        // 人工确认队列（机组口径，按 user_confirmed_at 排序；预加载以避免日循环反复查库）
+                        let user_confirmed_summaries: &[MaterialSummary] =
+                            user_confirmed_summaries_by_machine
+                                .get(machine_code)
+                                .map(Vec::as_slice)
+                                .unwrap_or(&[]);
 
                         // 候选池（用于 SeedS2）
-                        let candidate_summaries: Vec<MaterialSummary> = ready_materials
+                        let candidate_summaries: Vec<MaterialSummary> = candidate_materials
                             .iter()
-                            .zip(ready_states.iter())
+                            .zip(candidate_states.iter())
                             .filter_map(|(m, _s)| {
                                 let w = m.width_mm.unwrap_or(0.0);
                                 let t = m.thickness_mm.unwrap_or(0.0);
@@ -485,7 +563,7 @@ impl RecalcEngine {
                         let resolved = anchor_resolver.resolve(
                             &frozen_summaries,
                             &locked_summaries,
-                            &user_confirmed_summaries,
+                            user_confirmed_summaries,
                             &candidate_summaries,
                         );
 
@@ -534,29 +612,11 @@ impl RecalcEngine {
                     (None, None)
                 };
 
-                // ----- 4.6 查询结构目标配比 -----
-                let target_ratio = self
-                    .config_manager
-                    .get_target_ratio()
-                    .await
-                    .unwrap_or_else(|e| {
-                        tracing::warn!("加载目标配比配置失败: {}, 使用空配置", e);
-                        HashMap::new()
-                    });
-                let deviation_threshold = self
-                    .config_manager
-                    .get_deviation_threshold()
-                    .await
-                    .unwrap_or_else(|e| {
-                        tracing::warn!("加载偏差阈值配置失败: {}, 使用默认值 0.1", e);
-                        0.1
-                    });
-
                 // ----- 4.7 创建编排器并执行单日排产 -----
                 let schedule_result = orchestrator
                     .execute_single_day_schedule_with_path_rule(
-                        ready_materials,
-                        ready_states,
+                        candidate_materials,
+                        candidate_states,
                         &mut capacity_pool,
                         frozen_for_today,
                         &target_ratio,
@@ -568,6 +628,10 @@ impl RecalcEngine {
                         initial_anchor_material_id,
                     )
                     .await?;
+
+                // 统计成熟/未成熟：按 Eligibility 评估结果口径（避免“未来永远不适温”的错判）
+                mature_count += schedule_result.eligible_materials.len();
+                immature_count += schedule_result.blocked_materials.len();
 
                 // ----- 4.7.2 收集路径规则待确认（由 CapacityFiller 产生，供上层落库/汇总） -----
                 if !schedule_result.path_override_pending.is_empty() {
@@ -645,7 +709,11 @@ impl RecalcEngine {
                     .map(|(_, state)| state)
                     .collect();
 
-                if !is_dry_run && !updated_states.is_empty() {
+                // material_state 表承载“截至 base_date 的当前状态”（适温/紧急等级等），不是“未来某天的模拟状态”。
+                // 若在多日循环中每一天都落库，会把 material_state 覆盖成未来日期口径，且产生大量无意义写入（50k+ 下会明显拖慢发布/重算）。
+                //
+                // 当前策略：仅在 start_date 当天（base_date）落一次 material_state（用于前端解释/提示）；其余日期仅写 plan_item/capacity_pool 等版本化快照。
+                if !is_dry_run && !updated_states.is_empty() && current_date == start_date {
                     self.material_state_repo
                         .batch_insert_material_state(updated_states)?;
                     tracing::debug!(
@@ -697,4 +765,3 @@ impl RecalcEngine {
         })
     }
 }
-

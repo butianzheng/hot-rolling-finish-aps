@@ -565,6 +565,8 @@ mod tests {
             sched_state: Some("READY".to_string()),
             assign_reason: Some("test".to_string()),
             steel_grade: None,
+            width_mm: None,
+            thickness_mm: None,
         }
     }
 

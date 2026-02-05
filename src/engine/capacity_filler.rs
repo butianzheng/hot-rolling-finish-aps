@@ -92,7 +92,7 @@ impl CapacityFiller {
     ) -> (Vec<PlanItem>, Vec<(MaterialMaster, MaterialState, String)>) {
         let result = self.fill_single_day_with_path_rule(
             capacity_pool,
-            candidates,
+            &candidates,
             frozen_items,
             version_id,
             None,
@@ -107,7 +107,7 @@ impl CapacityFiller {
     pub fn fill_single_day_with_path_rule(
         &self,
         capacity_pool: &mut CapacityPool,
-        candidates: Vec<(MaterialMaster, MaterialState)>,
+        candidates: &[(MaterialMaster, MaterialState)],
         frozen_items: Vec<PlanItem>,
         version_id: &str,
         path_rule_engine: Option<&PathRuleEngine>,
@@ -122,16 +122,25 @@ impl CapacityFiller {
         let mut current_anchor = initial_anchor;
         let mut current_anchor_material_id = initial_anchor_material_id;
 
-        // 1. 先添加冻结区材料
-        let mut sequence_no = 1;
+        // 1. 先添加冻结区材料（冻结区吨位必须计入 used_capacity_t，否则会导致“计算区”在冻结项之上继续填充，出现单日超限）
+        //
+        // 说明：
+        // - capacity_pool.used_capacity_t 可能被调用方用于表达“预占用吨位”（例如外部约束/历史残留）。
+        // - frozen_capacity_t 专门承载冻结区吨位，便于前端解释与风险快照聚合。
+        // - seq_no：冻结项保持不变；新排产从当日冻结项的最大 seq_no+1 开始，避免重复 seq_no。
+        capacity_pool.frozen_capacity_t = 0.0;
+        let mut max_frozen_seq_no: i32 = 0;
         for frozen_item in frozen_items {
+            capacity_pool.used_capacity_t += frozen_item.weight_t;
+            capacity_pool.frozen_capacity_t += frozen_item.weight_t;
+            max_frozen_seq_no = max_frozen_seq_no.max(frozen_item.seq_no);
             plan_items.push(frozen_item);
-            sequence_no += 1;
         }
+        let mut sequence_no = max_frozen_seq_no.saturating_add(1).max(1);
 
         // 2. 填充计算区材料
         let plan_date = capacity_pool.plan_date;
-        for (master, state) in candidates {
+        for (master, state) in candidates.iter() {
             let weight = master.weight_t.unwrap_or(0.0);
 
             let candidate_width_mm = master.width_mm.unwrap_or(0.0);
@@ -155,8 +164,8 @@ impl CapacityFiller {
                     match check.status {
                         PathRuleStatus::HardViolation => {
                             skipped_materials.push((
-                                master,
-                                state,
+                                master.clone(),
+                                state.clone(),
                                 format!(
                                     "PATH_HARD_VIOLATION: violation={}, width_delta_mm={:.3}, thickness_delta_mm={:.3}",
                                     check
@@ -187,8 +196,8 @@ impl CapacityFiller {
                                 thickness_delta_mm: check.thickness_delta_mm,
                             });
                             skipped_materials.push((
-                                master,
-                                state,
+                                master.clone(),
+                                state.clone(),
                                 format!(
                                     "PATH_OVERRIDE_REQUIRED: violation={}, width_delta_mm={:.3}, thickness_delta_mm={:.3}",
                                     check
@@ -212,8 +221,8 @@ impl CapacityFiller {
             if state.sched_state == SchedState::Locked {
                 // 锁定材料必须添加，即使超过 limit
                 let plan_item = self.create_plan_item(
-                    &master,
-                    &state,
+                    master,
+                    state,
                     version_id,
                     plan_date,
                     sequence_no,
@@ -239,8 +248,8 @@ impl CapacityFiller {
             if !capacity_pool.can_add_material(weight) {
                 // 超过 limit_capacity_t，跳过
                 skipped_materials.push((
-                    master,
-                    state,
+                    master.clone(),
+                    state.clone(),
                     format!(
                         "CAPACITY_LIMIT_EXCEEDED: would exceed limit_capacity_t ({} + {} > {})",
                         capacity_pool.used_capacity_t, weight, capacity_pool.limit_capacity_t
@@ -257,8 +266,8 @@ impl CapacityFiller {
             } else {
                 // 已达到 limit，跳过
                 skipped_materials.push((
-                    master,
-                    state,
+                    master.clone(),
+                    state.clone(),
                     format!(
                         "TARGET_REACHED: capacity pool is full ({} >= {})",
                         capacity_pool.used_capacity_t, capacity_pool.limit_capacity_t
@@ -269,8 +278,8 @@ impl CapacityFiller {
 
             // 添加材料
             let plan_item = self.create_plan_item(
-                &master,
-                &state,
+                master,
+                state,
                 version_id,
                 plan_date,
                 sequence_no,
@@ -341,6 +350,8 @@ impl CapacityFiller {
             sched_state: Some(state.sched_state.to_string()),
             assign_reason: Some(assign_reason.to_string()),
             steel_grade: None,
+            width_mm: master.width_mm,
+            thickness_mm: master.thickness_mm,
         }
     }
 
@@ -638,7 +649,7 @@ mod tests {
             NaiveDate::from_ymd_opt(2026, 1, 20).unwrap(),
             1000.0, // target
             1200.0, // limit
-            500.0,  // used (冻结区已占用)
+            0.0,    // used（由 CapacityFiller 根据冻结区材料自动计入）
         );
 
         // 创建冻结区材料
@@ -658,6 +669,8 @@ mod tests {
                 sched_state: Some("Ready".to_string()),
                 assign_reason: Some("FROZEN".to_string()),
                 steel_grade: None,
+                width_mm: None,
+                thickness_mm: None,
             },
         ];
 
@@ -678,6 +691,75 @@ mod tests {
         assert_eq!(plan_items[0].is_frozen(), true);
         assert_eq!(plan_items[1].material_id, "M001"); // 新增材料在后
         assert_eq!(pool.used_capacity_t, 800.0); // 500 + 300
+        assert_eq!(pool.frozen_capacity_t, 500.0);
+    }
+
+    #[test]
+    fn test_frozen_items_sequence_no_gap_should_start_after_max() {
+        // 测试：冻结区 seq_no 存在空洞时，新排产 seq_no 从最大值+1 开始，避免重复
+        let filler = CapacityFiller::new();
+        let plan_date = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
+        let mut pool = create_test_capacity_pool(
+            "H032",
+            plan_date,
+            1000.0, // target
+            1200.0, // limit
+            0.0,    // used
+        );
+
+        let frozen_items = vec![
+            PlanItem {
+                version_id: "version-001".to_string(),
+                material_id: "F005".to_string(),
+                machine_code: "H032".to_string(),
+                plan_date,
+                seq_no: 5,
+                weight_t: 100.0,
+                source_type: "FROZEN".to_string(),
+                locked_in_plan: true,
+                force_release_in_plan: false,
+                violation_flags: None,
+                urgent_level: Some("L0".to_string()),
+                sched_state: Some("Ready".to_string()),
+                assign_reason: Some("FROZEN".to_string()),
+                steel_grade: None,
+                width_mm: None,
+                thickness_mm: None,
+            },
+            PlanItem {
+                version_id: "version-001".to_string(),
+                material_id: "F007".to_string(),
+                machine_code: "H032".to_string(),
+                plan_date,
+                seq_no: 7,
+                weight_t: 100.0,
+                source_type: "FROZEN".to_string(),
+                locked_in_plan: true,
+                force_release_in_plan: false,
+                violation_flags: None,
+                urgent_level: Some("L0".to_string()),
+                sched_state: Some("Ready".to_string()),
+                assign_reason: Some("FROZEN".to_string()),
+                steel_grade: None,
+                width_mm: None,
+                thickness_mm: None,
+            },
+        ];
+
+        let materials = vec![create_test_material("M001", "H032", SchedState::Ready, 50.0)];
+
+        let (plan_items, _skipped) =
+            filler.fill_single_day(&mut pool, materials, frozen_items, "version-001");
+
+        assert_eq!(plan_items.len(), 3);
+        assert_eq!(plan_items[0].material_id, "F005");
+        assert_eq!(plan_items[0].seq_no, 5);
+        assert_eq!(plan_items[1].material_id, "F007");
+        assert_eq!(plan_items[1].seq_no, 7);
+        assert_eq!(plan_items[2].material_id, "M001");
+        assert_eq!(plan_items[2].seq_no, 8);
+        assert_eq!(pool.used_capacity_t, 250.0);
+        assert_eq!(pool.frozen_capacity_t, 200.0);
     }
 
     #[test]
@@ -805,7 +887,7 @@ mod tests {
 
         let result = filler.fill_single_day_with_path_rule(
             &mut pool,
-            candidates,
+            &candidates,
             vec![],
             "version-001",
             Some(&engine),
@@ -852,7 +934,7 @@ mod tests {
 
         let result = filler.fill_single_day_with_path_rule(
             &mut pool,
-            candidates,
+            &candidates,
             vec![],
             "version-001",
             Some(&engine),
@@ -899,7 +981,7 @@ mod tests {
 
         let result = filler.fill_single_day_with_path_rule(
             &mut pool,
-            candidates,
+            &candidates,
             vec![],
             "version-001",
             Some(&engine),

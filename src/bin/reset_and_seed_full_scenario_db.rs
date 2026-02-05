@@ -63,16 +63,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn backup_and_reset_db(db_path: &str) -> Result<(), Box<dyn Error>> {
     let path = Path::new(db_path);
-    if !path.exists() {
-        return Ok(());
+    if path.exists() {
+        let ts = Local::now().format("%Y%m%d_%H%M%S").to_string();
+        let backup_path = format!("{}.bak.{}", db_path, ts);
+        fs::copy(path, &backup_path)?;
+        fs::remove_file(path)?;
+        eprintln!("Backed up {} -> {}", db_path, backup_path);
     }
 
-    let ts = Local::now().format("%Y%m%d_%H%M%S").to_string();
-    let backup_path = format!("{}.bak.{}", db_path, ts);
-    fs::copy(path, &backup_path)?;
-    fs::remove_file(path)?;
+    // best-effort: 清理 WAL/SHM，避免 SQLite 在重建库时遇到残留文件导致 IO 错误
+    // 说明：WAL/SHM 属于运行时临时文件，不做备份即可。
+    let wal_path = format!("{}-wal", db_path);
+    let shm_path = format!("{}-shm", db_path);
+    let _ = fs::remove_file(&wal_path);
+    let _ = fs::remove_file(&shm_path);
 
-    eprintln!("Backed up {} -> {}", db_path, backup_path);
     Ok(())
 }
 

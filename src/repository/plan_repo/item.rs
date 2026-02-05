@@ -66,26 +66,31 @@ impl PlanItemRepository {
         let mut conn = self.get_conn()?;
         let tx = conn.transaction()?;
 
-        for item in items {
-            tx.execute(
+        {
+            let mut stmt = tx.prepare(
                 r#"INSERT INTO plan_item (
-                    version_id, material_id, machine_code, plan_date, seq_no,
-                    weight_t, source_type, locked_in_plan, force_release_in_plan,
-                    violation_flags
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
-                params![
-                    &item.version_id,
-                    &item.material_id,
-                    &item.machine_code,
-                    &item.plan_date.format("%Y-%m-%d").to_string(),
-                    &item.seq_no,
-                    &item.weight_t,
-                    &item.source_type,
-                    if item.locked_in_plan { 1 } else { 0 },
-                    if item.force_release_in_plan { 1 } else { 0 },
-                    &item.violation_flags,
-                ],
+                        version_id, material_id, machine_code, plan_date, seq_no,
+                        weight_t, source_type, locked_in_plan, force_release_in_plan,
+                        violation_flags
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
             )?;
+
+            for item in items {
+                stmt.execute(
+                    params![
+                        &item.version_id,
+                        &item.material_id,
+                        &item.machine_code,
+                        &item.plan_date.format("%Y-%m-%d").to_string(),
+                        &item.seq_no,
+                        &item.weight_t,
+                        &item.source_type,
+                        if item.locked_in_plan { 1 } else { 0 },
+                        if item.force_release_in_plan { 1 } else { 0 },
+                        &item.violation_flags,
+                    ],
+                )?;
+            }
         }
 
         tx.commit()?;
@@ -101,26 +106,31 @@ impl PlanItemRepository {
         let mut conn = self.get_conn()?;
         let tx = conn.transaction()?;
 
-        for item in items {
-            tx.execute(
+        {
+            let mut stmt = tx.prepare(
                 r#"INSERT OR REPLACE INTO plan_item (
-                    version_id, material_id, machine_code, plan_date, seq_no,
-                    weight_t, source_type, locked_in_plan, force_release_in_plan,
-                    violation_flags
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
-                params![
-                    &item.version_id,
-                    &item.material_id,
-                    &item.machine_code,
-                    &item.plan_date.format("%Y-%m-%d").to_string(),
-                    &item.seq_no,
-                    &item.weight_t,
-                    &item.source_type,
-                    if item.locked_in_plan { 1 } else { 0 },
-                    if item.force_release_in_plan { 1 } else { 0 },
-                    &item.violation_flags,
-                ],
+                        version_id, material_id, machine_code, plan_date, seq_no,
+                        weight_t, source_type, locked_in_plan, force_release_in_plan,
+                        violation_flags
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
             )?;
+
+            for item in items {
+                stmt.execute(
+                    params![
+                        &item.version_id,
+                        &item.material_id,
+                        &item.machine_code,
+                        &item.plan_date.format("%Y-%m-%d").to_string(),
+                        &item.seq_no,
+                        &item.weight_t,
+                        &item.source_type,
+                        if item.locked_in_plan { 1 } else { 0 },
+                        if item.force_release_in_plan { 1 } else { 0 },
+                        &item.violation_flags,
+                    ],
+                )?;
+            }
         }
 
         tx.commit()?;
@@ -219,6 +229,94 @@ impl PlanItemRepository {
             .collect::<Result<Vec<PlanItem>, _>>()?;
 
         Ok(items)
+    }
+
+    /// 查询版本中所有 (machine_code, plan_date) 组合（去重）
+    ///
+    /// 用途：
+    /// - 删除版本/删除明细前获取受影响的产能池 keys
+    /// - 避免拉取全量 plan_item（50k+ 时会显著拖慢）
+    pub fn list_machine_date_keys(
+        &self,
+        version_id: &str,
+    ) -> RepositoryResult<Vec<(String, NaiveDate)>> {
+        let conn = self.get_conn()?;
+
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT DISTINCT machine_code, plan_date
+            FROM plan_item
+            WHERE version_id = ?1
+            ORDER BY machine_code, plan_date
+            "#,
+        )?;
+
+        let keys = stmt
+            .query_map(params![version_id], |row| {
+                let machine_code: String = row.get(0)?;
+                let plan_date_str: String = row.get(1)?;
+                let plan_date = NaiveDate::parse_from_str(&plan_date_str, "%Y-%m-%d").map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        1,
+                        rusqlite::types::Type::Text,
+                        Box::new(e),
+                    )
+                })?;
+                Ok((machine_code, plan_date))
+            })?
+            .collect::<Result<Vec<(String, NaiveDate)>, _>>()?;
+
+        Ok(keys)
+    }
+
+    /// 按 (machine_code, plan_date) 聚合版本内排产吨位
+    ///
+    /// 说明：
+    /// - 用于“版本激活后同步刷新产能池”场景；
+    /// - 通过 SQL 聚合避免拉取全量 plan_item 明细（50k+ 时会显著拖慢且占用内存）。
+    pub fn sum_weight_by_machine_and_date_range(
+        &self,
+        version_id: &str,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> RepositoryResult<Vec<(String, NaiveDate, f64)>> {
+        let conn = self.get_conn()?;
+        let start_date_str = start_date.format("%Y-%m-%d").to_string();
+        let end_date_str = end_date.format("%Y-%m-%d").to_string();
+
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT
+                machine_code,
+                plan_date,
+                COALESCE(SUM(weight_t), 0.0) AS used_capacity_t
+            FROM plan_item
+            WHERE version_id = ?1
+              AND plan_date BETWEEN ?2 AND ?3
+            GROUP BY machine_code, plan_date
+            ORDER BY machine_code, plan_date
+            "#,
+        )?;
+
+        let rows = stmt
+            .query_map(params![version_id, start_date_str, end_date_str], |row| {
+                let machine_code: String = row.get(0)?;
+                let plan_date_str: String = row.get(1)?;
+                let used_capacity_t: f64 = row.get(2)?;
+
+                let plan_date = NaiveDate::parse_from_str(&plan_date_str, "%Y-%m-%d").map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        1,
+                        rusqlite::types::Type::Text,
+                        Box::new(e),
+                    )
+                })?;
+
+                Ok((machine_code, plan_date, used_capacity_t))
+            })?
+            .collect::<Result<Vec<(String, NaiveDate, f64)>, _>>()?;
+
+        Ok(rows)
     }
 
     /// 获取版本的排产明细聚合统计（count/sum/min/max）
@@ -510,6 +608,8 @@ impl PlanItemRepository {
             sched_state: None,
             assign_reason: None,
             steel_grade: None,
+            width_mm: None,
+            thickness_mm: None,
         })
     }
 }

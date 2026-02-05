@@ -297,6 +297,7 @@ impl PathRuleApi {
         )?;
 
         drop(conn);
+        self.config_manager.invalidate_cache_all();
 
         let log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),

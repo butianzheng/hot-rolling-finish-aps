@@ -79,10 +79,16 @@ export const planApi = {
   },
 
   async activateVersion(versionId: string, operator: string): Promise<void> {
-    return IpcClient.call('activate_version', {
-      version_id: versionId,
-      operator,
-    });
+    return IpcClient.call(
+      'activate_version',
+      {
+        version_id: versionId,
+        operator,
+      },
+      {
+        timeout: 300000,
+      }
+    );
   },
 
   async rollbackVersion(
@@ -110,7 +116,8 @@ export const planApi = {
     baseDate: string,
     frozenDate?: string,
     operator: string = 'admin',
-    strategy?: string
+    strategy?: string,
+    windowDaysOverride?: number
   ): Promise<z.infer<typeof RecalcResponseSchema>> {
     return IpcClient.call(
       'simulate_recalc',
@@ -120,8 +127,10 @@ export const planApi = {
         frozen_date: frozenDate,
         operator,
         strategy,
+        window_days_override: windowDaysOverride,
       },
       {
+        timeout: 300000,
         validate: zodValidator(RecalcResponseSchema, 'simulate_recalc'),
       }
     );
@@ -132,7 +141,8 @@ export const planApi = {
     baseDate: string,
     frozenDate?: string,
     operator: string = 'admin',
-    strategy?: string
+    strategy?: string,
+    windowDaysOverride?: number
   ): Promise<z.infer<typeof RecalcResponseSchema>> {
     return IpcClient.call(
       'recalc_full',
@@ -142,8 +152,10 @@ export const planApi = {
         frozen_date: frozenDate,
         operator,
         strategy,
+        window_days_override: windowDaysOverride,
       },
       {
+        timeout: 300000,
         validate: zodValidator(RecalcResponseSchema, 'recalc_full'),
       }
     );
@@ -172,6 +184,7 @@ export const planApi = {
         operator: params.operator,
       },
       {
+        timeout: 300000,
         validate: zodValidator(GenerateStrategyDraftsResponseSchema, 'generate_strategy_drafts'),
       }
     );
@@ -188,6 +201,7 @@ export const planApi = {
         operator,
       },
       {
+        timeout: 300000,
         validate: zodValidator(ApplyStrategyDraftResponseSchema, 'apply_strategy_draft'),
       }
     );
@@ -261,6 +275,8 @@ export const planApi = {
       },
       {
         validate: zodValidator(z.array(PlanItemSchema), 'list_plan_items'),
+        // Plan items can be large (10k~50k+) depending on window/versions; avoid false timeouts.
+        timeout: 120000,
       }
     );
   },
@@ -274,6 +290,7 @@ export const planApi = {
       },
       {
         validate: zodValidator(z.array(PlanItemSchema), 'list_items_by_date'),
+        timeout: 60000,
       }
     );
   },
@@ -334,4 +351,3 @@ export const planApi = {
     );
   },
 };
-

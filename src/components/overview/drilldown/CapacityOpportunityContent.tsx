@@ -70,7 +70,7 @@ export const CapacityOpportunityContent: React.FC<CapacityOpportunityContentProp
       dataIndex: 'opportunitySpaceT',
       key: 'opportunitySpaceT',
       width: 110,
-      render: (v: number) => `${Number(v || 0).toFixed(1)}`,
+      render: (v: number) => `${Number(v || 0).toFixed(2)}`,
     },
     {
       title: '描述',
@@ -116,7 +116,7 @@ export const CapacityOpportunityContent: React.FC<CapacityOpportunityContentProp
           <Space wrap align="center">
             <Tag color="blue">{selected.machineCode}</Tag>
             <Text strong>
-              {selected.planDate} · 机会 {selected.opportunitySpaceT.toFixed(1)}t
+              {selected.planDate} · 机会 {selected.opportunitySpaceT.toFixed(2)}t
             </Text>
             {onGoWorkbench ? (
               <Button
@@ -133,9 +133,9 @@ export const CapacityOpportunityContent: React.FC<CapacityOpportunityContentProp
             <Descriptions.Item label="当前利用率">{selected.currentUtilPct.toFixed(1)}%</Descriptions.Item>
             <Descriptions.Item label="优化后利用率">{selected.optimizedUtilPct.toFixed(1)}%</Descriptions.Item>
             <Descriptions.Item label="已用/目标">
-              {selected.usedCapacityT.toFixed(1)} / {selected.targetCapacityT.toFixed(0)}t
+              {selected.usedCapacityT.toFixed(2)} / {selected.targetCapacityT.toFixed(2)}t
             </Descriptions.Item>
-            <Descriptions.Item label="机会空间">{selected.opportunitySpaceT.toFixed(1)}t</Descriptions.Item>
+            <Descriptions.Item label="机会空间">{selected.opportunitySpaceT.toFixed(2)}t</Descriptions.Item>
           </Descriptions>
 
           {selected.description ? (

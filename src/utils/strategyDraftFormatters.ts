@@ -33,7 +33,7 @@ export function clampRange(range: [Dayjs, Dayjs]): [Dayjs, Dayjs] {
 export function formatTon(v: unknown): string {
   const n = Number(v);
   if (!Number.isFinite(n)) return '—';
-  return n.toFixed(1);
+  return n.toFixed(2);
 }
 
 /**

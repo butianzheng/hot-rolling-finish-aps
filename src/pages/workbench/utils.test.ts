@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { extractForceReleaseViolations, getStrategyLabel } from './utils';
-import type { ForceReleaseViolation } from './types';
 
 describe('workbench/utils 工具函数', () => {
   describe('extractForceReleaseViolations', () => {

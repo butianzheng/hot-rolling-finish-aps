@@ -48,7 +48,7 @@ const OneClickOptimizeMenu: React.FC<OneClickOptimizeMenuProps> = ({
             { key: 'balanced', label: '均衡方案' },
             { key: 'urgent_first', label: '紧急优先' },
             { key: 'capacity_first', label: '产能优先' },
-            { key: 'cold_stock_first', label: '冷坨消化' },
+            { key: 'cold_stock_first', label: '冷料消化' },
           ],
         }}
       >
@@ -62,6 +62,7 @@ const OneClickOptimizeMenu: React.FC<OneClickOptimizeMenuProps> = ({
         strategyLabel={workflow.strategyLabel}
         strategy={workflow.strategy}
         baseDate={workflow.baseDate}
+        windowDaysOverride={workflow.windowDaysOverride}
         simulateLoading={workflow.simulateLoading}
         executeLoading={workflow.executeLoading}
         simulateResult={workflow.simulateResult}
@@ -69,8 +70,9 @@ const OneClickOptimizeMenu: React.FC<OneClickOptimizeMenuProps> = ({
         onClose={workflow.closePreview}
         onExecute={workflow.runExecute}
         onSimulate={workflow.runSimulate}
-        onBaseDateChange={workflow.setBaseDate}
+        onBaseDateChange={workflow.changeBaseDate}
         onStrategyChange={workflow.changeStrategy}
+        onWindowDaysOverrideChange={workflow.changeWindowDaysOverride}
       />
 
       <PostCreateModal

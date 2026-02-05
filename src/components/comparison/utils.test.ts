@@ -379,7 +379,7 @@ describe('comparison/utils', () => {
     });
 
     it('只有中文名称时应返回中文名称', () => {
-      const version: Version = {
+      const version = {
         version_id: 'v123',
         version_no: null,
         status: 'ACTIVE',
@@ -388,7 +388,7 @@ describe('comparison/utils', () => {
         config_snapshot_json: JSON.stringify({
           __meta_version_name_cn: '测试方案A',
         }),
-      };
+      } as unknown as Version;
       const result = formatVersionLabelWithCode(version);
       expect(result).toBe('测试方案A');
     });
@@ -420,27 +420,27 @@ describe('comparison/utils', () => {
     });
 
     it('UUID 格式的 ID 应返回前 8 位', () => {
-      const version: Version = {
+      const version = {
         version_id: '31c46b4d-1234-5678-9abc-def012345678',
         version_no: null,
         status: 'ACTIVE',
         recalc_window_days: 30,
         created_at: '2026-01-30',
         config_snapshot_json: null,
-      };
+      } as unknown as Version;
       const result = formatVersionLabelWithCode(version);
       expect(result).toBe('31c46b4d');
     });
 
     it('非 UUID 格式的 ID 应返回完整 ID', () => {
-      const version: Version = {
+      const version = {
         version_id: 'test_version_custom_name',
         version_no: null,
         status: 'ACTIVE',
         recalc_window_days: 30,
         created_at: '2026-01-30',
         config_snapshot_json: null,
-      };
+      } as unknown as Version;
       const result = formatVersionLabelWithCode(version);
       expect(result).toBe('test_version_custom_name');
     });

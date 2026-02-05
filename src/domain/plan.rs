@@ -86,6 +86,8 @@ pub struct PlanItem {
     pub sched_state: Option<String>,   // 状态快照 (可选，用于可解释性)
     pub assign_reason: Option<String>, // 落位原因 (可选，用于可解释性)
     pub steel_grade: Option<String>,   // 钢种/出钢记号 (来自 material_master.steel_mark)
+    pub width_mm: Option<f64>,         // 宽度快照 (来自 material_master.width_mm)
+    pub thickness_mm: Option<f64>,     // 厚度快照 (来自 material_master.thickness_mm)
 }
 
 // 辅助类型别名 (兼容旧代码)

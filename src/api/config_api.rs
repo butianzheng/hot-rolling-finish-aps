@@ -183,6 +183,7 @@ impl ConfigApi {
         .map_err(|e| ApiError::DatabaseError(format!("更新配置失败: {}", e)))?;
 
         drop(conn);
+        self.config_manager.invalidate_cache_all();
 
         // 记录ActionLog
         let action_log = ActionLog {
@@ -259,6 +260,7 @@ impl ConfigApi {
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         drop(conn);
+        self.config_manager.invalidate_cache_all();
 
         // 记录ActionLog
         let action_log = ActionLog {
@@ -413,6 +415,7 @@ impl ConfigApi {
         .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         drop(conn);
+        self.config_manager.invalidate_cache_all();
 
         // 记录ActionLog（可解释性红线：所有写操作必须有审计）
         let action_log = ActionLog {

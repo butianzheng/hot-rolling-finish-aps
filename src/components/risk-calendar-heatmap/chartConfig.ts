@@ -42,7 +42,7 @@ export function createChartOption({
             <div>风险等级: <span style="color: ${RISK_LEVEL_COLORS[dayData.riskLevel]};">${dayData.riskLevel}</span></div>
             <div>容量利用率: ${dayData.capacityUtilPct.toFixed(1)}%</div>
             <div>紧急订单失败: ${dayData.urgentFailureCount}个</div>
-            ${dayData.overloadWeightT > 0 ? `<div style="color: #ff4d4f;">超载: ${dayData.overloadWeightT.toFixed(1)}吨</div>` : ''}
+            ${dayData.overloadWeightT > 0 ? `<div style="color: #ff4d4f;">超载: ${dayData.overloadWeightT.toFixed(2)}吨</div>` : ''}
             <div style="margin-top: 4px; font-size: 12px; color: #8c8c8c;">点击查看详情</div>
           </div>
         `;

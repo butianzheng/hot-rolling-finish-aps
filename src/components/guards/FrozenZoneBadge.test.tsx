@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { FrozenZoneBadge, type FrozenZoneBadgeProps } from './FrozenZoneBadge';
+import { FrozenZoneBadge } from './FrozenZoneBadge';
 
 describe('FrozenZoneBadge 组件', () => {
   it('应该不渲染未锁定的徽章', () => {

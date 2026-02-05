@@ -15,6 +15,8 @@ export type PlanItemRow = {
   plan_date: string;
   seq_no: number;
   weight_t: number;
+  width_mm?: number | null;
+  thickness_mm?: number | null;
   urgent_level?: string;
   locked_in_plan?: boolean;
   force_release_in_plan?: boolean;

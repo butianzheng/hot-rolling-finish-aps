@@ -370,7 +370,7 @@ export default function ScheduleGanttView({
           {summary ? (
             <>
               <div style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.85)', marginBottom: 8 }}>
-                全量：{summary.totalCount} 件 / {summary.totalWeightT.toFixed(1)}t · 冻结 {summary.lockedCount} · 强放{' '}
+                全量：{summary.totalCount} 件 / {summary.totalWeightT.toFixed(2)}t · 冻结 {summary.lockedCount} · 强放{' '}
                 {summary.forceReleaseCount} · 可调 {summary.adjustableCount}
               </div>
 
@@ -405,7 +405,7 @@ export default function ScheduleGanttView({
                       }}
                     />
                     <span style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.85)' }}>
-                      {u} {summary.byUrgency[u].count} 件 / {summary.byUrgency[u].weightT.toFixed(1)}t
+                      {u} {summary.byUrgency[u].count} 件 / {summary.byUrgency[u].weightT.toFixed(2)}t
                     </span>
                   </div>
                 ))}
@@ -419,11 +419,11 @@ export default function ScheduleGanttView({
                 </div>
                 {urgentLevel && urgentLevel !== 'all' ? (
                   <div style={{ marginTop: 4, color: 'rgba(255, 255, 255, 0.65)' }}>
-                    当前视图显示：{summary.viewCount} 件 / {summary.viewWeightT.toFixed(1)}t
+                    当前视图显示：{summary.viewCount} 件 / {summary.viewWeightT.toFixed(2)}t
                   </div>
                 ) : statusFilter && statusFilter !== 'ALL' ? (
                   <div style={{ marginTop: 4, color: 'rgba(255, 255, 255, 0.65)' }}>
-                    当前视图显示：{summary.viewCount} 件 / {summary.viewWeightT.toFixed(1)}t
+                    当前视图显示：{summary.viewCount} 件 / {summary.viewWeightT.toFixed(2)}t
                   </div>
                 ) : null}
               </div>
@@ -474,7 +474,7 @@ export default function ScheduleGanttView({
                 display: 'flex',
               }}
               aria-label={`${key} 紧急度结构`}
-              title={summary ? `${summary.totalCount} 件 / ${summary.totalWeightT.toFixed(1)}t` : '无排程'}
+              title={summary ? `${summary.totalCount} 件 / ${summary.totalWeightT.toFixed(2)}t` : '无排程'}
             >
               {(['L3', 'L2', 'L1', 'L0'] as const).map((u) => {
                 if (!summary || urgencyBaseTotal <= 0) return null;

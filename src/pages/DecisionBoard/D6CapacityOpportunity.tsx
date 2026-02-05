@@ -163,8 +163,8 @@ export const D6CapacityOpportunity: React.FC<D6CapacityOpportunityProps> = ({ em
       render: (_, record) => (
         <div style={{ fontSize: '12px' }}>
           <div>
-            <span style={{ fontWeight: 'bold' }}>{record.usedCapacityT.toFixed(1)}</span> /{' '}
-            {record.targetCapacityT.toFixed(0)} 吨
+            <span style={{ fontWeight: 'bold' }}>{record.usedCapacityT.toFixed(2)}</span> /{' '}
+            {record.targetCapacityT.toFixed(2)} 吨
           </div>
         </div>
       ),
@@ -181,7 +181,7 @@ export const D6CapacityOpportunity: React.FC<D6CapacityOpportunityProps> = ({ em
             fontWeight: 'bold',
           }}
         >
-          {space.toFixed(1)}吨
+          {space.toFixed(2)}吨
         </span>
       ),
       sorter: (a, b) => a.opportunitySpaceT - b.opportunitySpaceT,

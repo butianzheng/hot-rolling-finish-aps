@@ -7,6 +7,13 @@ use std::sync::{Arc, Mutex};
 // ==========================================
 // MaterialMasterRepository - 材料主数据仓储
 // ==========================================
+#[derive(Debug, Clone)]
+pub struct MaterialSpecLite {
+    pub steel_mark: Option<String>,
+    pub width_mm: Option<f64>,
+    pub thickness_mm: Option<f64>,
+}
+
 /// 材料主数据仓储
 /// 职责: 管理 material_master 表的 CRUD 操作
 /// 红线: 不含业务逻辑，只负责数据访问
@@ -434,6 +441,71 @@ impl MaterialMasterRepository {
                     if !mark.is_empty() {
                         result.insert(id, mark);
                     }
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// 批量查询材料的“关键规格快照”（用于 plan_item 快照字段补齐）
+    ///
+    /// 返回：
+    /// - material_id → { steel_mark, width_mm, thickness_mm }
+    pub fn find_spec_lite_by_ids(
+        &self,
+        material_ids: &[String],
+    ) -> RepositoryResult<std::collections::HashMap<String, MaterialSpecLite>> {
+        if material_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        const CHUNK_SIZE: usize = 900;
+
+        let conn = self.get_conn()?;
+        let mut result = std::collections::HashMap::with_capacity(material_ids.len());
+
+        for chunk in material_ids.chunks(CHUNK_SIZE) {
+            let placeholders = std::iter::repeat("?")
+                .take(chunk.len())
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            let sql = format!(
+                "SELECT material_id, steel_mark, width_mm, thickness_mm FROM material_master WHERE material_id IN ({})",
+                placeholders
+            );
+
+            let mut stmt = conn.prepare(&sql)?;
+            let params_vec: Vec<&dyn rusqlite::ToSql> =
+                chunk.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
+
+            let rows = stmt.query_map(params_vec.as_slice(), |row| {
+                let id: String = row.get(0)?;
+                let mark: Option<String> = row.get(1)?;
+                let width_mm: Option<f64> = row.get(2)?;
+                let thickness_mm: Option<f64> = row.get(3)?;
+                let steel_mark = mark.and_then(|s| {
+                    let trimmed = s.trim().to_string();
+                    if trimmed.is_empty() {
+                        None
+                    } else {
+                        Some(trimmed)
+                    }
+                });
+                Ok((
+                    id,
+                    MaterialSpecLite {
+                        steel_mark,
+                        width_mm,
+                        thickness_mm,
+                    },
+                ))
+            })?;
+
+            for row in rows {
+                if let Ok((id, spec)) = row {
+                    result.insert(id, spec);
                 }
             }
         }

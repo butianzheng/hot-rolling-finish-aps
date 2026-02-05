@@ -88,14 +88,14 @@ export const CapacityDeltaCard: React.FC<CapacityDeltaCardProps> = ({
           )}
 
           <Space wrap>
-            <Tag color="blue">总量A {localCapacityRowsBase.totalA.toFixed(1)}t</Tag>
-            <Tag color="blue">总量B {localCapacityRowsBase.totalB.toFixed(1)}t</Tag>
+            <Tag color="blue">总量A {localCapacityRowsBase.totalA.toFixed(2)}t</Tag>
+            <Tag color="blue">总量B {localCapacityRowsBase.totalB.toFixed(2)}t</Tag>
             <Tag
               color={
                 localCapacityRowsBase.totalB - localCapacityRowsBase.totalA >= 0 ? 'green' : 'red'
               }
             >
-              Δ {(localCapacityRowsBase.totalB - localCapacityRowsBase.totalA).toFixed(1)}t
+              Δ {(localCapacityRowsBase.totalB - localCapacityRowsBase.totalA).toFixed(2)}t
             </Tag>
             {localCapacityRows ? (
               <Tag color={localCapacityRows.overflowRows.length > 0 ? 'red' : 'green'}>
@@ -129,7 +129,7 @@ export const CapacityDeltaCard: React.FC<CapacityDeltaCardProps> = ({
                 title: 'A已用(t)',
                 dataIndex: 'used_a',
                 width: 110,
-                render: (v: number) => v.toFixed(1),
+                render: (v: number) => v.toFixed(2),
               },
               {
                 title: 'B已用(t)',
@@ -138,7 +138,7 @@ export const CapacityDeltaCard: React.FC<CapacityDeltaCardProps> = ({
                 render: (v: number, r) => {
                   const threshold = r.limit_b ?? r.target_b ?? null;
                   const over = threshold != null && v > threshold + 1e-9;
-                  return <span style={{ color: over ? '#cf1322' : undefined }}>{v.toFixed(1)}</span>;
+                  return <span style={{ color: over ? '#cf1322' : undefined }}>{v.toFixed(2)}</span>;
                 },
               },
               {
@@ -147,7 +147,7 @@ export const CapacityDeltaCard: React.FC<CapacityDeltaCardProps> = ({
                 width: 110,
                 render: (v: number) => (
                   <span style={{ color: v > 1e-9 ? '#3f8600' : v < -1e-9 ? '#cf1322' : undefined }}>
-                    {v.toFixed(1)}
+                    {v.toFixed(2)}
                   </span>
                 ),
               },
@@ -159,8 +159,8 @@ export const CapacityDeltaCard: React.FC<CapacityDeltaCardProps> = ({
                   const target = r.target_b;
                   const limit = r.limit_b;
                   if (target == null && limit == null) return '-';
-                  const t = target == null ? '-' : target.toFixed(1);
-                  const l = limit == null ? '-' : limit.toFixed(1);
+                  const t = target == null ? '-' : target.toFixed(2);
+                  const l = limit == null ? '-' : limit.toFixed(2);
                   return `${t} / ${l}`;
                 },
               },
