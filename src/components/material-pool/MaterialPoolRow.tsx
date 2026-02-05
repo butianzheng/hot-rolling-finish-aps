@@ -91,7 +91,7 @@ export const MaterialPoolRow = React.memo(function MaterialPoolRow({
         <Text style={{ fontWeight: 600 }}>{row.level}</Text>
         <Text type="secondary">({row.count})</Text>
         <Text type="secondary" style={{ marginLeft: 'auto', fontFamily: FONT_FAMILIES.MONOSPACE }}>
-          {row.weight.toFixed(2)}t
+          {row.weight.toFixed(3)}t
         </Text>
       </div>
     );
@@ -166,7 +166,7 @@ export const MaterialPoolRow = React.memo(function MaterialPoolRow({
       {/* 第二行：钢种 + 重量 + 状态标签 + 风险标记 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, paddingLeft: 24 }}>
         <Text type="secondary" style={{ fontSize: 11 }} ellipsis>
-          {m.steel_mark || '-'} · {Number(m.weight_t || 0).toFixed(2)}t
+          {m.steel_mark || '-'} · {Number(m.weight_t || 0).toFixed(3)}t
         </Text>
 
         {/* 状态标签 */}

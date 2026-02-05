@@ -178,7 +178,7 @@ export const ColdStockContent: React.FC<ColdStockContentProps> = ({
         <Space wrap align="center">
           <Tag color="blue">{machineCodeFilter}</Tag>
           <Text type="secondary">
-            冷坨 {machineSummary.count} 件 · {machineSummary.weightT.toFixed(2)}t · 高压{' '}
+            冷坨 {machineSummary.count} 件 · {machineSummary.weightT.toFixed(3)}t · 高压{' '}
             {machineSummary.highPressureCount} 件 · 峰值 {machineSummary.maxPressureScore.toFixed(0)}
           </Text>
           {onGoWorkbench ? (
@@ -207,7 +207,7 @@ export const ColdStockContent: React.FC<ColdStockContentProps> = ({
 
           <Descriptions column={4} bordered size="small">
             <Descriptions.Item label="数量">{displayedBucket.count}</Descriptions.Item>
-            <Descriptions.Item label="重量">{displayedBucket.weightT.toFixed(2)}t</Descriptions.Item>
+            <Descriptions.Item label="重量">{displayedBucket.weightT.toFixed(3)}t</Descriptions.Item>
             <Descriptions.Item label="平均库龄">{displayedBucket.avgAgeDays.toFixed(1)}天</Descriptions.Item>
             <Descriptions.Item label="最大库龄">{displayedBucket.maxAgeDays}天</Descriptions.Item>
           </Descriptions>

@@ -160,7 +160,7 @@ export const D5RollCampaign: React.FC<D5RollCampaignProps> = ({ embedded, onOpen
       dataIndex: 'currentTonnageT',
       key: 'currentTonnageT',
       width: 140,
-      render: (weight: number) => `${weight.toFixed(2)}吨`,
+      render: (weight: number) => `${weight.toFixed(3)}吨`,
       sorter: (a, b) => a.currentTonnageT - b.currentTonnageT,
     },
     {
@@ -168,14 +168,14 @@ export const D5RollCampaign: React.FC<D5RollCampaignProps> = ({ embedded, onOpen
       dataIndex: 'softLimitT',
       key: 'softLimitT',
       width: 120,
-      render: (threshold: number) => `${threshold.toFixed(2)}吨`,
+      render: (threshold: number) => `${threshold.toFixed(3)}吨`,
     },
     {
       title: '硬限制',
       dataIndex: 'hardLimitT',
       key: 'hardLimitT',
       width: 120,
-      render: (limit: number) => `${limit.toFixed(2)}吨`,
+      render: (limit: number) => `${limit.toFixed(3)}吨`,
     },
     {
       title: '利用率',
@@ -216,7 +216,7 @@ export const D5RollCampaign: React.FC<D5RollCampaignProps> = ({ embedded, onOpen
       width: 120,
       render: (remaining: number) => (
         <span style={{ color: remaining <= 0 ? '#ff4d4f' : remaining < 500 ? '#faad14' : '#52c41a' }}>
-          {remaining.toFixed(2)}吨
+          {remaining.toFixed(3)}吨
         </span>
       ),
       sorter: (a, b) => a.remainingTonnageT - b.remainingTonnageT,
@@ -482,13 +482,13 @@ const SevereAlertCard: React.FC<SevereAlertCardProps> = ({ alert }) => {
         {/* 吨位信息 */}
         <Descriptions size="small" column={1} bordered>
           <Descriptions.Item label="当前累积">
-            {alert.currentTonnageT.toFixed(2)}吨
+            {alert.currentTonnageT.toFixed(3)}吨
           </Descriptions.Item>
           <Descriptions.Item label="软限制">
-            {alert.softLimitT.toFixed(2)}吨
+            {alert.softLimitT.toFixed(3)}吨
           </Descriptions.Item>
           <Descriptions.Item label="硬限制">
-            {alert.hardLimitT.toFixed(2)}吨
+            {alert.hardLimitT.toFixed(3)}吨
           </Descriptions.Item>
           <Descriptions.Item label="计划换辊">
             {alert.plannedChangeAt || '-'}

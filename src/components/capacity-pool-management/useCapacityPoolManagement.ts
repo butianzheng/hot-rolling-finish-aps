@@ -117,18 +117,14 @@ export function useCapacityPoolManagement(): UseCapacityPoolManagementReturn {
   // 加载机组选项
   const loadMachineOptions = useCallback(async () => {
     try {
-      const result = await materialApi.listMaterials({ limit: 1000, offset: 0 });
-      const codes = new Set<string>();
-      (Array.isArray(result) ? result : []).forEach((m: any) => {
-        const code = String(m?.machine_code ?? '').trim();
-        if (code) codes.add(code);
-      });
-      const list = Array.from(codes).sort();
+      // 修复：直接使用已知的机组列表，而不是从材料列表推导
+      // 这避免了材料列表为空时无法加载产能数据的问题
+      const list = ['H031', 'H032', 'H033', 'H034'];
       setMachineOptions(list);
       setSelectedMachines((prev) => {
         if (prev.length > 0) return prev;
         if (preferredMachineCode && list.includes(preferredMachineCode)) return [preferredMachineCode];
-        return list;
+        return list; // 默认选中所有机组
       });
     } catch (e) {
       console.error('加载机组选项失败:', e);

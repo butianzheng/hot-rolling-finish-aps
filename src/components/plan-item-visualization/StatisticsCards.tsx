@@ -24,7 +24,7 @@ export const StatisticsCards: React.FC<StatisticsCardsProps> = ({ statistics }) 
         <Card>
           <Statistic
             title="总吨位"
-            value={statistics.total_weight.toFixed(2)}
+            value={statistics.total_weight.toFixed(3)}
             suffix="吨"
           />
         </Card>

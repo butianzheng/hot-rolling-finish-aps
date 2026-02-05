@@ -121,7 +121,7 @@ export function createMaterialTableColumns(options: MaterialTableColumnsOptions)
       align: 'right',
       search: false,
       render: (val: any) => (
-        <span style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>{val ? val.toFixed(2) : '-'}</span>
+        <span style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>{val ? val.toFixed(3) : '-'}</span>
       ),
     },
     {
@@ -133,7 +133,7 @@ export function createMaterialTableColumns(options: MaterialTableColumnsOptions)
       search: false,
       render: (val: any) => (
         <span style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>
-          {val == null || !Number.isFinite(Number(val)) ? '-' : Number(val).toFixed(2)}
+          {val == null || !Number.isFinite(Number(val)) ? '-' : Number(val).toFixed(3)}
         </span>
       ),
     },
@@ -146,7 +146,7 @@ export function createMaterialTableColumns(options: MaterialTableColumnsOptions)
       search: false,
       render: (val: any) => (
         <span style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>
-          {val == null || !Number.isFinite(Number(val)) ? '-' : Number(val).toFixed(2)}
+          {val == null || !Number.isFinite(Number(val)) ? '-' : Number(val).toFixed(3)}
         </span>
       ),
     },

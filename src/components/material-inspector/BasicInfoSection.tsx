@@ -29,7 +29,7 @@ export const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({ material }) 
       </Descriptions.Item>
       <Descriptions.Item label="重量">
         <Text style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>
-          {material.weight_t ? `${material.weight_t.toFixed(2)} 吨` : '-'}
+          {material.weight_t ? `${material.weight_t.toFixed(3)} 吨` : '-'}
         </Text>
       </Descriptions.Item>
       <Descriptions.Item label="钢种">

@@ -39,13 +39,13 @@ export const formatNumber = (value: number | null | undefined, decimals: number 
 };
 
 /**
- * 格式化吨位（四舍五入保留2位小数）
+ * 格式化吨位（四舍五入保留3位小数）
  */
 export const formatWeight = (value: number | null | undefined): string => {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return '-';
   }
-  return `${value.toFixed(2)}t`;
+  return `${value.toFixed(3)}t`;
 };
 
 /**
@@ -59,11 +59,11 @@ export const formatPercent = (value: number | null | undefined): string => {
 };
 
 /**
- * 格式化产能（四舍五入保留2位小数）
+ * 格式化产能（四舍五入保留3位小数）
  */
 export const formatCapacity = (value: number | null | undefined): string => {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return '-';
   }
-  return value.toFixed(2);
+  return value.toFixed(3);
 };
