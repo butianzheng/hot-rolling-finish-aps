@@ -43,9 +43,9 @@ export function createChartOption({
             <div>堵塞分数: <span style="color: ${getBottleneckColor(bottleneckScore)}; font-weight: bold;">${bottleneckScore.toFixed(1)}</span></div>
             <div>堵塞等级: <span style="color: ${BOTTLENECK_LEVEL_COLORS[pointData.bottleneckLevel]};">${pointData.bottleneckLevel}</span></div>
             <div>容量利用率: ${pointData.capacityUtilPct.toFixed(1)}%</div>
-            <div>已排材料: ${pointData.scheduledMaterialCount ?? 0}个 / ${(pointData.scheduledWeightT ?? 0).toFixed(2)}吨</div>
+            <div>已排材料: ${pointData.scheduledMaterialCount ?? 0}个 / ${(pointData.scheduledWeightT ?? 0).toFixed(3)}吨</div>
             <div>缺口材料(≤当日): ${pointData.pendingMaterialCount}个</div>
-            <div>缺口重量(≤当日): ${pointData.pendingWeightT.toFixed(2)}吨</div>
+            <div>缺口重量(≤当日): ${pointData.pendingWeightT.toFixed(3)}吨</div>
             ${pointData.bottleneckTypes.length > 0 ? `<div>堵塞类型: ${pointData.bottleneckTypes.join(', ')}</div>` : ''}
             <div style="margin-top: 4px; font-size: 12px; color: #8c8c8c;">点击查看详情</div>
           </div>

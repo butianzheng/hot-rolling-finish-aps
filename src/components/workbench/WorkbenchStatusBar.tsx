@@ -31,7 +31,7 @@ const WorkbenchStatusBar: React.FC<{
       <Space wrap align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
         <Space wrap>
           <Typography.Text>已选: {selectedMaterialCount} 个物料</Typography.Text>
-          <Typography.Text type="secondary">总重: {selectedTotalWeight.toFixed(2)}t</Typography.Text>
+          <Typography.Text type="secondary">总重: {selectedTotalWeight.toFixed(3)}t</Typography.Text>
         </Space>
 
         <Space wrap>

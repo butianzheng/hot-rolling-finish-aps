@@ -116,7 +116,7 @@ export const RiskDayContent: React.FC<RiskDayContentProps> = ({
           <Descriptions column={4} bordered size="small">
             <Descriptions.Item label="风险分数">{selectedDay.riskScore.toFixed(1)}</Descriptions.Item>
             <Descriptions.Item label="容量利用率">{selectedDay.capacityUtilPct.toFixed(1)}%</Descriptions.Item>
-            <Descriptions.Item label="超载">{selectedDay.overloadWeightT.toFixed(2)}t</Descriptions.Item>
+            <Descriptions.Item label="超载">{selectedDay.overloadWeightT.toFixed(3)}t</Descriptions.Item>
             <Descriptions.Item label="紧急失败">{selectedDay.urgentFailureCount}</Descriptions.Item>
           </Descriptions>
 

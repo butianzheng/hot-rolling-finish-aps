@@ -367,7 +367,7 @@ const DailyRhythmManagerModal: React.FC<DailyRhythmManagerModalProps> = ({
         <Tag color={profile.isViolated ? 'red' : 'green'}>
           最大偏差 {maxPct.toFixed(1)}% / 阈值 {thPct.toFixed(1)}%
         </Tag>
-        <Tag>当日已排 {profile.totalScheduledWeightT.toFixed(2)} 吨</Tag>
+        <Tag>当日已排 {profile.totalScheduledWeightT.toFixed(3)} 吨</Tag>
         {profile.targetPresetId ? <Tag>模板 {profile.targetPresetId}</Tag> : <Tag>未绑定模板</Tag>}
         {profile.targetUpdatedAt ? <Tag>更新 {profile.targetUpdatedAt}</Tag> : null}
       </Space>

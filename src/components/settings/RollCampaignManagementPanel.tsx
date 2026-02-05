@@ -227,14 +227,14 @@ const RollCampaignManagementPanel: React.FC = () => {
       title: '当前累积',
       key: 'currentTonnageT',
       width: 120,
-      render: (_, row) => (row.alert ? `${row.alert.currentTonnageT.toFixed(2)} 吨` : '-'),
+      render: (_, row) => (row.alert ? `${row.alert.currentTonnageT.toFixed(3)} 吨` : '-'),
     },
     {
       title: '软/硬阈值',
       key: 'limits',
       width: 140,
       render: (_, row) =>
-        row.alert ? `${row.alert.softLimitT.toFixed(2)} / ${row.alert.hardLimitT.toFixed(2)}` : '-',
+        row.alert ? `${row.alert.softLimitT.toFixed(3)} / ${row.alert.hardLimitT.toFixed(3)}` : '-',
     },
     {
       title: '利用率(软)',

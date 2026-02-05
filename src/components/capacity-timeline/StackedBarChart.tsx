@@ -146,7 +146,7 @@ export const StackedBarChart: React.FC<StackedBarChartProps> = ({
               title={
                 <div>
                   <div style={{ fontWeight: 'bold' }}>{seg.urgencyLevel}</div>
-                  <div>吨位: {seg.tonnage.toFixed(2)}t</div>
+                  <div>吨位: {seg.tonnage.toFixed(3)}t</div>
                   <div>材料数: {seg.materialCount} 件</div>
                 </div>
               }

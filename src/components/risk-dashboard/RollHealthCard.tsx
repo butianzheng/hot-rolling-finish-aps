@@ -40,9 +40,9 @@ export const RollHealthCard: React.FC<RollHealthCardProps> = ({ roll }) => {
                 color: getRollStatusColor(roll.status),
               }}
             >
-              {roll.currentTonnage}
+              {roll.currentTonnage.toFixed(3)}
             </Text>
-            <Text type="secondary">/ {roll.threshold} 吨</Text>
+            <Text type="secondary">/ {roll.threshold.toFixed(3)} 吨</Text>
           </div>
         </div>
 
@@ -56,7 +56,7 @@ export const RollHealthCard: React.FC<RollHealthCardProps> = ({ roll }) => {
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <Statistic
             title="距离更换"
-            value={roll.threshold - roll.currentTonnage}
+            value={(roll.threshold - roll.currentTonnage).toFixed(3)}
             suffix="吨"
             valueStyle={{ fontSize: 20, color: getRollStatusColor(roll.status) }}
           />

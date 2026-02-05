@@ -101,10 +101,10 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
               {data.date} - {data.machineCode}
             </Title>
             <Text type="secondary" style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>
-              {data.actualCapacity.toFixed(2)}t / {data.targetCapacity.toFixed(2)}t
+              {data.actualCapacity.toFixed(3)}t / {data.targetCapacity.toFixed(3)}t
             </Text>
             {isOverLimit && (
-              <Tooltip title={`超出限制产能 ${data.limitCapacity.toFixed(2)}t`}>
+              <Tooltip title={`超出限制产能 ${data.limitCapacity.toFixed(3)}t`}>
                 <WarningOutlined style={{ color: '#ff4d4f', fontSize: 16 }} />
               </Tooltip>
             )}
@@ -114,7 +114,7 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
                   color="blue"
                   style={{ cursor: clickable ? 'pointer' : undefined }}
                   onClick={() => clickable && openScheduleCell({ statusFilter: 'ALL' })}
-                  title={`已排 ${statusSummary.totalCount} 件 / ${statusSummary.totalWeightT.toFixed(2)}t${clickable ? '（点击快筛并打开明细）' : ''}`}
+                  title={`已排 ${statusSummary.totalCount} 件 / ${statusSummary.totalWeightT.toFixed(3)}t${clickable ? '（点击快筛并打开明细）' : ''}`}
                 >
                   已排 {statusSummary.totalCount}
                 </Tag>
@@ -123,7 +123,7 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
                     color="purple"
                     style={{ cursor: clickable ? 'pointer' : undefined }}
                     onClick={() => clickable && openScheduleCell({ statusFilter: 'LOCKED' })}
-                    title={`冻结 ${statusSummary.lockedInPlanCount} 件 / ${statusSummary.lockedInPlanWeightT.toFixed(2)}t${clickable ? '（点击快筛并打开明细）' : ''}`}
+                    title={`冻结 ${statusSummary.lockedInPlanCount} 件 / ${statusSummary.lockedInPlanWeightT.toFixed(3)}t${clickable ? '（点击快筛并打开明细）' : ''}`}
                   >
                     冻结 {statusSummary.lockedInPlanCount}
                   </Tag>
@@ -133,7 +133,7 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
                     color="red"
                     style={{ cursor: clickable ? 'pointer' : undefined }}
                     onClick={() => clickable && openScheduleCell({ statusFilter: 'FORCE_RELEASE' })}
-                    title={`强制放行 ${statusSummary.forceReleaseCount} 件 / ${statusSummary.forceReleaseWeightT.toFixed(2)}t${clickable ? '（点击快筛并打开明细）' : ''}`}
+                    title={`强制放行 ${statusSummary.forceReleaseCount} 件 / ${statusSummary.forceReleaseWeightT.toFixed(3)}t${clickable ? '（点击快筛并打开明细）' : ''}`}
                   >
                     强放 {statusSummary.forceReleaseCount}
                   </Tag>
@@ -160,11 +160,11 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
             ) : null}
 
             {/* 轧辊状态 */}
-            <Tooltip title={`轧辊吨位: ${data.rollCampaignProgress.toFixed(2)}t / ${data.rollChangeThreshold.toFixed(2)}t`}>
+            <Tooltip title={`轧辊吨位: ${data.rollCampaignProgress.toFixed(3)}t / ${data.rollChangeThreshold.toFixed(3)}t`}>
               <Space size={8}>
                 <ToolOutlined style={{ color: rollStatusColor, fontSize: 16 }} />
                 <Text style={{ fontFamily: FONT_FAMILIES.MONOSPACE, color: rollStatusColor }}>
-                  {data.rollCampaignProgress.toFixed(2)}t
+                  {data.rollCampaignProgress.toFixed(3)}t
                 </Text>
               </Space>
             </Tooltip>

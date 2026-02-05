@@ -134,7 +134,7 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = (props) => {
                 userSelect: 'none',
               }}
               onClick={() => onStatusFilterChange?.('ALL')}
-              title={`已排 ${state.statusSummary.totalCount} 件 / ${state.statusSummary.totalWeightT.toFixed(2)}t`}
+              title={`已排 ${state.statusSummary.totalCount} 件 / ${state.statusSummary.totalWeightT.toFixed(3)}t`}
             >
               已排 {state.statusSummary.totalCount}
             </Tag>
@@ -158,7 +158,7 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = (props) => {
                 if (state.statusSummary.lockedInPlanCount === 0 && statusFilter !== 'LOCKED') return;
                 onStatusFilterChange(statusFilter === 'LOCKED' ? 'ALL' : ('LOCKED' as PlanItemStatusFilter));
               }}
-              title={`冻结 ${state.statusSummary.lockedInPlanCount} 件 / ${state.statusSummary.lockedInPlanWeightT.toFixed(2)}t`}
+              title={`冻结 ${state.statusSummary.lockedInPlanCount} 件 / ${state.statusSummary.lockedInPlanWeightT.toFixed(3)}t`}
             >
               冻结 {state.statusSummary.lockedInPlanCount}
             </Tag>
@@ -182,7 +182,7 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = (props) => {
                 if (state.statusSummary.forceReleaseCount === 0 && statusFilter !== 'FORCE_RELEASE') return;
                 onStatusFilterChange(statusFilter === 'FORCE_RELEASE' ? 'ALL' : ('FORCE_RELEASE' as PlanItemStatusFilter));
               }}
-              title={`强制放行 ${state.statusSummary.forceReleaseCount} 件 / ${state.statusSummary.forceReleaseWeightT.toFixed(2)}t`}
+              title={`强制放行 ${state.statusSummary.forceReleaseCount} 件 / ${state.statusSummary.forceReleaseWeightT.toFixed(3)}t`}
             >
               强放 {state.statusSummary.forceReleaseCount}
             </Tag>
@@ -206,7 +206,7 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = (props) => {
                 if (state.statusSummary.adjustableCount === 0 && statusFilter !== 'ADJUSTABLE') return;
                 onStatusFilterChange(statusFilter === 'ADJUSTABLE' ? 'ALL' : ('ADJUSTABLE' as PlanItemStatusFilter));
               }}
-              title={`可调（非冻结）${state.statusSummary.adjustableCount} 件 / ${state.statusSummary.adjustableWeightT.toFixed(2)}t`}
+              title={`可调（非冻结）${state.statusSummary.adjustableCount} 件 / ${state.statusSummary.adjustableWeightT.toFixed(3)}t`}
             >
               可调 {state.statusSummary.adjustableCount}
             </Tag>

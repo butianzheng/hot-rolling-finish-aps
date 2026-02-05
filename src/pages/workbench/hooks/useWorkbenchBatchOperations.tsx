@@ -208,7 +208,7 @@ export function useWorkbenchBatchOperations(params: {
 
             <Space wrap>
               <Tag color="blue">可识别 {targets.length}/{materialIds.length}</Tag>
-              <Tag color="geekblue">总重 {totalWeight.toFixed(2)}t</Tag>
+              <Tag color="geekblue">总重 {totalWeight.toFixed(3)}t</Tag>
               {frozenCount > 0 ? <Tag color="purple">冻结区 {frozenCount}</Tag> : null}
               {immatureCount > 0 ? <Tag color="orange">未适温 {immatureCount}</Tag> : null}
               {unknownMaturityCount > 0 ? <Tag>适温未知 {unknownMaturityCount}</Tag> : null}

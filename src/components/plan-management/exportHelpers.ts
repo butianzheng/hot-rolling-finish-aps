@@ -116,7 +116,7 @@ export const exportReportMarkdown = async (context: ExportContext): Promise<void
       : `## 物料变更明细\n\n- 无变更或未加载。\n\n`;
 
   const capacitySection = localCapacityRows
-    ? `## 产能变化（本地计算）\n\n- 总量A: ${localCapacityRows.totalA.toFixed(2)}t\n- 总量B: ${localCapacityRows.totalB.toFixed(2)}t\n- Δ: ${(localCapacityRows.totalB - localCapacityRows.totalA).toFixed(2)}t\n- 预计超上限行数（按版本B产能池）：${localCapacityRows.overflowRows.length}\n\n`
+    ? `## 产能变化（本地计算）\n\n- 总量A: ${localCapacityRows.totalA.toFixed(3)}t\n- 总量B: ${localCapacityRows.totalB.toFixed(3)}t\n- Δ: ${(localCapacityRows.totalB - localCapacityRows.totalA).toFixed(3)}t\n- 预计超上限行数（按版本B产能池）：${localCapacityRows.overflowRows.length}\n\n`
     : `## 产能变化（本地计算）\n\n- 未加载。\n\n`;
 
   const retrospectiveSection = `## 复盘总结（本地）\n\n${retrospectiveNote.trim() || '（空）'}\n\n`;
@@ -227,8 +227,8 @@ export const exportReportHTML = async (context: ExportContext): Promise<void> =>
     ${
       localCapacityRows
         ? `<table>
-      <tr><th>总量A</th><td>${escape(localCapacityRows.totalA.toFixed(2))}t</td><th>总量B</th><td>${escape(localCapacityRows.totalB.toFixed(2))}t</td></tr>
-      <tr><th>Δ</th><td>${escape((localCapacityRows.totalB - localCapacityRows.totalA).toFixed(2))}t</td><th>预计超上限行数</th><td>${escape(localCapacityRows.overflowRows.length)}</td></tr>
+      <tr><th>总量A</th><td>${escape(localCapacityRows.totalA.toFixed(3))}t</td><th>总量B</th><td>${escape(localCapacityRows.totalB.toFixed(3))}t</td></tr>
+      <tr><th>Δ</th><td>${escape((localCapacityRows.totalB - localCapacityRows.totalA).toFixed(3))}t</td><th>预计超上限行数</th><td>${escape(localCapacityRows.overflowRows.length)}</td></tr>
     </table>`
         : `<div class="meta">未加载。</div>`
     }
