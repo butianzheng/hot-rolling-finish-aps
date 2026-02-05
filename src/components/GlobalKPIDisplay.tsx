@@ -120,12 +120,12 @@ export const GlobalKPIDisplay: React.FC<GlobalKPIDisplayProps> = ({ kpi }) => {
 
       {/* 轧辊状态 */}
       <Tooltip
-        title={`轧辊吨位: ${kpi.rollCampaignProgress}t / ${kpi.rollChangeThreshold}t`}
+        title={`轧辊吨位: ${kpi.rollCampaignProgress.toFixed(3)}t / ${kpi.rollChangeThreshold.toFixed(3)}t`}
       >
         <Space size={6}>
           <ToolOutlined style={{ color: rollStatusColor, fontSize: 16 }} />
           <Text style={{ color: textColor }}>
-            {kpi.rollCampaignProgress}t
+            {kpi.rollCampaignProgress.toFixed(3)}t
           </Text>
         </Space>
       </Tooltip>

@@ -188,7 +188,7 @@ const KPIBand: React.FC<KPIBandProps> = ({ loading, kpi, onOpenDrilldown, onGoWo
             </Space>
             <Statistic value={rollMeta.label} valueStyle={{ color: rollMeta.color, fontWeight: 600 }} />
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {safe.rollCampaignProgress}t / {safe.rollChangeThreshold}t
+              {safe.rollCampaignProgress.toFixed(3)}t / {safe.rollChangeThreshold.toFixed(3)}t
             </Text>
             {onOpenDrilldown && (
               <Text type="secondary" style={{ fontSize: 12 }}>点击查看换辊监控</Text>
