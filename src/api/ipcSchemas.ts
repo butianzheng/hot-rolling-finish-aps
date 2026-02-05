@@ -46,4 +46,5 @@ export * from './ipcSchemas/pathRuleSchemas';
 export * from './ipcSchemas/rollSchemas';
 export * from './ipcSchemas/actionLogSchemas';
 export * from './ipcSchemas/rhythmSchemas';
+export * from './ipcSchemas/machineConfigSchemas';
 

@@ -162,11 +162,15 @@ fn main() {
             get_capacity_opportunity,           // D6: 是否存在产能优化空间
 
             // ==========================================
-            // 产能池管理相关命令 (3个)
+            // 产能池管理相关命令 (8个)
             // ==========================================
             get_capacity_pools,
             update_capacity_pool,
             batch_update_capacity_pools,
+            get_machine_capacity_configs,
+            create_or_update_machine_config,
+            apply_machine_config_to_dates,
+            get_machine_config_history,
 
             // ==========================================
             // 前端遥测/错误上报 (1个)

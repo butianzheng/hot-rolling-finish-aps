@@ -47,6 +47,30 @@ CREATE TABLE machine_master (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- ==========================================
+-- machine_capacity_config: 机组级产能配置表 (v0.8新增)
+-- 用于存储版本化的机组产能配置，支持版本隔离和历史追踪
+-- ==========================================
+CREATE TABLE machine_capacity_config (
+  config_id TEXT PRIMARY KEY,                       -- 配置ID (应用层生成UUID)
+  version_id TEXT NOT NULL,                         -- 版本ID (外键关联plan_version)
+  machine_code TEXT NOT NULL,                       -- 机组代码
+  default_daily_target_t REAL NOT NULL,             -- 机组级默认目标产能(吨/天)
+  default_daily_limit_pct REAL NOT NULL,            -- 机组级默认极限产能百分比 (如 1.05 表示 105%)
+  effective_date TEXT,                              -- 生效日期(可选, ISO DATE格式 YYYY-MM-DD)
+  created_at TEXT NOT NULL DEFAULT (datetime('now')), -- 创建时间
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')), -- 更新时间
+  created_by TEXT NOT NULL,                         -- 创建人
+  reason TEXT,                                      -- 配置原因/备注
+  FOREIGN KEY (version_id) REFERENCES plan_version(version_id) ON DELETE CASCADE,
+  UNIQUE(version_id, machine_code)                  -- 每个版本下每个机组只能有一条配置
+);
+
+CREATE INDEX idx_machine_config_version ON machine_capacity_config(version_id);
+CREATE INDEX idx_machine_config_machine ON machine_capacity_config(machine_code);
+CREATE INDEX idx_machine_config_created_at ON machine_capacity_config(created_at DESC);
+CREATE INDEX idx_machine_config_version_machine_date ON machine_capacity_config(version_id, machine_code, effective_date);
+
 CREATE TABLE material_master (
   material_id TEXT PRIMARY KEY,
   manufacturing_order_id TEXT,

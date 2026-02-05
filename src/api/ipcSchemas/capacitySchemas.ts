@@ -33,3 +33,10 @@ export const BatchUpdateCapacityPoolsResponseSchema = z
   })
   .passthrough();
 
+// ==========================================================
+// 类型导出
+// ==========================================================
+
+export type CapacityPool = z.infer<typeof CapacityPoolSchema>;
+export type BatchUpdateCapacityPoolsResponse = z.infer<typeof BatchUpdateCapacityPoolsResponseSchema>;
+

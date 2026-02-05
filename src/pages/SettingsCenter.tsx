@@ -7,7 +7,7 @@ import UserPreferencesPanel from '../components/settings/UserPreferencesPanel';
 
 const ConfigManagement = React.lazy(() => import('../components/ConfigManagement'));
 const ActionLogQuery = React.lazy(() => import('../components/ActionLogQuery'));
-const CapacityPoolManagement = React.lazy(() => import('../components/CapacityPoolManagement'));
+const CapacityPoolManagementV2 = React.lazy(() => import('../components/capacity-pool-management-v2'));
 const MaterialManagement = React.lazy(() => import('../components/MaterialManagement'));
 const StrategyProfilesPanel = React.lazy(() => import('../components/settings/StrategyProfilesPanel'));
 const PathRuleConfigPanel = React.lazy(() => import('../components/settings/PathRuleConfigPanel'));
@@ -20,7 +20,7 @@ const RhythmPresetManagementPanel = React.lazy(
 
 const TAB_KEYS = [
   'system',
-  'machine',
+  'capacity_calendar',
   'materials',
   'roll',
   'rhythm',
@@ -69,11 +69,11 @@ const SettingsCenter: React.FC = () => {
             ),
           },
           {
-            key: 'machine',
-            label: '机组配置',
+            key: 'capacity_calendar',
+            label: '产能池管理',
             children: (
               <React.Suspense fallback={<PageSkeleton />}>
-                <CapacityPoolManagement />
+                <CapacityPoolManagementV2 />
               </React.Suspense>
             ),
           },

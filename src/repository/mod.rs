@@ -12,6 +12,7 @@ pub mod action_log_repo;
 pub mod capacity_repo;
 pub mod decision_refresh_repo;
 pub mod error;
+pub mod machine_config_repo;
 pub mod material_import_repo;
 pub mod material_import_repo_impl;
 pub mod material_repo;
@@ -31,6 +32,7 @@ pub use decision_refresh_repo::{
     DecisionRefreshTaskEntity,
 };
 pub use error::{RepositoryError, RepositoryResult};
+pub use machine_config_repo::{MachineConfigEntity, MachineConfigRepository};
 pub use material_import_repo::MaterialImportRepository;
 pub use material_import_repo_impl::MaterialImportRepositoryImpl;
 pub use material_repo::{MaterialMasterRepository, MaterialStateRepository};

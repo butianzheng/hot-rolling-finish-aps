@@ -465,3 +465,228 @@ pub async fn batch_update_capacity_pools(
 
     serde_json::to_string(&resp).map_err(|e| format!("序列化失败: {}", e))
 }
+
+// ==========================================
+// 机组产能配置管理相关命令
+// ==========================================
+
+/// 查询机组产能配置
+///
+/// # 参数
+/// - version_id: 版本ID
+/// - machine_codes: 可选的机组代码列表 (JSON数组字符串)，如为空则返回该版本下所有配置
+///
+/// # 返回
+/// - 成功: JSON字符串, 包含配置列表
+/// - 失败: 错误消息
+#[tauri::command(rename_all = "snake_case")]
+pub async fn get_machine_capacity_configs(
+    state: tauri::State<'_, AppState>,
+    version_id: String,
+    machine_codes: Option<String>,
+) -> Result<String, String> {
+    use crate::api::machine_config_api::MachineConfigApi;
+    use crate::repository::MachineConfigRepository;
+
+    let db_path = state.db_path.clone();
+    let capacity_pool_repo = state.capacity_pool_repo.clone();
+    let action_log_repo = state.action_log_repo.clone();
+
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
+        let _perf = crate::perf::PerfGuard::new("ipc.get_machine_capacity_configs");
+
+        // 创建仓储和API实例
+        let machine_config_repo = std::sync::Arc::new(
+            MachineConfigRepository::new(&db_path)
+                .map_err(|e| format!("创建机组配置仓储失败: {}", e))?
+        );
+
+        let machine_config_api = MachineConfigApi::new(
+            machine_config_repo,
+            capacity_pool_repo,
+            action_log_repo,
+        );
+
+        // 解析 machine_codes（如果提供）
+        let codes: Option<Vec<String>> = match machine_codes {
+            Some(ref json_str) if !json_str.trim().is_empty() => {
+                Some(serde_json::from_str(json_str)
+                    .map_err(|e| format!("机组代码格式错误: {}", e))?)
+            }
+            _ => None,
+        };
+
+        // 调用API
+        let configs = machine_config_api
+            .get_machine_capacity_configs(&version_id, codes)
+            .map_err(|e| format!("查询机组配置失败: {}", e))?;
+
+        // 序列化返回
+        serde_json::to_string(&configs).map_err(|e| format!("序列化失败: {}", e))
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))??;
+
+    Ok(result)
+}
+
+/// 创建或更新机组配置
+///
+/// # 参数
+/// - request_json: 请求数据的JSON字符串 (包含 version_id, machine_code, default_daily_target_t等)
+///
+/// # 返回
+/// - 成功: JSON字符串, 包含创建/更新响应
+/// - 失败: 错误消息
+#[tauri::command(rename_all = "snake_case")]
+pub async fn create_or_update_machine_config(
+    state: tauri::State<'_, AppState>,
+    request_json: String,
+) -> Result<String, String> {
+    use crate::api::machine_config_api::{
+        CreateOrUpdateMachineConfigRequest, MachineConfigApi,
+    };
+    use crate::repository::MachineConfigRepository;
+
+    let db_path = state.db_path.clone();
+    let capacity_pool_repo = state.capacity_pool_repo.clone();
+    let action_log_repo = state.action_log_repo.clone();
+
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
+        let _perf = crate::perf::PerfGuard::new("ipc.create_or_update_machine_config");
+
+        // 解析请求
+        let request: CreateOrUpdateMachineConfigRequest = serde_json::from_str(&request_json)
+            .map_err(|e| format!("请求格式错误: {}", e))?;
+
+        // 创建仓储和API实例
+        let machine_config_repo = std::sync::Arc::new(
+            MachineConfigRepository::new(&db_path)
+                .map_err(|e| format!("创建机组配置仓储失败: {}", e))?
+        );
+
+        let machine_config_api = MachineConfigApi::new(
+            machine_config_repo,
+            capacity_pool_repo,
+            action_log_repo,
+        );
+
+        // 调用API
+        let response = machine_config_api
+            .create_or_update_machine_config(request)
+            .map_err(|e| format!("创建/更新机组配置失败: {}", e))?;
+
+        // 序列化返回
+        serde_json::to_string(&response).map_err(|e| format!("序列化失败: {}", e))
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))??;
+
+    Ok(result)
+}
+
+/// 批量应用机组配置到产能池日期范围
+///
+/// # 参数
+/// - request_json: 请求数据的JSON字符串 (包含 version_id, machine_code, date_from, date_to等)
+///
+/// # 返回
+/// - 成功: JSON字符串, 包含应用结果响应
+/// - 失败: 错误消息
+#[tauri::command(rename_all = "snake_case")]
+pub async fn apply_machine_config_to_dates(
+    state: tauri::State<'_, AppState>,
+    request_json: String,
+) -> Result<String, String> {
+    use crate::api::machine_config_api::{
+        ApplyConfigToDateRangeRequest, MachineConfigApi,
+    };
+    use crate::repository::MachineConfigRepository;
+
+    let db_path = state.db_path.clone();
+    let capacity_pool_repo = state.capacity_pool_repo.clone();
+    let action_log_repo = state.action_log_repo.clone();
+
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
+        let _perf = crate::perf::PerfGuard::new("ipc.apply_machine_config_to_dates");
+
+        // 解析请求
+        let request: ApplyConfigToDateRangeRequest = serde_json::from_str(&request_json)
+            .map_err(|e| format!("请求格式错误: {}", e))?;
+
+        // 创建仓储和API实例
+        let machine_config_repo = std::sync::Arc::new(
+            MachineConfigRepository::new(&db_path)
+                .map_err(|e| format!("创建机组配置仓储失败: {}", e))?
+        );
+
+        let machine_config_api = MachineConfigApi::new(
+            machine_config_repo,
+            capacity_pool_repo,
+            action_log_repo,
+        );
+
+        // 调用API
+        let response = machine_config_api
+            .apply_machine_config_to_dates(request)
+            .map_err(|e| format!("应用机组配置失败: {}", e))?;
+
+        // 序列化返回
+        serde_json::to_string(&response).map_err(|e| format!("序列化失败: {}", e))
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))??;
+
+    Ok(result)
+}
+
+/// 查询机组配置历史（跨版本）
+///
+/// # 参数
+/// - machine_code: 机组代码
+/// - limit: 可选的限制条数
+///
+/// # 返回
+/// - 成功: JSON字符串, 包含历史配置列表（按创建时间倒序）
+/// - 失败: 错误消息
+#[tauri::command(rename_all = "snake_case")]
+pub async fn get_machine_config_history(
+    state: tauri::State<'_, AppState>,
+    machine_code: String,
+    limit: Option<usize>,
+) -> Result<String, String> {
+    use crate::api::machine_config_api::MachineConfigApi;
+    use crate::repository::MachineConfigRepository;
+
+    let db_path = state.db_path.clone();
+    let capacity_pool_repo = state.capacity_pool_repo.clone();
+    let action_log_repo = state.action_log_repo.clone();
+
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
+        let _perf = crate::perf::PerfGuard::new("ipc.get_machine_config_history");
+
+        // 创建仓储和API实例
+        let machine_config_repo = std::sync::Arc::new(
+            MachineConfigRepository::new(&db_path)
+                .map_err(|e| format!("创建机组配置仓储失败: {}", e))?
+        );
+
+        let machine_config_api = MachineConfigApi::new(
+            machine_config_repo,
+            capacity_pool_repo,
+            action_log_repo,
+        );
+
+        // 调用API
+        let history = machine_config_api
+            .get_machine_config_history(&machine_code, limit)
+            .map_err(|e| format!("查询配置历史失败: {}", e))?;
+
+        // 序列化返回
+        serde_json::to_string(&history).map_err(|e| format!("序列化失败: {}", e))
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))??;
+
+    Ok(result)
+}

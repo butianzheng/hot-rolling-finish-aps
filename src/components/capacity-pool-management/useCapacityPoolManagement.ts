@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { message } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
-import { capacityApi, materialApi } from '../../api/tauri';
+import { capacityApi } from '../../api/tauri';
 import { useActiveVersionId, useCurrentUser, useGlobalStore } from '../../stores/use-global-store';
 import { formatDate } from '../../utils/formatters';
 import { getErrorMessage } from '../../utils/errorUtils';

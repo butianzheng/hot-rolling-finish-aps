@@ -6,6 +6,7 @@
 
 pub mod error;
 pub mod dashboard_api;
+pub mod machine_config_api;
 pub mod material_api;
 pub mod plan_api;
 pub mod config_api;
@@ -18,6 +19,7 @@ pub mod path_rule_api;
 // 重导出核心类型
 pub use error::{ApiError, ApiResult, ValidationViolation};
 pub use dashboard_api::DashboardApi;
+pub use machine_config_api::MachineConfigApi;
 pub use material_api::MaterialApi;
 pub use plan_api::PlanApi;
 pub use config_api::ConfigApi;

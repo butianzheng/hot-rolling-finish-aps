@@ -12,6 +12,7 @@ export { importApi } from './tauri/importApi';
 export { materialApi } from './tauri/materialApi';
 export { planApi } from './tauri/planApi';
 export { capacityApi } from './tauri/capacityApi';
+export { machineConfigApi } from './tauri/machineConfigApi';
 export { dashboardApi } from './tauri/dashboardApi';
 export { configApi } from './tauri/configApi';
 export { pathRuleApi } from './tauri/pathRuleApi';
