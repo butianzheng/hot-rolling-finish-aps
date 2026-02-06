@@ -17,6 +17,7 @@ import { useRecentDaysBottleneck } from '../../hooks/queries/use-decision-querie
 import type { DrilldownSpec } from '../../hooks/useRiskOverviewData';
 import { useActiveVersionId } from '../../stores/use-global-store';
 import { BottleneckHeatmap } from '../../components/charts/BottleneckHeatmap';
+import { EmptyState } from '../../components/EmptyState';
 import type { ReasonItem, BottleneckType } from '../../types/decision';
 
 // ==========================================
@@ -269,9 +270,7 @@ export const D4Bottleneck: React.FC<D4BottleneckProps> = ({ embedded, onOpenDril
             selectedPoint={selectedPoint}
           />
         ) : (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: '#8c8c8c' }}>
-            暂无数据
-          </div>
+          <EmptyState type="data" style={{ padding: '40px 0' }} />
         )}
       </Card>
 

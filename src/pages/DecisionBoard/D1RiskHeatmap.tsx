@@ -16,6 +16,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useRecentDaysRisk } from '../../hooks/queries/use-decision-queries';
 import { useActiveVersionId } from '../../stores/use-global-store';
 import { RiskCalendarHeatmap } from '../../components/charts/RiskCalendarHeatmap';
+import { EmptyState } from '../../components/EmptyState';
 import type { DrilldownSpec } from '../../hooks/useRiskOverviewData';
 import type { DaySummary, ReasonItem } from '../../types/decision';
 import { RISK_LEVEL_COLORS, isHighRiskDay } from '../../types/decision/d1-day-summary';
@@ -236,9 +237,7 @@ export const D1RiskHeatmap: React.FC<D1RiskHeatmapProps> = ({ embedded, onOpenDr
             selectedDate={selectedDate}
           />
         ) : (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: '#8c8c8c' }}>
-            暂无数据
-          </div>
+          <EmptyState type="date" style={{ padding: '40px 0' }} />
         )}
       </Card>
 

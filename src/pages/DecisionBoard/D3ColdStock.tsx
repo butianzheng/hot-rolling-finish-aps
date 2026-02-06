@@ -17,6 +17,7 @@ import { useColdStockProfile } from '../../hooks/queries/use-decision-queries';
 import type { DrilldownSpec } from '../../hooks/useRiskOverviewData';
 import { useActiveVersionId } from '../../stores/use-global-store';
 import { ColdStockChart } from '../../components/charts/ColdStockChart';
+import { EmptyState } from '../../components/EmptyState';
 import type { ColdStockBucket, AgeBin, PressureLevel, ReasonItem } from '../../types/decision';
 
 // ==========================================
@@ -412,9 +413,7 @@ export const D3ColdStock: React.FC<D3ColdStockProps> = ({ embedded, onOpenDrilld
             selectedMachine={selectedMachine}
           />
         ) : (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: '#8c8c8c' }}>
-            暂无数据
-          </div>
+          <EmptyState type="data" style={{ padding: '40px 0' }} />
         )}
       </Card>
 

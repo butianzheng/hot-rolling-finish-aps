@@ -16,6 +16,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useAllFailedOrders } from '../../hooks/queries/use-decision-queries';
 import type { DrilldownSpec } from '../../hooks/useRiskOverviewData';
 import { useActiveVersionId } from '../../stores/use-global-store';
+import { EmptyState } from '../../components/EmptyState';
 import type { OrderFailure, UrgencyLevel, FailType } from '../../types/decision';
 
 // ==========================================
@@ -457,9 +458,7 @@ export const D2OrderFailure: React.FC<D2OrderFailureProps> = ({ embedded, onOpen
                   />
                 ))}
                 {groupedOrders[level].length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '20px', color: '#8c8c8c' }}>
-                    暂无订单
-                  </div>
+                  <EmptyState type="order" style={{ padding: '20px 0', minHeight: '120px' }} />
                 )}
               </Card>
             </Col>
@@ -488,9 +487,7 @@ export const D2OrderFailure: React.FC<D2OrderFailureProps> = ({ embedded, onOpen
             ))}
           </Row>
           {displayOrders.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#8c8c8c' }}>
-              暂无订单
-            </div>
+            <EmptyState type="order" style={{ padding: '40px 0' }} />
           )}
         </Card>
       )}
