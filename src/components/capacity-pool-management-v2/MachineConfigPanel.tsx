@@ -156,7 +156,7 @@ export const MachineConfigPanel: React.FC<MachineConfigPanelProps> = ({
             </p>
             <ul>
               <li>目标产能: {values.default_daily_target_t.toFixed(3)} 吨/天</li>
-              <li>极限产能: {values.default_daily_limit_pct.toFixed(1)}%</li>
+              <li>极限产能: {values.default_daily_limit_pct.toFixed(2)}%</li>
             </ul>
             <p>
               <strong>应用范围：</strong>
@@ -269,7 +269,7 @@ export const MachineConfigPanel: React.FC<MachineConfigPanelProps> = ({
       title: '极限产能',
       dataIndex: 'default_daily_limit_pct',
       width: 110,
-      render: (v: number) => `${(v * 100).toFixed(1)}%`,
+      render: (v: number) => `${(v * 100).toFixed(2)}%`,
     },
     {
       title: '操作人',
@@ -354,7 +354,7 @@ export const MachineConfigPanel: React.FC<MachineConfigPanelProps> = ({
                                 {config.default_daily_target_t.toFixed(3)}t
                               </Tag>
                               <Tag color="orange" style={{ margin: 0, fontSize: 11 }}>
-                                {(config.default_daily_limit_pct * 100).toFixed(1)}%
+                                {(config.default_daily_limit_pct * 100).toFixed(2)}%
                               </Tag>
                               <Button
                                 type="link"

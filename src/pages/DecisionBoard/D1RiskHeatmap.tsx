@@ -19,7 +19,7 @@ import { RiskCalendarHeatmap } from '../../components/charts/RiskCalendarHeatmap
 import { EmptyState } from '../../components/EmptyState';
 import type { DrilldownSpec } from '../../hooks/useRiskOverviewData';
 import type { DaySummary, ReasonItem } from '../../types/decision';
-import { RISK_LEVEL_COLORS, isHighRiskDay } from '../../types/decision/d1-day-summary';
+import { RISK_LEVEL_COLORS, RISK_LEVEL_LABELS, isHighRiskDay } from '../../types/decision/d1-day-summary';
 
 // ==========================================
 // 主组件
@@ -165,7 +165,7 @@ export const D1RiskHeatmap: React.FC<D1RiskHeatmapProps> = ({ embedded, onOpenDr
             <Statistic
               title="平均风险分数"
               value={stats.avgRiskScore}
-              precision={1}
+              precision={2}
               suffix="/ 100"
               valueStyle={{
                 color: stats.avgRiskScore > 60 ? '#ff4d4f' : '#52c41a',
@@ -248,7 +248,7 @@ export const D1RiskHeatmap: React.FC<D1RiskHeatmapProps> = ({ embedded, onOpenDr
           size={embedded ? 'small' : undefined}
           extra={
             <Tag color={RISK_LEVEL_COLORS[selectedDayData.riskLevel]}>
-              {selectedDayData.riskLevel} - {selectedDayData.riskScore.toFixed(1)}
+              {RISK_LEVEL_LABELS[selectedDayData.riskLevel] || selectedDayData.riskLevel} - {selectedDayData.riskScore.toFixed(2)}
             </Tag>
           }
         >
@@ -257,7 +257,7 @@ export const D1RiskHeatmap: React.FC<D1RiskHeatmapProps> = ({ embedded, onOpenDr
               <Statistic
                 title="容量利用率"
                 value={selectedDayData.capacityUtilPct}
-                precision={1}
+                precision={2}
                 suffix="%"
               />
             </Col>
@@ -265,7 +265,7 @@ export const D1RiskHeatmap: React.FC<D1RiskHeatmapProps> = ({ embedded, onOpenDr
               <Statistic
                 title="超载重量"
                 value={selectedDayData.overloadWeightT}
-                precision={1}
+                precision={3}
                 suffix="吨"
               />
             </Col>
@@ -314,20 +314,45 @@ interface ReasonsTableProps {
   reasons: ReasonItem[];
 }
 
+/**
+ * 原因代码中文翻译映射
+ */
+const REASON_CODE_LABELS: Record<string, string> = {
+  CAPACITY_UTILIZATION: '产能利用率',
+  LOW_REMAINING_CAPACITY: '剩余产能不足',
+  HIGH_CAPACITY_PRESSURE: '产能压力高',
+  STRUCTURE_GAP: '结构性缺口',
+  COLD_STOCK_AGING: '冷料库龄',
+  ROLL_CHANGE_CONFLICT: '换辊冲突',
+  URGENCY_BACKLOG: '紧急订单积压',
+  MATURITY_CONSTRAINT: '适温约束',
+  OVERLOAD_RISK: '超载风险',
+  SCHEDULING_CONFLICT: '排产冲突',
+};
+
+function getReasonCodeLabel(code: string): string {
+  return REASON_CODE_LABELS[code] || code;
+}
+
 const ReasonsTable: React.FC<ReasonsTableProps> = ({ reasons }) => {
   const columns: ColumnsType<ReasonItem> = [
     {
       title: '原因代码',
       dataIndex: 'code',
       key: 'code',
-      width: 150,
-      render: (code: string) => <Tag>{code}</Tag>,
+      width: 140,
+      render: (code: string) => (
+        <Tag color="blue" style={{ maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {getReasonCodeLabel(code)}
+        </Tag>
+      ),
     },
     {
       title: '原因描述',
       dataIndex: 'msg',
       key: 'msg',
-      ellipsis: true,
+      ellipsis: { showTitle: true },
+      width: 320,
     },
     {
       title: '权重',
@@ -335,7 +360,7 @@ const ReasonsTable: React.FC<ReasonsTableProps> = ({ reasons }) => {
       key: 'weight',
       width: 100,
       render: (weight: number) => (
-        <span>{(weight * 100).toFixed(1)}%</span>
+        <span>{(weight * 100).toFixed(2)}%</span>
       ),
       sorter: (a, b) => a.weight - b.weight,
       defaultSortOrder: 'descend',
@@ -344,8 +369,8 @@ const ReasonsTable: React.FC<ReasonsTableProps> = ({ reasons }) => {
       title: '影响订单数',
       dataIndex: 'affectedCount',
       key: 'affectedCount',
-      width: 120,
-      render: (count?: number) => count || '-',
+      width: 90,
+      render: (count?: number) => (typeof count === 'number' ? count : '-'),
     },
   ];
 

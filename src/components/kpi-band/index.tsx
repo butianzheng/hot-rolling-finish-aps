@@ -142,7 +142,7 @@ const KPIBand: React.FC<KPIBandProps> = ({ loading, kpi, onOpenDrilldown, onGoWo
             <Text type="secondary">利用率</Text>
             <Statistic
               value={Number.isFinite(safe.capacityUtilization) ? safe.capacityUtilization : 0}
-              precision={1}
+              precision={2}
               suffix="%"
               valueStyle={{ fontWeight: 600 }}
             />

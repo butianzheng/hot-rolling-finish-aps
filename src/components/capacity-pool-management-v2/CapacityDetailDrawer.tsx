@@ -128,7 +128,7 @@ export const CapacityDetailDrawer: React.FC<CapacityDetailDrawerProps> = ({
 
         {/* 利用率进度条 */}
         <Progress
-          percent={parseFloat(utilizationPercent.toFixed(1))}
+          percent={parseFloat(utilizationPercent.toFixed(2))}
           status={data.utilization_pct > 1 ? 'exception' : 'normal'}
           strokeColor={data.color}
         />
@@ -148,7 +148,7 @@ export const CapacityDetailDrawer: React.FC<CapacityDetailDrawerProps> = ({
             {Math.max(0, data.target_capacity_t - data.used_capacity_t).toFixed(3)} 吨
           </Descriptions.Item>
           <Descriptions.Item label="利用率">
-            {(data.utilization_pct * 100).toFixed(1)}%
+            {(data.utilization_pct * 100).toFixed(2)}%
           </Descriptions.Item>
           {data.used_capacity_t > data.limit_capacity_t && (
             <Descriptions.Item label="超限">

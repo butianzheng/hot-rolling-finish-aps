@@ -374,7 +374,7 @@ export const D5RollCampaign: React.FC<D5RollCampaignProps> = ({ embedded, onOpen
             <Statistic
               title="平均利用率"
               value={stats.avgUtilization}
-              precision={1}
+              precision={2}
               suffix="%"
               valueStyle={{
                 color:

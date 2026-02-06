@@ -106,7 +106,7 @@ export const CapacityImpactPanel: React.FC<CapacityImpactPanelProps> = ({
         <Space size={16}>
           <Statistic
             title="原始产能"
-            value={originalCapacity.toFixed(1)}
+            value={originalCapacity.toFixed(3)}
             suffix="t"
             valueStyle={{ fontSize: 16, fontFamily: FONT_FAMILIES.MONOSPACE }}
           />
@@ -115,7 +115,7 @@ export const CapacityImpactPanel: React.FC<CapacityImpactPanelProps> = ({
 
           <Statistic
             title="预测产能"
-            value={predictedCapacity.toFixed(1)}
+            value={predictedCapacity.toFixed(3)}
             suffix="t"
             valueStyle={{
               fontSize: 16,
@@ -138,7 +138,7 @@ export const CapacityImpactPanel: React.FC<CapacityImpactPanelProps> = ({
 
           <Statistic
             title="利用率变化"
-            value={Math.abs(utilizationChangePercent).toFixed(1)}
+            value={Math.abs(utilizationChangePercent).toFixed(2)}
             suffix="%"
             prefix={utilizationChangePercent < 0 ? <ArrowDownOutlined /> : <ArrowUpOutlined />}
             valueStyle={{

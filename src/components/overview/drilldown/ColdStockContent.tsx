@@ -208,7 +208,7 @@ export const ColdStockContent: React.FC<ColdStockContentProps> = ({
           <Descriptions column={4} bordered size="small">
             <Descriptions.Item label="数量">{displayedBucket.count}</Descriptions.Item>
             <Descriptions.Item label="重量">{displayedBucket.weightT.toFixed(3)}t</Descriptions.Item>
-            <Descriptions.Item label="平均库龄">{displayedBucket.avgAgeDays.toFixed(1)}天</Descriptions.Item>
+            <Descriptions.Item label="平均库龄">{displayedBucket.avgAgeDays.toFixed(2)}天</Descriptions.Item>
             <Descriptions.Item label="最大库龄">{displayedBucket.maxAgeDays}天</Descriptions.Item>
           </Descriptions>
 

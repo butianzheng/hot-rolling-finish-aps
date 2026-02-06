@@ -313,14 +313,14 @@ const DailyRhythmManagerModal: React.FC<DailyRhythmManagerModalProps> = ({
       dataIndex: 'scheduledWeightT',
       key: 'scheduledWeightT',
       width: 110,
-      render: (v: number) => (Number.isFinite(v) ? v.toFixed(1) : '-'),
+      render: (v: number) => (Number.isFinite(v) ? v.toFixed(3) : '-'),
     },
     {
       title: '实际占比',
       dataIndex: 'actualRatio',
       key: 'actualRatio',
       width: 110,
-      render: (v: number) => `${((Number.isFinite(v) ? v : 0) * 100).toFixed(1)}%`,
+      render: (v: number) => `${((Number.isFinite(v) ? v : 0) * 100).toFixed(2)}%`,
     },
   ];
 
@@ -353,7 +353,7 @@ const DailyRhythmManagerModal: React.FC<DailyRhythmManagerModalProps> = ({
         const diff = ratio == null ? null : Math.abs((row.actualRatio || 0) - ratio);
         if (diff == null) return '-';
         const pct = diff * 100;
-        return <span style={{ color: pct >= (profile?.deviationThreshold || 0.1) * 100 ? '#faad14' : undefined }}>{pct.toFixed(1)}%</span>;
+        return <span style={{ color: pct >= (profile?.deviationThreshold || 0.1) * 100 ? '#faad14' : undefined }}>{pct.toFixed(2)}%</span>;
       },
     }
   );
@@ -365,7 +365,7 @@ const DailyRhythmManagerModal: React.FC<DailyRhythmManagerModalProps> = ({
     return (
       <Space wrap size={8}>
         <Tag color={profile.isViolated ? 'red' : 'green'}>
-          最大偏差 {maxPct.toFixed(1)}% / 阈值 {thPct.toFixed(1)}%
+          最大偏差 {maxPct.toFixed(2)}% / 阈值 {thPct.toFixed(2)}%
         </Tag>
         <Tag>当日已排 {profile.totalScheduledWeightT.toFixed(3)} 吨</Tag>
         {profile.targetPresetId ? <Tag>模板 {profile.targetPresetId}</Tag> : <Tag>未绑定模板</Tag>}

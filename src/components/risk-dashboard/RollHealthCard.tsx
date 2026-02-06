@@ -50,7 +50,7 @@ export const RollHealthCard: React.FC<RollHealthCardProps> = ({ roll }) => {
           percent={(roll.currentTonnage / roll.threshold) * 100}
           strokeColor={getRollStatusColor(roll.status)}
           status={roll.status === 'critical' ? 'exception' : 'active'}
-          format={(percent) => `${percent?.toFixed(1)}%`}
+          format={(percent) => `${percent?.toFixed(2)}%`}
         />
 
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>

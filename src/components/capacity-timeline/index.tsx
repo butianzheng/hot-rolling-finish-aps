@@ -196,7 +196,7 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
           percent={utilizationPercent}
           status={isOverLimit ? 'exception' : utilizationPercent > 90 ? 'normal' : 'active'}
           strokeColor={isOverLimit ? '#ff4d4f' : '#1677ff'}
-          format={(percent) => `${percent?.toFixed(1)}%`}
+          format={(percent) => `${percent?.toFixed(2)}%`}
         />
       </Space>
     </Card>

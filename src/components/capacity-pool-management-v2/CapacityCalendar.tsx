@@ -175,7 +175,7 @@ export const CapacityCalendar: React.FC<CapacityCalendarProps> = ({
             <div style={{ fontSize: 12, lineHeight: 1.6 }}>
               <strong>{dateStr}</strong>
               <br />
-              利用率: <strong>{(utilization * 100).toFixed(1)}%</strong>
+              利用率: <strong>{(utilization * 100).toFixed(2)}%</strong>
               <br />
               已用: {data.used_capacity_t.toFixed(3)}t
               <br />
@@ -265,7 +265,7 @@ export const CapacityCalendar: React.FC<CapacityCalendarProps> = ({
           总剩余: {statistics.totalRemaining.toFixed(3)}t
         </Tag>
         <Tag color="purple" style={{ margin: 0, fontSize: 11, padding: '0 6px' }}>
-          平均利用率: {(statistics.avgUtilization * 100).toFixed(1)}%
+          平均利用率: {(statistics.avgUtilization * 100).toFixed(2)}%
         </Tag>
         {statistics.overLimitCount > 0 && (
           <Tag color="red" style={{ margin: 0, fontSize: 11, padding: '0 6px' }}>

@@ -73,7 +73,7 @@ export const GlobalStatisticsCards: React.FC<GlobalStatisticsCardsProps> = ({
         <Card size="small" bodyStyle={{ padding: '12px 16px' }}>
           <Statistic
             title="平均利用率"
-            value={(stats.avgUtilization * 100).toFixed(1)}
+            value={(stats.avgUtilization * 100).toFixed(2)}
             suffix="%"
             valueStyle={{
               color:

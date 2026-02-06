@@ -204,7 +204,7 @@ export const D4Bottleneck: React.FC<D4BottleneckProps> = ({ embedded, onOpenDril
             <Statistic
               title="平均堵塞分数"
               value={stats.avgBottleneckScore}
-              precision={1}
+              precision={2}
               suffix="/ 100"
               valueStyle={{
                 color: stats.avgBottleneckScore > 60 ? '#ff4d4f' : '#52c41a',
@@ -349,27 +349,52 @@ interface ReasonsTableProps {
   reasons: ReasonItem[];
 }
 
+/**
+ * 原因代码中文翻译映射
+ */
+const REASON_CODE_LABELS: Record<string, string> = {
+  CAPACITY_UTILIZATION: '产能利用率',
+  LOW_REMAINING_CAPACITY: '剩余产能不足',
+  HIGH_CAPACITY_PRESSURE: '产能压力高',
+  STRUCTURE_GAP: '结构性缺口',
+  COLD_STOCK_AGING: '冷料库龄',
+  ROLL_CHANGE_CONFLICT: '换辊冲突',
+  URGENCY_BACKLOG: '紧急订单积压',
+  MATURITY_CONSTRAINT: '适温约束',
+  OVERLOAD_RISK: '超载风险',
+  SCHEDULING_CONFLICT: '排产冲突',
+};
+
+function getReasonCodeLabel(code: string): string {
+  return REASON_CODE_LABELS[code] || code;
+}
+
 const ReasonsTable: React.FC<ReasonsTableProps> = ({ reasons }) => {
   const columns: ColumnsType<ReasonItem> = [
     {
       title: '原因代码',
       dataIndex: 'code',
       key: 'code',
-      width: 150,
-      render: (code: string) => <Tag>{code}</Tag>,
+      width: 140,
+      render: (code: string) => (
+        <Tag color="blue" style={{ maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {getReasonCodeLabel(code)}
+        </Tag>
+      ),
     },
     {
       title: '原因描述',
       dataIndex: 'msg',
       key: 'msg',
-      ellipsis: true,
+      ellipsis: { showTitle: true },
+      width: 320,
     },
     {
       title: '权重',
       dataIndex: 'weight',
       key: 'weight',
       width: 100,
-      render: (weight: number) => <span>{(weight * 100).toFixed(1)}%</span>,
+      render: (weight: number) => <span>{(weight * 100).toFixed(2)}%</span>,
       sorter: (a, b) => a.weight - b.weight,
       defaultSortOrder: 'descend',
     },
@@ -377,8 +402,8 @@ const ReasonsTable: React.FC<ReasonsTableProps> = ({ reasons }) => {
       title: '影响订单数',
       dataIndex: 'affectedCount',
       key: 'affectedCount',
-      width: 120,
-      render: (count?: number) => count || '-',
+      width: 90,
+      render: (count?: number) => (typeof count === 'number' ? count : '-'),
     },
   ];
 

@@ -99,10 +99,10 @@ export const GlobalKPIDisplay: React.FC<GlobalKPIDisplayProps> = ({ kpi }) => {
       </Tooltip>
 
       {/* 产能利用率 */}
-      <Tooltip title={`产能利用率: ${kpi.capacityUtilization.toFixed(1)}%`}>
+      <Tooltip title={`产能利用率: ${kpi.capacityUtilization.toFixed(2)}%`}>
         <Space size={6}>
           <DashboardOutlined style={{ color: '#1677ff', fontSize: 16 }} />
-          <Text style={{ color: textColor }}>{kpi.capacityUtilization.toFixed(1)}%</Text>
+          <Text style={{ color: textColor }}>{kpi.capacityUtilization.toFixed(2)}%</Text>
         </Space>
       </Tooltip>
 

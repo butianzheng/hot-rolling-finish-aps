@@ -440,7 +440,7 @@ export const D3ColdStock: React.FC<D3ColdStockProps> = ({ embedded, onOpenDrilld
               {selectedMachineData.totalWeight.toFixed(3)}吨
             </Descriptions.Item>
             <Descriptions.Item label="平均库龄">
-              {selectedMachineData.avgAge.toFixed(1)}天
+              {selectedMachineData.avgAge.toFixed(2)}天
             </Descriptions.Item>
             <Descriptions.Item label="最大库龄">
               {selectedMachineData.maxAge}天
@@ -556,7 +556,7 @@ export const D3ColdStock: React.FC<D3ColdStockProps> = ({ embedded, onOpenDrilld
                           {bucket.trend!.direction === 'FALLING' && '↓ 下降'}
                         </span>
                         <span style={{ color: '#8c8c8c' }}>
-                          变化率: {bucket.trend!.changeRatePct.toFixed(1)}%
+                          变化率: {bucket.trend!.changeRatePct.toFixed(2)}%
                         </span>
                       </Space>
                     </Card>
@@ -616,7 +616,7 @@ const MachineStatsTable: React.FC<MachineStatsTableProps> = ({ data, onRowClick 
       dataIndex: 'avgAge',
       key: 'avgAge',
       width: 120,
-      render: (age: number) => age.toFixed(1),
+      render: (age: number) => age.toFixed(2),
       sorter: (a, b) => a.avgAge - b.avgAge,
     },
     {

@@ -127,7 +127,7 @@ export const D6CapacityOpportunity: React.FC<D6CapacityOpportunityProps> = ({ em
       width: 130,
       render: (pct: number) => (
         <div>
-          <div style={{ fontSize: '12px', marginBottom: '4px' }}>{pct.toFixed(1)}%</div>
+          <div style={{ fontSize: '12px', marginBottom: '4px' }}>{pct.toFixed(2)}%</div>
           <Progress
             percent={pct}
             size="small"
@@ -145,7 +145,7 @@ export const D6CapacityOpportunity: React.FC<D6CapacityOpportunityProps> = ({ em
       width: 130,
       render: (pct: number) => (
         <div>
-          <div style={{ fontSize: '12px', marginBottom: '4px' }}>{pct.toFixed(1)}%</div>
+          <div style={{ fontSize: '12px', marginBottom: '4px' }}>{pct.toFixed(2)}%</div>
           <Progress
             percent={pct}
             size="small"
@@ -314,7 +314,7 @@ export const D6CapacityOpportunity: React.FC<D6CapacityOpportunityProps> = ({ em
             <Statistic
               title="机会空间总计"
               value={stats.totalOpportunitySpace}
-              precision={1}
+              precision={3}
               suffix="吨"
               prefix={<SwapOutlined />}
               valueStyle={{ color: stats.totalOpportunitySpace > 0 ? '#52c41a' : '#8c8c8c' }}
@@ -326,7 +326,7 @@ export const D6CapacityOpportunity: React.FC<D6CapacityOpportunityProps> = ({ em
             <Statistic
               title="平均当前利用率"
               value={stats.avgCurrentUtilization}
-              precision={1}
+              precision={2}
               suffix="%"
               valueStyle={{
                 color: getUtilizationColor(stats.avgCurrentUtilization),
@@ -339,7 +339,7 @@ export const D6CapacityOpportunity: React.FC<D6CapacityOpportunityProps> = ({ em
             <Statistic
               title="平均优化后利用率"
               value={stats.avgOptimizedUtilization}
-              precision={1}
+              precision={2}
               suffix="%"
               valueStyle={{
                 color: getUtilizationColor(stats.avgOptimizedUtilization),

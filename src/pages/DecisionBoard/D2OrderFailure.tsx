@@ -57,6 +57,27 @@ const FAIL_TYPE_LABELS: Record<FailType, string> = {
   Other: '其他',
 };
 
+/**
+ * 阻塞因素类型中文翻译映射
+ */
+const FACTOR_TYPE_LABELS: Record<string, string> = {
+  Capacity: '产能不足',
+  Structure: '结构性堵塞',
+  RollChange: '换辊影响',
+  ColdStock: '冷料压库',
+  Material: '物料约束',
+  Temperature: '温度约束',
+  Maturity: '适温约束',
+  Mixed: '混合因素',
+  CapacityShortage: '产能不足',
+  StructureConflict: '结构冲突',
+  ColdStockNotReady: '冷料未适温',
+};
+
+function getFactorTypeLabel(type: string): string {
+  return FACTOR_TYPE_LABELS[type] || type;
+}
+
 const getFailTypeColor = (type: string) =>
   (FAIL_TYPE_COLORS as Record<string, string>)[type] || '#8c8c8c';
 const getFailTypeLabel = (type: string) =>
@@ -543,10 +564,10 @@ export const D2OrderFailure: React.FC<D2OrderFailureProps> = ({ embedded, onOpen
                   <Card key={index} size="small" type="inner">
                     <Space direction="vertical" style={{ width: '100%' }}>
                       <div>
-                        <Tag color="red">{factor.factorType}</Tag>
+                        <Tag color="red">{getFactorTypeLabel(factor.factorType)}</Tag>
                         <span style={{ fontWeight: 'bold' }}>{factor.description}</span>
                       </div>
-                      <div>影响权重: {(factor.impact * 100).toFixed(1)}%</div>
+                      <div>影响权重: {(factor.impact * 100).toFixed(2)}%</div>
                       <div>受影响材料数: {factor.affectedMaterialCount}个</div>
                     </Space>
                   </Card>
