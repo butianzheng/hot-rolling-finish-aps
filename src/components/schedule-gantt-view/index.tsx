@@ -340,7 +340,11 @@ export default function ScheduleGanttView({
     scrollToDateKey(dateKey, 'auto');
   }, [autoOpenCell, listApi, machines, onFocusChange, scrollToDateKey, setCellDetail]);
 
-  // 表头
+  // H8性能评估：headerCells已通过useMemo优化，120天数据量下性能可控
+  // - headerDateSummaryByKey已缓存，避免重复计算
+  // - Tooltip是懒渲染的，只在hover时显示内容
+  // - JSX创建在现代浏览器中性能影响可控
+  // 如未来出现性能问题，可考虑：1) 虚拟滚动 2) 将Tooltip内容提取为memo组件
   const headerCells = useMemo(() => {
     return dateKeys.map((key) => {
       const d = dayjs(key);
