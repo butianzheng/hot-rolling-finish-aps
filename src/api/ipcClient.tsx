@@ -33,11 +33,22 @@ export interface IpcOptions {
   validate?: (value: unknown) => unknown;
 }
 
+// M7修复：定义import.meta类型接口，替换any提升类型安全
+interface ImportMetaEnv {
+  DEV?: boolean;
+  TAURI_DEBUG?: string;
+  [key: string]: unknown;
+}
+
+interface ImportMeta {
+  env?: ImportMetaEnv;
+}
+
 const DEBUG_IPC = Boolean(
   // Vite dev server
-  (import.meta as any)?.env?.DEV ||
+  (import.meta as ImportMeta)?.env?.DEV ||
     // Optional: allow enabling IPC logs in Tauri builds via envPrefix ['TAURI_']
-    String((import.meta as any)?.env?.TAURI_DEBUG || '').toLowerCase() === 'true'
+    String((import.meta as ImportMeta)?.env?.TAURI_DEBUG || '').toLowerCase() === 'true'
 );
 
 export class IpcClient {
