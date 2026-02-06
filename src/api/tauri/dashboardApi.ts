@@ -8,7 +8,7 @@
 // 注意：D1-D6 决策支持查询请使用 decisionService.ts
 // ==========================================
 
-import { IpcClient } from '../ipcClient';
+import { IpcClient, IPC_TIMEOUT } from '../ipcClient';
 import {
   z,
   zodValidator,
@@ -29,7 +29,7 @@ export const dashboardApi = {
       },
       {
         validate: zodValidator(DecisionRefreshStatusResponseSchema, 'get_refresh_status'),
-        timeout: 60000,
+        timeout: IPC_TIMEOUT.SLOW,
       }
     );
   },
@@ -49,7 +49,7 @@ export const dashboardApi = {
       },
       {
         validate: zodValidator(ManualRefreshDecisionResponseSchema, 'manual_refresh_decision'),
-        timeout: 300000,
+        timeout: IPC_TIMEOUT.VERY_SLOW,
       }
     );
   },

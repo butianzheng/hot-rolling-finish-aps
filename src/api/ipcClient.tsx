@@ -9,6 +9,20 @@ export interface IpcError {
   details?: Record<string, unknown>;
 }
 
+// H12修复：定义统一的超时时间常量和分级策略
+export const IPC_TIMEOUT = {
+  /** 快速操作（查询、状态检查） - 5秒 */
+  FAST: 5_000,
+  /** 标准操作（列表加载、单条更新） - 30秒 */
+  NORMAL: 30_000,
+  /** 慢操作（批量更新、导入） - 60秒 */
+  SLOW: 60_000,
+  /** 较长操作（大批量数据处理） - 2分钟 */
+  LONG: 120_000,
+  /** 超长操作（重算、大批量导入） - 5分钟 */
+  VERY_SLOW: 300_000,
+} as const;
+
 export interface IpcOptions {
   retry?: number;
   timeout?: number;
@@ -27,12 +41,20 @@ const DEBUG_IPC = Boolean(
 );
 
 export class IpcClient {
+  // H11说明：参数传递不一致的根本原因在于后端Tauri命令签名不统一
+  // - 部分命令接收对象参数（如 {machine_code: string}）
+  // - 部分命令期望JSON字符串参数（如 {machine_codes: string}，其中string是JSON）
+  // 当前解决方案：在各API调用层使用JSON.stringify（见src/api/tauri/）
+  // 理想方案：统一后端命令签名为对象参数，前端移除所有JSON.stringify
+  // TODO: 后端API重构完成后，在IpcClient层实现自动参数规范化
+
   static async call<T>(
     command: string,
     params: unknown = {},
     options: IpcOptions = {}
   ): Promise<T> {
-    const { retry = 0, timeout = 30000, showError = true } = options;
+    // H12修复：使用统一的超时时间常量（默认30秒）
+    const { retry = 0, timeout = IPC_TIMEOUT.NORMAL, showError = true } = options;
 
     if (DEBUG_IPC) {
       // 调试日志：打印 IPC 调用信息（生产环境默认关闭，避免噪声/泄露敏感信息）

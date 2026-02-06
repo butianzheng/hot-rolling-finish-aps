@@ -1,4 +1,4 @@
-import { IpcClient } from '../ipcClient';
+import { IpcClient, IPC_TIMEOUT } from '../ipcClient';
 import {
   z,
   zodValidator,
@@ -41,7 +41,7 @@ export const materialApi = {
   async getMaterialPoolSummary(): Promise<z.infer<typeof MaterialPoolSummaryResponseSchema>> {
     return IpcClient.call('get_material_pool_summary', {}, {
       validate: zodValidator(MaterialPoolSummaryResponseSchema, 'get_material_pool_summary'),
-      timeout: 60000,
+      timeout: IPC_TIMEOUT.SLOW,
     });
   },
 

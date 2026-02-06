@@ -1,4 +1,4 @@
-import { IpcClient } from '../ipcClient';
+import { IpcClient, IPC_TIMEOUT } from '../ipcClient';
 import {
   z,
   zodValidator,
@@ -87,7 +87,7 @@ export const planApi = {
         operator,
       },
       {
-        timeout: 300000,
+        timeout: IPC_TIMEOUT.VERY_SLOW,
       }
     );
   },
@@ -131,7 +131,7 @@ export const planApi = {
         window_days_override: windowDaysOverride,
       },
       {
-        timeout: 300000,
+        timeout: IPC_TIMEOUT.VERY_SLOW,
         validate: zodValidator(RecalcResponseSchema, 'simulate_recalc'),
       }
     );
@@ -156,7 +156,7 @@ export const planApi = {
         window_days_override: windowDaysOverride,
       },
       {
-        timeout: 300000,
+        timeout: IPC_TIMEOUT.VERY_SLOW,
         validate: zodValidator(RecalcResponseSchema, 'recalc_full'),
       }
     );
@@ -185,7 +185,7 @@ export const planApi = {
         operator: params.operator,
       },
       {
-        timeout: 300000,
+        timeout: IPC_TIMEOUT.VERY_SLOW,
         validate: zodValidator(GenerateStrategyDraftsResponseSchema, 'generate_strategy_drafts'),
       }
     );
@@ -202,7 +202,7 @@ export const planApi = {
         operator,
       },
       {
-        timeout: 300000,
+        timeout: IPC_TIMEOUT.VERY_SLOW,
         validate: zodValidator(ApplyStrategyDraftResponseSchema, 'apply_strategy_draft'),
       }
     );
@@ -266,7 +266,7 @@ export const planApi = {
       },
       {
         validate: zodValidator(PlanItemDateBoundsResponseSchema, 'get_plan_item_date_bounds'),
-        timeout: 60000,
+        timeout: IPC_TIMEOUT.SLOW,
       }
     );
   },
@@ -294,7 +294,7 @@ export const planApi = {
       {
         validate: zodValidator(z.array(PlanItemSchema), 'list_plan_items'),
         // Plan items can be large (10k~50k+) depending on window/versions; avoid false timeouts.
-        timeout: 120000,
+        timeout: IPC_TIMEOUT.LONG,
       }
     );
   },
@@ -308,7 +308,7 @@ export const planApi = {
       },
       {
         validate: zodValidator(z.array(PlanItemSchema), 'list_items_by_date'),
-        timeout: 60000,
+        timeout: IPC_TIMEOUT.SLOW,
       }
     );
   },
