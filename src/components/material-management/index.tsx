@@ -31,6 +31,17 @@ import { MaterialOperationModal } from './MaterialOperationModal';
 import { createMaterialTableColumns } from './materialTableColumns';
 import { checkRedLineViolations, type Material, type OperationType } from './materialTypes';
 
+// M4修复：定义ProTable搜索参数类型，替换any
+interface MaterialSearchParams {
+  machine_code?: string;
+  sched_state?: string;
+  urgent_level?: string;
+  manual_urgent_flag?: string | boolean;
+  lock_flag?: string | boolean;
+  material_id?: string;
+  steel_mark?: string;
+}
+
 const MaterialManagement: React.FC = () => {
   const actionRef = useRef<ActionType>();
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
@@ -192,13 +203,15 @@ const MaterialManagement: React.FC = () => {
       setReason('');
       setSelectedRowKeys([]);
       actionRef.current?.reload();
-    } catch (error: any) {
-      message.error(`操作失败: ${error.message || error}`);
+    } catch (error) {
+      // M4修复：使用unknown替代any，通过类型守卫安全访问error属性
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      message.error(`操作失败: ${errorMessage}`);
     }
   }, [adminOverrideMode, currentUser, modalType, reason, selectedRowKeys]);
 
-  // 加载数据
-  const loadMaterials = useCallback(async (params: any) => {
+  // M4修复：loadMaterials参数使用明确的MaterialSearchParams类型
+  const loadMaterials = useCallback(async (params: MaterialSearchParams) => {
     try {
       const result = await materialApi.listMaterials({
         machine_code: params.machine_code,
@@ -216,16 +229,16 @@ const MaterialManagement: React.FC = () => {
         filtered = filtered.filter((m: Material) => m.urgent_level === params.urgent_level);
       }
       if (params.manual_urgent_flag !== undefined) {
-        const flag = params.manual_urgent_flag === 'true';
+        const flag = params.manual_urgent_flag === 'true' || params.manual_urgent_flag === true;
         filtered = filtered.filter((m: Material) => m.manual_urgent_flag === flag);
       }
       if (params.lock_flag !== undefined) {
-        const flag = params.lock_flag === 'true';
+        const flag = params.lock_flag === 'true' || params.lock_flag === true;
         filtered = filtered.filter((m: Material) => m.lock_flag === flag);
       }
       if (params.material_id) {
         filtered = filtered.filter((m: Material) =>
-          m.material_id.toLowerCase().includes(params.material_id.toLowerCase())
+          m.material_id.toLowerCase().includes(params.material_id!.toLowerCase())
         );
       }
       if (params.steel_mark) {
@@ -235,8 +248,10 @@ const MaterialManagement: React.FC = () => {
       }
 
       return { data: filtered, success: true, total: filtered.length };
-    } catch (error: any) {
-      message.error(`加载失败: ${error.message || error}`);
+    } catch (error) {
+      // M4修复：使用unknown替代any，通过类型守卫安全访问error属性
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      message.error(`加载失败: ${errorMessage}`);
       return { data: [], success: false, total: 0 };
     }
   }, []);

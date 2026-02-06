@@ -120,8 +120,11 @@ export function createMaterialTableColumns(options: MaterialTableColumnsOptions)
       width: 110,
       align: 'right',
       search: false,
-      render: (val: any) => (
-        <span style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>{val ? val.toFixed(3) : '-'}</span>
+      // M4修复：使用unknown替代any，通过类型守卫提升类型安全性
+      render: (val: unknown) => (
+        <span style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>
+          {typeof val === 'number' ? val.toFixed(3) : '-'}
+        </span>
       ),
     },
     {
@@ -131,9 +134,12 @@ export function createMaterialTableColumns(options: MaterialTableColumnsOptions)
       width: 100,
       align: 'right',
       search: false,
-      render: (val: any) => (
+      // M4修复：使用unknown替代any，通过类型守卫提升类型安全性
+      render: (val: unknown) => (
         <span style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>
-          {val == null || !Number.isFinite(Number(val)) ? '-' : Number(val).toFixed(3)}
+          {val == null || typeof val !== 'number' || !Number.isFinite(val)
+            ? '-'
+            : val.toFixed(3)}
         </span>
       ),
     },
@@ -144,9 +150,12 @@ export function createMaterialTableColumns(options: MaterialTableColumnsOptions)
       width: 100,
       align: 'right',
       search: false,
-      render: (val: any) => (
+      // M4修复：使用unknown替代any，通过类型守卫提升类型安全性
+      render: (val: unknown) => (
         <span style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>
-          {val == null || !Number.isFinite(Number(val)) ? '-' : Number(val).toFixed(3)}
+          {val == null || typeof val !== 'number' || !Number.isFinite(val)
+            ? '-'
+            : val.toFixed(3)}
         </span>
       ),
     },
