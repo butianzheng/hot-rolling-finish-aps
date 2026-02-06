@@ -191,15 +191,24 @@ export const usePlanStore = create<PlanState & PlanActions>()(
         }
       }),
 
-    activateVersion: (versionId) =>
+    // C9修复：不再直接修改UI状态，应该通过planApi.activateVersion调用后端API
+    // 该方法已废弃，请使用：
+    //   await planApi.activateVersion(versionId, operator);
+    //   await planActions.loadVersions(planId);
+    activateVersion: (versionId) => {
+      console.warn(
+        '[DEPRECATED] usePlanStore.activateVersion() 直接修改UI状态违反工业规范。',
+        '请使用 planApi.activateVersion(versionId, operator) 调用后端API，',
+        '然后使用 planActions.loadVersions(planId) 重新加载版本列表。'
+      );
+      // 临时保持原有功能以避免破坏现有代码，但应尽快迁移
       set((state) => {
-        // 将所有版本设为非激活
         state.versions.forEach((v) => {
           v.status = v.version_id === versionId ? 'ACTIVE' : 'ARCHIVED';
         });
-        // 更新当前选中版本
         state.selectedVersionId = versionId;
-      }),
+      });
+    },
 
     reset: () => set(initialState),
 

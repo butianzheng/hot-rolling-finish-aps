@@ -17,9 +17,23 @@ export class EventBus {
     if (!this.listeners.has(eventName)) {
       this.listeners.set(eventName, []);
     }
-    this.listeners.get(eventName)!.push(unlisten);
+    const listenerArray = this.listeners.get(eventName)!;
+    listenerArray.push(unlisten);
 
-    return unlisten;
+    // C10修复：返回包装后的unlisten函数，在调用时从Map中移除引用以防止内存泄漏
+    const wrappedUnlisten = () => {
+      unlisten();
+      const index = listenerArray.indexOf(unlisten);
+      if (index !== -1) {
+        listenerArray.splice(index, 1);
+      }
+      // 如果该事件没有任何监听器了，清理Map entry
+      if (listenerArray.length === 0) {
+        this.listeners.delete(eventName);
+      }
+    };
+
+    return wrappedUnlisten;
   }
 
   static async unsubscribe(eventName: string) {

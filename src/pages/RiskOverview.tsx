@@ -137,6 +137,12 @@ const RiskOverview: React.FC = () => {
   const { setWorkbenchFilters, setWorkbenchViewMode } = useGlobalActions();
   const data = useRiskOverviewData(activeVersionId);
 
+  // C1修复：过滤出高压力和严重压力的冷坨数据，避免DrilldownDrawer显示无关数据
+  const severeColdStockBuckets = useMemo(() =>
+    data.coldStockBuckets.filter(b =>
+      b.pressureLevel === 'HIGH' || b.pressureLevel === 'CRITICAL'
+    ), [data.coldStockBuckets]);
+
   const activeTab = useMemo(
     () => normalizeDimensionTabKey(searchParams.get('tab')),
     [searchParams]
@@ -363,7 +369,7 @@ const RiskOverview: React.FC = () => {
           riskDays={data.riskDays}
           bottlenecks={data.bottlenecks}
           orderFailures={data.orderFailures}
-          coldStockBuckets={data.coldStockBuckets}
+          coldStockBuckets={severeColdStockBuckets}
           rollAlerts={data.rollAlerts}
           capacityOpportunities={data.capacityOpportunities}
         />

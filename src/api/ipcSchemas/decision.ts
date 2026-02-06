@@ -300,7 +300,8 @@ export const ColdStockProfileResponseSchema = z.object({
 export const ErrorResponseSchema = z.object({
   code: z.string(),
   message: z.string(),
-  details: z.any().optional(),
+  // H13修复：使用z.unknown()替代z.any()以保持类型安全
+  details: z.unknown().optional(),
 });
 
 // ==========================================

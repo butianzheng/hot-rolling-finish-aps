@@ -64,11 +64,19 @@ export function useWorkbenchAutoDateRange(params: {
       end = tmp;
     }
     setWorkbenchDateRange([start, end]);
+
+    // C3修复：如果当前处于PINNED模式，用户手动调整日期应该切换到MANUAL模式，
+    // 而不是AUTO模式，以保持用户的意图
+    if (dateRangeMode === 'PINNED') {
+      setDateRangeMode('MANUAL');
+      return;
+    }
+
     const isAuto =
       formatDate(start) === formatDate(autoDateRange[0]) &&
       formatDate(end) === formatDate(autoDateRange[1]);
     setDateRangeMode(isAuto ? 'AUTO' : 'MANUAL');
-  }, [autoDateRange, setDateRangeMode, setWorkbenchDateRange]);
+  }, [autoDateRange, dateRangeMode, setDateRangeMode, setWorkbenchDateRange]);
 
   const resetWorkbenchDateRangeToAuto = useCallback(() => {
     setDateRangeMode('AUTO');
