@@ -181,7 +181,8 @@ export const D2OrderFailure: React.FC<D2OrderFailureProps> = ({ embedded, onOpen
   // H7修复：区分全局统计和筛选视图统计，避免用户误解
   // 全局统计（基于所有订单，不受筛选影响）
   const globalStats = useMemo(() => {
-    if (!allOrders || allOrders.length === 0) {
+    const allOrders = data?.items || [];
+    if (allOrders.length === 0) {
       return {
         totalFailures: 0,
         overdueCount: 0,
@@ -202,7 +203,7 @@ export const D2OrderFailure: React.FC<D2OrderFailureProps> = ({ embedded, onOpen
       nearDueImpossibleCount,
       avgCompletionRate: Math.round(avgCompletionRate),
     };
-  }, [allOrders]);
+  }, [data?.items]);
 
   // 当前筛选视图统计（基于筛选后的订单）
   const viewStats = useMemo(() => {

@@ -182,7 +182,12 @@ async function callWithValidation<T>(
       const errorParseResult = ErrorResponseSchema.safeParse(error);
       if (errorParseResult.success) {
         const errorData = errorParseResult.data;
-        throw new DecisionApiError(errorData.code, errorData.message, errorData.details);
+        // 类型安全转换：确保details是Record<string, unknown>类型或undefined
+        const details =
+          errorData.details && typeof errorData.details === 'object'
+            ? (errorData.details as Record<string, unknown>)
+            : undefined;
+        throw new DecisionApiError(errorData.code, errorData.message, details);
       }
     }
 

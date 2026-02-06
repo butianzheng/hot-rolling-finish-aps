@@ -320,7 +320,7 @@ export function useImportWorkflow(): UseImportWorkflowReturn {
         message.error(e?.message || '导入失败');
         // H5修复：导入失败后清空相关状态，避免显示过期的导入结果
         setImportResult(null);
-        setBatchId(null);
+        setBatchId(`BATCH_${Date.now()}`);
       } finally {
         setImportLoading(false);
         setImportingFunc(false);

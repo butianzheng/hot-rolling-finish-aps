@@ -60,7 +60,16 @@ const DATE_RANGE_PRESETS: DateRangePreset[] = [
   },
   {
     label: '本季度',
-    getValue: () => [dayjs().startOf('quarter'), dayjs().endOf('quarter')],
+    getValue: () => {
+      // 手动计算本季度（不依赖quarterOfYear插件）
+      const now = dayjs();
+      const currentMonth = now.month(); // 0-11
+      const quarterStartMonth = Math.floor(currentMonth / 3) * 3;
+      return [
+        now.month(quarterStartMonth).startOf('month'),
+        now.month(quarterStartMonth + 2).endOf('month'),
+      ];
+    },
   },
   {
     label: '本年度',
