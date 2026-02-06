@@ -191,23 +191,20 @@ export const usePlanStore = create<PlanState & PlanActions>()(
         }
       }),
 
-    // C9修复：不再直接修改UI状态，应该通过planApi.activateVersion调用后端API
-    // 该方法已废弃，请使用：
-    //   await planApi.activateVersion(versionId, operator);
-    //   await planActions.loadVersions(planId);
+    // C9修复：此方法已废弃并移除，违反工业规范
+    // 正确做法：
+    //   1. 调用后端API: await planApi.activateVersion(versionId, operator);
+    //   2. 重新加载版本列表或刷新缓存
+    // 直接修改UI层的version.status字段会导致前后端数据不一致
     activateVersion: (versionId) => {
-      console.warn(
-        '[DEPRECATED] usePlanStore.activateVersion() 直接修改UI状态违反工业规范。',
-        '请使用 planApi.activateVersion(versionId, operator) 调用后端API，',
-        '然后使用 planActions.loadVersions(planId) 重新加载版本列表。'
+      throw new Error(
+        '[DEPRECATED] usePlanStore.activateVersion() 已废弃。\n' +
+          '原因：直接修改UI状态违反工业规范，可能导致数据不一致。\n' +
+          '正确做法：\n' +
+          '  1. 调用后端API: await planApi.activateVersion(versionId, operator);\n' +
+          '  2. 调用 useGlobalStore.setActiveVersion(versionId); 更新全局激活版本ID\n' +
+          '  3. 重新加载版本列表: await planActions.loadVersions(planId);'
       );
-      // 临时保持原有功能以避免破坏现有代码，但应尽快迁移
-      set((state) => {
-        state.versions.forEach((v) => {
-          v.status = v.version_id === versionId ? 'ACTIVE' : 'ARCHIVED';
-        });
-        state.selectedVersionId = versionId;
-      });
     },
 
     reset: () => set(initialState),
@@ -266,7 +263,7 @@ export const useSelectedVersion = () =>
 export const useActiveVersion = () =>
   usePlanStore((state) => state.versions.find((v) => v.status === 'ACTIVE') || null);
 
-// 获取所有 Actions
+// 获取所有 Actions (C9修复：移除activateVersion导出)
 export const usePlanActions = () =>
   usePlanStore((state) => ({
     setPlans: state.setPlans,
@@ -279,7 +276,7 @@ export const usePlanActions = () =>
     addVersion: state.addVersion,
     updatePlan: state.updatePlan,
     updateVersion: state.updateVersion,
-    activateVersion: state.activateVersion,
+    // activateVersion 已废弃并移除，请使用 planApi.activateVersion()
     reset: state.reset,
     setDraftVersions: state.setDraftVersions,
     clearDraftVersions: state.clearDraftVersions,

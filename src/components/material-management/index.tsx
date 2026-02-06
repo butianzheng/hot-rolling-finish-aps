@@ -6,6 +6,7 @@
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ProTable } from '@ant-design/pro-components';
 import type { ActionType } from '@ant-design/pro-components';
 import { Button, Modal, Space, message } from 'antd';
@@ -44,6 +45,7 @@ interface MaterialSearchParams {
 
 const MaterialManagement: React.FC = () => {
   const actionRef = useRef<ActionType>();
+  const queryClient = useQueryClient();
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   const [inspectorVisible, setInspectorVisible] = useState(false);
@@ -57,9 +59,29 @@ const MaterialManagement: React.FC = () => {
   // 产能时间线 Hook
   const timeline = useMaterialTimeline();
 
-  // 订阅事件
-  useEvent('material_state_changed', () => actionRef.current?.reload());
-  useEvent('plan_updated', () => timeline.loadTimeline());
+  // C8修复：使用React Query缓存全量材料数据，避免每次筛选都重新加载
+  const {
+    data: allMaterials = [],
+    isLoading: isLoadingMaterials,
+    error: materialsError,
+  } = useQuery({
+    queryKey: ['materials', 'all'],
+    queryFn: async () => {
+      const result = await materialApi.listMaterials({ limit: 1000, offset: 0 });
+      return result;
+    },
+    staleTime: 2 * 60 * 1000, // 2分钟内数据视为新鲜，不重新请求
+    gcTime: 5 * 60 * 1000, // 缓存5分钟
+  });
+
+  // 订阅事件并刷新缓存
+  useEvent('material_state_changed', () => {
+    queryClient.invalidateQueries({ queryKey: ['materials', 'all'] });
+    actionRef.current?.reload();
+  });
+  useEvent('plan_updated', () => {
+    timeline.loadTimeline();
+  });
 
   // 查看详情
   const handleViewDetail = useCallback((record: Material) => {
@@ -120,8 +142,10 @@ const MaterialManagement: React.FC = () => {
       }
 
       if (!adminOverrideMode) {
-        const result = await materialApi.listMaterials({ limit: 1000, offset: 0 });
-        const selectedMaterials = result.filter((m: Material) => selectedRowKeys.includes(m.material_id));
+        // C8修复：使用缓存的材料数据而不是重新调用API
+        const selectedMaterials = allMaterials.filter((m: Material) =>
+          selectedRowKeys.includes(m.material_id)
+        );
 
         const allViolations = selectedMaterials.flatMap((material: Material) =>
           checkRedLineViolations(material, type, adminOverrideMode)
@@ -134,7 +158,9 @@ const MaterialManagement: React.FC = () => {
             content: (
               <Space direction="vertical" style={{ width: '100%' }} size={16}>
                 <div>
-                  <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>以下材料违反工业红线保护规则:</div>
+                  <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
+                    以下材料违反工业红线保护规则:
+                  </div>
                   <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
                     <RedLineGuard violations={allViolations} mode="detailed" />
                   </div>
@@ -167,7 +193,7 @@ const MaterialManagement: React.FC = () => {
       setModalType(type);
       setModalVisible(true);
     },
-    [adminOverrideMode, selectedRowKeys]
+    [adminOverrideMode, selectedRowKeys, allMaterials]
   );
 
   // 执行操作
@@ -186,7 +212,13 @@ const MaterialManagement: React.FC = () => {
         await materialApi.batchLockMaterials(materialIds, true, operator, reason, validationMode);
         message.success('锁定成功');
       } else if (modalType === 'unlock') {
-        await materialApi.batchLockMaterials(materialIds, false, operator, reason, validationMode);
+        await materialApi.batchLockMaterials(
+          materialIds,
+          false,
+          operator,
+          reason,
+          validationMode
+        );
         message.success('解锁成功');
       } else if (modalType === 'urgent') {
         await materialApi.batchSetUrgent(materialIds, true, operator, reason);
@@ -202,59 +234,76 @@ const MaterialManagement: React.FC = () => {
       setModalVisible(false);
       setReason('');
       setSelectedRowKeys([]);
+
+      // C8修复：刷新React Query缓存以更新材料数据
+      queryClient.invalidateQueries({ queryKey: ['materials', 'all'] });
       actionRef.current?.reload();
     } catch (error) {
       // M4修复：使用unknown替代any，通过类型守卫安全访问error属性
       const errorMessage = error instanceof Error ? error.message : String(error);
       message.error(`操作失败: ${errorMessage}`);
     }
-  }, [adminOverrideMode, currentUser, modalType, reason, selectedRowKeys]);
+  }, [adminOverrideMode, currentUser, modalType, reason, selectedRowKeys, queryClient]);
 
-  // M4修复：loadMaterials参数使用明确的MaterialSearchParams类型
-  const loadMaterials = useCallback(async (params: MaterialSearchParams) => {
-    try {
-      const result = await materialApi.listMaterials({
-        machine_code: params.machine_code,
-        limit: 1000,
-        offset: 0,
-      });
+  // C8修复：基于缓存数据进行前端筛选，而不是每次调用API
+  const loadMaterials = useCallback(
+    async (params: MaterialSearchParams) => {
+      try {
+        // 如果缓存数据加载中或出错，返回空数据
+        if (isLoadingMaterials) {
+          return { data: [], success: true, total: 0 };
+        }
+        if (materialsError) {
+          const errorMessage =
+            materialsError instanceof Error ? materialsError.message : String(materialsError);
+          message.error(`加载失败: ${errorMessage}`);
+          return { data: [], success: false, total: 0 };
+        }
 
-      let filtered = result;
+        // 基于缓存数据进行前端筛选
+        let filtered = allMaterials;
 
-      if (params.sched_state) {
-        const want = normalizeSchedState(params.sched_state);
-        filtered = filtered.filter((m: Material) => normalizeSchedState(m.sched_state) === want);
-      }
-      if (params.urgent_level) {
-        filtered = filtered.filter((m: Material) => m.urgent_level === params.urgent_level);
-      }
-      if (params.manual_urgent_flag !== undefined) {
-        const flag = params.manual_urgent_flag === 'true' || params.manual_urgent_flag === true;
-        filtered = filtered.filter((m: Material) => m.manual_urgent_flag === flag);
-      }
-      if (params.lock_flag !== undefined) {
-        const flag = params.lock_flag === 'true' || params.lock_flag === true;
-        filtered = filtered.filter((m: Material) => m.lock_flag === flag);
-      }
-      if (params.material_id) {
-        filtered = filtered.filter((m: Material) =>
-          m.material_id.toLowerCase().includes(params.material_id!.toLowerCase())
-        );
-      }
-      if (params.steel_mark) {
-        filtered = filtered.filter((m: Material) =>
-          String(m.steel_mark ?? '').toLowerCase().includes(String(params.steel_mark).toLowerCase())
-        );
-      }
+        if (params.machine_code) {
+          filtered = filtered.filter((m: Material) => m.current_machine === params.machine_code);
+        }
+        if (params.sched_state) {
+          const want = normalizeSchedState(params.sched_state);
+          filtered = filtered.filter((m: Material) => normalizeSchedState(m.sched_state) === want);
+        }
+        if (params.urgent_level) {
+          filtered = filtered.filter((m: Material) => m.urgent_level === params.urgent_level);
+        }
+        if (params.manual_urgent_flag !== undefined) {
+          const flag = params.manual_urgent_flag === 'true' || params.manual_urgent_flag === true;
+          filtered = filtered.filter((m: Material) => m.manual_urgent_flag === flag);
+        }
+        if (params.lock_flag !== undefined) {
+          const flag = params.lock_flag === 'true' || params.lock_flag === true;
+          filtered = filtered.filter((m: Material) => m.lock_flag === flag);
+        }
+        if (params.material_id) {
+          filtered = filtered.filter((m: Material) =>
+            m.material_id.toLowerCase().includes(params.material_id!.toLowerCase())
+          );
+        }
+        if (params.steel_mark) {
+          filtered = filtered.filter((m: Material) =>
+            String(m.steel_mark ?? '')
+              .toLowerCase()
+              .includes(String(params.steel_mark).toLowerCase())
+          );
+        }
 
-      return { data: filtered, success: true, total: filtered.length };
-    } catch (error) {
-      // M4修复：使用unknown替代any，通过类型守卫安全访问error属性
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      message.error(`加载失败: ${errorMessage}`);
-      return { data: [], success: false, total: 0 };
-    }
-  }, []);
+        return { data: filtered, success: true, total: filtered.length };
+      } catch (error) {
+        // M4修复：使用unknown替代any，通过类型守卫安全访问error属性
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        message.error(`筛选失败: ${errorMessage}`);
+        return { data: [], success: false, total: 0 };
+      }
+    },
+    [allMaterials, isLoadingMaterials, materialsError]
+  );
 
   // 表格列配置
   const columns = useMemo(
