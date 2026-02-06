@@ -14,8 +14,8 @@ import {
   computeCapacityMap,
   computeDailyTotals,
   makeRetrospectiveKey,
-} from '../comparison/utils';
-import type { Version } from '../comparison/types';
+} from './utils';
+import type { Version } from './types';
 
 describe('comparison/utils', () => {
   describe('normalizeDateOnly', () => {

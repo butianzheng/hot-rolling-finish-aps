@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ExportContext } from '../plan-management/types';
+import type { ExportContext } from './types';
 import type { BackendVersionComparisonResult } from '../../types/comparison';
 import {
   exportCapacityDelta,
@@ -11,7 +11,7 @@ import {
   exportRetrospectiveReport,
   exportReportMarkdown,
   exportReportHTML,
-} from '../plan-management/exportHelpers';
+} from './exportHelpers';
 
 // Mock 导出工具
 vi.mock('../../utils/exportUtils', () => ({
