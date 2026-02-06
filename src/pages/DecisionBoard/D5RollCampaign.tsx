@@ -454,76 +454,87 @@ interface SevereAlertCardProps {
   alert: RollCampaignAlert;
 }
 
-const SevereAlertCard: React.FC<SevereAlertCardProps> = ({ alert }) => {
-  const utilization = calculateUtilization(alert.currentTonnageT, alert.softLimitT);
-  const status = parseAlertLevel(alert.alertLevel);
+// M6修复：使用React.memo优化SevereAlertCard，避免不必要的重渲染
+const SevereAlertCard: React.FC<SevereAlertCardProps> = React.memo(
+  ({ alert }) => {
+    const utilization = calculateUtilization(alert.currentTonnageT, alert.softLimitT);
+    const status = parseAlertLevel(alert.alertLevel);
 
-  return (
-    <Card
-      size="small"
-      style={{
-        borderLeft: `4px solid ${ROLL_STATUS_COLORS[status]}`,
-      }}
-    >
-      <Space direction="vertical" style={{ width: '100%' }} size="small">
-        {/* 机组和状态 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Tag color="blue" style={{ fontSize: '14px', fontWeight: 'bold' }}>
-            {alert.machineCode}
-          </Tag>
-          <Tag
-            color={ROLL_STATUS_COLORS[status]}
-            icon={status === 'HARD_STOP' ? <StopOutlined /> : <WarningOutlined />}
-          >
-            {ROLL_STATUS_LABELS[status]}
-          </Tag>
-        </div>
-
-        {/* 吨位信息 */}
-        <Descriptions size="small" column={1} bordered>
-          <Descriptions.Item label="当前累积">
-            {alert.currentTonnageT.toFixed(3)}吨
-          </Descriptions.Item>
-          <Descriptions.Item label="软限制">
-            {alert.softLimitT.toFixed(3)}吨
-          </Descriptions.Item>
-          <Descriptions.Item label="硬限制">
-            {alert.hardLimitT.toFixed(3)}吨
-          </Descriptions.Item>
-          <Descriptions.Item label="计划换辊">
-            {alert.plannedChangeAt || '-'}
-          </Descriptions.Item>
-        </Descriptions>
-
-        {/* 利用率进度条 */}
-        <div>
-          <div style={{ fontSize: '12px', marginBottom: '4px' }}>利用率: {utilization}%</div>
-          <Progress
-            percent={utilization}
-            size="small"
-            strokeColor={utilization >= 100 ? '#ff4d4f' : '#faad14'}
-            status={utilization >= 100 ? 'exception' : 'normal'}
-          />
-        </div>
-
-        {/* 警报消息 */}
-        {alert.alertMessage && (
-          <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-            <ExclamationCircleOutlined style={{ marginRight: '4px' }} />
-            {alert.alertMessage}
+    return (
+      <Card
+        size="small"
+        style={{
+          borderLeft: `4px solid ${ROLL_STATUS_COLORS[status]}`,
+        }}
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="small">
+          {/* 机组和状态 */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Tag color="blue" style={{ fontSize: '14px', fontWeight: 'bold' }}>
+              {alert.machineCode}
+            </Tag>
+            <Tag
+              color={ROLL_STATUS_COLORS[status]}
+              icon={status === 'HARD_STOP' ? <StopOutlined /> : <WarningOutlined />}
+            >
+              {ROLL_STATUS_LABELS[status]}
+            </Tag>
           </div>
-        )}
 
-        {/* 预计触达软/硬 */}
-        {alert.estimatedSoftReachAt || alert.estimatedHardReachAt || alert.estimatedHardStopDate ? (
-          <div style={{ fontSize: '12px', color: '#1677ff' }}>
-            预计触达：软 {alert.estimatedSoftReachAt || '-'} / 硬 {alert.estimatedHardReachAt || alert.estimatedHardStopDate || '-'}
+          {/* 吨位信息 */}
+          <Descriptions size="small" column={1} bordered>
+            <Descriptions.Item label="当前累积">
+              {alert.currentTonnageT.toFixed(3)}吨
+            </Descriptions.Item>
+            <Descriptions.Item label="软限制">
+              {alert.softLimitT.toFixed(3)}吨
+            </Descriptions.Item>
+            <Descriptions.Item label="硬限制">
+              {alert.hardLimitT.toFixed(3)}吨
+            </Descriptions.Item>
+            <Descriptions.Item label="计划换辊">
+              {alert.plannedChangeAt || '-'}
+            </Descriptions.Item>
+          </Descriptions>
+
+          {/* 利用率进度条 */}
+          <div>
+            <div style={{ fontSize: '12px', marginBottom: '4px' }}>利用率: {utilization}%</div>
+            <Progress
+              percent={utilization}
+              size="small"
+              strokeColor={utilization >= 100 ? '#ff4d4f' : '#faad14'}
+              status={utilization >= 100 ? 'exception' : 'normal'}
+            />
           </div>
-        ) : null}
-      </Space>
-    </Card>
-  );
-};
+
+          {/* 警报消息 */}
+          {alert.alertMessage && (
+            <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
+              <ExclamationCircleOutlined style={{ marginRight: '4px' }} />
+              {alert.alertMessage}
+            </div>
+          )}
+
+          {/* 预计触达软/硬 */}
+          {alert.estimatedSoftReachAt || alert.estimatedHardReachAt || alert.estimatedHardStopDate ? (
+            <div style={{ fontSize: '12px', color: '#1677ff' }}>
+              预计触达：软 {alert.estimatedSoftReachAt || '-'} / 硬 {alert.estimatedHardReachAt || alert.estimatedHardStopDate || '-'}
+            </div>
+          ) : null}
+        </Space>
+      </Card>
+    );
+  },
+  // M6修复：自定义比较函数，仅在警报关键属性变化时重新渲染
+  (prev, next) =>
+    prev.alert.machineCode === next.alert.machineCode &&
+    prev.alert.currentTonnageT === next.alert.currentTonnageT &&
+    prev.alert.softLimitT === next.alert.softLimitT &&
+    prev.alert.hardLimitT === next.alert.hardLimitT &&
+    prev.alert.alertLevel === next.alert.alertLevel &&
+    prev.alert.alertMessage === next.alert.alertMessage
+);
 
 // ==========================================
 // 默认导出（用于React.lazy）

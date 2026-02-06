@@ -20,18 +20,20 @@ interface ProblemCardProps {
   onGoWorkbench: (problem: RiskProblem) => void;
 }
 
-export const ProblemCard: React.FC<ProblemCardProps> = ({
-  problem: p,
-  index,
-  entered,
-  compact,
-  onOpenDrilldown,
-  onGoWorkbench,
-}) => {
-  const { token } = theme.useToken();
-  const meta = severityMeta(p.severity);
-  const wb = workbenchMeta(p.workbenchTab);
-  const actionLabel = getActionLabel(p.workbenchTab);
+// M6修复：使用React.memo优化ProblemCard，避免不必要的重渲染
+export const ProblemCard: React.FC<ProblemCardProps> = React.memo(
+  ({
+    problem: p,
+    index,
+    entered,
+    compact,
+    onOpenDrilldown,
+    onGoWorkbench,
+  }) => {
+    const { token } = theme.useToken();
+    const meta = severityMeta(p.severity);
+    const wb = workbenchMeta(p.workbenchTab);
+    const actionLabel = getActionLabel(p.workbenchTab);
 
   return (
     <div
@@ -289,4 +291,12 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
       </div>
     </div>
   );
-};
+},
+// M6修复：自定义比较函数，仅在问题关键属性或状态变化时重新渲染
+(prev, next) =>
+  prev.problem.id === next.problem.id &&
+  prev.problem.severity === next.problem.severity &&
+  prev.problem.count === next.problem.count &&
+  prev.entered === next.entered &&
+  prev.compact === next.compact
+);

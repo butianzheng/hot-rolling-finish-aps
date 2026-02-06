@@ -595,68 +595,80 @@ interface OrderCardProps {
   isSelected: boolean;
 }
 
-const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, isSelected }) => {
-  return (
-    <Card
-      size="small"
-      hoverable
-      onClick={onClick}
-      style={{
-        marginBottom: '12px',
-        borderLeft: `4px solid ${URGENCY_LEVEL_COLORS[order.urgencyLevel]}`,
-        backgroundColor: isSelected ? '#e6f7ff' : undefined,
-        cursor: 'pointer',
-      }}
-    >
-      <Space direction="vertical" style={{ width: '100%' }} size="small">
-        {/* 订单号 */}
-        <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
-          {order.contractNo}
-        </div>
-
-        {/* 失败类型 */}
-        <Tag color={getFailTypeColor(order.failType)} style={{ margin: 0 }}>
-          {getFailTypeLabel(order.failType)}
-        </Tag>
-
-        {/* 到期信息 */}
-        <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-          <ClockCircleOutlined style={{ marginRight: '4px' }} />
-          {order.daysToDue}天后到期 ({order.dueDate})
-        </div>
-
-        {/* 完成率 */}
-        <div>
-          <div style={{ fontSize: '12px', marginBottom: '4px' }}>
-            完成率: {order.completionRate.toFixed(0)}%
+// M6修复：使用React.memo优化OrderCard，避免不必要的重渲染
+const OrderCard: React.FC<OrderCardProps> = React.memo(
+  ({ order, onClick, isSelected }) => {
+    return (
+      <Card
+        size="small"
+        hoverable
+        onClick={onClick}
+        style={{
+          marginBottom: '12px',
+          borderLeft: `4px solid ${URGENCY_LEVEL_COLORS[order.urgencyLevel]}`,
+          backgroundColor: isSelected ? '#e6f7ff' : undefined,
+          cursor: 'pointer',
+        }}
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="small">
+          {/* 订单号 */}
+          <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+            {order.contractNo}
           </div>
-          <Progress
-            percent={Math.round(order.completionRate)}
-            size="small"
-            showInfo={false}
-            strokeColor={
-              order.completionRate < 50
-                ? '#ff4d4f'
-                : order.completionRate < 80
-                ? '#faad14'
-                : '#52c41a'
-            }
-          />
-        </div>
 
-        {/* 重量信息 */}
-        <div style={{ fontSize: '12px' }}>
-          未排产: <span style={{ color: '#ff4d4f', fontWeight: 'bold' }}>{order.unscheduledWeightT.toFixed(3)}</span>吨 / 总计: {order.totalWeightT.toFixed(3)}吨
-        </div>
+          {/* 失败类型 */}
+          <Tag color={getFailTypeColor(order.failType)} style={{ margin: 0 }}>
+            {getFailTypeLabel(order.failType)}
+          </Tag>
 
-        {/* 机组 */}
-        <Tag color="blue" style={{ margin: 0 }}>
-          {order.machineCode}
-        </Tag>
-      </Space>
-    </Card>
-  );
-};
+          {/* 到期信息 */}
+          <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
+            <ClockCircleOutlined style={{ marginRight: '4px' }} />
+            {order.daysToDue}天后到期 ({order.dueDate})
+          </div>
+
+          {/* 完成率 */}
+          <div>
+            <div style={{ fontSize: '12px', marginBottom: '4px' }}>
+              完成率: {order.completionRate.toFixed(0)}%
+            </div>
+            <Progress
+              percent={Math.round(order.completionRate)}
+              size="small"
+              showInfo={false}
+              strokeColor={
+                order.completionRate < 50
+                  ? '#ff4d4f'
+                  : order.completionRate < 80
+                  ? '#faad14'
+                  : '#52c41a'
+              }
+            />
+          </div>
+
+          {/* 重量信息 */}
+          <div style={{ fontSize: '12px' }}>
+            未排产: <span style={{ color: '#ff4d4f', fontWeight: 'bold' }}>{order.unscheduledWeightT.toFixed(3)}</span>吨 / 总计: {order.totalWeightT.toFixed(3)}吨
+          </div>
+
+          {/* 机组 */}
+          <Tag color="blue" style={{ margin: 0 }}>
+            {order.machineCode}
+          </Tag>
+        </Space>
+      </Card>
+    );
+  },
+  // M6修复：自定义比较函数，仅在订单关键属性或选中状态变化时重新渲染
+  (prev, next) =>
+    prev.order.contractNo === next.order.contractNo &&
+    prev.order.completionRate === next.order.completionRate &&
+    prev.order.failType === next.order.failType &&
+    prev.order.urgencyLevel === next.order.urgencyLevel &&
+    prev.order.daysToDue === next.order.daysToDue &&
+    prev.order.unscheduledWeightT === next.order.unscheduledWeightT &&
+    prev.isSelected === next.isSelected
+);
 
 // ==========================================
 // 默认导出（用于React.lazy）
