@@ -177,8 +177,34 @@ export const D2OrderFailure: React.FC<D2OrderFailureProps> = ({ embedded, onOpen
     return groupedOrders[selectedUrgency];
   }, [groupedOrders, selectedUrgency]);
 
-  // 计算统计数据（基于当前筛选后的可见订单）
-  const stats = useMemo(() => {
+  // H7修复：区分全局统计和筛选视图统计，避免用户误解
+  // 全局统计（基于所有订单，不受筛选影响）
+  const globalStats = useMemo(() => {
+    if (!allOrders || allOrders.length === 0) {
+      return {
+        totalFailures: 0,
+        overdueCount: 0,
+        nearDueImpossibleCount: 0,
+        avgCompletionRate: 0,
+      };
+    }
+
+    const totalFailures = allOrders.length;
+    const overdueCount = allOrders.filter((o) => o.failType === 'Overdue').length;
+    const nearDueImpossibleCount = allOrders.filter((o) => o.failType === 'NearDueImpossible').length;
+    const avgCompletionRate =
+      allOrders.reduce((sum, o) => sum + o.completionRate, 0) / allOrders.length;
+
+    return {
+      totalFailures,
+      overdueCount,
+      nearDueImpossibleCount,
+      avgCompletionRate: Math.round(avgCompletionRate),
+    };
+  }, [allOrders]);
+
+  // 当前筛选视图统计（基于筛选后的订单）
+  const viewStats = useMemo(() => {
     if (!displayOrders || displayOrders.length === 0) {
       return {
         totalFailures: 0,
@@ -201,6 +227,9 @@ export const D2OrderFailure: React.FC<D2OrderFailureProps> = ({ embedded, onOpen
       avgCompletionRate: Math.round(avgCompletionRate),
     };
   }, [displayOrders]);
+
+  // H7修复：判断是否有筛选条件，用于决定是否显示筛选提示
+  const hasFilter = selectedUrgency !== 'ALL' || selectedFailType !== 'ALL';
 
   // ==========================================
   // 加载状态
@@ -338,48 +367,69 @@ export const D2OrderFailure: React.FC<D2OrderFailureProps> = ({ embedded, onOpen
         </div>
       )}
 
-      {/* 统计卡片 */}
+      {/* H7修复：统计卡片始终显示全局数据，避免筛选后的误导 */}
+      {/* 当有筛选时，在标题中添加"（全局）"说明，并在下方显示当前筛选视图的统计 */}
       <Row gutter={embedded ? 12 : 16} style={{ marginBottom: embedded ? 12 : 24 }}>
         <Col span={6}>
           <Card size={embedded ? 'small' : undefined}>
             <Statistic
-              title="失败订单总数"
-              value={stats.totalFailures}
+              title={hasFilter ? "失败订单总数（全局）" : "失败订单总数"}
+              value={globalStats.totalFailures}
               prefix={<ExclamationCircleOutlined />}
-              valueStyle={{ color: stats.totalFailures > 0 ? '#ff4d4f' : '#52c41a' }}
+              valueStyle={{ color: globalStats.totalFailures > 0 ? '#ff4d4f' : '#52c41a' }}
             />
+            {hasFilter && (
+              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 8 }}>
+                当前筛选: {viewStats.totalFailures}
+              </div>
+            )}
           </Card>
         </Col>
         <Col span={6}>
           <Card size={embedded ? 'small' : undefined}>
             <Statistic
-              title="超期未完成"
-              value={stats.overdueCount}
+              title={hasFilter ? "超期未完成（全局）" : "超期未完成"}
+              value={globalStats.overdueCount}
               prefix={<WarningOutlined />}
-              valueStyle={{ color: stats.overdueCount > 0 ? '#ff4d4f' : '#52c41a' }}
+              valueStyle={{ color: globalStats.overdueCount > 0 ? '#ff4d4f' : '#52c41a' }}
             />
+            {hasFilter && (
+              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 8 }}>
+                当前筛选: {viewStats.overdueCount}
+              </div>
+            )}
           </Card>
         </Col>
         <Col span={6}>
           <Card size={embedded ? 'small' : undefined}>
             <Statistic
-              title="临期无法完成"
-              value={stats.nearDueImpossibleCount}
+              title={hasFilter ? "临期无法完成（全局）" : "临期无法完成"}
+              value={globalStats.nearDueImpossibleCount}
               prefix={<ClockCircleOutlined />}
-              valueStyle={{ color: stats.nearDueImpossibleCount > 0 ? '#faad14' : '#52c41a' }}
+              valueStyle={{ color: globalStats.nearDueImpossibleCount > 0 ? '#faad14' : '#52c41a' }}
             />
+            {hasFilter && (
+              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 8 }}>
+                当前筛选: {viewStats.nearDueImpossibleCount}
+              </div>
+            )}
           </Card>
         </Col>
         <Col span={6}>
           <Card size={embedded ? 'small' : undefined}>
             <Statistic
-              title="平均完成率"
-              value={stats.avgCompletionRate}
+              title={hasFilter ? "平均完成率（全局）" : "平均完成率"}
+              value={globalStats.avgCompletionRate}
               suffix="%"
               valueStyle={{
-                color: stats.avgCompletionRate < 50 ? '#ff4d4f' : stats.avgCompletionRate < 80 ? '#faad14' : '#52c41a',
+                color: globalStats.avgCompletionRate < 50 ? '#ff4d4f' : globalStats.avgCompletionRate < 80 ? '#faad14' : '#52c41a',
               }}
             />
+            {hasFilter && (
+              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 8 }}>
+                当前筛选: {viewStats.avgCompletionRate}%
+              </div>
+            )}
           </Card>
         </Col>
       </Row>
