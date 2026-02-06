@@ -2,8 +2,9 @@
  * 配置筛选栏
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button, Card, Input, Select, Space } from 'antd';
+import { useDebounce } from '../../hooks/useDebounce';
 
 const { Option } = Select;
 
@@ -22,13 +23,29 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   onScopeTypeChange,
   onClearFilters,
 }) => {
+  // M3修复：添加防抖优化，减少搜索框频繁触发筛选
+  const [localSearchText, setLocalSearchText] = useState(searchText);
+  const debouncedSearchText = useDebounce(localSearchText, 400);
+
+  // 同步外部searchText变化到本地状态
+  React.useEffect(() => {
+    setLocalSearchText(searchText);
+  }, [searchText]);
+
+  // 当防抖后的值变化时，触发外部回调
+  React.useEffect(() => {
+    if (debouncedSearchText !== searchText) {
+      onSearchTextChange(debouncedSearchText);
+    }
+  }, [debouncedSearchText, onSearchTextChange, searchText]);
+
   return (
     <Card style={{ marginBottom: 16 }}>
       <Space wrap>
         <Input
           placeholder="搜索配置键、值或作用域ID"
-          value={searchText}
-          onChange={(e) => onSearchTextChange(e.target.value)}
+          value={localSearchText}
+          onChange={(e) => setLocalSearchText(e.target.value)}
           style={{ width: 250 }}
           allowClear
         />
