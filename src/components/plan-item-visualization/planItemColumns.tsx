@@ -5,7 +5,7 @@
 import { Button, Space, Tag, Tooltip } from 'antd';
 import { DragOutlined, HolderOutlined, LockOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { formatWeight } from '../../utils/formatters';
+import { formatNumber, formatWeight } from '../../utils/formatters';
 import { urgentLevelColors, sourceTypeLabels, type PlanItem } from './types';
 
 export interface PlanItemColumnsOptions {
@@ -44,7 +44,7 @@ export function createPlanItemColumns(options: PlanItemColumnsOptions): ColumnsT
       ),
     },
     {
-      title: '材料ID',
+      title: '材料编号',
       dataIndex: 'material_id',
       key: 'material_id',
       width: 150,
@@ -61,24 +61,24 @@ export function createPlanItemColumns(options: PlanItemColumnsOptions): ColumnsT
       width: 100,
     },
     {
-      title: '厚度(mm)',
+      title: '厚度（毫米）',
       dataIndex: 'thickness_mm',
       key: 'thickness_mm',
       width: 100,
       align: 'right',
       sorter: (a, b) => Number(a.thickness_mm ?? 0) - Number(b.thickness_mm ?? 0),
       render: (value: number | null | undefined) =>
-        value == null || !Number.isFinite(Number(value)) ? '-' : Number(value).toFixed(2),
+        value == null || !Number.isFinite(Number(value)) ? '-' : formatNumber(Number(value), 2, { useGrouping: false }),
     },
     {
-      title: '宽度(mm)',
+      title: '宽度（毫米）',
       dataIndex: 'width_mm',
       key: 'width_mm',
       width: 100,
       align: 'right',
       sorter: (a, b) => Number(a.width_mm ?? 0) - Number(b.width_mm ?? 0),
       render: (value: number | null | undefined) =>
-        value == null || !Number.isFinite(Number(value)) ? '-' : Number(value).toFixed(2),
+        value == null || !Number.isFinite(Number(value)) ? '-' : formatNumber(Number(value), 2, { useGrouping: false }),
     },
     {
       title: '吨位',
@@ -112,10 +112,10 @@ export function createPlanItemColumns(options: PlanItemColumnsOptions): ColumnsT
         <Tag color={urgentLevelColors[level] || 'default'}>{level}</Tag>
       ),
       filters: [
-        { text: 'L3-超紧急', value: 'L3' },
-        { text: 'L2-紧急', value: 'L2' },
-        { text: 'L1-较紧急', value: 'L1' },
-        { text: 'L0-正常', value: 'L0' },
+        { text: '三级-超紧急', value: 'L3' },
+        { text: '二级-紧急', value: 'L2' },
+        { text: '一级-较紧急', value: 'L1' },
+        { text: '常规-正常', value: 'L0' },
       ],
       onFilter: (value, record) => record.urgent_level === value,
     },

@@ -71,7 +71,7 @@ export const BatchAdjustModal: React.FC<BatchAdjustModalProps> = ({
       onClose();
       onUpdated?.();
     } catch (e: any) {
-      console.error('[BatchAdjustModal] update failed:', e);
+      console.error('【批量调整弹窗】更新失败：', e);
       message.error(e?.message || '批量调整失败');
     } finally {
       setSubmitting(false);

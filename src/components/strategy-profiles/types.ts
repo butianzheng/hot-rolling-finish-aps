@@ -36,7 +36,7 @@ export const BASE_STRATEGY_LABEL: Record<string, string> = {
 
 export const DEFAULT_PRESETS: StrategyPresetRow[] = [
   { strategy: 'balanced', title: '均衡方案', description: '在交付/产能/库存之间保持均衡' },
-  { strategy: 'urgent_first', title: '紧急优先', description: '优先保障 L3/L2 紧急订单' },
+  { strategy: 'urgent_first', title: '紧急优先', description: '优先保障 三级/二级紧急订单' },
   { strategy: 'capacity_first', title: '产能优先', description: '优先提升产能利用率，减少溢出' },
   { strategy: 'cold_stock_first', title: '冷料消化', description: '优先消化冷料/压库物料' },
 ];

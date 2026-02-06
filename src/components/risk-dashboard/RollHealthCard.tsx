@@ -8,8 +8,15 @@ import { ToolOutlined } from '@ant-design/icons';
 import { FONT_FAMILIES } from '../../theme';
 import type { RollCampaignHealth } from '../../types/dashboard';
 import { getRollStatusColor } from './types';
+import { formatNumber, formatPercent } from '../../utils/formatters';
 
 const { Title, Text } = Typography;
+
+const rollStatusTextMap: Record<string, string> = {
+  healthy: '健康',
+  warning: '预警',
+  critical: '严重',
+};
 
 export interface RollHealthCardProps {
   roll: RollCampaignHealth;
@@ -25,7 +32,7 @@ export const RollHealthCard: React.FC<RollHealthCardProps> = ({ roll }) => {
             轧辊健康度 - {roll.machineCode}
           </Title>
           <Tag color={getRollStatusColor(roll.status)}>
-            {roll.status.toUpperCase()}
+            {rollStatusTextMap[roll.status] || roll.status}
           </Tag>
         </div>
 
@@ -40,9 +47,9 @@ export const RollHealthCard: React.FC<RollHealthCardProps> = ({ roll }) => {
                 color: getRollStatusColor(roll.status),
               }}
             >
-              {roll.currentTonnage.toFixed(3)}
+              {formatNumber(roll.currentTonnage, 3)}
             </Text>
-            <Text type="secondary">/ {roll.threshold.toFixed(3)} 吨</Text>
+            <Text type="secondary">/ {formatNumber(roll.threshold, 3)} 吨</Text>
           </div>
         </div>
 
@@ -50,13 +57,13 @@ export const RollHealthCard: React.FC<RollHealthCardProps> = ({ roll }) => {
           percent={(roll.currentTonnage / roll.threshold) * 100}
           strokeColor={getRollStatusColor(roll.status)}
           status={roll.status === 'critical' ? 'exception' : 'active'}
-          format={(percent) => `${percent?.toFixed(2)}%`}
+          format={(percent) => formatPercent(percent == null ? undefined : percent)}
         />
 
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <Statistic
             title="距离更换"
-            value={(roll.threshold - roll.currentTonnage).toFixed(3)}
+            value={formatNumber(roll.threshold - roll.currentTonnage, 3)}
             suffix="吨"
             valueStyle={{ fontSize: 20, color: getRollStatusColor(roll.status) }}
           />

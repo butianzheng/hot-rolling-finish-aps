@@ -175,7 +175,7 @@ export function useCapacityCalendar(
         );
         return data || [];
       } catch (e: any) {
-        console.error('[CapacityCalendar] query failed:', e);
+        console.error('【产能日历】查询失败：', e);
         message.error(e?.message || '加载产能日历数据失败');
         throw e;
       }

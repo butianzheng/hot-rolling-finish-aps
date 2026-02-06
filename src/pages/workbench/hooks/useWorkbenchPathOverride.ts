@@ -94,7 +94,7 @@ export function useWorkbenchPathOverride(params: {
         // 使用统一的 queryKey 刷新
         await queryClient.invalidateQueries({ queryKey: workbenchQueryKeys.all });
       } catch (e: unknown) {
-        console.error('[Workbench] recalcAfterPathOverride failed:', e);
+        console.error('【工作台】路径放行后重算失败：', e);
         message.error(getErrorMessage(e) || '重算失败');
       } finally {
         setRecalculating(false);

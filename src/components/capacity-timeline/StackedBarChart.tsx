@@ -7,6 +7,7 @@ import { Tooltip } from 'antd';
 import { URGENCY_COLORS, ROLL_CHANGE_THRESHOLDS } from '../../theme';
 import type { CapacityTimelineData } from '../../types/capacity';
 import type { SegmentWithWidth } from './types';
+import { formatWeight } from '../../utils/formatters';
 
 export interface StackedBarChartProps {
   data: CapacityTimelineData;
@@ -146,7 +147,7 @@ export const StackedBarChart: React.FC<StackedBarChartProps> = ({
               title={
                 <div>
                   <div style={{ fontWeight: 'bold' }}>{seg.urgencyLevel}</div>
-                  <div>吨位: {seg.tonnage.toFixed(3)}t</div>
+                  <div>吨位：{formatWeight(seg.tonnage)}</div>
                   <div>材料数: {seg.materialCount} 件</div>
                 </div>
               }

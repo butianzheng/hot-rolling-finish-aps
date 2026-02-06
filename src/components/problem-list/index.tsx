@@ -71,7 +71,7 @@ const ProblemList: React.FC<ProblemListProps> = ({ loading, problems, onOpenDril
             onChange={(v) => setScope(v as 'ALL' | 'P0_P1')}
             options={[
               { label: '全部', value: 'ALL' },
-              { label: '仅 P0/P1', value: 'P0_P1' },
+              { label: '仅高优问题', value: 'P0_P1' },
             ]}
           />
         </Space>

@@ -99,8 +99,7 @@ const MaterialImport: React.FC = () => {
         材料导入
       </Title>
       <Paragraph type="secondary" style={{ marginTop: 8 }}>
-        当前导入通道基于后端 MaterialImporter：CSV 解析 → 字段映射 → 清洗/派生 → DQ 校验 → 冲突入队 →
-        落库。
+        当前导入流程：CSV 解析 → 字段映射 → 清洗与派生 → 数据质量校验 → 冲突入队 → 落库。
       </Paragraph>
 
       {!isTauriRuntime && (
@@ -108,7 +107,7 @@ const MaterialImport: React.FC = () => {
           type="warning"
           showIcon
           message="当前运行环境不支持材料导入"
-          description="材料导入依赖 Tauri 桌面端的文件选择与本地文件读取能力，请在 Tauri 窗口中使用该功能。"
+          description="材料导入依赖桌面端文件选择与本地文件读取能力，请在桌面窗口中使用该功能。"
           style={{ marginBottom: 16 }}
         />
       )}

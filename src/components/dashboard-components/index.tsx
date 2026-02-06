@@ -60,7 +60,7 @@ const Dashboard: React.FC = () => {
       {/* 数据表格 */}
       <Row gutter={16}>
         <Col span={12}>
-          <Card title="订单失败集合 (D2)" variant="borderless">
+          <Card title="订单失败集合（维度二）" variant="borderless">
             <Table
               columns={orderFailureColumns}
               dataSource={state.orderFailures}
@@ -82,7 +82,7 @@ const Dashboard: React.FC = () => {
           </Card>
         </Col>
         <Col span={12}>
-          <Card title="冷料压库分桶 (D3)" variant="borderless">
+          <Card title="冷料压库分桶（维度三）" variant="borderless">
             <Table
               columns={coldStockColumns}
               dataSource={state.coldStockBuckets}

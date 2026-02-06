@@ -19,6 +19,7 @@ import { useActiveVersionId } from '../../stores/use-global-store';
 import { BottleneckHeatmap } from '../../components/charts/BottleneckHeatmap';
 import { EmptyState } from '../../components/EmptyState';
 import type { ReasonItem, BottleneckType } from '../../types/decision';
+import { formatNumber, formatWeight } from '../../utils/formatters';
 
 // ==========================================
 // 堵塞类型颜色映射
@@ -38,6 +39,14 @@ const BOTTLENECK_LEVEL_COLORS = {
   HIGH: '#faad14',
   CRITICAL: '#ff4d4f',
 } as const;
+
+const BOTTLENECK_LEVEL_LABELS: Record<keyof typeof BOTTLENECK_LEVEL_COLORS, string> = {
+  NONE: '无堵塞',
+  LOW: '轻度提醒',
+  MEDIUM: '中度提醒',
+  HIGH: '堵塞',
+  CRITICAL: '严重堵塞',
+};
 
 // ==========================================
 // 主组件
@@ -177,7 +186,7 @@ export const D4Bottleneck: React.FC<D4BottleneckProps> = ({ embedded, onOpenDril
             D4决策：机组堵塞矩阵
           </h2>
           <p style={{ color: '#8c8c8c', marginBottom: 16 }}>
-            展示未来{selectedDays}天各机组的堵塞/提醒情况（仅 HIGH/CRITICAL 视为堵塞）
+            展示未来{selectedDays}天各机组的堵塞/提醒情况（仅高等级与严重等级视为堵塞）
           </p>
 
           <Space>
@@ -215,7 +224,7 @@ export const D4Bottleneck: React.FC<D4BottleneckProps> = ({ embedded, onOpenDril
         <Col span={6}>
           <Card size={embedded ? 'small' : undefined}>
             <Statistic
-              title="堵塞点位(HIGH/CRITICAL)"
+              title="堵塞点位（高等级/严重）"
               value={stats.highBottleneckCount}
               suffix={`/ ${data?.items.length || 0}`}
               prefix={<WarningOutlined />}
@@ -258,7 +267,7 @@ export const D4Bottleneck: React.FC<D4BottleneckProps> = ({ embedded, onOpenDril
           <Space>
             <InfoCircleOutlined />
             <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-              LOW/MEDIUM 为提醒，点击单元格查看详细原因
+              低等级/中等级为提醒，点击单元格查看详细原因
             </span>
           </Space>
         }
@@ -281,29 +290,29 @@ export const D4Bottleneck: React.FC<D4BottleneckProps> = ({ embedded, onOpenDril
           size={embedded ? 'small' : undefined}
           extra={
             <Tag color={BOTTLENECK_LEVEL_COLORS[selectedPointData.bottleneckLevel]}>
-              {selectedPointData.bottleneckLevel} - {selectedPointData.bottleneckScore.toFixed(2)}
+              {BOTTLENECK_LEVEL_LABELS[selectedPointData.bottleneckLevel]} - {formatNumber(selectedPointData.bottleneckScore, 2)}
             </Tag>
           }
         >
           {/* 基础信息 */}
           <Descriptions column={4} bordered size="small" style={{ marginBottom: '16px' }}>
             <Descriptions.Item label="堵塞分数">
-              {selectedPointData.bottleneckScore.toFixed(2)}
+              {formatNumber(selectedPointData.bottleneckScore, 2)}
             </Descriptions.Item>
             <Descriptions.Item label="容量利用率">
-              {selectedPointData.capacityUtilPct.toFixed(2)}%
+              {formatNumber(selectedPointData.capacityUtilPct, 2)}%
             </Descriptions.Item>
             <Descriptions.Item label="已排材料数">
               {selectedPointData.scheduledMaterialCount ?? 0}
             </Descriptions.Item>
             <Descriptions.Item label="已排重量">
-              {(selectedPointData.scheduledWeightT ?? 0).toFixed(3)} 吨
+              {formatWeight(selectedPointData.scheduledWeightT ?? 0)}
             </Descriptions.Item>
             <Descriptions.Item label="未排材料数(≤当日)">
               {selectedPointData.pendingMaterialCount}
             </Descriptions.Item>
             <Descriptions.Item label="未排重量(≤当日)">
-              {selectedPointData.pendingWeightT.toFixed(3)} 吨
+              {formatWeight(selectedPointData.pendingWeightT)}
             </Descriptions.Item>
           </Descriptions>
 
@@ -366,7 +375,7 @@ const REASON_CODE_LABELS: Record<string, string> = {
 };
 
 function getReasonCodeLabel(code: string): string {
-  return REASON_CODE_LABELS[code] || code;
+  return REASON_CODE_LABELS[code] || '其他原因';
 }
 
 const ReasonsTable: React.FC<ReasonsTableProps> = ({ reasons }) => {
@@ -394,7 +403,7 @@ const ReasonsTable: React.FC<ReasonsTableProps> = ({ reasons }) => {
       dataIndex: 'weight',
       key: 'weight',
       width: 100,
-      render: (weight: number) => <span>{(weight * 100).toFixed(2)}%</span>,
+      render: (weight: number) => <span>{formatNumber(weight * 100, 2)}%</span>,
       sorter: (a, b) => a.weight - b.weight,
       defaultSortOrder: 'descend',
     },

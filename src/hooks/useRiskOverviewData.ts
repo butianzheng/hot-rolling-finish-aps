@@ -11,6 +11,7 @@ import { useGlobalKPI } from './useGlobalKPI';
 import { parseAlertLevel } from '../types/decision';
 import type { UrgencyLevel } from '../types/decision';
 import type { GlobalKPI } from '../types/kpi';
+import { formatNumber } from '../utils/formatters';
 import type {
   BottleneckPoint,
   CapacityOpportunity,
@@ -74,8 +75,8 @@ const severityOrder: Record<ProblemSeverity, number> = { P0: 0, P1: 1, P2: 2, P3
 
 function formatTonnage(t: number): string {
   const v = Number.isFinite(t) ? t : 0;
-  if (Math.abs(v) >= 1000) return `${(v / 1000).toFixed(3)}kt`;
-  return `${v.toFixed(3)}t`;
+  if (Math.abs(v) >= 1000) return `${formatNumber(v / 1000, 3)}千吨`;
+  return `${formatNumber(v, 3)}吨`;
 }
 
 function getWorstRiskDay(days: DaySummary[]): DaySummary | null {
@@ -154,7 +155,7 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
       out.push({
         id: 'l3-order-failures',
         severity: 'P0',
-        title: 'L3 紧急订单未满足',
+        title: '三级紧急订单未满足',
         count: l3Failures.length,
         detail: earliestDueDate ? `最早交期 ${earliestDueDate}` : undefined,
         impact: [
@@ -179,7 +180,7 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
         id: 'worst-risk-day',
         severity: worstSeverity ?? 'P1',
         title: `最高风险日 ${worstRiskDay.planDate}`,
-        detail: `风险 ${worstRiskDay.riskScore.toFixed(1)} | 利用率 ${worstRiskDay.capacityUtilPct.toFixed(1)}% | 超载 ${formatTonnage(worstRiskDay.overloadWeightT)}`,
+        detail: `风险 ${formatNumber(worstRiskDay.riskScore, 1)} | 利用率 ${formatNumber(worstRiskDay.capacityUtilPct, 1)}% | 超载 ${formatTonnage(worstRiskDay.overloadWeightT)}`,
         impact: topReason ? `首因：${topReason}` : undefined,
         timeHint: machines.length > 0 ? `涉及机组：${machines.slice(0, 3).join(', ')}${machines.length > 3 ? '…' : ''}` : undefined,
         drilldown: { kind: 'risk', planDate: worstRiskDay.planDate },
@@ -201,7 +202,7 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
         title: '产能/结构堵塞预警',
         count: severeBottlenecks.length,
         detail: top
-          ? `${top.machineCode} ${top.planDate} 分数 ${top.bottleneckScore.toFixed(0)} | 利用率 ${top.capacityUtilPct.toFixed(1)}%`
+          ? `${top.machineCode} ${top.planDate} 分数 ${formatNumber(top.bottleneckScore, 0)} | 利用率 ${formatNumber(top.capacityUtilPct, 1)}%`
           : undefined,
         impact: top ? `未排材料 ${top.pendingMaterialCount} 件 · ${formatTonnage(top.pendingWeightT)}` : undefined,
         timeHint: topReason ? `首因：${topReason}` : undefined,
@@ -222,8 +223,8 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
         severity: 'P2',
         title: '冷坨高压力积压',
         count: highPressureCount,
-        detail: top ? `${top.machineCode} ${top.ageBin} 压力 ${top.pressureScore.toFixed(0)} | ${top.count} 件` : undefined,
-        impact: top ? `平均库龄 ${top.avgAgeDays.toFixed(1)} 天 · 最大 ${top.maxAgeDays} 天` : undefined,
+        detail: top ? `${top.machineCode} ${top.ageBin} 压力 ${formatNumber(top.pressureScore, 0)} | ${top.count} 件` : undefined,
+        impact: top ? `平均库龄 ${formatNumber(top.avgAgeDays, 1)} 天 · 最大 ${top.maxAgeDays} 天` : undefined,
         timeHint: top?.structureGap && top.structureGap !== '无' ? `结构缺口：${top.structureGap}` : undefined,
         drilldown: { kind: 'coldStock' },
         workbenchTab: 'materials',

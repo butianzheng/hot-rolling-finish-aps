@@ -20,6 +20,7 @@ import { EmptyState } from '../../components/EmptyState';
 import type { DrilldownSpec } from '../../hooks/useRiskOverviewData';
 import type { DaySummary, ReasonItem } from '../../types/decision';
 import { RISK_LEVEL_COLORS, RISK_LEVEL_LABELS, isHighRiskDay } from '../../types/decision/d1-day-summary';
+import { formatNumber } from '../../utils/formatters';
 
 // ==========================================
 // 主组件
@@ -190,12 +191,12 @@ export const D1RiskHeatmap: React.FC<D1RiskHeatmapProps> = ({ embedded, onOpenDr
           <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="最高风险日"
-              value={stats.maxRiskDay?.planDate || 'N/A'}
+              value={stats.maxRiskDay?.planDate || '暂无'}
               valueStyle={{ fontSize: '20px' }}
               suffix={
                 stats.maxRiskDay && (
                   <Tag color={RISK_LEVEL_COLORS[stats.maxRiskDay.riskLevel]}>
-                    {stats.maxRiskDay.riskScore.toFixed(0)}
+                    {formatNumber(stats.maxRiskDay.riskScore, 2)}
                   </Tag>
                 )
               }
@@ -248,7 +249,7 @@ export const D1RiskHeatmap: React.FC<D1RiskHeatmapProps> = ({ embedded, onOpenDr
           size={embedded ? 'small' : undefined}
           extra={
             <Tag color={RISK_LEVEL_COLORS[selectedDayData.riskLevel]}>
-              {RISK_LEVEL_LABELS[selectedDayData.riskLevel] || selectedDayData.riskLevel} - {selectedDayData.riskScore.toFixed(2)}
+              {RISK_LEVEL_LABELS[selectedDayData.riskLevel] || selectedDayData.riskLevel} - {formatNumber(selectedDayData.riskScore, 2)}
             </Tag>
           }
         >
@@ -331,7 +332,7 @@ const REASON_CODE_LABELS: Record<string, string> = {
 };
 
 function getReasonCodeLabel(code: string): string {
-  return REASON_CODE_LABELS[code] || code;
+  return REASON_CODE_LABELS[code] || '其他原因';
 }
 
 const ReasonsTable: React.FC<ReasonsTableProps> = ({ reasons }) => {
@@ -360,7 +361,7 @@ const ReasonsTable: React.FC<ReasonsTableProps> = ({ reasons }) => {
       key: 'weight',
       width: 100,
       render: (weight: number) => (
-        <span>{(weight * 100).toFixed(2)}%</span>
+        <span>{formatNumber(weight * 100, 2)}%</span>
       ),
       sorter: (a, b) => a.weight - b.weight,
       defaultSortOrder: 'descend',

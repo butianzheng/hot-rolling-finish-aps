@@ -9,6 +9,7 @@ import dayjs from 'dayjs';
 import { useCapacityCalendar, CAPACITY_COLORS } from '../../hooks/useCapacityCalendar';
 import type { ViewMode } from './types';
 import type { CapacityPoolCalendarData } from '../../api/ipcSchemas/machineConfigSchemas';
+import { formatNumber } from '../../utils/formatters';
 
 const { Text } = Typography;
 
@@ -175,13 +176,13 @@ export const CapacityCalendar: React.FC<CapacityCalendarProps> = ({
             <div style={{ fontSize: 12, lineHeight: 1.6 }}>
               <strong>{dateStr}</strong>
               <br />
-              利用率: <strong>{(utilization * 100).toFixed(2)}%</strong>
+              利用率: <strong>{formatNumber(utilization * 100, 2)}%</strong>
               <br />
-              已用: {data.used_capacity_t.toFixed(3)}t
+              已用: {formatNumber(data.used_capacity_t, 3)}吨
               <br />
-              目标: {data.target_capacity_t.toFixed(3)}t
+              目标: {formatNumber(data.target_capacity_t, 3)}吨
               <br />
-              极限: {data.limit_capacity_t.toFixed(3)}t
+              极限: {formatNumber(data.limit_capacity_t, 3)}吨
             </div>
           }
         >
@@ -253,19 +254,19 @@ export const CapacityCalendar: React.FC<CapacityCalendarProps> = ({
       {/* 数据统计 */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
         <Tag color="blue" style={{ margin: 0, fontSize: 11, padding: '0 6px' }}>
-          总目标: {statistics.totalTarget.toFixed(3)}t
+          总目标：{formatNumber(statistics.totalTarget, 3)}吨
         </Tag>
         <Tag color="cyan" style={{ margin: 0, fontSize: 11, padding: '0 6px' }}>
-          总已用: {statistics.totalUsed.toFixed(3)}t
+          总已用：{formatNumber(statistics.totalUsed, 3)}吨
         </Tag>
         <Tag
           color={statistics.totalRemaining > 0 ? 'green' : 'red'}
           style={{ margin: 0, fontSize: 11, padding: '0 6px' }}
         >
-          总剩余: {statistics.totalRemaining.toFixed(3)}t
+          总剩余：{formatNumber(statistics.totalRemaining, 3)}吨
         </Tag>
         <Tag color="purple" style={{ margin: 0, fontSize: 11, padding: '0 6px' }}>
-          平均利用率: {(statistics.avgUtilization * 100).toFixed(2)}%
+          平均利用率：{formatNumber(statistics.avgUtilization * 100, 2)}%
         </Tag>
         {statistics.overLimitCount > 0 && (
           <Tag color="red" style={{ margin: 0, fontSize: 11, padding: '0 6px' }}>
@@ -286,7 +287,7 @@ export const CapacityCalendar: React.FC<CapacityCalendarProps> = ({
         }}
       >
         <Text type="secondary" style={{ fontSize: 11, fontWeight: 500, flexShrink: 0 }}>
-          图例:
+          图例：
         </Text>
         <span style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
           <span style={{ width: 14, height: 14, backgroundColor: CAPACITY_COLORS.充裕, borderRadius: 2 }} />

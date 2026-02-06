@@ -140,8 +140,8 @@ export const CellDetailModal: React.FC<CellDetailModalProps> = ({
                 <th style={{ width: 80, padding: '8px 6px' }}>序号</th>
                 <th style={{ width: 90, padding: '8px 6px' }}>紧急</th>
                 <th style={{ width: 120, padding: '8px 6px' }}>重量</th>
-                <th style={{ width: 110, padding: '8px 6px' }}>厚度(mm)</th>
-                <th style={{ width: 110, padding: '8px 6px' }}>宽度(mm)</th>
+                <th style={{ width: 110, padding: '8px 6px' }}>厚度（毫米）</th>
+                <th style={{ width: 110, padding: '8px 6px' }}>宽度（毫米）</th>
                 <th style={{ width: 90, padding: '8px 6px' }}>冻结</th>
                 <th style={{ width: 120, padding: '8px 6px' }}>操作</th>
               </tr>
@@ -172,10 +172,10 @@ export const CellDetailModal: React.FC<CellDetailModalProps> = ({
                     </td>
                     <td style={{ padding: '8px 6px' }}>{formatWeight(it.weight_t)}</td>
                     <td style={{ padding: '8px 6px', fontFamily: FONT_FAMILIES.MONOSPACE }}>
-                      {thickness == null || !Number.isFinite(Number(thickness)) ? '-' : Number(thickness).toFixed(2)}
+                      {thickness == null || !Number.isFinite(Number(thickness)) ? '-' : formatCapacity(Number(thickness))}
                     </td>
                     <td style={{ padding: '8px 6px', fontFamily: FONT_FAMILIES.MONOSPACE }}>
-                      {width == null || !Number.isFinite(Number(width)) ? '-' : Number(width).toFixed(2)}
+                      {width == null || !Number.isFinite(Number(width)) ? '-' : formatCapacity(Number(width))}
                     </td>
                     <td style={{ padding: '8px 6px' }}>{it.locked_in_plan ? '是' : '否'}</td>
                     <td style={{ padding: '8px 6px' }}>

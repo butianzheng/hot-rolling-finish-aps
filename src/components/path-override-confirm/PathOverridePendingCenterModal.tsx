@@ -50,6 +50,17 @@ function fmtNum(v: unknown, digits: number = 1): string {
   return n.toFixed(digits);
 }
 
+function formatUrgencyLevel(level: string): string {
+  const normalized = normalizeUrgentLevel(level);
+  const mapping: Record<string, string> = {
+    L3: '三级紧急',
+    L2: '二级紧急',
+    L1: '一级紧急',
+    L0: '常规',
+  };
+  return mapping[normalized] || normalized;
+}
+
 export type PathOverridePendingCenterModalProps = {
   open: boolean;
   onClose: () => void;
@@ -129,7 +140,7 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
       });
       setRows(list);
     } catch (e: unknown) {
-      console.error('[PathOverridePendingCenterModal] loadSummary failed:', e);
+      console.error('【路径放行待确认中心】加载摘要失败：', e);
       setRows([]);
       const errorMessage = e instanceof Error ? e.message : String(e);
       setLoadError(errorMessage || '加载待确认汇总失败');
@@ -170,7 +181,7 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
         : [];
       setDetailRows(list);
     } catch (e: unknown) {
-      console.error('[PathOverridePendingCenterModal] loadDetail failed:', e);
+      console.error('【路径放行待确认中心】加载明细失败：', e);
       setDetailRows([]);
       const errorMessage = e instanceof Error ? e.message : String(e);
       setDetailError(errorMessage || '加载明细失败');
@@ -245,7 +256,7 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
         await loadDetail(selectedGroup.machineCode, selectedGroup.planDate);
       }
     } catch (e: unknown) {
-      console.error('[PathOverridePendingCenterModal] confirmAndRecalc failed:', e);
+      console.error('【路径放行待确认中心】确认并重算失败：', e);
       const errorMessage = e instanceof Error ? e.message : String(e);
       message.error(errorMessage || '批量确认失败');
       setRecalcFailed(true);
@@ -300,7 +311,7 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
         await loadDetail(selectedGroup.machineCode, selectedGroup.planDate);
       }
     } catch (e: unknown) {
-      console.error('[PathOverridePendingCenterModal] confirmAll failed:', e);
+      console.error('【路径放行待确认中心】全部确认失败：', e);
       const errorMessage = e instanceof Error ? e.message : String(e);
       message.error(errorMessage || '批量确认失败');
     } finally {
@@ -367,17 +378,17 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
       width: 90,
       render: (v) => {
         const level = normalizeUrgentLevel(v);
-        return <Tag color={urgentLevelColors[level] || 'default'}>{level}</Tag>;
+        return <Tag color={urgentLevelColors[level] || 'default'}>{formatUrgencyLevel(level)}</Tag>;
       },
     },
     {
-      title: '宽/厚 (mm)',
+      title: '宽/厚（毫米）',
       key: 'wt',
       width: 140,
       render: (_, r) => (
         <Space size={6}>
-          <span>W {fmtNum(r.width_mm, 1)}</span>
-          <span>T {fmtNum(r.thickness_mm, 2)}</span>
+          <span>宽 {fmtNum(r.width_mm, 1)}</span>
+          <span>厚 {fmtNum(r.thickness_mm, 2)}</span>
         </Space>
       ),
     },
@@ -393,24 +404,24 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
       },
     },
     {
-      title: '锚点 (mm)',
+      title: '锚点（毫米）',
       key: 'anchor',
       width: 150,
       render: (_, r) => (
         <Space size={6}>
-          <span>W {fmtNum(r.anchor_width_mm, 1)}</span>
-          <span>T {fmtNum(r.anchor_thickness_mm, 2)}</span>
+          <span>宽 {fmtNum(r.anchor_width_mm, 1)}</span>
+          <span>厚 {fmtNum(r.anchor_thickness_mm, 2)}</span>
         </Space>
       ),
     },
     {
-      title: 'Δ宽/Δ厚 (mm)',
+      title: '宽差/厚差（毫米）',
       key: 'delta',
       width: 150,
       render: (_, r) => (
         <Space size={6}>
-          <Tag color="volcano">ΔW {fmtNum(r.width_delta_mm, 1)}</Tag>
-          <Tag color="magenta">ΔT {fmtNum(r.thickness_delta_mm, 2)}</Tag>
+          <Tag color="volcano">宽差 {fmtNum(r.width_delta_mm, 1)}</Tag>
+          <Tag color="magenta">厚差 {fmtNum(r.thickness_delta_mm, 2)}</Tag>
         </Space>
       ),
     },
@@ -473,7 +484,7 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
           description={
             <div>
               <p style={{ marginBottom: 4 }}>
-                此处展示"最近一次重算"落库的 PATH_OVERRIDE_REQUIRED 待确认清单（按首次遇到日期汇总）。
+                此处展示“最近一次重算”落库的路径规则待确认清单（按首次遇到日期汇总）。
               </p>
               <p style={{ marginBottom: 0 }}>
                 <strong>快捷流程</strong>：点击"确认并重算"可一键完成确认+重算+版本切换，适合大部分场景。
@@ -564,4 +575,3 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
 };
 
 export default PathOverridePendingCenterModal;
-

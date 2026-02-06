@@ -57,13 +57,13 @@ export type TrendDirection = 'RISING' | 'STABLE' | 'FALLING';
 /**
  * 结构性缺口
  *
- * 后端目前返回的是“描述性文本”（例如："集中在规格 1250mm×3.5mm (10 块)" 或 "无"），
+ * 后端目前返回的是“描述性文本”（例如："集中在规格 1250毫米×3.5毫米 (10 块)" 或 "无"），
  * 并非严格的枚举值，因此这里使用 string 表示。
  */
 export type StructureGap = string;
 
 /**
- * 冷料趋势 DTO
+ * 冷料趋势数据对象
  */
 export interface ColdStockTrend {
   /** 趋势方向 */
@@ -77,7 +77,7 @@ export interface ColdStockTrend {
 }
 
 /**
- * 冷料分桶 DTO
+ * 冷料分桶数据对象
  */
 export interface ColdStockBucket {
   /** 机组代码 */
@@ -115,7 +115,7 @@ export interface ColdStockBucket {
 }
 
 /**
- * 机组库存统计 DTO
+ * 机组库存统计数据对象
  */
 export interface MachineStockStats {
   machineCode: string;
@@ -125,7 +125,7 @@ export interface MachineStockStats {
 }
 
 /**
- * 年龄分桶统计 DTO
+ * 年龄分桶统计数据对象
  */
 export interface AgeBinStats {
   ageBin: AgeBin;
@@ -134,7 +134,7 @@ export interface AgeBinStats {
 }
 
 /**
- * 冷料摘要 DTO
+ * 冷料摘要数据对象
  */
 export interface ColdStockSummary {
   /** 冷料总数量 */

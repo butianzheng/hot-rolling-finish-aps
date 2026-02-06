@@ -43,7 +43,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     <Card style={{ marginBottom: 16 }}>
       <Space wrap>
         <Input
-          placeholder="搜索配置键、值或作用域ID"
+          placeholder="搜索配置键、值或作用域编号"
           value={localSearchText}
           onChange={(e) => setLocalSearchText(e.target.value)}
           style={{ width: 250 }}
@@ -57,10 +57,10 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           onChange={onScopeTypeChange}
         >
           <Option value="all">全部类型</Option>
-          <Option value="GLOBAL">GLOBAL</Option>
-          <Option value="MACHINE">MACHINE</Option>
-          <Option value="STEEL_GRADE">STEEL_GRADE</Option>
-          <Option value="VERSION">VERSION</Option>
+          <Option value="GLOBAL">全局</Option>
+          <Option value="MACHINE">机组</Option>
+          <Option value="STEEL_GRADE">钢种</Option>
+          <Option value="VERSION">版本</Option>
         </Select>
 
         <Button onClick={onClearFilters}>

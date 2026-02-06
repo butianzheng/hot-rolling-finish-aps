@@ -193,17 +193,17 @@ export const usePlanStore = create<PlanState & PlanActions>()(
 
     // C9修复：此方法已废弃并移除，违反工业规范
     // 正确做法：
-    //   1. 调用后端API: await planApi.activateVersion(versionId, operator);
+    //   1. 调用后端接口执行版本激活；
     //   2. 重新加载版本列表或刷新缓存
-    // 直接修改UI层的version.status字段会导致前后端数据不一致
+    // 直接修改界面层的version.status字段会导致前后端数据不一致
     activateVersion: (_versionId) => {
       throw new Error(
-        '[DEPRECATED] usePlanStore.activateVersion() 已废弃。\n' +
-          '原因：直接修改UI状态违反工业规范，可能导致数据不一致。\n' +
+        '【已废弃】版本激活快捷方法已废弃。\n' +
+          '原因：直接修改界面状态违反工业规范，可能导致数据不一致。\n' +
           '正确做法：\n' +
-          '  1. 调用后端API: await planApi.activateVersion(versionId, operator);\n' +
-          '  2. 调用 useGlobalStore.setActiveVersion(versionId); 更新全局激活版本ID\n' +
-          '  3. 重新加载版本列表: await planActions.loadVersions(planId);'
+          '  1. 调用后端接口执行版本激活；\n' +
+          '  2. 更新全局激活版本编号；\n' +
+          '  3. 重新加载版本列表。'
       );
     },
 
@@ -220,17 +220,17 @@ export const usePlanStore = create<PlanState & PlanActions>()(
       }),
 
     createDraftVersion: async () => {
-      throw new Error('createDraftVersion is not implemented yet');
+      throw new Error('草案创建功能尚未实现');
     },
 
     publishDraft: async () => {
-      throw new Error('publishDraft is not implemented yet');
+      throw new Error('草案发布功能尚未实现');
     },
   }))
 );
 
 // ==========================================
-// Selector Hooks（性能优化）
+// 选择器函数（性能优化）
 // ==========================================
 
 // 获取排产方案列表

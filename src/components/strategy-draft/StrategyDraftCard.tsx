@@ -76,7 +76,7 @@ export const StrategyDraftCard: React.FC<StrategyDraftCardProps> = ({
             <div style={{ fontWeight: 600 }}>{hasDraft ? draft?.plan_items_count : '—'}</div>
           </div>
           <div>
-            <Text type="secondary">预计产量(t)</Text>
+            <Text type="secondary">预计产量（吨）</Text>
             <div style={{ fontWeight: 600 }}>{hasDraft ? formatTon(draft?.total_capacity_used_t) : '—'}</div>
           </div>
           <div>
@@ -122,18 +122,18 @@ export const StrategyDraftCard: React.FC<StrategyDraftCardProps> = ({
               type="warning"
               showIcon
               message="存在产能超限风险"
-              description={draft?.message || '可尝试"产能优先"或缩短窗口/调整产能配置后再生成'}
+              description={draft?.message || '可尝试“产能优先”或缩短窗口、调整产能配置后再生成'}
             />
           ) : (
             <Alert
               type="success"
               showIcon
               message="草案可用"
-              description={draft?.message || '可点击"选择该草案"生成正式版本'}
+              description={draft?.message || '可点击“选择该草案”生成正式版本'}
             />
           )
         ) : (
-          <Alert type="warning" showIcon message="尚未生成" description={'点击"重新计算策略草案"后生成该策略的草案'} />
+          <Alert type="warning" showIcon message="尚未生成" description={'点击“重新计算策略草案”后生成该策略的草案'} />
         )}
       </Space>
     </Card>

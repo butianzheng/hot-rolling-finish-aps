@@ -161,7 +161,7 @@ export function useImportWorkflow(): UseImportWorkflowReturn {
       setPreviewRows(parsed.rows);
       setPreviewTotalRows(parsed.totalRows);
     } catch (e: any) {
-      console.error('[MaterialImport] preview failed:', e);
+      console.error('【材料导入】预览失败：', e);
       setPreviewHeaders([]);
       setPreviewRows([]);
       setPreviewTotalRows(0);
@@ -174,19 +174,19 @@ export function useImportWorkflow(): UseImportWorkflowReturn {
   const handleSelectFile = useCallback(
     async (isTauriRuntime: boolean) => {
       if (!isTauriRuntime) {
-        message.warning('材料导入需要在 Tauri 桌面端运行');
+        message.warning('材料导入需要在桌面端运行');
         return;
       }
 
       try {
         const selected = await open({
           multiple: false,
-          filters: [{ name: 'CSV 文件', extensions: ['csv'] }],
+          filters: [{ name: '逗号分隔文件', extensions: ['csv'] }],
         });
 
         if (selected && typeof selected === 'string') {
           if (!selected.toLowerCase().endsWith('.csv')) {
-            message.error('当前仅支持 CSV (.csv) 格式文件');
+            message.error('当前仅支持逗号分隔格式文件');
             return;
           }
 
@@ -195,7 +195,7 @@ export function useImportWorkflow(): UseImportWorkflowReturn {
           message.success('文件已选择');
         }
       } catch (e: any) {
-        console.error('[MaterialImport] select file failed:', e);
+        console.error('【材料导入】选择文件失败：', e);
         message.error(e?.message || '文件选择失败');
       }
     },
@@ -264,7 +264,7 @@ export function useImportWorkflow(): UseImportWorkflowReturn {
         }));
         return { list, total };
       } catch (e: any) {
-        console.error('[MaterialImport] load conflicts failed:', e);
+        console.error('【材料导入】加载冲突失败：', e);
         setConflicts([]);
         setConflictPagination((prev) => ({ ...prev, total: 0 }));
         message.error(e?.message || '加载冲突列表失败');
@@ -316,7 +316,7 @@ export function useImportWorkflow(): UseImportWorkflowReturn {
           shouldNavigateToWorkbench = true;
         }
       } catch (e: any) {
-        console.error('[MaterialImport] import failed:', e);
+        console.error('【材料导入】执行导入失败：', e);
         message.error(e?.message || '导入失败');
         // H5修复：导入失败后清空相关状态，避免显示过期的导入结果
         setImportResult(null);
@@ -339,7 +339,7 @@ export function useImportWorkflow(): UseImportWorkflowReturn {
       const missing = importOptions?.missingHeaders ?? missingHeaders;
 
       if (!filePath) {
-        message.warning('请先选择 CSV 文件');
+        message.warning('请先选择逗号分隔文件');
         return;
       }
 
@@ -384,7 +384,7 @@ export function useImportWorkflow(): UseImportWorkflowReturn {
           });
         }
       } catch (e: any) {
-        console.error('[MaterialImport] resolve conflict failed:', e);
+        console.error('【材料导入】处理冲突失败：', e);
         message.error(e?.message || '处理冲突失败');
       }
     },

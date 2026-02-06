@@ -44,7 +44,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         紧急失败数: snapshot.urgentFailureCount,
         涉及机组: (snapshot.involvedMachines || []).join(','),
       }));
-      exportCSV(data, '风险摘要(D1)');
+      exportCSV(data, '风险摘要（一类）');
       message.success('导出成功');
     } catch (error: any) {
       message.error(`导出失败: ${error.message}`);
@@ -98,12 +98,12 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             menu={{
               items: [
                 {
-                  label: '导出为 CSV',
+                  label: '导出为表格文件',
                   key: 'csv',
                   onClick: handleExportCSV,
                 },
                 {
-                  label: '导出为 JSON',
+                  label: '导出为数据文件',
                   key: 'json',
                   onClick: handleExportJSON,
                 },

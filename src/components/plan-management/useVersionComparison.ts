@@ -3,6 +3,7 @@ import { message } from 'antd';
 import type { EChartsOption } from 'echarts';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
+import { formatNumber } from '../../utils/formatters';
 
 import { capacityApi, planApi } from '../../api/tauri';
 import type {
@@ -120,7 +121,7 @@ export function useVersionComparison(params: {
       message.success('复盘总结已保存（本地）');
     } catch (error: unknown) {
       const errMsg = error instanceof Error ? error.message : String(error ?? '');
-      message.error(errMsg || '保存失败（localStorage 不可用）');
+      message.error(errMsg || '保存失败（本地存储不可用）');
     }
   };
 
@@ -146,7 +147,7 @@ export function useVersionComparison(params: {
     const fmtInt = (v: number | null | undefined) =>
       v == null || !Number.isFinite(Number(v)) ? '-' : String(Math.trunc(Number(v)));
     const fmtNum = (v: number | null | undefined, digits = 1) =>
-      v == null || !Number.isFinite(Number(v)) ? '-' : Number(v).toFixed(digits);
+      v == null || !Number.isFinite(Number(v)) ? '-' : formatNumber(Number(v), digits, { useGrouping: false });
 
     const deltaInt = (va: number | null | undefined, vb: number | null | undefined) =>
       va == null || vb == null ? '-' : String(Math.trunc(Number(vb) - Number(va)));
@@ -154,7 +155,7 @@ export function useVersionComparison(params: {
       va: number | null | undefined,
       vb: number | null | undefined,
       digits = 1
-    ) => (va == null || vb == null ? '-' : (Number(vb) - Number(va)).toFixed(digits));
+    ) => (va == null || vb == null ? '-' : formatNumber(Number(vb) - Number(va), digits, { useGrouping: false }));
 
     return [
       {
@@ -166,7 +167,7 @@ export function useVersionComparison(params: {
       },
       {
         key: 'total_weight_t',
-        metric: '总吨位(t)',
+        metric: '总吨位（吨）',
         a: fmtNum(a.total_weight_t, 1),
         b: fmtNum(b.total_weight_t, 1),
         delta: deltaNum(a.total_weight_t, b.total_weight_t, 1),
@@ -187,42 +188,42 @@ export function useVersionComparison(params: {
       },
       {
         key: 'overflow_days',
-        metric: '溢出天数(days)',
+        metric: '溢出天数（天）',
         a: fmtInt(a.overflow_days),
         b: fmtInt(b.overflow_days),
         delta: deltaInt(a.overflow_days, b.overflow_days),
       },
       {
         key: 'overflow_t',
-        metric: '溢出吨位(t)',
+        metric: '溢出吨位（吨）',
         a: fmtNum(a.overflow_t, 1),
         b: fmtNum(b.overflow_t, 1),
         delta: deltaNum(a.overflow_t, b.overflow_t, 1),
       },
       {
         key: 'capacity_util_pct',
-        metric: '产能利用率(%)',
+        metric: '产能利用率（%）',
         a: fmtNum(a.capacity_util_pct, 1),
         b: fmtNum(b.capacity_util_pct, 1),
         delta: deltaNum(a.capacity_util_pct, b.capacity_util_pct, 1),
       },
       {
         key: 'mature_backlog_t',
-        metric: '适温待排(t)',
+        metric: '适温待排（吨）',
         a: fmtNum(a.mature_backlog_t, 1),
         b: fmtNum(b.mature_backlog_t, 1),
         delta: deltaNum(a.mature_backlog_t, b.mature_backlog_t, 1),
       },
       {
         key: 'immature_backlog_t',
-        metric: '未适温待排(t)',
+        metric: '未适温待排（吨）',
         a: fmtNum(a.immature_backlog_t, 1),
         b: fmtNum(b.immature_backlog_t, 1),
         delta: deltaNum(a.immature_backlog_t, b.immature_backlog_t, 1),
       },
       {
         key: 'urgent_total_t',
-        metric: '紧急吨位(t)',
+        metric: '紧急吨位（吨）',
         a: fmtNum(a.urgent_total_t, 1),
         b: fmtNum(b.urgent_total_t, 1),
         delta: deltaNum(a.urgent_total_t, b.urgent_total_t, 1),
@@ -488,17 +489,17 @@ export function useVersionComparison(params: {
 
     return {
       tooltip: { trigger: 'axis' },
-      legend: { top: 0, left: 'left', data: ['版本A', '版本B', 'Δ(B-A)'] },
+      legend: { top: 0, left: 'left', data: ['版本甲', '版本乙', '变化值（乙-甲）'] },
       grid: { left: 52, right: 52, top: 36, bottom: 44 },
       xAxis: {
         type: 'category',
         data: dates,
         axisLabel: { formatter: (value: string) => String(value).slice(5) },
       },
-      yAxis: [{ type: 'value', name: 't' }, { type: 'value', name: 'Δt' }],
+      yAxis: [{ type: 'value', name: '吨' }, { type: 'value', name: '变化吨位' }],
       series: [
         {
-          name: '版本A',
+          name: '版本甲',
           type: 'line',
           data: aValues,
           smooth: true,
@@ -506,7 +507,7 @@ export function useVersionComparison(params: {
           lineStyle: { width: 2 },
         },
         {
-          name: '版本B',
+          name: '版本乙',
           type: 'line',
           data: bValues,
           smooth: true,
@@ -514,7 +515,7 @@ export function useVersionComparison(params: {
           lineStyle: { width: 2 },
         },
         {
-          name: 'Δ(B-A)',
+          name: '变化值（乙-甲）',
           type: 'bar',
           yAxisIndex: 1,
           barMaxWidth: 26,
@@ -547,19 +548,19 @@ export function useVersionComparison(params: {
 
     return {
       tooltip: { trigger: 'axis' },
-      legend: { top: 0, left: 'left', data: ['A风险', 'B风险', 'Δ'] },
+      legend: { top: 0, left: 'left', data: ['版本甲风险', '版本乙风险', '变化值'] },
       grid: { left: 52, right: 52, top: 36, bottom: 44 },
       xAxis: {
         type: 'category',
         data: dates,
         axisLabel: { formatter: (value: string) => String(value).slice(5) },
       },
-      yAxis: [{ type: 'value', name: '风险' }, { type: 'value', name: 'Δ' }],
+      yAxis: [{ type: 'value', name: '风险' }, { type: 'value', name: '变化值' }],
       series: [
-        { name: 'A风险', type: 'line', data: aValues, smooth: true, showSymbol: false, lineStyle: { width: 2 } },
-        { name: 'B风险', type: 'line', data: bValues, smooth: true, showSymbol: false, lineStyle: { width: 2 } },
+        { name: '版本甲风险', type: 'line', data: aValues, smooth: true, showSymbol: false, lineStyle: { width: 2 } },
+        { name: '版本乙风险', type: 'line', data: bValues, smooth: true, showSymbol: false, lineStyle: { width: 2 } },
         {
-          name: 'Δ',
+          name: '变化值',
           type: 'bar',
           yAxisIndex: 1,
           barMaxWidth: 26,

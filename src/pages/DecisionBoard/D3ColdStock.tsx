@@ -19,6 +19,7 @@ import { useActiveVersionId } from '../../stores/use-global-store';
 import { ColdStockChart } from '../../components/charts/ColdStockChart';
 import { EmptyState } from '../../components/EmptyState';
 import type { ColdStockBucket, AgeBin, PressureLevel, ReasonItem } from '../../types/decision';
+import { formatNumber, formatWeight } from '../../utils/formatters';
 
 // ==========================================
 // 压力等级颜色映射
@@ -371,7 +372,7 @@ export const D3ColdStock: React.FC<D3ColdStockProps> = ({ embedded, onOpenDrilld
           <Card size={embedded ? 'small' : undefined}>
             <Statistic
               title="冷料总重量"
-              value={globalStats.totalWeight.toFixed(3)}
+              value={formatNumber(globalStats.totalWeight, 3)}
               suffix="吨"
               valueStyle={{
                 color: globalStats.totalWeight > 1000 ? '#faad14' : '#52c41a',
@@ -437,10 +438,10 @@ export const D3ColdStock: React.FC<D3ColdStockProps> = ({ embedded, onOpenDrilld
               {selectedMachineData.totalCount}个
             </Descriptions.Item>
             <Descriptions.Item label="冷料总重量">
-              {selectedMachineData.totalWeight.toFixed(3)}吨
+              {formatWeight(selectedMachineData.totalWeight)}
             </Descriptions.Item>
             <Descriptions.Item label="平均库龄">
-              {selectedMachineData.avgAge.toFixed(2)}天
+              {formatNumber(selectedMachineData.avgAge, 2)}天
             </Descriptions.Item>
             <Descriptions.Item label="最大库龄">
               {selectedMachineData.maxAge}天
@@ -482,14 +483,14 @@ export const D3ColdStock: React.FC<D3ColdStockProps> = ({ embedded, onOpenDrilld
                     {AGE_BIN_LABELS[bucket.ageBin]}
                   </div>
                   <div>数量: {bucket.count}个</div>
-                  <div>重量: {bucket.weightT.toFixed(3)}吨</div>
+                  <div>重量: {formatWeight(bucket.weightT)}</div>
                   <div>
                     压力:
                     <Tag
                       color={PRESSURE_LEVEL_COLORS[bucket.pressureLevel]}
                       style={{ marginLeft: '4px' }}
                     >
-                      {bucket.pressureScore.toFixed(0)}
+                      {formatNumber(bucket.pressureScore, 2)}
                     </Tag>
                   </div>
                 </Card>
@@ -556,7 +557,7 @@ export const D3ColdStock: React.FC<D3ColdStockProps> = ({ embedded, onOpenDrilld
                           {bucket.trend!.direction === 'FALLING' && '↓ 下降'}
                         </span>
                         <span style={{ color: '#8c8c8c' }}>
-                          变化率: {bucket.trend!.changeRatePct.toFixed(2)}%
+                          变化率: {formatNumber(bucket.trend!.changeRatePct, 2)}%
                         </span>
                       </Space>
                     </Card>
@@ -608,7 +609,7 @@ const MachineStatsTable: React.FC<MachineStatsTableProps> = ({ data, onRowClick 
       dataIndex: 'totalWeight',
       key: 'totalWeight',
       width: 120,
-      render: (weight: number) => weight.toFixed(3),
+      render: (weight: number) => formatWeight(weight),
       sorter: (a, b) => a.totalWeight - b.totalWeight,
     },
     {
@@ -616,7 +617,7 @@ const MachineStatsTable: React.FC<MachineStatsTableProps> = ({ data, onRowClick 
       dataIndex: 'avgAge',
       key: 'avgAge',
       width: 120,
-      render: (age: number) => age.toFixed(2),
+      render: (age: number) => formatNumber(age, 2),
       sorter: (a, b) => a.avgAge - b.avgAge,
     },
     {
@@ -652,7 +653,7 @@ const MachineStatsTable: React.FC<MachineStatsTableProps> = ({ data, onRowClick 
       dataIndex: 'maxPressureScore',
       key: 'maxPressureScore',
       width: 100,
-      render: (score: number) => score.toFixed(0),
+      render: (score: number) => formatNumber(score, 2),
       sorter: (a, b) => a.maxPressureScore - b.maxPressureScore,
     },
   ];
@@ -700,7 +701,7 @@ const REASON_CODE_LABELS: Record<string, string> = {
  * 获取原因代码的中文标签
  */
 function getReasonCodeLabel(code: string): string {
-  return REASON_CODE_LABELS[code] || code;
+  return REASON_CODE_LABELS[code] || '其他原因';
 }
 
 const ReasonsTable: React.FC<ReasonsTableProps> = ({ reasons }) => {
@@ -746,7 +747,7 @@ const ReasonsTable: React.FC<ReasonsTableProps> = ({ reasons }) => {
       dataIndex: 'weight',
       key: 'weight',
       width: 90,
-      render: (weight: number) => <span>{(weight * 100).toFixed(2)}%</span>,
+      render: (weight: number) => <span>{formatNumber(weight * 100, 2)}%</span>,
       sorter: (a, b) => a.weight - b.weight,
       defaultSortOrder: 'descend',
     },

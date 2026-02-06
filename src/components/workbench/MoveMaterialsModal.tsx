@@ -4,6 +4,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { DEFAULT_MOVE_REASON, QUICK_MOVE_REASONS } from '../../pages/workbench/constants';
 import type { MoveImpactRow, MoveSeqMode, MoveValidationMode } from '../../pages/workbench/types';
 import type { MoveModalState, MoveModalActions } from '../../pages/workbench/hooks/useWorkbenchMoveModal';
+import { formatCapacity, formatNumber } from '../../utils/formatters';
 
 /**
  * MoveMaterialsModal Props（Phase 2 重构：使用聚合对象）
@@ -37,45 +38,45 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
     { title: '机组', dataIndex: 'machine_code', width: 90 },
     { title: '日期', dataIndex: 'date', width: 120 },
     {
-      title: '操作前(t)',
+      title: '操作前（吨）',
       dataIndex: 'before_t',
       width: 120,
       render: (v) => (
-        <span style={{ fontFamily: 'monospace' }}>{Number(v).toFixed(2)}</span>
+        <span style={{ fontFamily: 'monospace' }}>{formatCapacity(Number(v))}</span>
       ),
     },
     {
-      title: '变化(t)',
+      title: '变化（吨）',
       dataIndex: 'delta_t',
       width: 110,
       render: (v) => {
         const n = Number(v);
         const color = n > 0 ? 'green' : n < 0 ? 'red' : 'default';
-        const label = `${n >= 0 ? '+' : ''}${n.toFixed(2)}`;
+        const label = `${n >= 0 ? '+' : ''}${formatCapacity(n)}`;
         return <Tag color={color}>{label}</Tag>;
       },
     },
     {
-      title: '操作后(t)',
+      title: '操作后（吨）',
       dataIndex: 'after_t',
       width: 120,
       render: (v) => (
-        <span style={{ fontFamily: 'monospace' }}>{Number(v).toFixed(2)}</span>
+        <span style={{ fontFamily: 'monospace' }}>{formatCapacity(Number(v))}</span>
       ),
     },
     {
-      title: '目标/限制(t)',
+      title: '目标/限制（吨）',
       key: 'cap',
       render: (_, r) => {
         const target = r.target_capacity_t;
         const limit = r.limit_capacity_t;
         if (target == null && limit == null) return <span>-</span>;
         if (limit != null && target != null && Math.abs(limit - target) < 1e-9) {
-          return <span style={{ fontFamily: 'monospace' }}>{target.toFixed(2)}</span>;
+          return <span style={{ fontFamily: 'monospace' }}>{formatCapacity(target)}</span>;
         }
         return (
           <span style={{ fontFamily: 'monospace' }}>
-            {(target ?? 0).toFixed(2)} / {(limit ?? 0).toFixed(2)}
+            {formatCapacity(target ?? 0)} / {formatCapacity(limit ?? 0)}
           </span>
         );
       },
@@ -88,16 +89,16 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
         const limit = r.limit_capacity_t;
         if (limit == null || limit <= 0) return <Tag>未知</Tag>;
         const pct = (r.after_t / limit) * 100;
-        if (pct > 100) return <Tag color="red">超限 {pct.toFixed(0)}%</Tag>;
-        if (pct > 90) return <Tag color="orange">偏高 {pct.toFixed(0)}%</Tag>;
-        return <Tag color="green">正常 {pct.toFixed(0)}%</Tag>;
+        if (pct > 100) return <Tag color="red">超限 {formatNumber(pct, 0)}%</Tag>;
+        if (pct > 90) return <Tag color="orange">偏高 {formatNumber(pct, 0)}%</Tag>;
+        return <Tag color="green">正常 {formatNumber(pct, 0)}%</Tag>;
       },
     },
   ], []); // 空依赖数组：列定义不依赖任何 props/state
 
   return (
     <Modal
-      title="移动到..."
+      title="移动到…"
       open={state.open}
       onCancel={() => actions.setOpen(false)}
       onOk={() => actions.submit()}
@@ -120,7 +121,7 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
           <Alert
             type="warning"
             showIcon
-            message={`检测到 ${state.selectedPlanItemStats.frozenInPlan} 个冻结排程项：STRICT 模式会失败，AUTO_FIX 模式会跳过`}
+            message={`检测到 ${state.selectedPlanItemStats.frozenInPlan} 个冻结排程项：严格模式会失败，自动修正模式会跳过`}
           />
         ) : null}
 
@@ -197,8 +198,8 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
             style={{ width: 180 }}
             onChange={(v) => actions.setValidationMode(v as MoveValidationMode)}
             options={[
-              { label: 'AUTO_FIX（跳过冻结）', value: 'AUTO_FIX' },
-              { label: 'STRICT（遇冻结失败）', value: 'STRICT' },
+              { label: '自动修正模式（跳过冻结）', value: 'AUTO_FIX' },
+              { label: '严格模式（遇冻结失败）', value: 'STRICT' },
             ]}
           />
         </Space>
@@ -228,7 +229,7 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
           onChange={(e) => actions.setReason(e.target.value)}
           rows={3}
           autoSize={{ minRows: 3, maxRows: 6 }}
-          placeholder="例如：为满足L3紧急订单，调整到更早日期"
+          placeholder="例如：为满足三级紧急订单，调整到更早日期"
         />
 
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -260,7 +261,7 @@ const MoveMaterialsModal: React.FC<MoveMaterialsModalProps> = ({
                   type="warning"
                   showIcon
                   message={`警告：预计有 ${state.impactPreview.overflowRows.length} 个机组/日期将超出限制产能`}
-                  description="可尝试切换到其他日期/机组，或使用 AUTO_FIX 模式（冻结项将跳过）。"
+                  description="可尝试切换到其他日期/机组，或使用自动修正模式（冻结项将跳过）。"
                 />
               ) : (
                 <Alert type="success" showIcon message="未发现超限风险（按当前估算）" />

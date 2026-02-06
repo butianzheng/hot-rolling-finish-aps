@@ -86,7 +86,7 @@ const WorkbenchAlerts: React.FC<{
           type="info"
           showIcon
           message="暂无物料数据"
-          description="请先在“数据导入”导入材料CSV；导入成功后再返回工作台进行排程与干预。"
+          description="请先在“数据导入”导入材料数据文件；导入成功后再返回工作台进行排程与干预。"
           action={
             <Button size="small" type="primary" onClick={() => navigate('/import')}>
               去导入

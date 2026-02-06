@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button, Card, Space, Typography } from 'antd';
+import { formatWeight } from '../../utils/formatters';
 
 const WorkbenchStatusBar: React.FC<{
   selectedMaterialCount: number;
@@ -31,7 +32,7 @@ const WorkbenchStatusBar: React.FC<{
       <Space wrap align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
         <Space wrap>
           <Typography.Text>已选: {selectedMaterialCount} 个物料</Typography.Text>
-          <Typography.Text type="secondary">总重: {selectedTotalWeight.toFixed(3)}t</Typography.Text>
+          <Typography.Text type="secondary">总重: {formatWeight(selectedTotalWeight)}</Typography.Text>
         </Space>
 
         <Space wrap>
@@ -54,7 +55,7 @@ const WorkbenchStatusBar: React.FC<{
             最近可行
           </Button>
           <Button disabled={disabled} onClick={onOpenMoveModal}>
-            移动到...
+            移动到…
           </Button>
           <Button disabled={disabled} onClick={onClearSelection}>
             清空选择
@@ -66,4 +67,3 @@ const WorkbenchStatusBar: React.FC<{
 };
 
 export default React.memo(WorkbenchStatusBar);
-

@@ -7,6 +7,7 @@ import { Button, Descriptions, Space, Table, Tag, Typography, theme } from 'antd
 import type { ColumnsType } from 'antd/es/table';
 import type { ColdStockBucket, ReasonItem } from '../../../types/decision';
 import { getPressureLevelColor, getPressureLevelLabel, ReasonTable, getHighlightStyle, type WorkbenchCallback } from './shared';
+import { formatNumber, formatWeight } from '../../../utils/formatters';
 
 const { Text } = Typography;
 
@@ -122,11 +123,23 @@ export const ColdStockContent: React.FC<ColdStockContentProps> = ({
       dataIndex: 'pressureScore',
       key: 'pressureScore',
       width: 90,
-      render: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(0) : '-'),
+      render: (v: number) => (Number.isFinite(v) ? formatNumber(Number(v), 2) : '-'),
     },
     { title: '数量', dataIndex: 'count', key: 'count', width: 80 },
-    { title: '重量(吨)', dataIndex: 'weightT', key: 'weightT', width: 100 },
-    { title: '平均库龄', dataIndex: 'avgAgeDays', key: 'avgAgeDays', width: 100 },
+    {
+      title: '重量（吨）',
+      dataIndex: 'weightT',
+      key: 'weightT',
+      width: 120,
+      render: (v: number) => formatWeight(v),
+    },
+    {
+      title: '平均库龄',
+      dataIndex: 'avgAgeDays',
+      key: 'avgAgeDays',
+      width: 110,
+      render: (v: number) => `${formatNumber(v, 2)}天`,
+    },
     { title: '最大库龄', dataIndex: 'maxAgeDays', key: 'maxAgeDays', width: 100 },
     {
       title: '结构缺口',
@@ -178,8 +191,8 @@ export const ColdStockContent: React.FC<ColdStockContentProps> = ({
         <Space wrap align="center">
           <Tag color="blue">{machineCodeFilter}</Tag>
           <Text type="secondary">
-            冷坨 {machineSummary.count} 件 · {machineSummary.weightT.toFixed(3)}t · 高压{' '}
-            {machineSummary.highPressureCount} 件 · 峰值 {machineSummary.maxPressureScore.toFixed(0)}
+            冷坨 {machineSummary.count} 件 · {formatWeight(machineSummary.weightT)} · 高压{' '}
+            {machineSummary.highPressureCount} 件 · 峰值 {formatNumber(machineSummary.maxPressureScore, 2)}
           </Text>
           {onGoWorkbench ? (
             <Button
@@ -197,7 +210,7 @@ export const ColdStockContent: React.FC<ColdStockContentProps> = ({
         <>
           <Space wrap align="center">
             <Tag color={getPressureLevelColor(displayedBucket.pressureLevel)}>
-              {getPressureLevelLabel(displayedBucket.pressureLevel)} / {displayedBucket.pressureScore.toFixed(0)}
+              {getPressureLevelLabel(displayedBucket.pressureLevel)} / {formatNumber(displayedBucket.pressureScore, 2)}
             </Tag>
             <Text strong>
               {displayedBucket.machineCode} · {displayedBucket.ageBin}
@@ -207,8 +220,8 @@ export const ColdStockContent: React.FC<ColdStockContentProps> = ({
 
           <Descriptions column={4} bordered size="small">
             <Descriptions.Item label="数量">{displayedBucket.count}</Descriptions.Item>
-            <Descriptions.Item label="重量">{displayedBucket.weightT.toFixed(3)}t</Descriptions.Item>
-            <Descriptions.Item label="平均库龄">{displayedBucket.avgAgeDays.toFixed(2)}天</Descriptions.Item>
+            <Descriptions.Item label="重量">{formatWeight(displayedBucket.weightT)}</Descriptions.Item>
+            <Descriptions.Item label="平均库龄">{formatNumber(displayedBucket.avgAgeDays, 2)}天</Descriptions.Item>
             <Descriptions.Item label="最大库龄">{displayedBucket.maxAgeDays}天</Descriptions.Item>
           </Descriptions>
 

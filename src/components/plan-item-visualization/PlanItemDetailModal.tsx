@@ -32,7 +32,7 @@ export const PlanItemDetailModal: React.FC<PlanItemDetailModalProps> = ({
     >
       {item && (
         <Descriptions bordered column={2}>
-          <Descriptions.Item label="材料ID" span={2}>
+          <Descriptions.Item label="材料编号" span={2}>
             {item.material_id}
           </Descriptions.Item>
           <Descriptions.Item label="钢种">{item.steel_grade}</Descriptions.Item>

@@ -8,6 +8,7 @@ import type { EChartsOption } from 'echarts';
 import type { VersionDiff } from '../../types/comparison';
 import type { LocalVersionDiffSummary } from './localTypes';
 import { Chart } from './Chart';
+import { formatWeight } from '../../utils/formatters';
 
 const { Text } = Typography;
 
@@ -57,10 +58,10 @@ export const MaterialDiffCard: React.FC<MaterialDiffCardProps> = ({
             {loadLocalCompareDetail ? '已加载明细' : '加载明细'}
           </Button>
           <Button size="small" onClick={() => onExportDiffs?.('csv')} disabled={!localDiffResult}>
-            导出差异(CSV)
+            导出差异（CSV）
           </Button>
           <Button size="small" onClick={() => onExportDiffs?.('json')} disabled={!localDiffResult}>
-            导出差异(JSON)
+            导出差异（JSON）
           </Button>
         </Space>
       }
@@ -70,7 +71,7 @@ export const MaterialDiffCard: React.FC<MaterialDiffCardProps> = ({
           type="info"
           showIcon
           message="为提升性能，默认不加载全量排产明细"
-          description="点击右上角「加载明细」后，将拉取两个版本的 plan_item 用于本地计算：变更明细/产能变化等。"
+          description="点击右上角「加载明细」后，将拉取两个版本的排产明细用于本地计算：变更明细与产能变化等。"
         />
       ) : planItemsLoading ? (
         <Alert type="info" showIcon message="正在加载排产明细，用于计算差异…" />
@@ -103,7 +104,7 @@ export const MaterialDiffCard: React.FC<MaterialDiffCardProps> = ({
 
           <Space wrap>
             <Input
-              placeholder="搜索物料/From/To…"
+              placeholder="搜索物料/原位置/新位置…"
               value={diffSearchText}
               onChange={(e) => onDiffSearchChange?.(e.target.value)}
               style={{ width: 260 }}
@@ -138,7 +139,8 @@ export const MaterialDiffCard: React.FC<MaterialDiffCardProps> = ({
                 width: 90,
                 render: (v) => {
                   const color = v === 'REMOVED' ? 'red' : v === 'ADDED' ? 'green' : v === 'MOVED' ? 'gold' : 'purple';
-                  return <Tag color={color}>{v}</Tag>;
+                  const label = v === 'REMOVED' ? '删除' : v === 'ADDED' ? '新增' : v === 'MOVED' ? '移动' : '修改';
+                  return <Tag color={color}>{label}</Tag>;
                 },
               },
               {
@@ -152,7 +154,7 @@ export const MaterialDiffCard: React.FC<MaterialDiffCardProps> = ({
                 ),
               },
               {
-                title: 'From',
+                title: '原位置',
                 key: 'from',
                 width: 260,
                 render: (_, r) => {
@@ -161,7 +163,7 @@ export const MaterialDiffCard: React.FC<MaterialDiffCardProps> = ({
                 },
               },
               {
-                title: 'To',
+                title: '新位置',
                 key: 'to',
                 width: 260,
                 render: (_, r) => {
@@ -185,7 +187,7 @@ export const MaterialDiffCard: React.FC<MaterialDiffCardProps> = ({
                 render: (_, r) => {
                   const w = r.currentState?.weight_t ?? r.previousState?.weight_t ?? null;
                   if (w == null || !Number.isFinite(Number(w))) return '-';
-                  return `${Number(w).toFixed(2)}t`;
+                  return formatWeight(Number(w));
                 },
               },
             ]}

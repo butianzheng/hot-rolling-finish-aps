@@ -9,6 +9,7 @@ import type { MaterialPoolMaterial } from '../../../components/workbench/Materia
 import type { MaterialOperationType } from '../types';
 import { extractForceReleaseViolations } from '../utils';
 import { useWorkbenchRefreshActions } from './useWorkbenchRefreshActions';
+import { formatWeight } from '../../../utils/formatters';
 
 type IpcImpactSummary = Awaited<ReturnType<typeof materialApi.batchForceRelease>>;
 
@@ -208,7 +209,7 @@ export function useWorkbenchBatchOperations(params: {
 
             <Space wrap>
               <Tag color="blue">可识别 {targets.length}/{materialIds.length}</Tag>
-              <Tag color="geekblue">总重 {totalWeight.toFixed(3)}t</Tag>
+              <Tag color="geekblue">总重 {formatWeight(totalWeight)}</Tag>
               {frozenCount > 0 ? <Tag color="purple">冻结区 {frozenCount}</Tag> : null}
               {immatureCount > 0 ? <Tag color="orange">未适温 {immatureCount}</Tag> : null}
               {unknownMaturityCount > 0 ? <Tag>适温未知 {unknownMaturityCount}</Tag> : null}
@@ -219,7 +220,7 @@ export function useWorkbenchBatchOperations(params: {
                 type="warning"
                 showIcon
                 message={`检测到 ${immatureCount} 个未适温材料`}
-                description="AUTO_FIX：允许放行并记录警告；STRICT：将阻止操作。"
+                description="自动修正模式：允许放行并记录警告；严格模式：将阻止操作。"
               />
             ) : null}
 
@@ -232,8 +233,8 @@ export function useWorkbenchBatchOperations(params: {
                   mode = v as 'AutoFix' | 'Strict';
                 }}
                 options={[
-                  { value: 'AutoFix', label: 'AUTO_FIX（允许未适温）' },
-                  { value: 'Strict', label: 'STRICT（未适温则失败）' },
+                  { value: 'AutoFix', label: '自动修正模式（允许未适温）' },
+                  { value: 'Strict', label: '严格模式（未适温则失败）' },
                 ]}
               />
             </Space>
@@ -279,7 +280,7 @@ export function useWorkbenchBatchOperations(params: {
                   <Alert
                     type="warning"
                     showIcon
-                    message={`本次包含 ${violations.length} 个未适温材料（AUTO_FIX 模式允许）`}
+                    message={`本次包含 ${violations.length} 个未适温材料（自动修正模式允许）`}
                   />
                   <Table
                     size="small"

@@ -51,7 +51,7 @@ const FIELD_GROUPS: Array<{ title: string; fields: FieldMeta[] }> = [
         max: 1.2,
         step: 0.01,
         precision: 2,
-        extra: 'used/limit 低于该值不计堵塞，仅提醒；建议 0.90~0.98。',
+        extra: '已用/上限 低于该值不计堵塞，仅提醒；建议 0.90~0.98。',
       },
       {
         key: 'd4_capacity_full_threshold',
@@ -110,25 +110,25 @@ const FIELD_GROUPS: Array<{ title: string; fields: FieldMeta[] }> = [
     fields: [
       {
         key: 'd4_bottleneck_low_threshold',
-        label: 'LOW 阈值',
+        label: '低阈值',
         min: 0,
         max: 1,
         step: 0.01,
         precision: 2,
-        extra: '低于该值为“无”；LOW/MEDIUM 仅作为提醒。',
+        extra: '低于该值为“无”；低/中 仅作为提醒。',
       },
       {
         key: 'd4_bottleneck_medium_threshold',
-        label: 'MEDIUM 阈值',
+        label: '中阈值',
         min: 0,
         max: 1,
         step: 0.01,
         precision: 2,
-        extra: '介于 LOW 与 HIGH 之间为 MEDIUM（提醒）。',
+        extra: '介于 低 与 高 之间为 中等（提醒）。',
       },
       {
         key: 'd4_bottleneck_high_threshold',
-        label: 'HIGH 阈值',
+        label: '高阈值',
         min: 0,
         max: 1,
         step: 0.01,
@@ -137,7 +137,7 @@ const FIELD_GROUPS: Array<{ title: string; fields: FieldMeta[] }> = [
       },
       {
         key: 'd4_bottleneck_critical_threshold',
-        label: 'CRITICAL 阈值',
+        label: '严重阈值',
         min: 0,
         max: 1,
         step: 0.01,
@@ -198,7 +198,7 @@ const BottleneckScoringConfigPanel: React.FC = () => {
       form.setFieldsValue(cfg);
       setReason('');
     } catch (e: any) {
-      console.error('[BottleneckScoringConfigPanel] loadConfig failed:', e);
+      console.error('【堵塞评分配置】加载失败：', e);
       setLoadError(String(e?.message || e || '加载配置失败'));
     } finally {
       setLoading(false);
@@ -238,14 +238,14 @@ const BottleneckScoringConfigPanel: React.FC = () => {
       return '结构违规满载数需大于等于 1';
     }
     const { d4_bottleneck_low_threshold, d4_bottleneck_medium_threshold, d4_bottleneck_high_threshold, d4_bottleneck_critical_threshold } = values;
-    if (d4_bottleneck_low_threshold < 0 || d4_bottleneck_low_threshold > 1) return 'LOW 阈值需在 0~1 之间';
-    if (d4_bottleneck_medium_threshold < 0 || d4_bottleneck_medium_threshold > 1) return 'MEDIUM 阈值需在 0~1 之间';
-    if (d4_bottleneck_high_threshold < 0 || d4_bottleneck_high_threshold > 1) return 'HIGH 阈值需在 0~1 之间';
-    if (d4_bottleneck_critical_threshold < 0 || d4_bottleneck_critical_threshold > 1) return 'CRITICAL 阈值需在 0~1 之间';
+    if (d4_bottleneck_low_threshold < 0 || d4_bottleneck_low_threshold > 1) return '低阈值需在 0~1 之间';
+    if (d4_bottleneck_medium_threshold < 0 || d4_bottleneck_medium_threshold > 1) return '中阈值需在 0~1 之间';
+    if (d4_bottleneck_high_threshold < 0 || d4_bottleneck_high_threshold > 1) return '高阈值需在 0~1 之间';
+    if (d4_bottleneck_critical_threshold < 0 || d4_bottleneck_critical_threshold > 1) return '严重阈值需在 0~1 之间';
     if (!(d4_bottleneck_low_threshold <= d4_bottleneck_medium_threshold
       && d4_bottleneck_medium_threshold <= d4_bottleneck_high_threshold
       && d4_bottleneck_high_threshold <= d4_bottleneck_critical_threshold)) {
-      return '等级阈值需满足 LOW ≤ MEDIUM ≤ HIGH ≤ CRITICAL';
+      return '等级阈值需满足 低 ≤ 中 ≤ 高 ≤ 严重';
     }
     return null;
   };
@@ -277,7 +277,7 @@ const BottleneckScoringConfigPanel: React.FC = () => {
       message.success('堵塞评分参数已保存');
       await loadConfig();
     } catch (e: any) {
-      console.error('[BottleneckScoringConfigPanel] saveConfig failed:', e);
+      console.error('【堵塞评分配置】保存失败：', e);
       message.error(String(e?.message || e || '保存失败'));
     } finally {
       setSaving(false);
@@ -317,7 +317,7 @@ const BottleneckScoringConfigPanel: React.FC = () => {
           description={
             <div>
               <div>分数 = max(产能严重度, 结构偏差严重度, 结构违规严重度) × 100。</div>
-              <div>HIGH/CRITICAL 视为“堵塞”，LOW/MEDIUM 为“提醒”。</div>
+              <div>HIGH/CRITICAL 视为“堵塞”，低/中 为“提醒”。</div>
             </div>
           }
         />
@@ -325,7 +325,7 @@ const BottleneckScoringConfigPanel: React.FC = () => {
           type="warning"
           showIcon
           message="生效方式"
-          description='修改后需执行“刷新/重算”以写入读模型（建议：设置中心保存后进行刷新），D4 实时回退口径会直接读取最新配置。'
+          description='修改后需执行“刷新/重算”以写入读模型（建议：设置中心保存后进行刷新），堵塞评分实时回退口径会直接读取最新配置。'
         />
         {loadError ? (
           <Alert
@@ -369,7 +369,7 @@ const BottleneckScoringConfigPanel: React.FC = () => {
         <Card size="small" title="变更说明">
           <Space direction="vertical" size={8}>
             <Typography.Text>
-              - 产能口径基于 used/limit；仅当超过硬阈值才进入堵塞评分。
+              - 产能口径基于 已用/上限；仅当超过硬阈值才进入堵塞评分。
             </Typography.Text>
             <Typography.Text>
               - 结构偏差使用加权偏差（Σ|实际-目标|/2），并忽略占比过小的品类。

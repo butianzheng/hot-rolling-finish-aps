@@ -17,8 +17,16 @@ import {
 } from 'recharts';
 import { FONT_FAMILIES } from '../../theme';
 import type { ColdStockBucketRow } from './types';
+import { formatNumber } from '../../utils/formatters';
 
 const { Title } = Typography;
+
+const pressureLevelTextMap: Record<string, string> = {
+  CRITICAL: '严重',
+  HIGH: '较高',
+  MEDIUM: '中等',
+  LOW: '较低',
+};
 
 export interface ColdStockCardProps {
   coldStockBuckets: ColdStockBucketRow[];
@@ -49,13 +57,13 @@ export const ColdStockCard: React.FC<ColdStockCardProps> = ({ coldStockBuckets }
                     type="number"
                     dataKey="avgAgeDays"
                     name="平均库龄"
-                    label={{ value: '平均库龄(天)', position: 'insideBottom', offset: -5 }}
+                    label={{ value: '平均库龄（天）', position: 'insideBottom', offset: -5 }}
                   />
                   <YAxis
                     type="number"
                     dataKey="weightT"
-                    name="重量(t)"
-                    label={{ value: '重量(t)', angle: -90, position: 'insideLeft' }}
+                    name="重量（吨）"
+                    label={{ value: '重量（吨）', angle: -90, position: 'insideLeft' }}
                   />
                   <Tooltip
                     cursor={{ strokeDasharray: '3 3' }}
@@ -73,10 +81,10 @@ export const ColdStockCard: React.FC<ColdStockCardProps> = ({ coldStockBuckets }
                           >
                             <div style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>{data.machineCode}</div>
                             <div>库龄分桶: {data.ageBin}</div>
-                            <div>压力等级: {data.pressureLevel}</div>
+                            <div>压力等级: {pressureLevelTextMap[data.pressureLevel] || data.pressureLevel}</div>
                             <div>数量: {data.count}</div>
-                            <div>重量: {data.weightT} 吨</div>
-                            <div>平均库龄: {data.avgAgeDays} 天</div>
+                            <div>重量: {formatNumber(data.weightT, 3)} 吨</div>
+                            <div>平均库龄: {formatNumber(data.avgAgeDays, 1)} 天</div>
                           </div>
                         );
                       }

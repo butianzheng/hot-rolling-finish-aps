@@ -42,7 +42,7 @@ export const HistoryTabContent: React.FC<HistoryTabContentProps> = ({
     },
     { title: '导入人', dataIndex: 'operator', width: 100 },
     {
-      title: '批次ID',
+      title: '批次编号',
       dataIndex: 'id',
       width: 200,
       ellipsis: true,
@@ -94,7 +94,7 @@ export const HistoryTabContent: React.FC<HistoryTabContentProps> = ({
             查看冲突
           </Button>
           <Button size="small" onClick={() => onCopyId(r.id)}>
-            复制ID
+            复制编号
           </Button>
           {onCancelImport && r.import_batch_id && (
             <Popconfirm
@@ -132,7 +132,7 @@ export const HistoryTabContent: React.FC<HistoryTabContentProps> = ({
             onClick={() => {
               Modal.confirm({
                 title: '清空导入历史？',
-                content: '仅清除本机 localStorage 记录，不影响后端数据。',
+                content: '仅清除本机缓存记录，不影响后端数据。',
                 okText: '清空',
                 okButtonProps: { danger: true },
                 cancelText: '取消',
@@ -150,7 +150,7 @@ export const HistoryTabContent: React.FC<HistoryTabContentProps> = ({
         type="info"
         showIcon
         message="说明"
-        description="导入历史暂存于本机 localStorage，用于快速定位批次与冲突；如需全局导入审计/查询，需要后端提供 import_batch 列表接口。"
+        description="导入历史暂存于本机缓存，用于快速定位批次与冲突；如需全局导入审计与查询，需要后端提供导入批次列表接口。"
         style={{ marginBottom: 12 }}
       />
 

@@ -25,6 +25,24 @@ import {
   parseAlertLevel,
   type RollStatus,
 } from '../../types/decision/d5-roll-campaign';
+import { formatWeight } from '../../utils/formatters';
+
+function formatDateTimeText(value: string | null | undefined): string {
+  const text = String(value || '').trim();
+  if (!text) {
+    return '-';
+  }
+  const normalized = text.replace('T', ' ').replace('Z', '');
+  const dateMatch = normalized.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (!dateMatch) {
+    return text;
+  }
+  const timeMatch = normalized.match(/^\d{4}-\d{2}-\d{2}\s(\d{2}:\d{2})(?::(\d{2}))?/);
+  if (!timeMatch) {
+    return dateMatch[1];
+  }
+  return `${dateMatch[1]} ${timeMatch[1]}:${timeMatch[2] || '00'}`;
+}
 
 // ==========================================
 // 主组件
@@ -112,14 +130,14 @@ export const D5RollCampaign: React.FC<D5RollCampaignProps> = ({ embedded, onOpen
       dataIndex: 'campaignStartAt',
       key: 'campaignStartAt',
       width: 170,
-      render: (v: string | undefined) => v || '-',
+      render: (v: string | undefined) => formatDateTimeText(v),
     },
     {
       title: '计划换辊时刻',
       dataIndex: 'plannedChangeAt',
       key: 'plannedChangeAt',
       width: 170,
-      render: (v: string | null | undefined) => v || '-',
+      render: (v: string | null | undefined) => formatDateTimeText(v),
     },
     {
       title: '警报等级',
@@ -160,7 +178,7 @@ export const D5RollCampaign: React.FC<D5RollCampaignProps> = ({ embedded, onOpen
       dataIndex: 'currentTonnageT',
       key: 'currentTonnageT',
       width: 140,
-      render: (weight: number) => `${weight.toFixed(3)}吨`,
+      render: (weight: number) => formatWeight(weight),
       sorter: (a, b) => a.currentTonnageT - b.currentTonnageT,
     },
     {
@@ -168,14 +186,14 @@ export const D5RollCampaign: React.FC<D5RollCampaignProps> = ({ embedded, onOpen
       dataIndex: 'softLimitT',
       key: 'softLimitT',
       width: 120,
-      render: (threshold: number) => `${threshold.toFixed(3)}吨`,
+      render: (threshold: number) => formatWeight(threshold),
     },
     {
       title: '硬限制',
       dataIndex: 'hardLimitT',
       key: 'hardLimitT',
       width: 120,
-      render: (limit: number) => `${limit.toFixed(3)}吨`,
+      render: (limit: number) => formatWeight(limit),
     },
     {
       title: '利用率',
@@ -216,7 +234,7 @@ export const D5RollCampaign: React.FC<D5RollCampaignProps> = ({ embedded, onOpen
       width: 120,
       render: (remaining: number) => (
         <span style={{ color: remaining <= 0 ? '#ff4d4f' : remaining < 500 ? '#faad14' : '#52c41a' }}>
-          {remaining.toFixed(3)}吨
+          {formatWeight(remaining)}
         </span>
       ),
       sorter: (a, b) => a.remainingTonnageT - b.remainingTonnageT,
@@ -227,7 +245,7 @@ export const D5RollCampaign: React.FC<D5RollCampaignProps> = ({ embedded, onOpen
       width: 240,
       render: (_, record) => (
         <span>
-          {record.estimatedSoftReachAt || '-'} / {record.estimatedHardReachAt || record.estimatedHardStopDate || '-'}
+          {formatDateTimeText(record.estimatedSoftReachAt)} / {formatDateTimeText(record.estimatedHardReachAt || record.estimatedHardStopDate)}
         </span>
       ),
     },
@@ -484,16 +502,16 @@ const SevereAlertCard: React.FC<SevereAlertCardProps> = React.memo(
           {/* 吨位信息 */}
           <Descriptions size="small" column={1} bordered>
             <Descriptions.Item label="当前累积">
-              {alert.currentTonnageT.toFixed(3)}吨
+              {formatWeight(alert.currentTonnageT)}
             </Descriptions.Item>
             <Descriptions.Item label="软限制">
-              {alert.softLimitT.toFixed(3)}吨
+              {formatWeight(alert.softLimitT)}
             </Descriptions.Item>
             <Descriptions.Item label="硬限制">
-              {alert.hardLimitT.toFixed(3)}吨
+              {formatWeight(alert.hardLimitT)}
             </Descriptions.Item>
             <Descriptions.Item label="计划换辊">
-              {alert.plannedChangeAt || '-'}
+              {formatDateTimeText(alert.plannedChangeAt)}
             </Descriptions.Item>
           </Descriptions>
 
@@ -519,7 +537,7 @@ const SevereAlertCard: React.FC<SevereAlertCardProps> = React.memo(
           {/* 预计触达软/硬 */}
           {alert.estimatedSoftReachAt || alert.estimatedHardReachAt || alert.estimatedHardStopDate ? (
             <div style={{ fontSize: '12px', color: '#1677ff' }}>
-              预计触达：软 {alert.estimatedSoftReachAt || '-'} / 硬 {alert.estimatedHardReachAt || alert.estimatedHardStopDate || '-'}
+              预计触达：预警线 {formatDateTimeText(alert.estimatedSoftReachAt)} / 上限 {formatDateTimeText(alert.estimatedHardReachAt || alert.estimatedHardStopDate)}
             </div>
           ) : null}
         </Space>

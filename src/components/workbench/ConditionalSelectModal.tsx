@@ -4,6 +4,7 @@ import { DownOutlined } from '@ant-design/icons';
 import { normalizeSchedState } from '../../utils/schedState';
 import type { MaterialPoolMaterial } from './MaterialPool';
 import type { ConditionLockFilter } from '../../pages/workbench/types';
+import { formatWeight } from '../../utils/formatters';
 
 type BatchApplyKey = 'lock' | 'unlock' | 'urgent_on' | 'urgent_off' | 'force_release';
 
@@ -81,7 +82,7 @@ const ConditionalSelectModal: React.FC<ConditionalSelectModalProps> = ({
 
   return (
     <Modal
-      title="按条件选中..."
+      title="按条件选中…"
       open={open}
       onCancel={onClose}
       width={820}
@@ -212,7 +213,7 @@ const ConditionalSelectModal: React.FC<ConditionalSelectModalProps> = ({
           <Space wrap align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
             <Space wrap>
               <Typography.Text>命中 {conditionalSummary.count} 条</Typography.Text>
-              <Typography.Text type="secondary">总重 {conditionalSummary.weight.toFixed(3)}t</Typography.Text>
+              <Typography.Text type="secondary">总重 {formatWeight(conditionalSummary.weight)}</Typography.Text>
             </Space>
             {conditionalSummary.count > 2000 ? <Tag color="orange">命中较多，建议增加筛选条件</Tag> : null}
           </Space>
@@ -234,10 +235,10 @@ const ConditionalSelectModal: React.FC<ConditionalSelectModalProps> = ({
             { title: '状态', dataIndex: 'sched_state', width: 120 },
             { title: '紧急度', dataIndex: 'urgent_level', width: 90, render: (v) => <Tag>{String(v || 'L0')}</Tag> },
             {
-              title: '重量(t)',
+              title: '重量（吨）',
               dataIndex: 'weight_t',
               width: 110,
-              render: (v) => <span style={{ fontFamily: 'monospace' }}>{Number(v || 0).toFixed(2)}</span>,
+              render: (v) => <span style={{ fontFamily: 'monospace' }}>{formatWeight(Number(v || 0))}</span>,
             },
             { title: '钢种', dataIndex: 'steel_mark', ellipsis: true },
           ]}
@@ -248,4 +249,3 @@ const ConditionalSelectModal: React.FC<ConditionalSelectModalProps> = ({
 };
 
 export default React.memo(ConditionalSelectModal);
-

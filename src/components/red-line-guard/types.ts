@@ -82,7 +82,7 @@ export const RED_LINE_META: Record<RedLineType, RedLineMeta> = {
     label: '分层紧急度',
     icon: React.createElement(ThunderboltOutlined),
     color: '#1677ff',
-    description: '紧急度采用L0-L3分层制，非评分制',
+    description: '紧急度采用四级分层制，非评分制',
   },
   CAPACITY_FIRST: {
     label: '容量优先',

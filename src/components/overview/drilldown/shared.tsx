@@ -7,6 +7,7 @@ import { Button, Space, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { ReasonItem } from '../../../types/decision';
 import type { WorkbenchTabKey } from '../../../hooks/useRiskOverviewData';
+import { formatNumber } from '../../../utils/formatters';
 
 export type { WorkbenchTabKey };
 
@@ -74,7 +75,7 @@ const REASON_CODE_LABELS: Record<string, string> = {
  * 获取原因代码的中文标签
  */
 function getReasonCodeLabel(code: string): string {
-  return REASON_CODE_LABELS[code] || code;
+  return REASON_CODE_LABELS[code] || '其他原因';
 }
 
 // Reason table columns
@@ -102,7 +103,7 @@ export const reasonColumns: ColumnsType<ReasonItem> = [
     dataIndex: 'weight',
     key: 'weight',
     width: 90,
-    render: (v: number) => `${(Number(v || 0) * 100).toFixed(2)}%`,
+    render: (v: number) => `${formatNumber(Number(v || 0) * 100, 2)}%`,
   },
   {
     title: '影响数',

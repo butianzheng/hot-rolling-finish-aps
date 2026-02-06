@@ -114,7 +114,7 @@ export function useRiskDashboard(): UseRiskDashboardReturn {
 
         setLoadError(errors.length ? errors.join('；') : null);
       } catch (e: any) {
-        console.error('[RiskDashboard] load failed:', e);
+        console.error('【风险看板】加载失败：', e);
         setLoadError(e?.message || '数据加载失败');
       } finally {
         setLoading(false);

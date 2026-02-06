@@ -176,7 +176,7 @@ describe('exportHelpers', () => {
 
       await exportRetrospectiveReport(context);
       expect(exportJSON).toHaveBeenCalled();
-      expect(message.success).toHaveBeenCalledWith('已导出复盘总结（JSON）');
+      expect(message.success).toHaveBeenCalledWith('已导出复盘总结（数据文件）');
     });
 
     it('compareResult 缺失时应该提前返回', async () => {
@@ -239,7 +239,7 @@ describe('exportHelpers', () => {
 
       await exportReportMarkdown(context);
       expect(exportMarkdown).toHaveBeenCalled();
-      expect(message.success).toHaveBeenCalledWith('已导出（Markdown）');
+      expect(message.success).toHaveBeenCalledWith('已导出（文档）');
     });
 
     it('错误时应该显示错误信息', async () => {
@@ -314,7 +314,7 @@ describe('exportHelpers', () => {
 
       await exportReportHTML(context);
       expect(exportHTML).toHaveBeenCalled();
-      expect(message.success).toHaveBeenCalledWith('已导出（HTML）');
+      expect(message.success).toHaveBeenCalledWith('已导出（网页）');
     });
 
     it('应该渲染配置变化和物料变更明细', async () => {

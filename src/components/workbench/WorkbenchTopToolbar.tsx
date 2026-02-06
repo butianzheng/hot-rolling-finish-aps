@@ -72,7 +72,7 @@ const WorkbenchTopToolbar: React.FC<{
                 { key: 'machine', label: '机组配置（产能池）' },
                 { type: 'divider' },
                 { key: 'system', label: '系统配置' },
-                { key: 'path_rule', label: '路径规则（v0.6）' },
+                { key: 'path_rule', label: '路径规则（0.6版）' },
                 { key: 'logs', label: '操作日志' },
               ],
             }}

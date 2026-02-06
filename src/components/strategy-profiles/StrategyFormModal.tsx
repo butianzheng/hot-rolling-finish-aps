@@ -53,11 +53,11 @@ export const StrategyFormModal: React.FC<StrategyFormModalProps> = ({
     >
       <Form form={form} layout="vertical">
         <Form.Item
-          label="策略ID（仅字母/数字/_/-）"
+          label="策略编号（仅字母、数字、下划线、短横线）"
           name="strategy_id"
-          rules={[{ required: true, message: '请输入策略ID' }]}
+          rules={[{ required: true, message: '请输入策略编号' }]}
         >
-          <Input disabled={mode === 'edit'} placeholder="例如：custom_balanced_ab12cd" />
+          <Input disabled={mode === 'edit'} placeholder="例如：自定义_均衡方案_01" />
         </Form.Item>
 
         <Form.Item
@@ -138,10 +138,10 @@ export const StrategyFormModal: React.FC<StrategyFormModalProps> = ({
             <Form.Item
               label={
                 <span>
-                  紧急权重 <Typography.Text type="secondary">(urgent_weight)</Typography.Text>
+                  紧急权重 <Typography.Text type="secondary">（紧急参数）</Typography.Text>
                 </span>
               }
-              tooltip="0~100；值越大越优先排入更高紧急等级（L2/L3）的材料。"
+              tooltip="0~100；值越大越优先排入更高紧急等级（二级/三级）的材料。"
               name={['parameters', 'urgent_weight']}
             >
               <InputNumber min={0} max={100} style={{ width: 140 }} />
@@ -149,7 +149,7 @@ export const StrategyFormModal: React.FC<StrategyFormModalProps> = ({
             <Form.Item
               label={
                 <span>
-                  重量权重 <Typography.Text type="secondary">(capacity_weight)</Typography.Text>
+                  重量权重 <Typography.Text type="secondary">（吨位参数）</Typography.Text>
                 </span>
               }
               tooltip="0~100；按材料吨位加权，值越大越倾向优先排“大重量”材料（更容易填满产能）。"
@@ -160,7 +160,7 @@ export const StrategyFormModal: React.FC<StrategyFormModalProps> = ({
             <Form.Item
               label={
                 <span>
-                  冷坨权重 <Typography.Text type="secondary">(cold_stock_weight)</Typography.Text>
+                  冷坨权重 <Typography.Text type="secondary">（冷库参数）</Typography.Text>
                 </span>
               }
               tooltip="0~100；按库龄（天）加权，值越大越优先消化库龄更大的材料。"
@@ -171,7 +171,7 @@ export const StrategyFormModal: React.FC<StrategyFormModalProps> = ({
             <Form.Item
               label={
                 <span>
-                  交期权重 <Typography.Text type="secondary">(due_date_weight)</Typography.Text>
+                  交期权重 <Typography.Text type="secondary">（交期参数）</Typography.Text>
                 </span>
               }
               tooltip="0~100；按交期紧迫度加权（越临期/逾期越优先）。"
@@ -183,7 +183,7 @@ export const StrategyFormModal: React.FC<StrategyFormModalProps> = ({
               label={
                 <span>
                   出炉时长权重{' '}
-                  <Typography.Text type="secondary">(rolling_output_age_weight)</Typography.Text>
+                  <Typography.Text type="secondary">（出炉时长参数）</Typography.Text>
                 </span>
               }
               tooltip="0~100；按出炉时长（天）加权，值越大越优先排“出炉更久”的材料。"
@@ -194,8 +194,8 @@ export const StrategyFormModal: React.FC<StrategyFormModalProps> = ({
             <Form.Item
               label={
                 <span>
-                  冷坨起算阈值(天){' '}
-                  <Typography.Text type="secondary">(cold_stock_age_threshold_days)</Typography.Text>
+                  冷坨起算阈值（天）{' '}
+                  <Typography.Text type="secondary">（冷库阈值参数）</Typography.Text>
                 </span>
               }
               tooltip="0~365；库龄低于该阈值的材料不计入“冷坨”评分（可避免轻微库龄扰动排序）。"
@@ -206,8 +206,8 @@ export const StrategyFormModal: React.FC<StrategyFormModalProps> = ({
             <Form.Item
               label={
                 <span>
-                  产能溢出容忍(0~1){' '}
-                  <Typography.Text type="secondary">(overflow_tolerance_pct)</Typography.Text>
+                  产能溢出容忍（0~1）{' '}
+                  <Typography.Text type="secondary">（溢出容忍参数）</Typography.Text>
                 </span>
               }
               tooltip="预留参数：当前版本暂未参与排产计算；0.05 表示容忍 5% 溢出。"
@@ -223,7 +223,7 @@ export const StrategyFormModal: React.FC<StrategyFormModalProps> = ({
           name="reason"
           rules={[{ required: true, message: '请输入保存原因' }]}
         >
-          <Input.TextArea rows={2} placeholder="例如：为保障 L3 订单，提升紧急权重" />
+          <Input.TextArea rows={2} placeholder="例如：为保障三级订单，提升紧急权重" />
         </Form.Item>
       </Form>
     </Modal>

@@ -96,18 +96,18 @@ describe('formatters', () => {
 
   describe('formatWeight', () => {
     it('应该格式化吨位（保留3位小数）', () => {
-      expect(formatWeight(123.456789)).toBe('123.457t');
-      expect(formatWeight(100.123456)).toBe('100.123t');
+      expect(formatWeight(123.456789)).toBe('123.457吨');
+      expect(formatWeight(100.123456)).toBe('100.123吨');
     });
 
     it('应该处理整数吨位', () => {
-      expect(formatWeight(100)).toBe('100.000t');
+      expect(formatWeight(100)).toBe('100.000吨');
     });
 
     it('应该处理小数吨位', () => {
-      expect(formatWeight(0.123)).toBe('0.123t');
-      expect(formatWeight(0.001)).toBe('0.001t');
-      expect(formatWeight(0.0001)).toBe('0.000t');
+      expect(formatWeight(0.123)).toBe('0.123吨');
+      expect(formatWeight(0.001)).toBe('0.001吨');
+      expect(formatWeight(0.0001)).toBe('0.000吨');
     });
 
     it('应该处理 null 返回 -', () => {
@@ -128,11 +128,11 @@ describe('formatters', () => {
     });
 
     it('应该处理负数吨位', () => {
-      expect(formatWeight(-50.123)).toBe('-50.123t');
+      expect(formatWeight(-50.123)).toBe('-50.123吨');
     });
 
     it('应该处理零吨位', () => {
-      expect(formatWeight(0)).toBe('0.000t');
+      expect(formatWeight(0)).toBe('0.000吨');
     });
   });
 
@@ -180,13 +180,13 @@ describe('formatters', () => {
 
   describe('formatCapacity', () => {
     it('应该格式化产能（保留3位小数）', () => {
-      expect(formatCapacity(1234.567)).toBe('1234.567');
+      expect(formatCapacity(1234.567)).toBe('1,234.567');
       expect(formatCapacity(100.12)).toBe('100.120');
       expect(formatCapacity(100.123456)).toBe('100.123');
     });
 
     it('应该处理整数产能', () => {
-      expect(formatCapacity(1000)).toBe('1000.000');
+      expect(formatCapacity(1000)).toBe('1,000.000');
     });
 
     it('应该处理小数产能', () => {

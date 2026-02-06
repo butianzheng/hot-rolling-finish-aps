@@ -67,8 +67,8 @@ const ActionLogQuery: React.FC = () => {
             <Dropdown
               menu={{
                 items: [
-                  { label: '导出为 CSV', key: 'csv', onClick: handleExportCSV },
-                  { label: '导出为 JSON', key: 'json', onClick: handleExportJSON },
+                  { label: '导出为表格文件', key: 'csv', onClick: handleExportCSV },
+                  { label: '导出为数据文件', key: 'json', onClick: handleExportJSON },
                 ],
               }}
             >

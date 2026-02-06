@@ -67,7 +67,7 @@ export function useMachineConfig(versionId: string): UseMachineConfigReturn {
         const data = await machineConfigApi.getMachineCapacityConfigs(versionId);
         return data || [];
       } catch (e: any) {
-        console.error('[MachineConfig] query failed:', e);
+        console.error('【机组配置】查询失败：', e);
         message.error(e?.message || '加载机组配置失败');
         throw e;
       }
@@ -96,7 +96,7 @@ export function useMachineConfig(versionId: string): UseMachineConfigReturn {
         message.success(response.message);
         return response;
       } catch (e: any) {
-        console.error('[MachineConfig] update failed:', e);
+        console.error('【机组配置】更新失败：', e);
         message.error(e?.message || '更新机组配置失败');
         throw e;
       }
@@ -117,7 +117,7 @@ export function useMachineConfig(versionId: string): UseMachineConfigReturn {
         );
         return response;
       } catch (e: any) {
-        console.error('[MachineConfig] apply failed:', e);
+        console.error('【机组配置】应用失败：', e);
         message.error(e?.message || '应用配置失败');
         throw e;
       }
@@ -132,7 +132,7 @@ export function useMachineConfig(versionId: string): UseMachineConfigReturn {
         const history = await machineConfigApi.getMachineConfigHistory(machineCode);
         setConfigHistory(history || []);
       } catch (e: any) {
-        console.error('[MachineConfig] history query failed:', e);
+        console.error('【机组配置】历史查询失败：', e);
         message.error(e?.message || '查询配置历史失败');
         setConfigHistory([]);
       }

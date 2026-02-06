@@ -69,7 +69,7 @@ export function useOneClickOptimize({
       setSimulateResult(res);
       message.success('试算完成');
     } catch (e: any) {
-      console.error('[OneClickOptimizeMenu] simulate failed:', e);
+      console.error('【一键优化】模拟执行失败：', e);
       message.error(e?.message || '试算失败');
       setSimulateResult(null);
     } finally {
@@ -103,7 +103,7 @@ export function useOneClickOptimize({
       setPreviewOpen(false);
       setSimulateResult(null);
     } catch (e: any) {
-      console.error('[OneClickOptimizeMenu] execute failed:', e);
+      console.error('【一键优化】正式执行失败：', e);
       message.error(e?.message || '重算失败');
     } finally {
       setExecuteLoading(false);

@@ -7,6 +7,7 @@ import { Alert, Button, Card, Space, Table, Tag, Typography } from 'antd';
 import type { EChartsOption } from 'echarts';
 import type { LocalCapacityDeltaRow } from './localTypes';
 import { Chart } from './Chart';
+import { formatNumber } from '../../utils/formatters';
 
 const { Text } = Typography;
 
@@ -60,10 +61,10 @@ export const CapacityDeltaCard: React.FC<CapacityDeltaCardProps> = ({
             {showAllCapacityRows ? '仅看变化' : '查看全量'}
           </Button>
           <Button size="small" onClick={() => onExportCapacity?.('csv')} disabled={!localCapacityRows}>
-            导出产能(CSV)
+            导出产能（表格）
           </Button>
           <Button size="small" onClick={() => onExportCapacity?.('json')} disabled={!localCapacityRows}>
-            导出产能(JSON)
+            导出产能（数据）
           </Button>
         </Space>
       }
@@ -88,14 +89,14 @@ export const CapacityDeltaCard: React.FC<CapacityDeltaCardProps> = ({
           )}
 
           <Space wrap>
-            <Tag color="blue">总量A {localCapacityRowsBase.totalA.toFixed(3)}t</Tag>
-            <Tag color="blue">总量B {localCapacityRowsBase.totalB.toFixed(3)}t</Tag>
+            <Tag color="blue">总量甲 {formatNumber(localCapacityRowsBase.totalA, 3)}吨</Tag>
+            <Tag color="blue">总量乙 {formatNumber(localCapacityRowsBase.totalB, 3)}吨</Tag>
             <Tag
               color={
                 localCapacityRowsBase.totalB - localCapacityRowsBase.totalA >= 0 ? 'green' : 'red'
               }
             >
-              Δ {(localCapacityRowsBase.totalB - localCapacityRowsBase.totalA).toFixed(3)}t
+              变化值 {formatNumber(localCapacityRowsBase.totalB - localCapacityRowsBase.totalA, 3)}吨
             </Tag>
             {localCapacityRows ? (
               <Tag color={localCapacityRows.overflowRows.length > 0 ? 'red' : 'green'}>
@@ -126,41 +127,41 @@ export const CapacityDeltaCard: React.FC<CapacityDeltaCardProps> = ({
               { title: '日期', dataIndex: 'date', width: 120 },
               { title: '机组', dataIndex: 'machine_code', width: 90 },
               {
-                title: 'A已用(t)',
+                title: '版本甲已用（吨）',
                 dataIndex: 'used_a',
                 width: 110,
-                render: (v: number) => v.toFixed(3),
+                render: (v: number) => formatNumber(v, 3, { useGrouping: false }),
               },
               {
-                title: 'B已用(t)',
+                title: '版本乙已用（吨）',
                 dataIndex: 'used_b',
                 width: 110,
                 render: (v: number, r) => {
                   const threshold = r.limit_b ?? r.target_b ?? null;
                   const over = threshold != null && v > threshold + 1e-9;
-                  return <span style={{ color: over ? '#cf1322' : undefined }}>{v.toFixed(3)}</span>;
+                  return <span style={{ color: over ? '#cf1322' : undefined }}>{formatNumber(v, 3, { useGrouping: false })}</span>;
                 },
               },
               {
-                title: 'Δ(t)',
+                title: '变化值（吨）',
                 dataIndex: 'delta',
                 width: 110,
                 render: (v: number) => (
                   <span style={{ color: v > 1e-9 ? '#3f8600' : v < -1e-9 ? '#cf1322' : undefined }}>
-                    {v.toFixed(3)}
+                    {formatNumber(v, 3, { useGrouping: false })}
                   </span>
                 ),
               },
               {
-                title: 'B目标/上限',
+                title: '版本乙目标/上限',
                 key: 'capB',
                 width: 160,
                 render: (_, r) => {
                   const target = r.target_b;
                   const limit = r.limit_b;
                   if (target == null && limit == null) return '-';
-                  const t = target == null ? '-' : target.toFixed(3);
-                  const l = limit == null ? '-' : limit.toFixed(3);
+                  const t = target == null ? '-' : formatNumber(target, 3, { useGrouping: false });
+                  const l = limit == null ? '-' : formatNumber(limit, 3, { useGrouping: false });
                   return `${t} / ${l}`;
                 },
               },

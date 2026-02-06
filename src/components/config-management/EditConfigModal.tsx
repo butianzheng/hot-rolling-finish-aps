@@ -5,7 +5,7 @@
 import React from 'react';
 import { Descriptions, Input, Modal, Space, Tag } from 'antd';
 import type { ConfigItem } from './types';
-import { scopeTypeColors, configDescriptions } from './types';
+import { scopeTypeColors, scopeTypeLabels, configDescriptions } from './types';
 
 export interface EditConfigModalProps {
   open: boolean;
@@ -44,10 +44,10 @@ export const EditConfigModal: React.FC<EditConfigModalProps> = ({
           <Descriptions bordered column={1} size="small">
             <Descriptions.Item label="作用域类型">
               <Tag color={scopeTypeColors[config.scope_type]}>
-                {config.scope_type}
+                {scopeTypeLabels[config.scope_type] || config.scope_type}
               </Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="作用域ID">
+            <Descriptions.Item label="作用域编号">
               {config.scope_id}
             </Descriptions.Item>
             <Descriptions.Item label="配置键">
@@ -59,7 +59,7 @@ export const EditConfigModal: React.FC<EditConfigModalProps> = ({
           </Descriptions>
 
           <div style={{ marginTop: 16 }}>
-            <label>配置值:</label>
+            <label>配置值：</label>
             <Input
               style={{ marginTop: 8 }}
               value={editValue}
@@ -69,7 +69,7 @@ export const EditConfigModal: React.FC<EditConfigModalProps> = ({
           </div>
 
           <div>
-            <label>修改原因(必填):</label>
+            <label>修改原因（必填）：</label>
             <Input.TextArea
               style={{ marginTop: 8 }}
               placeholder="请输入修改原因"

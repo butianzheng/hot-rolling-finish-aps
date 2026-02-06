@@ -151,7 +151,7 @@ export function buildSqueezedOutHintSections(
   const notes: string[] = [
     `比较窗口：${windowStartDate} ~ ${windowEndDate}`,
     '挤出=草案窗口内未排入（若被排到窗口外，也会显示为挤出）',
-    '说明：以下提示仅基于 material_state 字段（未额外查库）',
+    '说明：以下提示仅基于 当前状态字段（未额外查库）',
   ];
 
   sections.push({ title: '含义/范围', lines: notes });
@@ -171,10 +171,10 @@ export function buildSqueezedOutHintSections(
         key.push(`距适温：${readyInDays} 天（预计适温日：${readyDate}）`);
       }
     } else {
-      key.push('已适温（ready_in_days <= 0）');
+      key.push('已适温（可排）');
     }
   } else if (state?.is_mature != null) {
-    key.push(asBool(state?.is_mature) ? '已适温（is_mature=1）' : '未适温（is_mature=0）');
+    key.push(asBool(state?.is_mature) ? '已适温（是）' : '未适温（否）');
   }
 
   const earliest = String(state?.earliest_sched_date ?? '').trim();
@@ -212,11 +212,11 @@ export function buildSqueezedOutHintSections(
   const scheduledMachine = String(state?.scheduled_machine_code ?? '').trim();
   const seqNo = state?.seq_no;
   if (scheduledDate || scheduledMachine) {
-    cur.push(`已排（material_state）：${scheduledMachine || '-'} / ${scheduledDate || '-'} / #${seqNo ?? '-'}`);
+    cur.push(`已排（当前状态）：${scheduledMachine || '-'} / ${scheduledDate || '-'} / #${seqNo ?? '-'}`);
   } else {
-    cur.push('已排（material_state）：未排');
+    cur.push('已排（当前状态）：未排');
   }
-  if (cur.length) sections.push({ title: '当前状态（material_state）', lines: cur });
+  if (cur.length) sections.push({ title: '当前状态（状态表）', lines: cur });
 
   return sections;
 }

@@ -6,6 +6,7 @@ import React from 'react';
 import { Descriptions, Typography } from 'antd';
 import { FONT_FAMILIES } from '../../theme';
 import type { Material } from './types';
+import { formatWeight } from '../../utils/formatters';
 
 const { Text } = Typography;
 
@@ -29,7 +30,7 @@ export const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({ material }) 
       </Descriptions.Item>
       <Descriptions.Item label="重量">
         <Text style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>
-          {material.weight_t ? `${material.weight_t.toFixed(3)} 吨` : '-'}
+          {material.weight_t != null ? formatWeight(material.weight_t) : '-'}
         </Text>
       </Descriptions.Item>
       <Descriptions.Item label="钢种">

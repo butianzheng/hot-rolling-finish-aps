@@ -131,7 +131,7 @@ export function parseCsvPreviewAsync(
     const handleError = (error: ErrorEvent) => {
       worker.removeEventListener('message', handleMessage);
       worker.removeEventListener('error', handleError);
-      reject(new Error(error.message || 'Worker 执行失败'));
+      reject(new Error(error.message || '工作线程执行失败'));
     };
 
     worker.addEventListener('message', handleMessage);

@@ -60,14 +60,14 @@ export function createRiskSnapshotColumns(
       ),
     },
     {
-      title: '产能利用率(%)',
+      title: '产能利用率（%）',
       dataIndex: 'capacityUtilPct',
       key: 'capacityUtilPct',
       width: 100,
       render: (val: number) => formatNumber(val, 1),
     },
     {
-      title: '超载吨数(t)',
+      title: '超载吨数（吨）',
       dataIndex: 'overloadWeightT',
       key: 'overloadWeightT',
       width: 100,

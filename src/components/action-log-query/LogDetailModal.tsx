@@ -112,12 +112,12 @@ function buildPayloadKVs(log: ActionLog): { items: KV[]; configList?: Array<{ sc
     case 'RESTORE_CONFIG': {
       push('原因', raw.reason, 2);
       if (typeof raw.snapshot_json === 'string') {
-        push('快照JSON', `（已保存，可在下方查看原始JSON）`, 2);
+        push('快照数据', `（已保存，可在下方查看原始数据）`, 2);
       }
       return { items, raw };
     }
     case 'SAVE_CUSTOM_STRATEGY': {
-      push('策略ID', raw.strategy_id);
+      push('策略编号', raw.strategy_id);
       push('策略名称', raw.title);
       push('基于预设策略', raw.base_strategy);
       push('保存原因', raw.reason, 2);
@@ -131,7 +131,7 @@ function buildPayloadKVs(log: ActionLog): { items: KV[]; configList?: Array<{ sc
     case 'UNLOCK_MATERIALS': {
       const ids = Array.isArray(raw.material_ids) ? raw.material_ids : [];
       push('材料数', ids.length);
-      push('材料ID列表', ids, 2);
+      push('材料编号列表', ids, 2);
       push('锁定标志', raw.lock_flag);
       push('原因', raw.reason, 2);
       return { items, raw };
@@ -139,7 +139,7 @@ function buildPayloadKVs(log: ActionLog): { items: KV[]; configList?: Array<{ sc
     case 'FORCE_RELEASE': {
       const ids = Array.isArray(raw.material_ids) ? raw.material_ids : [];
       push('材料数', ids.length);
-      push('材料ID列表', ids, 2);
+      push('材料编号列表', ids, 2);
       if (raw.immature_count != null) push('未适温数量', raw.immature_count);
       if (raw.violations != null) push('违规明细', raw.violations, 2);
       push('原因', raw.reason, 2);
@@ -148,7 +148,7 @@ function buildPayloadKVs(log: ActionLog): { items: KV[]; configList?: Array<{ sc
     case 'SET_URGENT': {
       const ids = Array.isArray(raw.material_ids) ? raw.material_ids : [];
       push('材料数', ids.length);
-      push('材料ID列表', ids, 2);
+      push('材料编号列表', ids, 2);
       push('人工紧急标志', raw.manual_urgent_flag);
       push('原因', raw.reason, 2);
       return { items, raw };
@@ -166,8 +166,8 @@ function buildPayloadKVs(log: ActionLog): { items: KV[]; configList?: Array<{ sc
       push('机组', raw.machine_code);
       push('批次号', raw.campaign_no);
       push('开始日期', raw.start_date);
-      push('建议阈值(吨)', raw.suggest_threshold_t);
-      push('硬限制(吨)', raw.hard_limit_t);
+      push('建议阈值（吨）', raw.suggest_threshold_t);
+      push('硬限制（吨）', raw.hard_limit_t);
       push('原因', raw.reason, 2);
       return { items, raw };
     }
@@ -186,8 +186,8 @@ function buildPayloadKVs(log: ActionLog): { items: KV[]; configList?: Array<{ sc
       return { items, raw };
     }
     case 'APPLY_STRATEGY_DRAFT': {
-      push('草案ID', raw.draft_id);
-      push('基准版本ID', raw.base_version_id);
+      push('草案编号', raw.draft_id);
+      push('基准版本编号', raw.base_version_id);
       push('计划范围', `${raw.plan_date_from ?? '-'} ~ ${raw.plan_date_to ?? '-'}`, 2);
       push('窗口天数', raw.window_days);
       push('策略', raw.strategy);
@@ -197,7 +197,7 @@ function buildPayloadKVs(log: ActionLog): { items: KV[]; configList?: Array<{ sc
       return { items, raw };
     }
     case 'ROLLBACK_VERSION': {
-      push('方案ID', raw.plan_id);
+      push('方案编号', raw.plan_id);
       push('方案名称', raw.plan_name, 2);
       push('回滚前版本', `V${raw.from_version_no ?? '-'}（${raw.from_version_id ?? '-'}）`, 2);
       push('回滚到版本', `V${raw.to_version_no ?? '-'}（${raw.to_version_id ?? '-'}）`, 2);
@@ -207,8 +207,8 @@ function buildPayloadKVs(log: ActionLog): { items: KV[]; configList?: Array<{ sc
       return { items, raw };
     }
     case 'MANUAL_REFRESH_DECISION': {
-      push('版本ID', raw.version_id);
-      push('任务ID', raw.task_id);
+      push('版本编号', raw.version_id);
+      push('任务编号', raw.task_id);
       push('是否成功', raw.success);
       push('返回信息', raw.message, 2);
       return { items, raw };
@@ -241,7 +241,7 @@ function buildImpactKVs(log: ActionLog): { items: KV[]; raw?: any } {
     push('冻结项数量', raw.frozen_items_count);
     push('适温材料数', raw.mature_count);
     push('未适温材料数', raw.immature_count);
-    if (raw.elapsed_ms != null) push('耗时(ms)', raw.elapsed_ms);
+    if (raw.elapsed_ms != null) push('耗时（毫秒）', raw.elapsed_ms);
     return { items, raw };
   }
 
@@ -296,7 +296,7 @@ export const LogDetailModal: React.FC<LogDetailModalProps> = ({
       {log && (
         <div>
           <Descriptions bordered column={2} size="small">
-            <Descriptions.Item label="操作ID" span={2}>
+            <Descriptions.Item label="操作编号" span={2}>
               <Typography.Text copyable>{log.action_id}</Typography.Text>
             </Descriptions.Item>
             <Descriptions.Item label="操作时间" span={2}>
@@ -310,7 +310,7 @@ export const LogDetailModal: React.FC<LogDetailModalProps> = ({
             <Descriptions.Item label="操作人">
               <Typography.Text copyable>{log.actor}</Typography.Text>
             </Descriptions.Item>
-            <Descriptions.Item label="版本ID">
+            <Descriptions.Item label="版本编号">
               {log.version_id ? <Typography.Text copyable>{log.version_id}</Typography.Text> : '-'}
             </Descriptions.Item>
             <Descriptions.Item label="机组">
@@ -372,7 +372,7 @@ export const LogDetailModal: React.FC<LogDetailModalProps> = ({
                 items={[
                   {
                     key: 'raw_payload',
-                    label: '查看原始 Payload JSON',
+                    label: '查看原始请求数据',
                     children: renderJson(log.payload_json),
                   },
                 ]}
@@ -400,7 +400,7 @@ export const LogDetailModal: React.FC<LogDetailModalProps> = ({
                 items={[
                   {
                     key: 'raw_impact',
-                    label: '查看原始 Impact Summary JSON',
+                    label: '查看原始影响摘要数据',
                     children: renderJson(log.impact_summary_json),
                   },
                 ]}

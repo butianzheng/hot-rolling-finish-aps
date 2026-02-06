@@ -154,18 +154,18 @@ export const ImportTabContent: React.FC<ImportTabContentProps> = ({
               <Row gutter={12}>
                 <Col xs={24} md={12}>
                   <Form.Item
-                    label="批次标识（source_batch_id）"
-                    tooltip="用于前端/审计标识；实际落库批次ID将在导入后返回"
+                    label="批次标识"
+                    tooltip="用于前端与审计标识；实际落库批次编号将在导入后返回"
                   >
                     <Input
                       value={batchId}
                       onChange={(e) => onBatchIdChange(e.target.value)}
-                      placeholder="例如：BATCH_20260126_001"
+                      placeholder="例如：批次_20260126_001"
                     />
                   </Form.Item>
                 </Col>
                 <Col xs={24} md={12}>
-                  <Form.Item label="映射配置ID（可选）" tooltip="预留字段，当前后端未启用映射配置">
+                  <Form.Item label="映射配置编号（可选）" tooltip="预留字段，当前后端暂未启用映射配置">
                     <Input
                       value={mappingProfileId}
                       onChange={(e) => onMappingProfileIdChange(e.target.value)}
@@ -230,14 +230,14 @@ export const ImportTabContent: React.FC<ImportTabContentProps> = ({
                 </Col>
                 <Col span={12}>
                   <Statistic
-                    title="阻断 (ERROR)"
+                    title="阻断（错误）"
                     value={Number(importResult.dq_summary?.blocked || 0)}
                     valueStyle={{ color: '#ff4d4f' }}
                   />
                 </Col>
                 <Col span={12}>
                   <Statistic
-                    title="警告 (WARNING)"
+                    title="警告（提示）"
                     value={Number(importResult.dq_summary?.warning || 0)}
                     valueStyle={{ color: '#1677ff' }}
                   />
@@ -245,17 +245,17 @@ export const ImportTabContent: React.FC<ImportTabContentProps> = ({
               </Row>
 
               <Descriptions column={1} size="small" bordered>
-                <Descriptions.Item label="source_batch_id">
+                <Descriptions.Item label="来源批次标识">
                   <Text style={{ fontFamily: 'monospace' }}>{importResult.batch_id || '-'}</Text>
                 </Descriptions.Item>
-                <Descriptions.Item label="import_batch_id">
+                <Descriptions.Item label="导入批次标识">
                   <Text style={{ fontFamily: 'monospace' }}>{importResult.import_batch_id || '-'}</Text>
                 </Descriptions.Item>
                 <Descriptions.Item label="耗时">{formatMs(importResult.elapsed_ms)}</Descriptions.Item>
               </Descriptions>
 
               {dqStats.topFields.length > 0 && (
-                <Card size="small" title="DQ 摘要（Top 字段）">
+                <Card size="small" title="数据质量摘要（高频字段）">
                   <Table
                     size="small"
                     pagination={false}

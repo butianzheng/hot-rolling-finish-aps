@@ -77,7 +77,7 @@ export const exportRetrospectiveReport = async (context: ExportContext): Promise
       2
     );
     exportJSON(JSON.parse(json), '复盘总结');
-    message.success('已导出复盘总结（JSON）');
+    message.success('已导出复盘总结（数据文件）');
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : '导出失败';
     message.error(errorMessage);
@@ -123,7 +123,7 @@ export const exportReportMarkdown = async (context: ExportContext): Promise<void
 
   try {
     exportMarkdown(header + backendSummary + localSummary + configSection + diffsSection + capacitySection + retrospectiveSection, '版本对比报告');
-    message.success('已导出（Markdown）');
+    message.success('已导出（文档）');
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : '导出失败';
     message.error(errorMessage);
@@ -242,7 +242,7 @@ export const exportReportHTML = async (context: ExportContext): Promise<void> =>
 
   try {
     exportHTML(html, '版本对比报告');
-    message.success('已导出（HTML）');
+    message.success('已导出（网页）');
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : '导出失败';
     message.error(errorMessage);

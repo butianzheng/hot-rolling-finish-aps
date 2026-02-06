@@ -6,6 +6,7 @@ import React from 'react';
 import { Button, Descriptions, Space, Table, Tag, Typography, theme } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { CapacityOpportunity } from '../../../types/decision';
+import { formatCapacity, formatNumber, formatWeight } from '../../../utils/formatters';
 import {
   OPPORTUNITY_TYPE_COLORS,
   OPPORTUNITY_TYPE_LABELS,
@@ -63,14 +64,14 @@ export const CapacityOpportunityContent: React.FC<CapacityOpportunityContentProp
       dataIndex: 'currentUtilPct',
       key: 'currentUtilPct',
       width: 110,
-      render: (v: number) => `${Number(v || 0).toFixed(2)}%`,
+      render: (v: number) => `${formatNumber(Number(v || 0), 2)}%`,
     },
     {
-      title: '机会(吨)',
+      title: '机会（吨）',
       dataIndex: 'opportunitySpaceT',
       key: 'opportunitySpaceT',
       width: 110,
-      render: (v: number) => `${Number(v || 0).toFixed(3)}`,
+      render: (v: number) => formatWeight(Number(v || 0)),
     },
     {
       title: '描述',
@@ -116,7 +117,7 @@ export const CapacityOpportunityContent: React.FC<CapacityOpportunityContentProp
           <Space wrap align="center">
             <Tag color="blue">{selected.machineCode}</Tag>
             <Text strong>
-              {selected.planDate} · 机会 {selected.opportunitySpaceT.toFixed(3)}t
+              {selected.planDate} · 机会 {formatWeight(selected.opportunitySpaceT)}
             </Text>
             {onGoWorkbench ? (
               <Button
@@ -130,12 +131,12 @@ export const CapacityOpportunityContent: React.FC<CapacityOpportunityContentProp
           </Space>
 
           <Descriptions column={4} bordered size="small">
-            <Descriptions.Item label="当前利用率">{selected.currentUtilPct.toFixed(2)}%</Descriptions.Item>
-            <Descriptions.Item label="优化后利用率">{selected.optimizedUtilPct.toFixed(2)}%</Descriptions.Item>
+            <Descriptions.Item label="当前利用率">{formatNumber(selected.currentUtilPct, 2)}%</Descriptions.Item>
+            <Descriptions.Item label="优化后利用率">{formatNumber(selected.optimizedUtilPct, 2)}%</Descriptions.Item>
             <Descriptions.Item label="已用/目标">
-              {selected.usedCapacityT.toFixed(3)} / {selected.targetCapacityT.toFixed(3)}t
+              {formatCapacity(selected.usedCapacityT)} / {formatCapacity(selected.targetCapacityT)} 吨
             </Descriptions.Item>
-            <Descriptions.Item label="机会空间">{selected.opportunitySpaceT.toFixed(3)}t</Descriptions.Item>
+            <Descriptions.Item label="机会空间">{formatWeight(selected.opportunitySpaceT)}</Descriptions.Item>
           </Descriptions>
 
           {selected.description ? (

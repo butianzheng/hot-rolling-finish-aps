@@ -4,6 +4,7 @@
 
 import React from 'react';
 import { Card, Col, Row, Statistic } from 'antd';
+import { formatNumber } from '../../utils/formatters';
 import type { Statistics } from './types';
 
 export interface StatisticsCardsProps {
@@ -24,7 +25,7 @@ export const StatisticsCards: React.FC<StatisticsCardsProps> = ({ statistics }) 
         <Card>
           <Statistic
             title="总吨位"
-            value={statistics.total_weight.toFixed(3)}
+            value={formatNumber(statistics.total_weight, 3)}
             suffix="吨"
           />
         </Card>
@@ -42,7 +43,7 @@ export const StatisticsCards: React.FC<StatisticsCardsProps> = ({ statistics }) 
       <Col span={6}>
         <Card>
           <Statistic
-            title="紧急材料(L2+)"
+            title="紧急材料（二级及以上）"
             value={
               (statistics.by_urgent_level['L2'] || 0) +
               (statistics.by_urgent_level['L3'] || 0)

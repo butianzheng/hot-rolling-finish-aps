@@ -36,7 +36,7 @@ export const queryClient = new QueryClient({
 
       // 全局错误处理
       onError: (error: unknown) => {
-        console.error('[Mutation Error]', error);
+        console.error('【变更执行错误】', error);
         const msg = error instanceof Error ? error.message : '操作失败，请重试';
         message.error(msg);
       },

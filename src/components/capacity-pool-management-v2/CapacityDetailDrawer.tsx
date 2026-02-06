@@ -19,6 +19,7 @@ import {
 import { EditOutlined } from '@ant-design/icons';
 import { capacityApi } from '../../api/tauri';
 import type { CapacityPoolCalendarData } from '../../api/ipcSchemas/machineConfigSchemas';
+import { formatNumber } from '../../utils/formatters';
 
 export interface CapacityDetailDrawerProps {
   open: boolean;
@@ -71,7 +72,7 @@ export const CapacityDetailDrawer: React.FC<CapacityDetailDrawerProps> = ({
       setEditing(false);
       onUpdated?.();
     } catch (e: any) {
-      console.error('[CapacityDetailDrawer] update failed:', e);
+      console.error('【产能详情抽屉】更新失败：', e);
       message.error(e?.message || '调整失败');
     } finally {
       setSubmitting(false);
@@ -136,24 +137,24 @@ export const CapacityDetailDrawer: React.FC<CapacityDetailDrawerProps> = ({
         {/* 详情信息 */}
         <Descriptions column={1} bordered size="small">
           <Descriptions.Item label="目标产能">
-            {data.target_capacity_t.toFixed(3)} 吨
+            {formatNumber(data.target_capacity_t, 3)} 吨
           </Descriptions.Item>
           <Descriptions.Item label="极限产能">
-            {data.limit_capacity_t.toFixed(3)} 吨
+            {formatNumber(data.limit_capacity_t, 3)} 吨
           </Descriptions.Item>
           <Descriptions.Item label="已用产能">
-            {data.used_capacity_t.toFixed(3)} 吨
+            {formatNumber(data.used_capacity_t, 3)} 吨
           </Descriptions.Item>
           <Descriptions.Item label="剩余产能">
-            {Math.max(0, data.target_capacity_t - data.used_capacity_t).toFixed(3)} 吨
+            {formatNumber(Math.max(0, data.target_capacity_t - data.used_capacity_t), 3)} 吨
           </Descriptions.Item>
           <Descriptions.Item label="利用率">
-            {(data.utilization_pct * 100).toFixed(2)}%
+            {formatNumber(data.utilization_pct * 100, 2)}%
           </Descriptions.Item>
           {data.used_capacity_t > data.limit_capacity_t && (
             <Descriptions.Item label="超限">
               <Tag color="red">
-                超出 {(data.used_capacity_t - data.limit_capacity_t).toFixed(3)} 吨
+                超出 {formatNumber(data.used_capacity_t - data.limit_capacity_t, 3)} 吨
               </Tag>
             </Descriptions.Item>
           )}
@@ -163,7 +164,7 @@ export const CapacityDetailDrawer: React.FC<CapacityDetailDrawerProps> = ({
         {editing && (
           <Form form={form} layout="vertical">
             <Form.Item
-              label="目标产能 (吨)"
+              label="目标产能（吨）"
               name="target_capacity_t"
               rules={[{ required: true, message: '请输入目标产能' }]}
             >
@@ -175,7 +176,7 @@ export const CapacityDetailDrawer: React.FC<CapacityDetailDrawerProps> = ({
             </Form.Item>
 
             <Form.Item
-              label="极限产能 (吨)"
+              label="极限产能（吨）"
               name="limit_capacity_t"
               rules={[
                 { required: true, message: '请输入极限产能' },

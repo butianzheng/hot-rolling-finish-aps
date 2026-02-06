@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { Card, Col, Row, Statistic, Spin } from 'antd';
+import { formatNumber } from '../../utils/formatters';
 
 export interface GlobalStats {
   totalTarget: number;
@@ -39,7 +40,7 @@ export const GlobalStatisticsCards: React.FC<GlobalStatisticsCardsProps> = ({
         <Card size="small" bodyStyle={{ padding: '12px 16px' }}>
           <Statistic
             title="总目标产能"
-            value={stats.totalTarget.toFixed(3)}
+            value={formatNumber(stats.totalTarget, 3)}
             suffix="吨"
             valueStyle={{ fontSize: 20, fontWeight: 600 }}
           />
@@ -49,7 +50,7 @@ export const GlobalStatisticsCards: React.FC<GlobalStatisticsCardsProps> = ({
         <Card size="small" bodyStyle={{ padding: '12px 16px' }}>
           <Statistic
             title="总已用产能"
-            value={stats.totalUsed.toFixed(3)}
+            value={formatNumber(stats.totalUsed, 3)}
             suffix="吨"
             valueStyle={{ color: '#1890ff', fontSize: 20, fontWeight: 600 }}
           />
@@ -59,7 +60,7 @@ export const GlobalStatisticsCards: React.FC<GlobalStatisticsCardsProps> = ({
         <Card size="small" bodyStyle={{ padding: '12px 16px' }}>
           <Statistic
             title="总剩余产能"
-            value={stats.totalRemaining.toFixed(3)}
+            value={formatNumber(stats.totalRemaining, 3)}
             suffix="吨"
             valueStyle={{
               color: stats.totalRemaining < 500 ? '#cf1322' : '#52c41a',
@@ -73,7 +74,7 @@ export const GlobalStatisticsCards: React.FC<GlobalStatisticsCardsProps> = ({
         <Card size="small" bodyStyle={{ padding: '12px 16px' }}>
           <Statistic
             title="平均利用率"
-            value={(stats.avgUtilization * 100).toFixed(2)}
+            value={formatNumber(stats.avgUtilization * 100, 2)}
             suffix="%"
             valueStyle={{
               color:

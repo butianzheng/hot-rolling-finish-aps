@@ -4,6 +4,7 @@ import { ReloadOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { pathRuleApi } from '../../api/tauri';
 import { workbenchQueryKeys } from '../../pages/workbench/queryKeys';
+import { formatWeight } from '../../utils/formatters';
 
 type RollCycleAnchorDto = {
   version_id: string;
@@ -21,7 +22,7 @@ const anchorSourceLabels: Record<string, { text: string; color: string }> = {
   FROZEN_LAST: { text: '冻结末端', color: 'purple' },
   LOCKED_LAST: { text: '锁定末端', color: 'geekblue' },
   USER_CONFIRMED_LAST: { text: '已确认末端', color: 'green' },
-  SEED_S2: { text: 'S2 种子', color: 'gold' },
+  SEED_S2: { text: '种子锚点', color: 'gold' },
   NONE: { text: '无', color: 'default' },
 };
 
@@ -107,7 +108,7 @@ const RollCycleAnchorCard: React.FC<RollCycleAnchorCardProps> = ({
       await refetch();
       onAfterReset?.();
     } catch (e: any) {
-      console.error('[RollCycleAnchorCard] resetRollCycle failed:', e);
+      console.error('【轧辊锚点卡片】重置轧辊周期失败：', e);
       message.error(String(e?.message || e || '重置失败'));
     } finally {
       setResetSubmitting(false);
@@ -118,7 +119,7 @@ const RollCycleAnchorCard: React.FC<RollCycleAnchorCardProps> = ({
     <>
       <Card
         size="small"
-        title="RollCycle 锚点"
+        title="换辊周期锚点"
         extra={
           <Space>
             <Button icon={<ReloadOutlined />} size="small" onClick={handleRefresh} disabled={!canQuery || loading}>
@@ -150,7 +151,7 @@ const RollCycleAnchorCard: React.FC<RollCycleAnchorCardProps> = ({
               <Typography.Text>{data.campaign_no}</Typography.Text>
             </Descriptions.Item>
             <Descriptions.Item label="累计吨位">
-              <Typography.Text>{fmtNum(data.cum_weight_t, 1)} t</Typography.Text>
+              <Typography.Text>{formatWeight(data.cum_weight_t)}</Typography.Text>
             </Descriptions.Item>
             <Descriptions.Item label="状态">
               <Tag>{String(data.status || '-')}</Tag>
@@ -173,7 +174,7 @@ const RollCycleAnchorCard: React.FC<RollCycleAnchorCardProps> = ({
 
       <Modal
         open={resetOpen}
-        title="手动换辊/重置 RollCycle"
+        title="手动换辊/重置换辊周期"
         okText="确认重置"
         okButtonProps={{ danger: true, loading: resetSubmitting }}
         cancelText="取消"
@@ -202,4 +203,3 @@ const RollCycleAnchorCard: React.FC<RollCycleAnchorCardProps> = ({
 };
 
 export default RollCycleAnchorCard;
-

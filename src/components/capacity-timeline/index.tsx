@@ -16,6 +16,7 @@ import { Legend } from './Legend';
 import { CapacityImpactPanel } from '../CapacityImpactPanel';
 import { predictRemovalImpact } from '../../services/capacityImpactService';
 import type { PlanItemStatusFilter } from '../../utils/planItemStatus';
+import { formatPercent, formatWeight } from '../../utils/formatters';
 
 const { Text, Title } = Typography;
 
@@ -101,10 +102,10 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
               {data.date} - {data.machineCode}
             </Title>
             <Text type="secondary" style={{ fontFamily: FONT_FAMILIES.MONOSPACE }}>
-              {data.actualCapacity.toFixed(3)}t / {data.targetCapacity.toFixed(3)}t
+              {formatWeight(data.actualCapacity)} / {formatWeight(data.targetCapacity)}
             </Text>
             {isOverLimit && (
-              <Tooltip title={`超出限制产能 ${data.limitCapacity.toFixed(3)}t`}>
+              <Tooltip title={`超出限制产能 ${formatWeight(data.limitCapacity)}`}>
                 <WarningOutlined style={{ color: '#ff4d4f', fontSize: 16 }} />
               </Tooltip>
             )}
@@ -114,7 +115,7 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
                   color="blue"
                   style={{ cursor: clickable ? 'pointer' : undefined }}
                   onClick={() => clickable && openScheduleCell({ statusFilter: 'ALL' })}
-                  title={`已排 ${statusSummary.totalCount} 件 / ${statusSummary.totalWeightT.toFixed(3)}t${clickable ? '（点击快筛并打开明细）' : ''}`}
+                  title={`已排 ${statusSummary.totalCount} 件 / ${formatWeight(statusSummary.totalWeightT)}${clickable ? '（点击快筛并打开明细）' : ''}`}
                 >
                   已排 {statusSummary.totalCount}
                 </Tag>
@@ -123,7 +124,7 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
                     color="purple"
                     style={{ cursor: clickable ? 'pointer' : undefined }}
                     onClick={() => clickable && openScheduleCell({ statusFilter: 'LOCKED' })}
-                    title={`冻结 ${statusSummary.lockedInPlanCount} 件 / ${statusSummary.lockedInPlanWeightT.toFixed(3)}t${clickable ? '（点击快筛并打开明细）' : ''}`}
+                    title={`冻结 ${statusSummary.lockedInPlanCount} 件 / ${formatWeight(statusSummary.lockedInPlanWeightT)}${clickable ? '（点击快筛并打开明细）' : ''}`}
                   >
                     冻结 {statusSummary.lockedInPlanCount}
                   </Tag>
@@ -133,7 +134,7 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
                     color="red"
                     style={{ cursor: clickable ? 'pointer' : undefined }}
                     onClick={() => clickable && openScheduleCell({ statusFilter: 'FORCE_RELEASE' })}
-                    title={`强制放行 ${statusSummary.forceReleaseCount} 件 / ${statusSummary.forceReleaseWeightT.toFixed(3)}t${clickable ? '（点击快筛并打开明细）' : ''}`}
+                    title={`强制放行 ${statusSummary.forceReleaseCount} 件 / ${formatWeight(statusSummary.forceReleaseWeightT)}${clickable ? '（点击快筛并打开明细）' : ''}`}
                   >
                     强放 {statusSummary.forceReleaseCount}
                   </Tag>
@@ -160,11 +161,11 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
             ) : null}
 
             {/* 轧辊状态 */}
-            <Tooltip title={`轧辊吨位: ${data.rollCampaignProgress.toFixed(3)}t / ${data.rollChangeThreshold.toFixed(3)}t`}>
+            <Tooltip title={`轧辊吨位：${formatWeight(data.rollCampaignProgress)} / ${formatWeight(data.rollChangeThreshold)}`}>
               <Space size={8}>
                 <ToolOutlined style={{ color: rollStatusColor, fontSize: 16 }} />
                 <Text style={{ fontFamily: FONT_FAMILIES.MONOSPACE, color: rollStatusColor }}>
-                  {data.rollCampaignProgress.toFixed(3)}t
+                  {formatWeight(data.rollCampaignProgress)}
                 </Text>
               </Space>
             </Tooltip>
@@ -196,7 +197,7 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
           percent={utilizationPercent}
           status={isOverLimit ? 'exception' : utilizationPercent > 90 ? 'normal' : 'active'}
           strokeColor={isOverLimit ? '#ff4d4f' : '#1677ff'}
-          format={(percent) => `${percent?.toFixed(2)}%`}
+          format={(percent) => formatPercent(percent == null ? undefined : percent)}
         />
       </Space>
     </Card>

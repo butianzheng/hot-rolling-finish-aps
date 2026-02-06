@@ -78,12 +78,12 @@ export const VersionComparisonModal: React.FC<VersionComparisonModalProps> = ({
       footer={[
         compareResult ? (
           <Button key="activateA" onClick={() => onActivateVersion?.(compareResult.version_id_a)}>
-            回滚到版本A
+            回滚到版本甲
           </Button>
         ) : null,
         compareResult ? (
           <Button key="activateB" type="primary" onClick={() => onActivateVersion?.(compareResult.version_id_b)}>
-            回滚到版本B
+            回滚到版本乙
           </Button>
         ) : null,
         <Button key="close" onClick={onClose}>
@@ -100,8 +100,8 @@ export const VersionComparisonModal: React.FC<VersionComparisonModalProps> = ({
           {/* 对比摘要卡片 */}
           <Card title="对比摘要" size="small">
             <Descriptions size="small" column={2} bordered>
-              <Descriptions.Item label="版本A">{compareResult.version_id_a}</Descriptions.Item>
-              <Descriptions.Item label="版本B">{compareResult.version_id_b}</Descriptions.Item>
+              <Descriptions.Item label="版本甲">{compareResult.version_id_a}</Descriptions.Item>
+              <Descriptions.Item label="版本乙">{compareResult.version_id_b}</Descriptions.Item>
               <Descriptions.Item label="移动数量">{compareResult.moved_count}</Descriptions.Item>
               <Descriptions.Item label="新增数量">{compareResult.added_count}</Descriptions.Item>
               <Descriptions.Item label="删除数量">{compareResult.removed_count}</Descriptions.Item>
@@ -149,9 +149,9 @@ export const VersionComparisonModal: React.FC<VersionComparisonModalProps> = ({
                 rowKey={(r) => r.key}
                 dataSource={compareResult.config_changes}
                 columns={[
-                  { title: 'Key', dataIndex: 'key', width: 220 },
-                  { title: '版本A', dataIndex: 'value_a', render: (v) => (v == null ? '-' : String(v)) },
-                  { title: '版本B', dataIndex: 'value_b', render: (v) => (v == null ? '-' : String(v)) },
+                  { title: '配置键', dataIndex: 'key', width: 220 },
+                  { title: '版本甲', dataIndex: 'value_a', render: (v) => (v == null ? '-' : String(v)) },
+                  { title: '版本乙', dataIndex: 'value_b', render: (v) => (v == null ? '-' : String(v)) },
                 ]}
                 scroll={{ y: 240 }}
               />
@@ -173,9 +173,9 @@ export const VersionComparisonModal: React.FC<VersionComparisonModalProps> = ({
                     dataSource={compareResult.risk_delta}
                     columns={[
                       { title: '日期', dataIndex: 'date', width: 120 },
-                      { title: 'A风险', dataIndex: 'risk_score_a', width: 120 },
-                      { title: 'B风险', dataIndex: 'risk_score_b', width: 120 },
-                      { title: 'Δ', dataIndex: 'risk_score_delta' },
+                      { title: '版本甲风险', dataIndex: 'risk_score_a', width: 120 },
+                      { title: '版本乙风险', dataIndex: 'risk_score_b', width: 120 },
+                      { title: '变化值', dataIndex: 'risk_score_delta' },
                     ]}
                     scroll={{ y: 200 }}
                   />
@@ -185,7 +185,7 @@ export const VersionComparisonModal: React.FC<VersionComparisonModalProps> = ({
                   type="info"
                   showIcon
                   message="风险变化对比暂不可用"
-                  description="后端 compare_versions 当前未返回 risk_delta（待 RiskSnapshotRepository 支持）。"
+                  description="后端版本对比接口当前未返回风险变化明细（待风险快照仓储支持）。"
                 />
               )}
 
@@ -198,9 +198,9 @@ export const VersionComparisonModal: React.FC<VersionComparisonModalProps> = ({
                   columns={[
                     { title: '机组', dataIndex: 'machine_code', width: 90 },
                     { title: '日期', dataIndex: 'date', width: 120 },
-                    { title: 'A已用', dataIndex: 'used_capacity_a', width: 120 },
-                    { title: 'B已用', dataIndex: 'used_capacity_b', width: 120 },
-                    { title: 'Δ', dataIndex: 'capacity_delta' },
+                    { title: '版本甲已用', dataIndex: 'used_capacity_a', width: 120 },
+                    { title: '版本乙已用', dataIndex: 'used_capacity_b', width: 120 },
+                    { title: '变化值', dataIndex: 'capacity_delta' },
                   ]}
                   scroll={{ y: 200 }}
                 />
@@ -209,7 +209,7 @@ export const VersionComparisonModal: React.FC<VersionComparisonModalProps> = ({
                   type="info"
                   showIcon
                   message="产能变化对比暂不可用"
-                  description="后端 compare_versions 当前未返回 capacity_delta（待 CapacityPoolRepository 支持）。"
+                  description="后端版本对比接口当前未返回产能变化明细（待产能池仓储支持）。"
                 />
               )}
             </Space>

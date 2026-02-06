@@ -130,9 +130,9 @@ export function generateCalendarOption(
           <div style="font-size: 12px; line-height: 1.6;">
             <strong style="font-size: 13px;">${date}</strong><br/>
             <span style="color: #3498db;">利用率:</span> <strong>${utilization}%</strong><br/>
-            <span style="color: #27ae60;">已用:</span> ${item.used_capacity_t.toFixed(3)}t<br/>
-            <span style="color: #95a5a6;">目标:</span> ${item.target_capacity_t.toFixed(3)}t<br/>
-            <span style="color: #e67e22;">极限:</span> ${item.limit_capacity_t.toFixed(3)}t
+            <span style="color: #27ae60;">已用：</span> ${item.used_capacity_t.toFixed(3)}吨<br/>
+            <span style="color: #95a5a6;">目标：</span> ${item.target_capacity_t.toFixed(3)}吨<br/>
+            <span style="color: #e67e22;">极限：</span> ${item.limit_capacity_t.toFixed(3)}吨
           </div>
         `;
       },
@@ -208,8 +208,8 @@ export function generateMonthCalendarOption(
           <div style="font-size: 12px; line-height: 1.6;">
             <strong>${month}</strong><br/>
             利用率: <strong>${utilization}%</strong><br/>
-            已用: ${totalUsed.toFixed(3)}t<br/>
-            目标: ${totalTarget.toFixed(3)}t<br/>
+            已用：${totalUsed.toFixed(3)}吨<br/>
+            目标：${totalTarget.toFixed(3)}吨<br/>
             天数: ${count}天
           </div>
         `;
@@ -224,7 +224,7 @@ export function generateMonthCalendarOption(
     },
     yAxis: {
       type: 'value',
-      name: '利用率 (%)',
+      name: '利用率（%）',
       max: 120,
       nameTextStyle: {
         fontSize: 11,

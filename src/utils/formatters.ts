@@ -6,6 +6,25 @@
 
 import dayjs, { Dayjs } from 'dayjs';
 
+const numberFormatterCache = new Map<string, Intl.NumberFormat>();
+
+function getNumberFormatter(decimals: number, useGrouping: boolean): Intl.NumberFormat {
+  const safeDecimals = Number.isFinite(decimals) ? Math.max(0, Math.floor(decimals)) : 0;
+  const cacheKey = `${safeDecimals}-${useGrouping ? 'group' : 'plain'}`;
+  const cached = numberFormatterCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const formatter = new Intl.NumberFormat('zh-CN', {
+    minimumFractionDigits: safeDecimals,
+    maximumFractionDigits: safeDecimals,
+    useGrouping,
+  });
+  numberFormatterCache.set(cacheKey, formatter);
+  return formatter;
+}
+
 // ==========================================
 // 日期格式化
 // ==========================================
@@ -31,11 +50,16 @@ export const formatDateTime = (date: string | Dayjs | Date): string => {
 /**
  * 格式化数字为指定小数位
  */
-export const formatNumber = (value: number | null | undefined, decimals: number = 1): string => {
+export const formatNumber = (
+  value: number | null | undefined,
+  decimals: number = 1,
+  options?: { useGrouping?: boolean }
+): string => {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return '-';
   }
-  return value.toFixed(decimals);
+  const useGrouping = options?.useGrouping ?? true;
+  return getNumberFormatter(decimals, useGrouping).format(value);
 };
 
 /**
@@ -45,7 +69,7 @@ export const formatWeight = (value: number | null | undefined): string => {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return '-';
   }
-  return `${value.toFixed(3)}t`;
+  return `${formatNumber(value, 3)}吨`;
 };
 
 /**
@@ -55,7 +79,7 @@ export const formatPercent = (value: number | null | undefined): string => {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return '-';
   }
-  return `${value.toFixed(1)}%`;
+  return `${formatNumber(value, 1)}%`;
 };
 
 /**
@@ -65,5 +89,5 @@ export const formatCapacity = (value: number | null | undefined): string => {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return '-';
   }
-  return value.toFixed(3);
+  return formatNumber(value, 3);
 };

@@ -30,7 +30,7 @@ export type RiskSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
  */
 export type RiskBadgeType =
   | 'CAPACITY_OVERFLOW'     // 超产能日期
-  | 'L3_URGENT'            // L3紧急订单
+  | 'L3_URGENT'            // 三级紧急订单
   | 'L2_URGENT'            // L2紧急订单
   | 'ROLL_CHANGE_RISK'     // 轧辊换辊风险
   | 'TEMP_ISSUE'           // 温度问题
@@ -139,14 +139,14 @@ export function computeRiskBadges(
   if (urgency === 'L3') {
     badges.push({
       type: 'L3_URGENT',
-      label: 'L3紧急',
+      label: '三级紧急',
       severity: 'CRITICAL',
       tooltip: '最高优先级订单，不建议调整',
     });
   } else if (urgency === 'L2') {
     badges.push({
       type: 'L2_URGENT',
-      label: 'L2高优',
+      label: '二级高优',
       severity: 'HIGH',
       tooltip: '高优先级订单，调整需谨慎',
     });

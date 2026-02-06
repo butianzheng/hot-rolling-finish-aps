@@ -103,7 +103,7 @@ const PathRuleConfigPanel: React.FC<PathRuleConfigPanelProps> = ({
       form.setFieldsValue(cfg);
       setReason('');
     } catch (e: any) {
-      console.error('[PathRuleConfigPanel] loadConfig failed:', e);
+      console.error('【路径规则配置】加载失败：', e);
       setLoadError(String(e?.message || e || '加载配置失败'));
     } finally {
       setLoading(false);
@@ -143,11 +143,11 @@ const PathRuleConfigPanel: React.FC<PathRuleConfigPanelProps> = ({
       return;
     }
     if (!(cfg.seed_s2_percentile >= 0 && cfg.seed_s2_percentile <= 1)) {
-      message.warning('S2 分位数必须在 0~1 之间');
+      message.warning('种子分位数必须在 0~1 之间');
       return;
     }
     if (!Number.isInteger(cfg.seed_s2_small_sample_threshold) || cfg.seed_s2_small_sample_threshold < 1) {
-      message.warning('S2 小样本阈值必须为 >= 1 的整数');
+      message.warning('种子小样本阈值必须为 >= 1 的整数');
       return;
     }
 
@@ -161,7 +161,7 @@ const PathRuleConfigPanel: React.FC<PathRuleConfigPanelProps> = ({
       message.success('路径规则配置已保存');
       await loadConfig();
     } catch (e: any) {
-      console.error('[PathRuleConfigPanel] saveConfig failed:', e);
+      console.error('【路径规则配置】保存失败：', e);
       message.error(String(e?.message || e || '保存失败'));
     } finally {
       setSaving(false);
@@ -259,7 +259,7 @@ const PathRuleConfigPanel: React.FC<PathRuleConfigPanelProps> = ({
 
           <Space wrap>
             <Form.Item
-              label="宽度容差 (mm)"
+              label="宽度容差（毫米）"
               name="width_tolerance_mm"
               style={{ marginBottom: 0, minWidth: 260 }}
               extra="候选宽度允许比锚点更宽的最大偏差。"
@@ -268,7 +268,7 @@ const PathRuleConfigPanel: React.FC<PathRuleConfigPanelProps> = ({
             </Form.Item>
 
             <Form.Item
-              label="厚度容差 (mm)"
+              label="厚度容差（毫米）"
               name="thickness_tolerance_mm"
               style={{ marginBottom: 0, minWidth: 260 }}
               extra="候选厚度允许比锚点更厚的最大偏差。"
@@ -286,13 +286,13 @@ const PathRuleConfigPanel: React.FC<PathRuleConfigPanelProps> = ({
           </Form.Item>
 
           <Typography.Title level={5} style={{ marginTop: 8, marginBottom: 0 }}>
-            S2 种子策略
+            种子策略
           </Typography.Title>
           <Divider style={{ margin: '8px 0' }} />
 
           <Space wrap>
             <Form.Item
-              label="S2 分位数 (0~1)"
+              label="种子分位数（0~1）"
               name="seed_s2_percentile"
               style={{ marginBottom: 0, minWidth: 260 }}
               extra="无冻结/锁定/已确认锚点时，用候选分布生成初始锚点。"
@@ -301,7 +301,7 @@ const PathRuleConfigPanel: React.FC<PathRuleConfigPanelProps> = ({
             </Form.Item>
 
             <Form.Item
-              label="S2 小样本阈值"
+              label="种子小样本阈值"
               name="seed_s2_small_sample_threshold"
               style={{ marginBottom: 0, minWidth: 260 }}
               extra="候选样本不足时回退到保守规则。"

@@ -243,8 +243,8 @@ export function usePropsChangeMonitor<T extends Record<string, any>>(
         `[Props Change] ${componentName} re-rendered due to:`,
         changedProps.join(', ')
       );
-      console.log('  Old:', changedProps.map((k) => `${k}=${prevProps[k]}`));
-      console.log('  New:', changedProps.map((k) => `${k}=${props[k]}`));
+      console.log('  变更前：', changedProps.map((k) => `${k}=${prevProps[k]}`));
+      console.log('  变更后：', changedProps.map((k) => `${k}=${props[k]}`));
     }
 
     prevPropsRef.current = props;

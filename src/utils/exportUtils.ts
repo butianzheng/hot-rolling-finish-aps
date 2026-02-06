@@ -12,7 +12,7 @@ interface ExportOptions {
 }
 
 /**
- * 将对象数组导出为 CSV 格式
+ * 将对象数组导出为表格文件 格式
  */
 function convertToCSV(data: Record<string, unknown>[]): string {
   if (data.length === 0) {
@@ -67,7 +67,7 @@ function convertToCSV(data: Record<string, unknown>[]): string {
 }
 
 /**
- * 将对象数组导出为 TSV 格式
+ * 将对象数组导出为制表分隔文件 格式
  */
 function convertToTSV(data: Record<string, unknown>[]): string {
   if (data.length === 0) {
@@ -219,35 +219,35 @@ export function getExportMenuItems(
 ): Array<{ label: string; key: string; onClick: () => void }> {
   return [
     {
-      label: '导出为 CSV',
+      label: '导出为表格文件',
       key: 'csv',
       onClick: () => {
         try {
           exportCSV(data, filename);
         } catch (error: unknown) {
-          console.error('导出 CSV 失败:', error instanceof Error ? error.message : String(error));
+          console.error('导出表格文件失败:', error instanceof Error ? error.message : String(error));
         }
       },
     },
     {
-      label: '导出为 JSON',
+      label: '导出为数据文件',
       key: 'json',
       onClick: () => {
         try {
           exportJSON(data, filename);
         } catch (error: unknown) {
-          console.error('导出 JSON 失败:', error instanceof Error ? error.message : String(error));
+          console.error('导出数据文件失败:', error instanceof Error ? error.message : String(error));
         }
       },
     },
     {
-      label: '导出为 TSV',
+      label: '导出为制表分隔文件',
       key: 'tsv',
       onClick: () => {
         try {
           exportTSV(data, filename);
         } catch (error: unknown) {
-          console.error('导出 TSV 失败:', error instanceof Error ? error.message : String(error));
+          console.error('导出制表分隔文件失败:', error instanceof Error ? error.message : String(error));
         }
       },
     },

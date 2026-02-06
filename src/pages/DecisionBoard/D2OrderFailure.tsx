@@ -18,6 +18,7 @@ import type { DrilldownSpec } from '../../hooks/useRiskOverviewData';
 import { useActiveVersionId } from '../../stores/use-global-store';
 import { EmptyState } from '../../components/EmptyState';
 import type { OrderFailure, UrgencyLevel, FailType } from '../../types/decision';
+import { formatNumber, formatWeight } from '../../utils/formatters';
 
 // ==========================================
 // 紧急度颜色映射
@@ -537,13 +538,13 @@ export const D2OrderFailure: React.FC<D2OrderFailureProps> = ({ embedded, onOpen
             </Descriptions.Item>
             <Descriptions.Item label="机组">{selectedOrder.machineCode}</Descriptions.Item>
             <Descriptions.Item label="总重量">
-              {selectedOrder.totalWeightT.toFixed(3)}吨
+              {formatWeight(selectedOrder.totalWeightT)}
             </Descriptions.Item>
             <Descriptions.Item label="已排产重量">
-              {selectedOrder.scheduledWeightT.toFixed(3)}吨
+              {formatWeight(selectedOrder.scheduledWeightT)}
             </Descriptions.Item>
             <Descriptions.Item label="未排产重量">
-              {selectedOrder.unscheduledWeightT.toFixed(3)}吨
+              {formatWeight(selectedOrder.unscheduledWeightT)}
             </Descriptions.Item>
           </Descriptions>
 
@@ -567,7 +568,7 @@ export const D2OrderFailure: React.FC<D2OrderFailureProps> = ({ embedded, onOpen
                         <Tag color="red">{getFactorTypeLabel(factor.factorType)}</Tag>
                         <span style={{ fontWeight: 'bold' }}>{factor.description}</span>
                       </div>
-                      <div>影响权重: {(factor.impact * 100).toFixed(2)}%</div>
+                      <div>影响权重: {formatNumber(factor.impact * 100, 2)}%</div>
                       <div>受影响材料数: {factor.affectedMaterialCount}个</div>
                     </Space>
                   </Card>
@@ -652,7 +653,7 @@ const OrderCard: React.FC<OrderCardProps> = React.memo(
           {/* 完成率 */}
           <div>
             <div style={{ fontSize: '12px', marginBottom: '4px' }}>
-              完成率: {order.completionRate.toFixed(0)}%
+              完成率: {formatNumber(order.completionRate, 0)}%
             </div>
             <Progress
               percent={Math.round(order.completionRate)}
@@ -670,7 +671,7 @@ const OrderCard: React.FC<OrderCardProps> = React.memo(
 
           {/* 重量信息 */}
           <div style={{ fontSize: '12px' }}>
-            未排产: <span style={{ color: '#ff4d4f', fontWeight: 'bold' }}>{order.unscheduledWeightT.toFixed(3)}</span>吨 / 总计: {order.totalWeightT.toFixed(3)}吨
+            未排产: <span style={{ color: '#ff4d4f', fontWeight: 'bold' }}>{formatWeight(order.unscheduledWeightT)}</span> / 总计: {formatWeight(order.totalWeightT)}
           </div>
 
           {/* 机组 */}

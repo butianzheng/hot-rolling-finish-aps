@@ -44,6 +44,7 @@ import { RollAlertContent } from './RollAlertContent';
 import { RiskDayContent } from './RiskDayContent';
 import { CapacityOpportunityContent } from './CapacityOpportunityContent';
 import { ReasonTable } from './shared';
+import { formatNumber, formatWeight } from '../../../utils/formatters';
 
 const { Text } = Typography;
 
@@ -63,15 +64,14 @@ const FIELD_LABEL_MAP: Record<string, string> = {
   bottleneckLevel: '堵塞等级',
   bottleneckTypes: '堵塞类型',
   capacityUtilPct: '容量利用率',
-  pendingMaterialCount: '未排材料数(≤当日)',
-  pendingWeightT: '未排重量(吨, ≤当日)',
+  pendingMaterialCount: '未排材料数（≤当日）',
+  pendingWeightT: '未排重量（吨，≤当日）',
   scheduledMaterialCount: '已排材料数',
-  // scheduledWeightT 在 OrderFailure 部分已定义
 
   // DaySummary - 日期风险摘要
   riskScore: '风险分数',
   riskLevel: '风险等级',
-  overloadWeightT: '超载重量(吨)',
+  overloadWeightT: '超载重量（吨）',
   urgentFailureCount: '紧急失败数',
   topReasons: '主要原因',
   involvedMachines: '涉及机组',
@@ -83,44 +83,60 @@ const FIELD_LABEL_MAP: Record<string, string> = {
   urgencyLevel: '紧急等级',
   failType: '失败类型',
   completionRate: '完成率',
-  totalWeightT: '总重量(吨)',
-  scheduledWeightT: '已排重量(吨)',
-  unscheduledWeightT: '未排重量(吨)',
+  totalWeightT: '总重量（吨）',
+  scheduledWeightT: '已排重量（吨）',
+  unscheduledWeightT: '未排重量（吨）',
   blockingFactors: '阻塞因素',
   failureReasons: '失败原因',
+  factorType: '因素类型',
+  impact: '影响权重',
+  affectedMaterialCount: '受影响材料数',
 
   // ColdStockBucket - 冷料分桶
   ageBin: '库龄分桶',
   count: '数量',
-  weightT: '重量(吨)',
+  weightT: '重量（吨）',
   pressureScore: '压库分数',
   pressureLevel: '压库等级',
-  avgAgeDays: '平均库龄(天)',
-  maxAgeDays: '最大库龄(天)',
+  avgAgeDays: '平均库龄（天）',
+  maxAgeDays: '最大库龄（天）',
   structureGap: '结构性缺口',
   trend: '趋势',
+  direction: '趋势方向',
+  changeRatePct: '变化率',
 
   // RollCampaignAlert - 换辊警报
-  campaignId: '轧制活动ID',
+  campaignId: '轧制活动编号',
   campaignStartDate: '轧制活动开始日期',
-  currentTonnageT: '当前吨位(吨)',
-  softLimitT: '软限制(吨)',
-  hardLimitT: '硬限制(吨)',
-  remainingTonnageT: '剩余吨位(吨)',
+  campaignStartAt: '周期起点时刻',
+  plannedChangeAt: '计划换辊时刻',
+  plannedDowntimeMinutes: '计划停机时长（分钟）',
+  planedDowntimeMinutes: '计划停机时长（分钟）',
+  currentTonnageT: '当前吨位（吨）',
+  softLimitT: '软限制（吨）',
+  hardLimitT: '硬限制（吨）',
+  remainingTonnageT: '剩余吨位（吨）',
   alertLevel: '警报等级',
   alertType: '警报类型',
   estimatedHardStopDate: '预计硬停日期',
+  estimatedSoftReachAt: '预计触达软限制时刻',
+  estimatedHardReachAt: '预计触达硬限制时刻',
   alertMessage: '警报消息',
   impactDescription: '影响描述',
 
   // CapacityOpportunity - 容量优化机会
   opportunityType: '机会类型',
   currentUtilPct: '当前利用率',
-  targetCapacityT: '目标容量(吨)',
-  usedCapacityT: '已用容量(吨)',
-  opportunitySpaceT: '机会空间(吨)',
+  targetCapacityT: '目标容量（吨）',
+  usedCapacityT: '已用容量（吨）',
+  opportunitySpaceT: '机会空间（吨）',
   optimizedUtilPct: '优化后利用率',
   sensitivity: '敏感性分析',
+  scenarios: '方案列表',
+  bestScenarioIndex: '最优方案索引',
+  name: '方案名称',
+  adjustment: '调整策略',
+  utilPct: '利用率',
   description: '描述',
   potentialBenefits: '潜在收益',
 };
@@ -129,8 +145,37 @@ const FIELD_LABEL_MAP: Record<string, string> = {
  * 获取字段的汉化标签
  */
 function getFieldLabel(fieldName: string): string {
-  return FIELD_LABEL_MAP[fieldName] || fieldName;
+  return FIELD_LABEL_MAP[fieldName] || '其他字段';
 }
+
+const ALERT_TYPE_LABELS: Record<string, string> = {
+  HARD_LIMIT_EXCEEDED: '硬上限超限',
+  SOFT_LIMIT_EXCEEDED: '软限制触达',
+  NORMAL: '正常',
+  CAPACITY_HIGH: '产能高负荷',
+  CAPACITY_MEDIUM: '产能中负荷',
+  CAPACITY_LOW: '产能低负荷',
+};
+
+const BLOCKING_FACTOR_LABELS: Record<string, string> = {
+  COLD_STOCK: '冷料未适温',
+  STRUCTURE_CONFLICT: '结构冲突',
+  CAPACITY_SHORTAGE: '产能不足',
+};
+
+const TREND_DIRECTION_LABELS: Record<string, string> = {
+  RISING: '上升',
+  STABLE: '稳定',
+  FALLING: '下降',
+};
+
+const DATE_ONLY_FIELDS = new Set<string>(['planDate', 'dueDate', 'campaignStartDate', 'estimatedHardStopDate']);
+const DATE_TIME_FIELDS = new Set<string>([
+  'campaignStartAt',
+  'plannedChangeAt',
+  'estimatedSoftReachAt',
+  'estimatedHardReachAt',
+]);
 
 /**
  * 枚举值汉化映射表
@@ -147,7 +192,41 @@ const ENUM_VALUE_LABELS: Record<string, Record<string, string>> = {
   opportunityType: OPPORTUNITY_TYPE_LABELS,
   structureGap: STRUCTURE_GAP_LABELS,
   status: ROLL_STATUS_LABELS,
+  alertType: ALERT_TYPE_LABELS,
+  factorType: BLOCKING_FACTOR_LABELS,
+  direction: TREND_DIRECTION_LABELS,
 };
+
+function formatDateValue(rawValue: unknown, withTime: boolean): string {
+  const text = String(rawValue || '').trim();
+  if (!text) {
+    return '-';
+  }
+  const normalized = text.replace('T', ' ').replace('Z', '');
+  const dateMatch = normalized.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (!dateMatch) {
+    return text;
+  }
+  if (!withTime) {
+    return dateMatch[1];
+  }
+  const timeMatch = normalized.match(/^\d{4}-\d{2}-\d{2}\s(\d{2}:\d{2})(?::(\d{2}))?/);
+  if (!timeMatch) {
+    return `${dateMatch[1]} 00:00:00`;
+  }
+  const seconds = timeMatch[2] || '00';
+  return `${dateMatch[1]} ${timeMatch[1]}:${seconds}`;
+}
+
+function formatObjectValue(value: Record<string, unknown>): string {
+  const entries = Object.entries(value);
+  if (entries.length === 0) {
+    return '-';
+  }
+  return entries
+    .map(([entryKey, entryValue]) => `${getFieldLabel(entryKey)}：${formatFieldValue(entryKey, entryValue)}`)
+    .join('；');
+}
 
 /**
  * 格式化字段值，对枚举类型进行汉化
@@ -157,36 +236,59 @@ function formatFieldValue(fieldName: string, value: unknown): string {
     return '-';
   }
 
-  // 处理数组类型
   if (Array.isArray(value)) {
     const labelMap = ENUM_VALUE_LABELS[fieldName];
     if (labelMap) {
-      // 数组中每个枚举值都进行汉化
-      return value.map((v) => labelMap[String(v)] || String(v)).join(', ');
+      return value.map((item) => labelMap[String(item)] || '其他').join('、');
     }
-    // 普通数组，直接 join
-    return value.map((v) => (typeof v === 'object' ? JSON.stringify(v) : String(v))).join(', ');
+    return value
+      .map((item) => {
+        if (item === null || item === undefined) {
+          return '-';
+        }
+        if (typeof item === 'object') {
+          return formatObjectValue(item as Record<string, unknown>);
+        }
+        return String(item);
+      })
+      .join('；');
   }
 
-  // 处理对象类型（如 trend、reasons 等）
   if (typeof value === 'object') {
-    return JSON.stringify(value);
+    return formatObjectValue(value as Record<string, unknown>);
   }
 
-  // 特殊处理 alertLevel 字段（需要通过 parseAlertLevel 转换）
   if (fieldName === 'alertLevel') {
     return getAlertLevelLabel(String(value));
   }
 
-  // 处理枚举值
   const labelMap = ENUM_VALUE_LABELS[fieldName];
   if (labelMap) {
-    return labelMap[String(value)] || String(value);
+    return labelMap[String(value)] || '其他';
   }
 
-  // 处理百分比字段
-  if (fieldName.endsWith('Pct') || fieldName === 'completionRate') {
-    return `${Number(value).toFixed(2)}%`;
+  if (DATE_TIME_FIELDS.has(fieldName) || fieldName.endsWith('At')) {
+    return formatDateValue(value, true);
+  }
+
+  if (DATE_ONLY_FIELDS.has(fieldName) || fieldName.endsWith('Date')) {
+    return formatDateValue(value, false);
+  }
+
+  if (fieldName.endsWith('Pct') || fieldName === 'completionRate' || fieldName === 'impact') {
+    return `${formatNumber(Number(value), 2)}%`;
+  }
+
+  if (fieldName.endsWith('Score')) {
+    return formatNumber(Number(value), 2);
+  }
+
+  if (fieldName.endsWith('Days')) {
+    return formatNumber(Number(value), 2);
+  }
+
+  if (fieldName.endsWith('T')) {
+    return formatWeight(Number(value));
   }
 
   return String(value);
@@ -200,10 +302,8 @@ function renderFieldValue(fieldName: string, value: unknown): React.ReactNode {
     return '-';
   }
 
-  // 特殊处理 reasons 字段 - 使用 ReasonTable 组件
   if (fieldName === 'reasons' || fieldName === 'topReasons' || fieldName === 'failureReasons') {
     if (Array.isArray(value) && value.length > 0) {
-      // 确保第一个元素有code、msg、weight字段（简单类型检查）
       const firstItem = value[0];
       if (firstItem && typeof firstItem === 'object' && 'code' in firstItem && 'msg' in firstItem) {
         return (
@@ -212,33 +312,41 @@ function renderFieldValue(fieldName: string, value: unknown): React.ReactNode {
           </div>
         );
       }
-    }
-    return <Text type="secondary">暂无原因</Text>;
-  }
-
-  // 处理数组类型
-  if (Array.isArray(value)) {
-    const labelMap = ENUM_VALUE_LABELS[fieldName];
-    if (labelMap) {
-      // 数组中每个枚举值都进行汉化
       return (
-        <Space wrap>
-          {value.map((v, idx) => (
-            <Tag key={idx}>{labelMap[String(v)] || String(v)}</Tag>
+        <Space direction="vertical" size={4} style={{ width: '100%' }}>
+          {value.map((item, index) => (
+            <Text key={index}>{String(item)}</Text>
           ))}
         </Space>
       );
     }
-    // 普通数组
-    return value.map((v) => (typeof v === 'object' ? JSON.stringify(v) : String(v))).join(', ');
+    return <Text type="secondary">暂无原因</Text>;
   }
 
-  // 处理对象类型（趋势等）
+  if (Array.isArray(value)) {
+    const labelMap = ENUM_VALUE_LABELS[fieldName];
+    if (labelMap) {
+      return (
+        <Space wrap>
+          {value.map((item, index) => (
+            <Tag key={index}>{labelMap[String(item)] || '其他'}</Tag>
+          ))}
+        </Space>
+      );
+    }
+    return (
+      <Space direction="vertical" size={4} style={{ width: '100%' }}>
+        {value.map((item, index) => (
+          <Text key={index}>{formatFieldValue(fieldName, item)}</Text>
+        ))}
+      </Space>
+    );
+  }
+
   if (typeof value === 'object') {
-    return <pre style={{ fontSize: 12, margin: 0 }}>{JSON.stringify(value, null, 2)}</pre>;
+    return <Text style={{ whiteSpace: 'pre-wrap' }}>{formatFieldValue(fieldName, value)}</Text>;
   }
 
-  // 其他情况使用原有的formatFieldValue
   return formatFieldValue(fieldName, value);
 }
 

@@ -139,7 +139,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         </Select>
 
         <Search
-          placeholder="搜索操作ID或详情"
+          placeholder="搜索操作编号或详情"
           value={localSearchText}
           onChange={(e) => setLocalSearchText(e.target.value)}
           style={{ width: 250 }}

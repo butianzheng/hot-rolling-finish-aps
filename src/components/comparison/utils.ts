@@ -42,7 +42,7 @@ export function formatVersionLabel(version: Version): string {
   if (nameCn) return nameCn;
   const no = Number(version.version_no ?? 0);
   if (Number.isFinite(no) && no > 0) return `V${no}`;
-  // 降级显示：UUID 前 8 位；非 UUID 则保留完整 ID（例如人工命名/测试版本）
+  // 降级显示：唯一编号前8位；非标准唯一编号则保留完整编号（例如人工命名或测试版本）
   const id = String(version.version_id ?? '').trim();
   const isUuid =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -53,10 +53,10 @@ export function formatVersionLabel(version: Version): string {
  * 格式化版本标签（带完整信息：中文名称 + 版本号）
  *
  * @example
- * - 有中文名称和版本号: "重排产优化 (V10)"
- * - 只有中文名称: "测试方案A"
- * - 只有版本号: "V12"
- * - 都没有: "31c46b4d"（UUID前8位）
+ * - 有中文名称和版本号："重排产优化（版本10）"
+ * - 只有中文名称："测试方案甲"
+ * - 只有版本号："版本12"
+ * - 都没有："31c46b4d"（唯一编号前8位）
  */
 export function formatVersionLabelWithCode(version: Version): string {
   const nameCn = extractVersionNameCn(version);
@@ -69,7 +69,7 @@ export function formatVersionLabelWithCode(version: Version): string {
   } else if (Number.isFinite(no) && no > 0) {
     return `V${no}`;
   } else {
-    // 降级显示：UUID 前 8 位；非 UUID 则保留完整 ID（例如人工命名/测试版本）
+    // 降级显示：唯一编号前8位；非标准唯一编号则保留完整编号（例如人工命名或测试版本）
     const id = String(version.version_id ?? '').trim();
     const isUuid =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(

@@ -39,12 +39,12 @@ export const KpiOverviewCard: React.FC<KpiOverviewCardProps> = ({
     () => [
       {
         key: 'items',
-        label: '排产项(冻结+新排)',
+        label: '排产项（冻结+新排）',
         render: (d) => `${d.plan_items_count} (${d.frozen_items_count}+${d.calc_items_count})`,
       },
       {
         key: 'capacity',
-        label: '预计产量(t)',
+        label: '预计产量（吨）',
         better: 'max',
         getScore: (d) => Number(d.total_capacity_used_t ?? 0),
         render: (d) => formatTon(d.total_capacity_used_t),
@@ -58,7 +58,7 @@ export const KpiOverviewCard: React.FC<KpiOverviewCardProps> = ({
       },
       {
         key: 'maturity',
-        label: '成熟/未成熟(成熟率)',
+        label: '成熟/未成熟（成熟率）',
         better: 'max',
         getScore: (d) => getMaturityRate(d),
         render: (d) => `${d.mature_count}/${d.immature_count} (${formatPercent(getMaturityRate(d))})`,
@@ -105,7 +105,7 @@ export const KpiOverviewCard: React.FC<KpiOverviewCardProps> = ({
   }, [draftsByStrategy, overviewRows, selectedStrategyKeysInOrder]);
 
   return (
-    <Card size="small" title="KPI 总览（并排对比）" style={{ marginBottom: 12 }}>
+    <Card size="small" title="指标总览（并排对比）" style={{ marginBottom: 12 }}>
       <Space direction="vertical" style={{ width: '100%' }} size={10}>
         {recommendation && (
           <Alert
@@ -114,7 +114,7 @@ export const KpiOverviewCard: React.FC<KpiOverviewCardProps> = ({
             message={`建议优先考虑：${strategyTitleMap[recommendation.strategy] || recommendation.strategy}`}
             description={
               <Text type="secondary">
-                超限机组日 {recommendation.overflow_days}，预计产量 {formatTon(recommendation.total_capacity_used_t)}t，
+                超限机组日 {recommendation.overflow_days}，预计产量 {formatTon(recommendation.total_capacity_used_t)}吨，
                 成熟/未成熟 {recommendation.mature_count}/{recommendation.immature_count}，挤出{' '}
                 {recommendation.squeezed_out_count}。 （仍建议人工复核关键订单/冻结区/风险点）
               </Text>

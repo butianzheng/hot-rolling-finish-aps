@@ -46,10 +46,10 @@ export const BatchEditModal: React.FC<BatchEditModalProps> = ({
           type="info"
           showIcon
           message="提示"
-          description="留空表示保持原值；批量提交后会自动触发一次决策刷新（可在Header看到刷新状态）。"
+          description="留空表示保持原值；批量提交后会自动触发一次决策刷新（可在顶部栏看到刷新状态）。"
         />
         <div>
-          <label>目标产能(吨)：</label>
+          <label>目标产能（吨）：</label>
           <InputNumber
             style={{ width: '100%', marginTop: 8 }}
             min={0}
@@ -60,7 +60,7 @@ export const BatchEditModal: React.FC<BatchEditModalProps> = ({
           />
         </div>
         <div>
-          <label>极限产能(吨)：</label>
+          <label>极限产能（吨）：</label>
           <InputNumber
             style={{ width: '100%', marginTop: 8 }}
             min={0}
@@ -71,7 +71,7 @@ export const BatchEditModal: React.FC<BatchEditModalProps> = ({
           />
         </div>
         <div>
-          <label>调整原因(必填)：</label>
+          <label>调整原因（必填）：</label>
           <Input.TextArea
             style={{ marginTop: 8 }}
             placeholder="请输入调整原因"

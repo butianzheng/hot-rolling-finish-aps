@@ -18,10 +18,10 @@ import { useActiveVersionId } from '../stores/use-global-store';
 import { decisionQueryKeys } from './queries/use-decision-queries';
 
 /**
- * 版本切换缓存失效 Hook
+ * 版本切换缓存失效函数
  *
  * 使用方式：
- * - 在顶层组件（如 App.tsx 或 Layout.tsx）中调用
+ * - 在顶层组件（如应用入口或布局组件）中调用
  * - 确保在版本切换时立即失效所有决策数据缓存
  */
 export function useVersionSwitchInvalidation() {
@@ -42,7 +42,7 @@ export function useVersionSwitchInvalidation() {
       prevVersionIdRef.current !== activeVersionId;
 
     if (versionChanged) {
-      console.log('[VersionSwitch] 检测到版本切换:', {
+      console.log('【版本切换】 检测到版本切换:', {
         from: prevVersionIdRef.current,
         to: activeVersionId,
       });
@@ -53,7 +53,7 @@ export function useVersionSwitchInvalidation() {
       // 失效全局 KPI 查询（按新版本重新获取）
       queryClient.invalidateQueries({ queryKey: ['globalKpi', activeVersionId] });
 
-      console.log('[VersionSwitch] 已失效所有决策数据缓存，将重新获取');
+      console.log('【版本切换】 已失效所有决策数据缓存，将重新获取');
     }
 
     // 更新 prevVersionIdRef 为当前值

@@ -7,6 +7,7 @@ import { Button, Descriptions, Space, Table, Tag, Typography, theme } from 'antd
 import type { ColumnsType } from 'antd/es/table';
 import type { DaySummary } from '../../../types/decision';
 import { getRiskLevelColor, getRiskLevelLabel, ReasonTable, getHighlightStyle, type WorkbenchCallback } from './shared';
+import { formatNumber, formatWeight } from '../../../utils/formatters';
 
 const { Text } = Typography;
 
@@ -37,15 +38,27 @@ export const RiskDayContent: React.FC<RiskDayContentProps> = ({
       width: 120,
       render: (v: DaySummary['riskLevel']) => <Tag color={getRiskLevelColor(v)}>{getRiskLevelLabel(v)}</Tag>,
     },
-    { title: '分数', dataIndex: 'riskScore', key: 'riskScore', width: 90 },
+    {
+      title: '分数',
+      dataIndex: 'riskScore',
+      key: 'riskScore',
+      width: 90,
+      render: (v: number) => formatNumber(Number(v || 0), 2),
+    },
     {
       title: '利用率',
       dataIndex: 'capacityUtilPct',
       key: 'capacityUtilPct',
       width: 100,
-      render: (v: number) => `${Number(v || 0).toFixed(2)}%`,
+      render: (v: number) => `${formatNumber(Number(v || 0), 2)}%`,
     },
-    { title: '超载(吨)', dataIndex: 'overloadWeightT', key: 'overloadWeightT', width: 100 },
+    {
+      title: '超载（吨）',
+      dataIndex: 'overloadWeightT',
+      key: 'overloadWeightT',
+      width: 130,
+      render: (v: number) => formatWeight(v),
+    },
     { title: '紧急失败', dataIndex: 'urgentFailureCount', key: 'urgentFailureCount', width: 90 },
     {
       title: '涉及机组',
@@ -91,7 +104,7 @@ export const RiskDayContent: React.FC<RiskDayContentProps> = ({
         <>
           <Space wrap align="center">
             <Tag color={getRiskLevelColor(selectedDay.riskLevel)}>
-              {getRiskLevelLabel(selectedDay.riskLevel)} / {selectedDay.riskScore.toFixed(2)}
+              {getRiskLevelLabel(selectedDay.riskLevel)} / {formatNumber(selectedDay.riskScore, 2)}
             </Tag>
             <Text strong>{selectedDay.planDate}</Text>
             {onGoWorkbench ? (
@@ -114,9 +127,9 @@ export const RiskDayContent: React.FC<RiskDayContentProps> = ({
           </Space>
 
           <Descriptions column={4} bordered size="small">
-            <Descriptions.Item label="风险分数">{selectedDay.riskScore.toFixed(2)}</Descriptions.Item>
-            <Descriptions.Item label="容量利用率">{selectedDay.capacityUtilPct.toFixed(2)}%</Descriptions.Item>
-            <Descriptions.Item label="超载">{selectedDay.overloadWeightT.toFixed(3)}t</Descriptions.Item>
+            <Descriptions.Item label="风险分数">{formatNumber(selectedDay.riskScore, 2)}</Descriptions.Item>
+            <Descriptions.Item label="容量利用率">{formatNumber(selectedDay.capacityUtilPct, 2)}%</Descriptions.Item>
+            <Descriptions.Item label="超载">{formatWeight(selectedDay.overloadWeightT)}</Descriptions.Item>
             <Descriptions.Item label="紧急失败">{selectedDay.urgentFailureCount}</Descriptions.Item>
           </Descriptions>
 

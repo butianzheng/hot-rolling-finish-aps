@@ -43,10 +43,10 @@ export const ROLL_STATUS_COLORS: Record<RollStatus, string> = {
 
 // 图例项配置
 export const URGENCY_LEGEND_ITEMS = [
-  { key: 'L3_EMERGENCY', color: URGENCY_COLORS.L3_EMERGENCY, label: 'L3 紧急' },
-  { key: 'L2_HIGH', color: URGENCY_COLORS.L2_HIGH, label: 'L2 高' },
-  { key: 'L1_MEDIUM', color: URGENCY_COLORS.L1_MEDIUM, label: 'L1 中' },
-  { key: 'L0_NORMAL', color: URGENCY_COLORS.L0_NORMAL, label: 'L0 正常' },
+  { key: 'L3_EMERGENCY', color: URGENCY_COLORS.L3_EMERGENCY, label: '三级 紧急' },
+  { key: 'L2_HIGH', color: URGENCY_COLORS.L2_HIGH, label: '二级 高' },
+  { key: 'L1_MEDIUM', color: URGENCY_COLORS.L1_MEDIUM, label: '一级 中' },
+  { key: 'L0_NORMAL', color: URGENCY_COLORS.L0_NORMAL, label: '常规 正常' },
 ] as const;
 
 export const LINE_LEGEND_ITEMS = [

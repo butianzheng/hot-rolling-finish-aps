@@ -22,6 +22,7 @@ import {
   isUnderutilized,
   getUtilizationColor,
 } from '../../types/decision/d6-capacity-opportunity';
+import { formatCapacity, formatNumber, formatWeight } from '../../utils/formatters';
 
 // 辅助函数：解析机会类型字符串为 OpportunityType
 function parseOpportunityType(typeStr: string): OpportunityType {
@@ -127,7 +128,7 @@ export const D6CapacityOpportunity: React.FC<D6CapacityOpportunityProps> = ({ em
       width: 130,
       render: (pct: number) => (
         <div>
-          <div style={{ fontSize: '12px', marginBottom: '4px' }}>{pct.toFixed(2)}%</div>
+          <div style={{ fontSize: '12px', marginBottom: '4px' }}>{formatNumber(pct, 2)}%</div>
           <Progress
             percent={pct}
             size="small"
@@ -145,7 +146,7 @@ export const D6CapacityOpportunity: React.FC<D6CapacityOpportunityProps> = ({ em
       width: 130,
       render: (pct: number) => (
         <div>
-          <div style={{ fontSize: '12px', marginBottom: '4px' }}>{pct.toFixed(2)}%</div>
+          <div style={{ fontSize: '12px', marginBottom: '4px' }}>{formatNumber(pct, 2)}%</div>
           <Progress
             percent={pct}
             size="small"
@@ -163,8 +164,8 @@ export const D6CapacityOpportunity: React.FC<D6CapacityOpportunityProps> = ({ em
       render: (_, record) => (
         <div style={{ fontSize: '12px' }}>
           <div>
-            <span style={{ fontWeight: 'bold' }}>{record.usedCapacityT.toFixed(3)}</span> /{' '}
-            {record.targetCapacityT.toFixed(3)} 吨
+            <span style={{ fontWeight: 'bold' }}>{formatCapacity(record.usedCapacityT)}</span> /{' '}
+            {formatCapacity(record.targetCapacityT)} 吨
           </div>
         </div>
       ),
@@ -181,7 +182,7 @@ export const D6CapacityOpportunity: React.FC<D6CapacityOpportunityProps> = ({ em
             fontWeight: 'bold',
           }}
         >
-          {space.toFixed(3)}吨
+          {formatWeight(space)}
         </span>
       ),
       sorter: (a, b) => a.opportunitySpaceT - b.opportunitySpaceT,

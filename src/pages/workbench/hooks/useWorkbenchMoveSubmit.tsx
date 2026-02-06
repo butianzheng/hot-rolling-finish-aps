@@ -113,7 +113,7 @@ export function useWorkbenchMoveSubmit(params: {
 
       showMoveSubmitResult(res, missing);
     } catch (e: unknown) {
-      console.error('[Workbench] moveItems failed:', e);
+      console.error('【工作台】移位失败：', e);
       message.error(getErrorMessage(e) || '移动失败');
     } finally {
       setMoveSubmitting(false);

@@ -6,6 +6,7 @@ import React from 'react';
 import { Button, Descriptions, Space, Table, Tag, Typography, theme } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { BottleneckPoint } from '../../../types/decision';
+import { formatNumber, formatWeight } from '../../../utils/formatters';
 import {
   BOTTLENECK_LEVEL_COLORS,
   BOTTLENECK_LEVEL_LABELS,
@@ -55,16 +56,28 @@ export const BottleneckContent: React.FC<BottleneckContentProps> = ({
         <Tag color={BOTTLENECK_LEVEL_COLORS[v] || '#8c8c8c'}>{BOTTLENECK_LEVEL_LABELS[v] || v}</Tag>
       ),
     },
-    { title: '分数', dataIndex: 'bottleneckScore', key: 'bottleneckScore', width: 90 },
+    {
+      title: '分数',
+      dataIndex: 'bottleneckScore',
+      key: 'bottleneckScore',
+      width: 90,
+      render: (v: number) => formatNumber(Number(v || 0), 2),
+    },
     {
       title: '利用率',
       dataIndex: 'capacityUtilPct',
       key: 'capacityUtilPct',
       width: 100,
-      render: (v: number) => `${Number(v || 0).toFixed(2)}%`,
+      render: (v: number) => `${formatNumber(Number(v || 0), 2)}%`,
     },
     { title: '未排数', dataIndex: 'pendingMaterialCount', key: 'pendingMaterialCount', width: 90 },
-    { title: '未排(吨)', dataIndex: 'pendingWeightT', key: 'pendingWeightT', width: 100 },
+    {
+      title: '未排（吨）',
+      dataIndex: 'pendingWeightT',
+      key: 'pendingWeightT',
+      width: 120,
+      render: (v: number) => formatWeight(v),
+    },
     {
       title: '操作',
       key: 'action',
@@ -94,7 +107,7 @@ export const BottleneckContent: React.FC<BottleneckContentProps> = ({
         <>
           <Space wrap align="center">
             <Tag color={BOTTLENECK_LEVEL_COLORS[selectedPoint.bottleneckLevel] || '#8c8c8c'}>
-              {BOTTLENECK_LEVEL_LABELS[selectedPoint.bottleneckLevel] || selectedPoint.bottleneckLevel} / {selectedPoint.bottleneckScore.toFixed(2)}
+              {BOTTLENECK_LEVEL_LABELS[selectedPoint.bottleneckLevel] || selectedPoint.bottleneckLevel} / {formatNumber(selectedPoint.bottleneckScore, 2)}
             </Tag>
             <Text strong>
               {selectedPoint.machineCode} · {selectedPoint.planDate}
@@ -111,10 +124,10 @@ export const BottleneckContent: React.FC<BottleneckContentProps> = ({
           </Space>
 
           <Descriptions column={4} bordered size="small">
-            <Descriptions.Item label="堵塞分数">{selectedPoint.bottleneckScore.toFixed(2)}</Descriptions.Item>
-            <Descriptions.Item label="容量利用率">{selectedPoint.capacityUtilPct.toFixed(2)}%</Descriptions.Item>
+            <Descriptions.Item label="堵塞分数">{formatNumber(selectedPoint.bottleneckScore, 2)}</Descriptions.Item>
+            <Descriptions.Item label="容量利用率">{formatNumber(selectedPoint.capacityUtilPct, 2)}%</Descriptions.Item>
             <Descriptions.Item label="未排材料数(≤当日)">{selectedPoint.pendingMaterialCount}</Descriptions.Item>
-            <Descriptions.Item label="未排重量(≤当日)">{selectedPoint.pendingWeightT.toFixed(3)}t</Descriptions.Item>
+            <Descriptions.Item label="未排重量(≤当日)">{formatWeight(selectedPoint.pendingWeightT)}</Descriptions.Item>
           </Descriptions>
 
           {Array.isArray(selectedPoint.bottleneckTypes) && selectedPoint.bottleneckTypes.length > 0 ? (

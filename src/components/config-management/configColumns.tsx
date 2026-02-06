@@ -31,7 +31,7 @@ export function createConfigColumns(
       ),
     },
     {
-      title: '作用域ID',
+      title: '作用域编号',
       dataIndex: 'scope_id',
       key: 'scope_id',
       width: 120,

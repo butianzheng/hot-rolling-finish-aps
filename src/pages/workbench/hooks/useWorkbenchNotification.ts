@@ -1,9 +1,9 @@
 /**
- * Workbench 消息通知统一接口
+ * 工作台消息通知统一接口
  *
- * 目标：统一 message + Modal.info/confirm 的反馈链路
+ * 目标：统一消息与提示弹窗的反馈链路
  *
- * 原来的实现分散在各处：
+ * 原实现分散在各处：
  * - message.warning('请先选择物料');
  * - message.success('推荐位置：...');
  * - message.error(`推荐位置失败: ${error}`);
@@ -59,7 +59,7 @@ export function useWorkbenchNotification() {
    *
    * @example
    * notify.operationError('锁定', error);
-   * // → 显示："锁定失败：{errorMessage}"
+   * // → 显示："锁定失败：{错误信息}"
    */
   const operationError = (operation: string, error?: unknown) => {
     const errorMessage = getErrorMessage(error);

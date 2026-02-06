@@ -29,7 +29,7 @@ function getCurrentIndex(stage: DecisionFlowGuideProps['stage']): number {
 }
 
 const FLOW_STEPS = [
-  { title: '风险概览', description: '定位 P0/P1' },
+  { title: '风险概览', description: '定位高优问题' },
   { title: '工作台处理', description: '移位/锁定/紧急' },
   { title: '策略草案对比', description: '生成+解释' },
   { title: '发布并激活', description: '生成版本' },

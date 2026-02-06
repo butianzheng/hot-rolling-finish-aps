@@ -20,7 +20,7 @@ export const MaterialInfoSection: React.FC<MaterialInfoSectionProps> = ({ data }
         </Text>
       </Descriptions.Item>
       <Descriptions.Item label="钢种">{formatText(data.master?.steel_mark)}</Descriptions.Item>
-      <Descriptions.Item label="重量(t)">{formatNumber(data.master?.weight_t, 3)}</Descriptions.Item>
+      <Descriptions.Item label="重量（吨）">{formatNumber(data.master?.weight_t, 3)}</Descriptions.Item>
       <Descriptions.Item label="交期">{formatText(data.master?.due_date)}</Descriptions.Item>
       <Descriptions.Item label="下道机组">
         {formatText(data.master?.next_machine_code || data.master?.current_machine_code)}

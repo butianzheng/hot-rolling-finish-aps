@@ -43,7 +43,7 @@ export function createActionLogColumns(
       width: 120,
     },
     {
-      title: '版本ID',
+      title: '版本编号',
       dataIndex: 'version_id',
       key: 'version_id',
       width: 120,

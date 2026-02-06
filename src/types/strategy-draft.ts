@@ -139,7 +139,7 @@ export type SqueezedHintSection = {
 /** 预置策略列表（后端未返回时的 fallback） */
 export const FALLBACK_STRATEGIES: StrategyPreset[] = [
   { key: 'balanced', title: '均衡方案', description: '在交付/产能/库存之间保持均衡', kind: 'preset' },
-  { key: 'urgent_first', title: '紧急优先', description: '优先保障 L3/L2 紧急订单', kind: 'preset' },
+  { key: 'urgent_first', title: '紧急优先', description: '优先保障 三级/二级紧急订单', kind: 'preset' },
   { key: 'capacity_first', title: '产能优先', description: '优先提升产能利用率，减少溢出', kind: 'preset' },
   { key: 'cold_stock_first', title: '冷料消化', description: '优先消化冷料/压库物料', kind: 'preset' },
 ];

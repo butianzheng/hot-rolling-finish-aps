@@ -26,7 +26,7 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('ErrorBoundary caught error:', error, errorInfo);
+    console.error('错误边界捕获异常：', error, errorInfo);
     void reportFrontendError(error, {
       source: 'ErrorBoundary',
       componentStack: errorInfo?.componentStack || null,

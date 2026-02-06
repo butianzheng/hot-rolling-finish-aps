@@ -44,6 +44,17 @@ function fmtNum(v: unknown, digits: number = 1): string {
   return n.toFixed(digits);
 }
 
+function formatUrgencyLevel(level: string): string {
+  const normalized = normalizeUrgentLevel(level);
+  const mapping: Record<string, string> = {
+    L3: '三级紧急',
+    L2: '二级紧急',
+    L1: '一级紧急',
+    L0: '常规',
+  };
+  return mapping[normalized] || normalized;
+}
+
 export type PathOverrideConfirmModalProps = {
   open: boolean;
   onClose: () => void;
@@ -111,7 +122,7 @@ const PathOverrideConfirmModal: React.FC<PathOverrideConfirmModalProps> = ({
       setRows(list);
       setSelectedIds((prev) => prev.filter((id) => list.some((r) => r.material_id === id)));
     } catch (e: unknown) {
-      console.error('[PathOverrideConfirmModal] loadPending failed:', e);
+      console.error('【路径放行确认弹窗】加载待确认失败：', e);
       setRows([]);
       const errorMessage = e instanceof Error ? e.message : String(e);
       setLoadError(errorMessage || '加载待确认列表失败');
@@ -150,7 +161,7 @@ const PathOverrideConfirmModal: React.FC<PathOverrideConfirmModalProps> = ({
       onConfirmed?.({ confirmedCount: 1, autoRecalc });
       await loadPending();
     } catch (e: unknown) {
-      console.error('[PathOverrideConfirmModal] confirmSingle failed:', e);
+      console.error('【路径放行确认弹窗】单条确认失败：', e);
       const errorMessage = e instanceof Error ? e.message : String(e);
       message.error(errorMessage || '确认失败');
     } finally {
@@ -202,7 +213,7 @@ const PathOverrideConfirmModal: React.FC<PathOverrideConfirmModalProps> = ({
       setSelectedIds([]);
       await loadPending();
     } catch (e: unknown) {
-      console.error('[PathOverrideConfirmModal] confirmBatch failed:', e);
+      console.error('【路径放行确认弹窗】批量确认失败：', e);
       const errorMessage = e instanceof Error ? e.message : String(e);
       message.error(errorMessage || '批量确认失败');
     } finally {
@@ -225,17 +236,17 @@ const PathOverrideConfirmModal: React.FC<PathOverrideConfirmModalProps> = ({
       width: 90,
       render: (v) => {
         const level = normalizeUrgentLevel(v);
-        return <Tag color={urgentLevelColors[level] || 'default'}>{level}</Tag>;
+        return <Tag color={urgentLevelColors[level] || 'default'}>{formatUrgencyLevel(level)}</Tag>;
       },
     },
     {
-      title: '宽/厚 (mm)',
+      title: '宽/厚（毫米）',
       key: 'wt',
       width: 140,
       render: (_, r) => (
         <Space size={6}>
-          <span>W {fmtNum(r.width_mm, 1)}</span>
-          <span>T {fmtNum(r.thickness_mm, 2)}</span>
+          <span>宽 {fmtNum(r.width_mm, 1)}</span>
+          <span>厚 {fmtNum(r.thickness_mm, 2)}</span>
         </Space>
       ),
     },
@@ -251,24 +262,24 @@ const PathOverrideConfirmModal: React.FC<PathOverrideConfirmModalProps> = ({
       },
     },
     {
-      title: '锚点 (mm)',
+      title: '锚点（毫米）',
       key: 'anchor',
       width: 150,
       render: (_, r) => (
         <Space size={6}>
-          <span>W {fmtNum(r.anchor_width_mm, 1)}</span>
-          <span>T {fmtNum(r.anchor_thickness_mm, 2)}</span>
+          <span>宽 {fmtNum(r.anchor_width_mm, 1)}</span>
+          <span>厚 {fmtNum(r.anchor_thickness_mm, 2)}</span>
         </Space>
       ),
     },
     {
-      title: 'Δ宽/Δ厚 (mm)',
+      title: '宽差/厚差（毫米）',
       key: 'delta',
       width: 150,
       render: (_, r) => (
         <Space size={6}>
-          <Tag color="volcano">ΔW {fmtNum(r.width_delta_mm, 1)}</Tag>
-          <Tag color="magenta">ΔT {fmtNum(r.thickness_delta_mm, 2)}</Tag>
+          <Tag color="volcano">宽差 {fmtNum(r.width_delta_mm, 1)}</Tag>
+          <Tag color="magenta">厚差 {fmtNum(r.thickness_delta_mm, 2)}</Tag>
         </Space>
       ),
     },
@@ -334,7 +345,7 @@ const PathOverrideConfirmModal: React.FC<PathOverrideConfirmModalProps> = ({
               <>
                 <Typography.Text type="secondary">当前锚点</Typography.Text>
                 <Tag color="geekblue">
-                  W {fmtNum(anchorSummary.w, 1)} / T {fmtNum(anchorSummary.t, 2)}
+                  宽 {fmtNum(anchorSummary.w, 1)} / 厚 {fmtNum(anchorSummary.t, 2)}
                 </Tag>
               </>
             ) : null}
@@ -378,4 +389,3 @@ const PathOverrideConfirmModal: React.FC<PathOverrideConfirmModalProps> = ({
 };
 
 export default PathOverrideConfirmModal;
-

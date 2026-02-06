@@ -36,6 +36,7 @@ import {
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { useMachineConfig } from '../../hooks/useMachineConfig';
+import { formatNumber } from '../../utils/formatters';
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
@@ -155,16 +156,16 @@ export const MachineConfigPanel: React.FC<MachineConfigPanelProps> = ({
               <strong>将应用以下配置：</strong>
             </p>
             <ul>
-              <li>目标产能: {values.default_daily_target_t.toFixed(3)} 吨/天</li>
-              <li>极限产能: {values.default_daily_limit_pct.toFixed(2)}%</li>
+              <li>目标产能：{formatNumber(values.default_daily_target_t, 3, { useGrouping: false })} 吨/天</li>
+              <li>极限产能：{formatNumber(values.default_daily_limit_pct, 2, { useGrouping: false })}%</li>
             </ul>
             <p>
               <strong>应用范围：</strong>
             </p>
             <ul>
-              <li>机组: {selectedMachines.join(', ')}</li>
+              <li>机组：{selectedMachines.join(', ')}</li>
               <li>
-                日期范围: {from.format('YYYY-MM-DD')} ~ {to.format('YYYY-MM-DD')}
+                日期范围：{from.format('YYYY-MM-DD')} ~ {to.format('YYYY-MM-DD')}
               </li>
               <li>
                 <Tag color="blue">共 {dateRangeStats.totalRecords} 条记录</Tag>
@@ -209,7 +210,7 @@ export const MachineConfigPanel: React.FC<MachineConfigPanelProps> = ({
         },
       });
     } catch (e: any) {
-      console.error('[MachineConfigPanel] batch apply failed:', e);
+      console.error('【机组配置面板】批量应用失败：', e);
     }
   };
 
@@ -235,7 +236,7 @@ export const MachineConfigPanel: React.FC<MachineConfigPanelProps> = ({
       message.success(`已为 ${selectedMachines.length} 个机组更新默认配置`);
       form.resetFields(['reason']);
     } catch (e: any) {
-      console.error('[MachineConfigPanel] update config failed:', e);
+      console.error('【机组配置面板】更新配置失败：', e);
     }
   };
 
@@ -254,16 +255,16 @@ export const MachineConfigPanel: React.FC<MachineConfigPanelProps> = ({
   // 历史记录列
   const historyColumns = [
     {
-      title: '版本ID',
+      title: '版本编号',
       dataIndex: 'version_id',
       width: 120,
       ellipsis: true,
     },
     {
-      title: '目标产能(t/天)',
+      title: '目标产能（吨/天）',
       dataIndex: 'default_daily_target_t',
       width: 140,
-      render: (v: number) => v.toFixed(3),
+      render: (v: number) => formatNumber(v, 3, { useGrouping: false }),
     },
     {
       title: '极限产能',
@@ -351,10 +352,10 @@ export const MachineConfigPanel: React.FC<MachineConfigPanelProps> = ({
                           {config ? (
                             <Space size={4}>
                               <Tag color="blue" style={{ margin: 0, fontSize: 11 }}>
-                                {config.default_daily_target_t.toFixed(3)}t
+                                {formatNumber(config.default_daily_target_t, 3, { useGrouping: false })}吨
                               </Tag>
                               <Tag color="orange" style={{ margin: 0, fontSize: 11 }}>
-                                {(config.default_daily_limit_pct * 100).toFixed(2)}%
+                                {formatNumber(config.default_daily_limit_pct * 100, 2, { useGrouping: false })}%
                               </Tag>
                               <Button
                                 type="link"
@@ -473,7 +474,7 @@ export const MachineConfigPanel: React.FC<MachineConfigPanelProps> = ({
             }}
           >
             <Form.Item
-              label={<span style={{ fontSize: 12 }}>目标产能 (吨/天)</span>}
+              label={<span style={{ fontSize: 12 }}>目标产能（吨/天）</span>}
               name="default_daily_target_t"
               rules={[
                 { required: true, message: '请输入目标产能' },
@@ -491,13 +492,13 @@ export const MachineConfigPanel: React.FC<MachineConfigPanelProps> = ({
             </Form.Item>
 
             <Form.Item
-              label={<span style={{ fontSize: 12 }}>极限产能 (%)</span>}
+              label={<span style={{ fontSize: 12 }}>极限产能（%）</span>}
               name="default_daily_limit_pct"
               rules={[
                 { required: true, message: '请输入极限产能百分比' },
                 { type: 'number', min: 100, message: '极限产能必须 ≥ 100%' },
               ]}
-              tooltip="相对于目标产能的百分比，通常为 105%-120%"
+              tooltip="相对于目标产能的百分比，通常为 105%～120%"
               style={{ marginBottom: 12 }}
             >
               <InputNumber

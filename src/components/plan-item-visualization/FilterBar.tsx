@@ -91,7 +91,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         />
 
         <Search
-          placeholder="搜索材料ID或钢种"
+          placeholder="搜索材料编号或钢种"
           value={searchText}
           onChange={(e) => onSearchChange(e.target.value)}
           style={{ width: 250 }}

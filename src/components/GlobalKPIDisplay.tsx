@@ -15,6 +15,7 @@ import {
 } from '@ant-design/icons';
 import { useTheme } from '../theme';
 import type { GlobalKPI } from '../types/kpi';
+import { formatPercent, formatWeight } from '../utils/formatters';
 
 const { Text } = Typography;
 
@@ -99,10 +100,10 @@ export const GlobalKPIDisplay: React.FC<GlobalKPIDisplayProps> = ({ kpi }) => {
       </Tooltip>
 
       {/* 产能利用率 */}
-      <Tooltip title={`产能利用率: ${kpi.capacityUtilization.toFixed(2)}%`}>
+      <Tooltip title={`产能利用率：${formatPercent(kpi.capacityUtilization)}`}>
         <Space size={6}>
           <DashboardOutlined style={{ color: '#1677ff', fontSize: 16 }} />
-          <Text style={{ color: textColor }}>{kpi.capacityUtilization.toFixed(2)}%</Text>
+          <Text style={{ color: textColor }}>{formatPercent(kpi.capacityUtilization)}</Text>
         </Space>
       </Tooltip>
 
@@ -120,12 +121,12 @@ export const GlobalKPIDisplay: React.FC<GlobalKPIDisplayProps> = ({ kpi }) => {
 
       {/* 轧辊状态 */}
       <Tooltip
-        title={`轧辊吨位: ${kpi.rollCampaignProgress.toFixed(3)}t / ${kpi.rollChangeThreshold.toFixed(3)}t`}
+        title={`轧辊吨位：${formatWeight(kpi.rollCampaignProgress)} / ${formatWeight(kpi.rollChangeThreshold)}`}
       >
         <Space size={6}>
           <ToolOutlined style={{ color: rollStatusColor, fontSize: 16 }} />
           <Text style={{ color: textColor }}>
-            {kpi.rollCampaignProgress.toFixed(3)}t
+            {formatWeight(kpi.rollCampaignProgress)}
           </Text>
         </Space>
       </Tooltip>

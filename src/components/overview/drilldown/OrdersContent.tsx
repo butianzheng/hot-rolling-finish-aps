@@ -7,6 +7,7 @@ import { Button, Space, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { OrderFailure } from '../../../types/decision';
 import { getUrgencyLevelColor, getUrgencyLevelLabel, TagWithColor, type WorkbenchCallback } from './shared';
+import { formatNumber, formatWeight } from '../../../utils/formatters';
 
 export interface OrdersContentProps {
   rows: OrderFailure[];
@@ -40,9 +41,15 @@ export const OrdersContent: React.FC<OrdersContentProps> = ({
       dataIndex: 'completionRate',
       key: 'completionRate',
       width: 90,
-      render: (v: number) => `${Number(v || 0).toFixed(2)}%`,
+      render: (v: number) => `${formatNumber(Number(v || 0), 2)}%`,
     },
-    { title: '未排(吨)', dataIndex: 'unscheduledWeightT', key: 'unscheduledWeightT', width: 100 },
+    {
+      title: '未排（吨）',
+      dataIndex: 'unscheduledWeightT',
+      key: 'unscheduledWeightT',
+      width: 120,
+      render: (v: number) => formatWeight(v),
+    },
     { title: '机组', dataIndex: 'machineCode', key: 'machineCode', width: 90 },
     {
       title: '操作',

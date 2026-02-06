@@ -262,7 +262,7 @@ const PlanningWorkbench: React.FC = () => {
               ) : null}
             </Space>
           }
-          description="建议先在工作台处理 P0/P1 物料（移位/锁定/紧急/强制放行），再去草案对比选择推荐方案发布并激活。"
+          description="建议先在工作台处理零级/一级优先问题物料（移位/锁定/紧急/强制放行），再去草案对比选择推荐方案发布并激活。"
           primaryAction={decisionPrimaryAction}
           secondaryAction={decisionSecondaryAction}
         />

@@ -13,18 +13,18 @@ interface KpiCompareCardProps {
 
 export const KpiCompareCard: React.FC<KpiCompareCardProps> = ({ loading, error, rows }) => {
   return (
-    <Card title="KPI 总览（后端聚合）" size="small">
+    <Card title="指标总览（后端聚合）" size="small">
       {loading ? (
-        <Alert type="info" showIcon message="正在计算 KPI…" />
+        <Alert type="info" showIcon message="正在计算指标…" />
       ) : error ? (
         <Alert
           type="error"
           showIcon
-          message="KPI 计算失败"
+          message="指标计算失败"
           description={String((error as any)?.message || error)}
         />
       ) : !rows || rows.length === 0 ? (
-        <Alert type="info" showIcon message="暂无 KPI 数据" />
+        <Alert type="info" showIcon message="暂无指标数据" />
       ) : (
         <Table
           size="small"
@@ -33,9 +33,9 @@ export const KpiCompareCard: React.FC<KpiCompareCardProps> = ({ loading, error, 
           dataSource={rows}
           columns={[
             { title: '指标', dataIndex: 'metric', width: 180 },
-            { title: '版本A', dataIndex: 'a', width: 160 },
-            { title: '版本B', dataIndex: 'b', width: 160 },
-            { title: 'Δ(B-A)', dataIndex: 'delta' },
+            { title: '版本甲', dataIndex: 'a', width: 160 },
+            { title: '版本乙', dataIndex: 'b', width: 160 },
+            { title: '变化值（乙-甲）', dataIndex: 'delta' },
           ]}
         />
       )}

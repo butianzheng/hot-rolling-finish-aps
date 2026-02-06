@@ -4,7 +4,7 @@ import type { ColumnsType } from 'antd/es/table';
 import dayjs, { type Dayjs } from 'dayjs';
 import { ReloadOutlined } from '@ant-design/icons';
 import { rhythmApi } from '../../api/tauri';
-import { formatDate } from '../../utils/formatters';
+import { formatDate, formatNumber, formatWeight } from '../../utils/formatters';
 
 type PresetRow = {
   presetId: string;
@@ -313,14 +313,14 @@ const DailyRhythmManagerModal: React.FC<DailyRhythmManagerModalProps> = ({
       dataIndex: 'scheduledWeightT',
       key: 'scheduledWeightT',
       width: 110,
-      render: (v: number) => (Number.isFinite(v) ? v.toFixed(3) : '-'),
+      render: (v: number) => (Number.isFinite(v) ? formatNumber(v, 3) : '-'),
     },
     {
       title: '实际占比',
       dataIndex: 'actualRatio',
       key: 'actualRatio',
       width: 110,
-      render: (v: number) => `${((Number.isFinite(v) ? v : 0) * 100).toFixed(2)}%`,
+      render: (v: number) => `${formatNumber((Number.isFinite(v) ? v : 0) * 100, 2)}%`,
     },
   ];
 
@@ -353,7 +353,7 @@ const DailyRhythmManagerModal: React.FC<DailyRhythmManagerModalProps> = ({
         const diff = ratio == null ? null : Math.abs((row.actualRatio || 0) - ratio);
         if (diff == null) return '-';
         const pct = diff * 100;
-        return <span style={{ color: pct >= (profile?.deviationThreshold || 0.1) * 100 ? '#faad14' : undefined }}>{pct.toFixed(2)}%</span>;
+        return <span style={{ color: pct >= (profile?.deviationThreshold || 0.1) * 100 ? '#faad14' : undefined }}>{formatNumber(pct, 2)}%</span>;
       },
     }
   );
@@ -365,9 +365,9 @@ const DailyRhythmManagerModal: React.FC<DailyRhythmManagerModalProps> = ({
     return (
       <Space wrap size={8}>
         <Tag color={profile.isViolated ? 'red' : 'green'}>
-          最大偏差 {maxPct.toFixed(2)}% / 阈值 {thPct.toFixed(2)}%
+          最大偏差 {formatNumber(maxPct, 2)}% / 阈值 {formatNumber(thPct, 2)}%
         </Tag>
-        <Tag>当日已排 {profile.totalScheduledWeightT.toFixed(3)} 吨</Tag>
+        <Tag>当日已排 {formatWeight(profile.totalScheduledWeightT)}</Tag>
         {profile.targetPresetId ? <Tag>模板 {profile.targetPresetId}</Tag> : <Tag>未绑定模板</Tag>}
         {profile.targetUpdatedAt ? <Tag>更新 {profile.targetUpdatedAt}</Tag> : null}
       </Space>
@@ -391,7 +391,7 @@ const DailyRhythmManagerModal: React.FC<DailyRhythmManagerModalProps> = ({
         type="info"
         showIcon
         message="口径说明"
-        description="节奏目标用于监控当日品种大类占比（目标 vs 实际），不直接改变排程结果；修改后会触发 D4 等读模型刷新。"
+        description="节奏目标用于监控当日品种大类占比（目标与实际），不直接改变排程结果；修改后会触发第四类决策等读模型刷新。"
         style={{ marginBottom: 12 }}
       />
 

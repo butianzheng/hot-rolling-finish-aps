@@ -7,6 +7,7 @@ import { Button, Space, Table, Tag, theme } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { RollCampaignAlert } from '../../../types/decision';
 import { getAlertLevelLabel, getAlertLevelColor, getHighlightStyle, type WorkbenchCallback } from './shared';
+import { formatWeight } from '../../../utils/formatters';
 
 export interface RollAlertContentProps {
   alerts: RollCampaignAlert[];
@@ -40,21 +41,21 @@ export const RollAlertContent: React.FC<RollAlertContentProps> = ({
       dataIndex: 'currentTonnageT',
       key: 'currentTonnageT',
       width: 100,
-      render: (v: number) => v?.toFixed(3) || '-',
+      render: (v: number) => formatWeight(v),
     },
     {
       title: '硬上限',
       dataIndex: 'hardLimitT',
       key: 'hardLimitT',
       width: 100,
-      render: (v: number) => v?.toFixed(3) || '-',
+      render: (v: number) => formatWeight(v),
     },
     {
       title: '剩余(距硬上限)',
       dataIndex: 'remainingTonnageT',
       key: 'remainingTonnageT',
       width: 140,
-      render: (v: number) => v?.toFixed(3) || '-',
+      render: (v: number) => formatWeight(v),
     },
     { title: '开始日', dataIndex: 'campaignStartDate', key: 'campaignStartDate', width: 110 },
     { title: '预计硬停止', dataIndex: 'estimatedHardStopDate', key: 'estimatedHardStopDate', width: 120 },

@@ -51,7 +51,7 @@ export const FilterAndSearch: React.FC<FilterAndSearchProps> = ({
       />
       <Input
         allowClear
-        placeholder="搜索 material_id"
+        placeholder="搜索材料编号"
         style={{ width: 240 }}
         value={localSearch}
         onChange={(e) => setLocalSearch(e.target.value)}

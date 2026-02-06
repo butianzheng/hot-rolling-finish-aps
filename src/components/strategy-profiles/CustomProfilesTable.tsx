@@ -36,7 +36,7 @@ export const CustomProfilesTable: React.FC<CustomProfilesTableProps> = ({
       render: (v: string) => <Text strong>{v}</Text>,
     },
     {
-      title: '策略ID',
+      title: '策略编号',
       dataIndex: 'strategy_id',
       key: 'strategy_id',
       width: 200,
