@@ -6,7 +6,7 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { Alert, Button, Descriptions, Drawer, Modal, Space, Typography } from 'antd';
+import { Alert, Button, Descriptions, Drawer, Modal, Space, Tag, Typography } from 'antd';
 import type { DrilldownSpec, WorkbenchTabKey } from '../../../hooks/useRiskOverviewData';
 import type {
   BottleneckPoint,
@@ -15,6 +15,7 @@ import type {
   DaySummary,
   OrderFailure,
   RollCampaignAlert,
+  ReasonItem,
 } from '../../../types/decision';
 import {
   // 堵塞等级/类型
@@ -40,6 +41,7 @@ import { BottleneckContent } from './BottleneckContent';
 import { RollAlertContent } from './RollAlertContent';
 import { RiskDayContent } from './RiskDayContent';
 import { CapacityOpportunityContent } from './CapacityOpportunityContent';
+import { ReasonTable } from './shared';
 
 const { Text } = Typography;
 
@@ -185,6 +187,57 @@ function formatFieldValue(fieldName: string, value: unknown): string {
 
   return String(value);
 }
+
+/**
+ * 渲染字段值（支持复杂类型，返回React节点）
+ */
+function renderFieldValue(fieldName: string, value: unknown): React.ReactNode {
+  if (value === null || value === undefined) {
+    return '-';
+  }
+
+  // 特殊处理 reasons 字段 - 使用 ReasonTable 组件
+  if (fieldName === 'reasons' || fieldName === 'topReasons' || fieldName === 'failureReasons') {
+    if (Array.isArray(value) && value.length > 0) {
+      // 确保第一个元素有code、msg、weight字段（简单类型检查）
+      const firstItem = value[0];
+      if (firstItem && typeof firstItem === 'object' && 'code' in firstItem && 'msg' in firstItem) {
+        return (
+          <div style={{ marginTop: 8 }}>
+            <ReasonTable reasons={value as ReasonItem[]} />
+          </div>
+        );
+      }
+    }
+    return <Text type="secondary">暂无原因</Text>;
+  }
+
+  // 处理数组类型
+  if (Array.isArray(value)) {
+    const labelMap = ENUM_VALUE_LABELS[fieldName];
+    if (labelMap) {
+      // 数组中每个枚举值都进行汉化
+      return (
+        <Space wrap>
+          {value.map((v, idx) => (
+            <Tag key={idx}>{labelMap[String(v)] || String(v)}</Tag>
+          ))}
+        </Space>
+      );
+    }
+    // 普通数组
+    return value.map((v) => (typeof v === 'object' ? JSON.stringify(v) : String(v))).join(', ');
+  }
+
+  // 处理对象类型（趋势等）
+  if (typeof value === 'object') {
+    return <pre style={{ fontSize: 12, margin: 0 }}>{JSON.stringify(value, null, 2)}</pre>;
+  }
+
+  // 其他情况使用原有的formatFieldValue
+  return formatFieldValue(fieldName, value);
+}
+
 
 interface DrilldownDrawerProps {
   open: boolean;
@@ -362,13 +415,13 @@ const DrilldownDrawer: React.FC<DrilldownDrawerProps> = ({
         open={detailOpen}
         onCancel={() => setDetailOpen(false)}
         footer={<Button onClick={() => setDetailOpen(false)}>关闭</Button>}
-        width={720}
+        width={880}
       >
         {detailRecord ? (
-          <Descriptions size="small" column={1} bordered>
+          <Descriptions size="small" column={1} bordered layout="vertical">
             {Object.entries(detailRecord).map(([k, v]) => (
               <Descriptions.Item key={k} label={getFieldLabel(k)}>
-                {formatFieldValue(k, v)}
+                {renderFieldValue(k, v)}
               </Descriptions.Item>
             ))}
           </Descriptions>

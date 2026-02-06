@@ -54,16 +54,55 @@ export const TagWithColor: React.FC<{ color: string; children: React.ReactNode }
   <Tag color={color}>{children}</Tag>
 );
 
+/**
+ * 原因代码中文翻译映射
+ */
+const REASON_CODE_LABELS: Record<string, string> = {
+  CAPACITY_UTILIZATION: '产能利用率',
+  LOW_REMAINING_CAPACITY: '剩余产能不足',
+  HIGH_CAPACITY_PRESSURE: '产能压力高',
+  STRUCTURE_GAP: '结构性缺口',
+  COLD_STOCK_AGING: '冷料库龄',
+  ROLL_CHANGE_CONFLICT: '换辊冲突',
+  URGENCY_BACKLOG: '紧急订单积压',
+  MATURITY_CONSTRAINT: '适温约束',
+  OVERLOAD_RISK: '超载风险',
+  SCHEDULING_CONFLICT: '排产冲突',
+};
+
+/**
+ * 获取原因代码的中文标签
+ */
+function getReasonCodeLabel(code: string): string {
+  return REASON_CODE_LABELS[code] || code;
+}
+
 // Reason table columns
 export const reasonColumns: ColumnsType<ReasonItem> = [
-  { title: '代码', dataIndex: 'code', key: 'code', width: 120, render: (v: string) => <Tag>{v}</Tag> },
-  { title: '原因', dataIndex: 'msg', key: 'msg', ellipsis: true },
+  {
+    title: '代码',
+    dataIndex: 'code',
+    key: 'code',
+    width: 140,
+    render: (v: string) => (
+      <Tag color="blue" style={{ maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {getReasonCodeLabel(v)}
+      </Tag>
+    ),
+  },
+  {
+    title: '原因',
+    dataIndex: 'msg',
+    key: 'msg',
+    ellipsis: { showTitle: true },
+    width: 320,
+  },
   {
     title: '权重',
     dataIndex: 'weight',
     key: 'weight',
     width: 90,
-    render: (v: number) => `${(Number(v || 0) * 100).toFixed(1)}%`,
+    render: (v: number) => `${(Number(v || 0) * 100).toFixed(2)}%`,
   },
   {
     title: '影响数',
