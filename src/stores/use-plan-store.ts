@@ -196,7 +196,7 @@ export const usePlanStore = create<PlanState & PlanActions>()(
     //   1. 调用后端API: await planApi.activateVersion(versionId, operator);
     //   2. 重新加载版本列表或刷新缓存
     // 直接修改UI层的version.status字段会导致前后端数据不一致
-    activateVersion: (versionId) => {
+    activateVersion: (_versionId) => {
       throw new Error(
         '[DEPRECATED] usePlanStore.activateVersion() 已废弃。\n' +
           '原因：直接修改UI状态违反工业规范，可能导致数据不一致。\n' +

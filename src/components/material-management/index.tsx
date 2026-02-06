@@ -246,8 +246,15 @@ const MaterialManagement: React.FC = () => {
   }, [adminOverrideMode, currentUser, modalType, reason, selectedRowKeys, queryClient]);
 
   // C8修复：基于缓存数据进行前端筛选，而不是每次调用API
+  // M4修复：loadMaterials参数使用明确的MaterialSearchParams类型 + 兼容ProTable分页参数
   const loadMaterials = useCallback(
-    async (params: MaterialSearchParams) => {
+    async (
+      params: MaterialSearchParams & {
+        pageSize?: number;
+        current?: number;
+        keyword?: string;
+      }
+    ) => {
       try {
         // 如果缓存数据加载中或出错，返回空数据
         if (isLoadingMaterials) {
@@ -264,7 +271,7 @@ const MaterialManagement: React.FC = () => {
         let filtered = allMaterials;
 
         if (params.machine_code) {
-          filtered = filtered.filter((m: Material) => m.current_machine === params.machine_code);
+          filtered = filtered.filter((m: Material) => m.machine_code === params.machine_code);
         }
         if (params.sched_state) {
           const want = normalizeSchedState(params.sched_state);
