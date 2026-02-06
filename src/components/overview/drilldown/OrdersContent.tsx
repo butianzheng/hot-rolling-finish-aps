@@ -40,7 +40,7 @@ export const OrdersContent: React.FC<OrdersContentProps> = ({
       dataIndex: 'completionRate',
       key: 'completionRate',
       width: 90,
-      render: (v: number) => `${Number(v || 0).toFixed(1)}%`,
+      render: (v: number) => `${Number(v || 0).toFixed(2)}%`,
     },
     { title: '未排(吨)', dataIndex: 'unscheduledWeightT', key: 'unscheduledWeightT', width: 100 },
     { title: '机组', dataIndex: 'machineCode', key: 'machineCode', width: 90 },

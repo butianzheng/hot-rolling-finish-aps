@@ -61,7 +61,7 @@ export const BottleneckContent: React.FC<BottleneckContentProps> = ({
       dataIndex: 'capacityUtilPct',
       key: 'capacityUtilPct',
       width: 100,
-      render: (v: number) => `${Number(v || 0).toFixed(1)}%`,
+      render: (v: number) => `${Number(v || 0).toFixed(2)}%`,
     },
     { title: '未排数', dataIndex: 'pendingMaterialCount', key: 'pendingMaterialCount', width: 90 },
     { title: '未排(吨)', dataIndex: 'pendingWeightT', key: 'pendingWeightT', width: 100 },
@@ -94,7 +94,7 @@ export const BottleneckContent: React.FC<BottleneckContentProps> = ({
         <>
           <Space wrap align="center">
             <Tag color={BOTTLENECK_LEVEL_COLORS[selectedPoint.bottleneckLevel] || '#8c8c8c'}>
-              {BOTTLENECK_LEVEL_LABELS[selectedPoint.bottleneckLevel] || selectedPoint.bottleneckLevel} / {selectedPoint.bottleneckScore.toFixed(1)}
+              {BOTTLENECK_LEVEL_LABELS[selectedPoint.bottleneckLevel] || selectedPoint.bottleneckLevel} / {selectedPoint.bottleneckScore.toFixed(2)}
             </Tag>
             <Text strong>
               {selectedPoint.machineCode} · {selectedPoint.planDate}
@@ -111,8 +111,8 @@ export const BottleneckContent: React.FC<BottleneckContentProps> = ({
           </Space>
 
           <Descriptions column={4} bordered size="small">
-            <Descriptions.Item label="堵塞分数">{selectedPoint.bottleneckScore.toFixed(1)}</Descriptions.Item>
-            <Descriptions.Item label="容量利用率">{selectedPoint.capacityUtilPct.toFixed(1)}%</Descriptions.Item>
+            <Descriptions.Item label="堵塞分数">{selectedPoint.bottleneckScore.toFixed(2)}</Descriptions.Item>
+            <Descriptions.Item label="容量利用率">{selectedPoint.capacityUtilPct.toFixed(2)}%</Descriptions.Item>
             <Descriptions.Item label="未排材料数(≤当日)">{selectedPoint.pendingMaterialCount}</Descriptions.Item>
             <Descriptions.Item label="未排重量(≤当日)">{selectedPoint.pendingWeightT.toFixed(3)}t</Descriptions.Item>
           </Descriptions>

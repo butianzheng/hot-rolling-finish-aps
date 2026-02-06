@@ -26,12 +26,14 @@ import {
   // 紧急等级/失败类型
   URGENCY_LEVEL_LABELS,
   FAIL_TYPE_LABELS,
-  // 压库等级/年龄分桶
+  // 压库等级/年龄分桶/结构缺口
   PRESSURE_LEVEL_LABELS,
   AGE_BIN_LABELS,
+  STRUCTURE_GAP_LABELS,
   // 机会类型
   OPPORTUNITY_TYPE_LABELS,
   // 换辊状态
+  ROLL_STATUS_LABELS,
   getAlertLevelLabel,
 } from '../../../types/decision';
 
@@ -143,6 +145,8 @@ const ENUM_VALUE_LABELS: Record<string, Record<string, string>> = {
   pressureLevel: PRESSURE_LEVEL_LABELS,
   ageBin: AGE_BIN_LABELS,
   opportunityType: OPPORTUNITY_TYPE_LABELS,
+  structureGap: STRUCTURE_GAP_LABELS,
+  status: ROLL_STATUS_LABELS,
 };
 
 /**
@@ -182,7 +186,7 @@ function formatFieldValue(fieldName: string, value: unknown): string {
 
   // 处理百分比字段
   if (fieldName.endsWith('Pct') || fieldName === 'completionRate') {
-    return `${Number(value).toFixed(1)}%`;
+    return `${Number(value).toFixed(2)}%`;
   }
 
   return String(value);

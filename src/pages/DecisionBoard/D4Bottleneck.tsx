@@ -281,17 +281,17 @@ export const D4Bottleneck: React.FC<D4BottleneckProps> = ({ embedded, onOpenDril
           size={embedded ? 'small' : undefined}
           extra={
             <Tag color={BOTTLENECK_LEVEL_COLORS[selectedPointData.bottleneckLevel]}>
-              {selectedPointData.bottleneckLevel} - {selectedPointData.bottleneckScore.toFixed(1)}
+              {selectedPointData.bottleneckLevel} - {selectedPointData.bottleneckScore.toFixed(2)}
             </Tag>
           }
         >
           {/* 基础信息 */}
           <Descriptions column={4} bordered size="small" style={{ marginBottom: '16px' }}>
             <Descriptions.Item label="堵塞分数">
-              {selectedPointData.bottleneckScore.toFixed(1)}
+              {selectedPointData.bottleneckScore.toFixed(2)}
             </Descriptions.Item>
             <Descriptions.Item label="容量利用率">
-              {selectedPointData.capacityUtilPct.toFixed(1)}%
+              {selectedPointData.capacityUtilPct.toFixed(2)}%
             </Descriptions.Item>
             <Descriptions.Item label="已排材料数">
               {selectedPointData.scheduledMaterialCount ?? 0}

@@ -43,7 +43,7 @@ export const RiskDayContent: React.FC<RiskDayContentProps> = ({
       dataIndex: 'capacityUtilPct',
       key: 'capacityUtilPct',
       width: 100,
-      render: (v: number) => `${Number(v || 0).toFixed(1)}%`,
+      render: (v: number) => `${Number(v || 0).toFixed(2)}%`,
     },
     { title: '超载(吨)', dataIndex: 'overloadWeightT', key: 'overloadWeightT', width: 100 },
     { title: '紧急失败', dataIndex: 'urgentFailureCount', key: 'urgentFailureCount', width: 90 },
@@ -91,7 +91,7 @@ export const RiskDayContent: React.FC<RiskDayContentProps> = ({
         <>
           <Space wrap align="center">
             <Tag color={getRiskLevelColor(selectedDay.riskLevel)}>
-              {getRiskLevelLabel(selectedDay.riskLevel)} / {selectedDay.riskScore.toFixed(1)}
+              {getRiskLevelLabel(selectedDay.riskLevel)} / {selectedDay.riskScore.toFixed(2)}
             </Tag>
             <Text strong>{selectedDay.planDate}</Text>
             {onGoWorkbench ? (
@@ -114,8 +114,8 @@ export const RiskDayContent: React.FC<RiskDayContentProps> = ({
           </Space>
 
           <Descriptions column={4} bordered size="small">
-            <Descriptions.Item label="风险分数">{selectedDay.riskScore.toFixed(1)}</Descriptions.Item>
-            <Descriptions.Item label="容量利用率">{selectedDay.capacityUtilPct.toFixed(1)}%</Descriptions.Item>
+            <Descriptions.Item label="风险分数">{selectedDay.riskScore.toFixed(2)}</Descriptions.Item>
+            <Descriptions.Item label="容量利用率">{selectedDay.capacityUtilPct.toFixed(2)}%</Descriptions.Item>
             <Descriptions.Item label="超载">{selectedDay.overloadWeightT.toFixed(3)}t</Descriptions.Item>
             <Descriptions.Item label="紧急失败">{selectedDay.urgentFailureCount}</Descriptions.Item>
           </Descriptions>

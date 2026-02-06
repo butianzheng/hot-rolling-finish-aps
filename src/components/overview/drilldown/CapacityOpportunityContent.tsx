@@ -63,7 +63,7 @@ export const CapacityOpportunityContent: React.FC<CapacityOpportunityContentProp
       dataIndex: 'currentUtilPct',
       key: 'currentUtilPct',
       width: 110,
-      render: (v: number) => `${Number(v || 0).toFixed(1)}%`,
+      render: (v: number) => `${Number(v || 0).toFixed(2)}%`,
     },
     {
       title: '机会(吨)',
@@ -130,8 +130,8 @@ export const CapacityOpportunityContent: React.FC<CapacityOpportunityContentProp
           </Space>
 
           <Descriptions column={4} bordered size="small">
-            <Descriptions.Item label="当前利用率">{selected.currentUtilPct.toFixed(1)}%</Descriptions.Item>
-            <Descriptions.Item label="优化后利用率">{selected.optimizedUtilPct.toFixed(1)}%</Descriptions.Item>
+            <Descriptions.Item label="当前利用率">{selected.currentUtilPct.toFixed(2)}%</Descriptions.Item>
+            <Descriptions.Item label="优化后利用率">{selected.optimizedUtilPct.toFixed(2)}%</Descriptions.Item>
             <Descriptions.Item label="已用/目标">
               {selected.usedCapacityT.toFixed(3)} / {selected.targetCapacityT.toFixed(3)}t
             </Descriptions.Item>
