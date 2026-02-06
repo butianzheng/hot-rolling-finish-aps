@@ -188,6 +188,7 @@ mod e2e_p0_p1_features_test {
                 due_date: Some(base_date + Duration::days(1)),
                 stock_age_days: Some(10),
                 output_age_days_raw: Some(5),
+                rolling_output_date: None,
                 status_updated_at: None,
                 contract_no: Some("C001".to_string()),
                 contract_nature: None,

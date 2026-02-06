@@ -159,10 +159,10 @@ export const BOTTLENECK_LEVEL_COLORS: Record<BottleneckLevel, string> = {
  */
 export const BOTTLENECK_LEVEL_LABELS: Record<BottleneckLevel, string> = {
   NONE: '无堵塞',
-  LOW: '轻度堵塞',
-  MEDIUM: '中度堵塞',
-  HIGH: '严重堵塞',
-  CRITICAL: '极度堵塞',
+  LOW: '轻度提醒',
+  MEDIUM: '中度提醒',
+  HIGH: '堵塞',
+  CRITICAL: '严重堵塞',
 };
 
 /**

@@ -377,7 +377,7 @@ mod tests {
 
         // 第一个应该是 H033（产能超载）
         assert_eq!(profiles[0].machine_code, "H033");
-        assert!(profiles[0].reasons.iter().any(|r| r.code == "CAPACITY_OVERFLOW"));
+        assert!(profiles[0].reasons.iter().any(|r| r.code == "CAPACITY_UTILIZATION"));
 
         // 第二个应该是 H032（高利用率）
         assert_eq!(profiles[1].machine_code, "H032");
@@ -416,10 +416,10 @@ mod tests {
         assert!(!h033.reasons.is_empty());
 
         // 应该包含产能超载原因
-        assert!(h033.reasons.iter().any(|r| r.code == "CAPACITY_OVERFLOW"));
+        assert!(h033.reasons.iter().any(|r| r.code == "CAPACITY_UTILIZATION"));
 
         // 应该包含结构冲突原因（5 个违规）
-        assert!(h033.reasons.iter().any(|r| r.code == "STRUCTURE_CONFLICT"));
+        assert!(h033.reasons.iter().any(|r| r.code == "STRUCTURE_VIOLATION"));
 
         // 注意：HIGH_PENDING_COUNT 原因需要从 material_state 查询待排材料
         // 测试中未插入待排材料数据，因此不会产生此原因

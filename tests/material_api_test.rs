@@ -44,14 +44,32 @@ fn test_list_materials_正常查询() {
 
     // 测试: 查询M1机组材料
     let result = env.material_api
-        .list_materials(Some("M1".to_string()), None, 100, 0)
+        .list_materials(
+            Some("M1".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            100,
+            0,
+        )
         .expect("查询失败");
 
     assert_eq!(result.len(), 2, "M1机组应该有2个材料");
 
     // 测试: 按机组过滤M2
     let result = env.material_api
-        .list_materials(Some("M2".to_string()), None, 100, 0)
+        .list_materials(
+            Some("M2".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            100,
+            0,
+        )
         .expect("查询失败");
 
     assert_eq!(result.len(), 1, "M2机组应该有1个材料");
@@ -76,7 +94,16 @@ fn test_list_materials_分页查询() {
     // 注意: 当前实现不支持分页，返回所有结果
     // TODO: 实现分页支持后更新此测试
     let result = env.material_api
-        .list_materials(Some("M1".to_string()), None, 100, 0)
+        .list_materials(
+            Some("M1".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            100,
+            0,
+        )
         .expect("查询失败");
 
     assert_eq!(result.len(), 10, "应该返回M1机组的所有10个材料");

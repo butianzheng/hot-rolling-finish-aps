@@ -108,6 +108,8 @@ fn create_test_plan_item(
         sched_state: Some("READY".to_string()),
         assign_reason: Some("测试".to_string()),
         steel_grade: None,
+        width_mm: None,
+        thickness_mm: None,
     }
 }
 
@@ -447,6 +449,8 @@ fn test_plan_item_batch_insert() {
             sched_state: None,
             assign_reason: None,
             steel_grade: None,
+            width_mm: None,
+            thickness_mm: None,
         },
         PlanItem {
             version_id: "v001".to_string(),
@@ -463,6 +467,8 @@ fn test_plan_item_batch_insert() {
             sched_state: None,
             assign_reason: None,
             steel_grade: None,
+            width_mm: None,
+            thickness_mm: None,
         },
         PlanItem {
             version_id: "v001".to_string(),
@@ -479,6 +485,8 @@ fn test_plan_item_batch_insert() {
             sched_state: None,
             assign_reason: None,
             steel_grade: None,
+            width_mm: None,
+            thickness_mm: None,
         },
     ];
 

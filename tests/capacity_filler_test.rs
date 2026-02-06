@@ -59,6 +59,7 @@ fn create_test_material(
         material_status_code_src: Some("READY".to_string()),
         status_updated_at: None,
         output_age_days_raw: Some(3),
+        rolling_output_date: None,
         stock_age_days: Some(5),
         contract_nature: Some("NORMAL".to_string()),
         weekly_delivery_flag: Some("N".to_string()),
@@ -226,6 +227,8 @@ fn test_capacity_filler_frozen_zone_priority() {
             sched_state: None,
             assign_reason: None,
             steel_grade: None,
+            width_mm: None,
+            thickness_mm: None,
         },
         PlanItem {
             version_id: "V001".to_string(),
@@ -242,6 +245,8 @@ fn test_capacity_filler_frozen_zone_priority() {
             sched_state: None,
             assign_reason: None,
             steel_grade: None,
+            width_mm: None,
+            thickness_mm: None,
         },
     ];
 

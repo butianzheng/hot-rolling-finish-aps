@@ -67,6 +67,18 @@ export const configKeyLabels: Record<string, string> = {
   deviation_threshold: '结构偏差阈值',
   rhythm_deviation_threshold: '节奏偏差阈值',
 
+  // D4 堵塞评分配置
+  d4_capacity_hard_threshold: 'D4 产能硬阈值',
+  d4_capacity_full_threshold: 'D4 产能满载阈值',
+  d4_structure_dev_threshold: 'D4 结构偏差阈值',
+  d4_structure_dev_full_multiplier: 'D4 结构满载倍数',
+  d4_structure_small_category_threshold: 'D4 小类忽略阈值',
+  d4_structure_violation_full_count: 'D4 结构违规满载数',
+  d4_bottleneck_low_threshold: 'D4 等级-LOW阈值',
+  d4_bottleneck_medium_threshold: 'D4 等级-MEDIUM阈值',
+  d4_bottleneck_high_threshold: 'D4 等级-HIGH阈值',
+  d4_bottleneck_critical_threshold: 'D4 等级-CRITICAL阈值',
+
   // 数据质量配置
   weight_anomaly_threshold: '重量异常阈值',
   batch_retention_days: '批次保留天数',
@@ -113,6 +125,18 @@ export const configDescriptions: Record<string, string> = {
   target_ratio: '目标钢种配比（JSON格式，如：{"钢种A":0.3,"钢种B":0.5}，空对象{}表示不启用）',
   deviation_threshold: '结构偏差阈值（允许的目标配比偏差，默认0.1即10%）',
   rhythm_deviation_threshold: '每日生产节奏偏差阈值（用于节奏监控的最大偏差阈值，默认0.1即10%）',
+
+  // D4 堵塞评分配置
+  d4_capacity_hard_threshold: '产能硬阈值（used/limit）。低于该值不计堵塞，仅提示。默认0.95。',
+  d4_capacity_full_threshold: '产能满载阈值（used/limit）。用于将>硬阈值的利用率线性映射为0~1严重度，默认1.0。',
+  d4_structure_dev_threshold: '结构加权偏差起算阈值（0~1）。低于该值不计堵塞。默认0.10。',
+  d4_structure_dev_full_multiplier: '结构偏差满载倍数。满载阈值=偏差阈值×倍数，默认2.0。',
+  d4_structure_small_category_threshold: '小类忽略阈值（0~1）。当某品类目标/实际占比均低于该值时不参与偏差计算，默认0.05。',
+  d4_structure_violation_full_count: '结构违规满载数量。违规数达到该值时严重度=1，默认10。',
+  d4_bottleneck_low_threshold: '堵塞等级阈值-LOW（严重度0~1）。低于该值为“无”，默认0.30。',
+  d4_bottleneck_medium_threshold: '堵塞等级阈值-MEDIUM（严重度0~1），默认0.60。',
+  d4_bottleneck_high_threshold: '堵塞等级阈值-HIGH（严重度0~1），默认0.90。HIGH/CRITICAL视为堵塞。',
+  d4_bottleneck_critical_threshold: '堵塞等级阈值-CRITICAL（严重度0~1），默认0.95。',
 
   // 数据质量配置
   weight_anomaly_threshold: '重量异常阈值（单位：吨，超过此值视为异常，默认100.0吨）',

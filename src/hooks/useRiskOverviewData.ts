@@ -203,7 +203,7 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
         detail: top
           ? `${top.machineCode} ${top.planDate} 分数 ${top.bottleneckScore.toFixed(0)} | 利用率 ${top.capacityUtilPct.toFixed(1)}%`
           : undefined,
-        impact: top ? `缺口 ${top.pendingMaterialCount} 件 · ${formatTonnage(top.pendingWeightT)}` : undefined,
+        impact: top ? `未排材料 ${top.pendingMaterialCount} 件 · ${formatTonnage(top.pendingWeightT)}` : undefined,
         timeHint: topReason ? `首因：${topReason}` : undefined,
         drilldown: top ? { kind: 'bottleneck', machineCode: top.machineCode, planDate: top.planDate } : { kind: 'bottleneck' },
         workbenchTab: 'capacity',

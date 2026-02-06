@@ -52,6 +52,7 @@ fn create_test_material_master(material_id: &str) -> MaterialMaster {
         due_date: Some(NaiveDate::from_ymd_opt(2026, 2, 15).unwrap()),
         stock_age_days: Some(10),
         output_age_days_raw: Some(5),
+        rolling_output_date: None,
         status_updated_at: None,
         contract_no: Some("CONTRACT001".to_string()),
         contract_nature: Some("A".to_string()),

@@ -225,9 +225,10 @@ impl BottleneckRepository {
             }
         }
 
-        // 2) pending: 口径调整为“缺口（到当日仍未排入 <= 当日 的量）”
-        //    缺口随日期变化：gap(D) = max(0, demand_ready_cum(<=D) - scheduled_cum(<=D))
-        //    demand_ready_cum 按 effective_earliest_date 累计（FORCE_RELEASE 视为 start_date）。
+        // 2) pending: 口径调整为“未排材料（到当日仍未排入 <= 当日 的量）”
+        //    pending(D) = sum(ready_unscheduled_incr(<=D))
+        //    ready_unscheduled_incr 按 effective_earliest_date 累计（FORCE_RELEASE 视为 start_date）。
+        //    unscheduled：当前版本内未出现在 plan_item 的材料。
         //    注：由于 capacity_pool 不是按 version_id 隔离，读模型也可能不全字段，这里在仓储层统一补齐。
         let machine_codes: Vec<String> = {
             let mut list: Vec<String> = profiles.iter().map(|p| p.machine_code.clone()).collect();
@@ -244,16 +245,12 @@ impl BottleneckRepository {
                 .insert(p.plan_date.clone());
         }
 
-        let scheduled_before_map =
-            Self::query_scheduled_before_date(conn, version_id, &machine_codes, start_date)?;
-        let demand_incr_map =
-            Self::query_ready_demand_increments(conn, version_id, &machine_codes, start_date, end_date)?;
-        let gap_map = Self::compute_gap_map(
+        let pending_incr_map =
+            Self::query_unscheduled_ready_increments(conn, version_id, &machine_codes, start_date, end_date)?;
+        let pending_map = Self::compute_pending_map(
             &machine_codes,
             &profile_dates,
-            &scheduled_before_map,
-            &scheduled_map,
-            &demand_incr_map,
+            &pending_incr_map,
         );
 
         // 3) 写回 profiles
@@ -270,13 +267,38 @@ impl BottleneckRepository {
             }
 
             if let Some((count, weight_t)) =
-                gap_map.get(&(profile.machine_code.clone(), profile.plan_date.clone()))
+                pending_map.get(&(profile.machine_code.clone(), profile.plan_date.clone()))
             {
                 profile.pending_materials = *count;
                 profile.pending_weight_t = *weight_t;
             } else {
                 profile.pending_materials = 0;
                 profile.pending_weight_t = 0.0;
+            }
+
+            if profile.pending_materials > 20 {
+                profile.reasons.push(crate::decision::use_cases::d4_machine_bottleneck::BottleneckReason {
+                    code: "HIGH_PENDING_COUNT".to_string(),
+                    description: format!(
+                        "未排材料数量较多 {} 个（到当日仍未排入≤当日）",
+                        profile.pending_materials
+                    ),
+                    severity: 0.0,
+                    affected_materials: profile.pending_materials,
+                });
+            }
+
+            if profile.remaining_capacity_t < 100.0 && profile.pending_weight_t > 0.0 {
+                profile.reasons.push(crate::decision::use_cases::d4_machine_bottleneck::BottleneckReason {
+                    code: "LOW_REMAINING_CAPACITY".to_string(),
+                    description: format!(
+                        "剩余产能不足 {:.1}t，未排 {:.1}t（到当日仍未排入≤当日）",
+                        profile.remaining_capacity_t,
+                        profile.pending_weight_t
+                    ),
+                    severity: 0.0,
+                    affected_materials: 0,
+                });
             }
         }
 

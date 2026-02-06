@@ -57,6 +57,8 @@ fn create_test_plan_item(
         sched_state: None,
         assign_reason: None,
         steel_grade: None,
+        width_mm: None,
+        thickness_mm: None,
     }
 }
 

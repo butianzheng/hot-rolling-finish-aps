@@ -418,7 +418,7 @@ fn test_get_bottleneck_profile() {
     assert_eq!(h033.machine_code, "H033");
     assert!(h033.bottleneck_score > 0.0);
     assert!(h033.is_severe());
-    // pending_materials 口径：缺口（到当日仍未排入≤当日）
+    // pending_materials 口径：未排材料（到当日仍未排入≤当日）
     assert_eq!(h033.pending_materials, 5);
     assert_eq!(h033.structure_violations, 5);
     // scheduled_materials 来自 plan_item
@@ -428,7 +428,7 @@ fn test_get_bottleneck_profile() {
     let h032 = &profiles[1];
     assert_eq!(h032.machine_code, "H032");
     assert!(h032.bottleneck_score > 0.0);
-    // pending_materials 口径：缺口（到当日仍未排入≤当日）
+    // pending_materials 口径：未排材料（到当日仍未排入≤当日）
     assert_eq!(h032.pending_materials, 3);
     assert_eq!(h032.structure_violations, 2);
     // scheduled_materials 来自 plan_item
@@ -500,13 +500,13 @@ fn test_filter_by_machine_code() {
 
     assert_eq!(profiles.len(), 1);
     assert_eq!(profiles[0].machine_code, "H032");
-    assert_eq!(profiles[0].pending_materials, 3);  // H032 有 3 个待排材料
+    assert_eq!(profiles[0].pending_materials, 3);  // H032 有 3 个未排材料
     assert_eq!(profiles[0].scheduled_materials, 10);  // H032 有 10 个已排材料
 }
 
 #[test]
-fn test_pending_materials_gap_by_date() {
-    // 新测试：验证缺口（到当日仍未排入≤当日）按日期随排产累计收敛
+fn test_pending_materials_unscheduled_by_date() {
+    // 新测试：验证未排材料（到当日仍未排入≤当日）按日期随可排范围累计
     let conn_arc = setup_test_db();
     {
         let conn = conn_arc.lock().expect("锁获取失败");
@@ -604,14 +604,14 @@ fn test_pending_materials_gap_by_date() {
     }
 
     let p_24 = by_date.get("2026-01-24").expect("missing 2026-01-24");
-    // 2026-01-24：需求 3（MAT001/MAT002/MAT004），已排 1（MAT001）→ 缺口 2
-    assert_eq!(p_24.pending_materials, 2);
-    assert_eq!(p_24.pending_weight_t, 200.0);
+    // 2026-01-24：未排 1（MAT004）
+    assert_eq!(p_24.pending_materials, 1);
+    assert_eq!(p_24.pending_weight_t, 100.0);
     assert_eq!(p_24.scheduled_materials, 1);
     assert_eq!(p_24.scheduled_weight_t, 100.0);
 
     let p_25 = by_date.get("2026-01-25").expect("missing 2026-01-25");
-    // 2026-01-25：需求 4（+MAT003），已排累计 3（+MAT002/MAT003）→ 缺口 1（MAT004）
+    // 2026-01-25：未排仍为 1（MAT004）
     assert_eq!(p_25.pending_materials, 1);
     assert_eq!(p_25.pending_weight_t, 100.0);
     assert_eq!(p_25.scheduled_materials, 2);

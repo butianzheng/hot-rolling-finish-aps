@@ -41,6 +41,7 @@ fn create_test_material_master(
         due_date: Some(NaiveDate::from_ymd_opt(2026, 1, 25).unwrap()),
         stock_age_days: Some(5),
         output_age_days_raw: Some(3),
+        rolling_output_date: None,
         status_updated_at: Some(Utc::now()),
         contract_no: Some("C001".to_string()),
         contract_nature: Some("EXPORT".to_string()),
@@ -511,6 +512,8 @@ fn test_integration_frozen_zone_priority_with_risk() {
             sched_state: Some("LOCKED".to_string()),
             assign_reason: Some("FROZEN_ZONE".to_string()),
             steel_grade: None,
+            width_mm: None,
+            thickness_mm: None,
         },
     ];
 

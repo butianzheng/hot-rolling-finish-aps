@@ -11,6 +11,9 @@ const CapacityPoolManagementV2 = React.lazy(() => import('../components/capacity
 const MaterialManagement = React.lazy(() => import('../components/MaterialManagement'));
 const StrategyProfilesPanel = React.lazy(() => import('../components/settings/StrategyProfilesPanel'));
 const PathRuleConfigPanel = React.lazy(() => import('../components/settings/PathRuleConfigPanel'));
+const BottleneckScoringConfigPanel = React.lazy(
+  () => import('../components/settings/BottleneckScoringConfigPanel')
+);
 const RollCampaignManagementPanel = React.lazy(
   () => import('../components/settings/RollCampaignManagementPanel')
 );
@@ -20,6 +23,7 @@ const RhythmPresetManagementPanel = React.lazy(
 
 const TAB_KEYS = [
   'system',
+  'bottleneck_scoring',
   'capacity_calendar',
   'materials',
   'roll',
@@ -73,6 +77,15 @@ const SettingsCenter: React.FC = () => {
             children: (
               <React.Suspense fallback={<PageSkeleton />}>
                 <ConfigManagement />
+              </React.Suspense>
+            ),
+          },
+          {
+            key: 'bottleneck_scoring',
+            label: '堵塞评分',
+            children: (
+              <React.Suspense fallback={<PageSkeleton />}>
+                <BottleneckScoringConfigPanel />
               </React.Suspense>
             ),
           },

@@ -68,6 +68,7 @@ mod system_performance_test {
                 due_date: Some(base_date + chrono::Duration::days((i % 60) as i64)),
                 stock_age_days: Some((i % 30) as i32),
                 output_age_days_raw: Some((i % 30) as i32),
+                rolling_output_date: None,
                 status_updated_at: Some(Utc::now()),
                 contract_no: Some(format!("CONTRACT{:04}", i % 200)),
                 contract_nature: Some("NORMAL".to_string()),

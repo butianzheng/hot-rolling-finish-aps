@@ -184,23 +184,33 @@ impl MachineBottleneckProfile {
         }
     }
 
-    /// 设置产能信息
+    /// 设置产能信息（默认阈值 0.95）
     pub fn set_capacity_info(&mut self, remaining_t: f64, utilization: f64) {
+        self.set_capacity_info_with_threshold(remaining_t, utilization, 0.95);
+    }
+
+    /// 设置产能信息（可配置阈值）
+    pub fn set_capacity_info_with_threshold(
+        &mut self,
+        remaining_t: f64,
+        utilization: f64,
+        hard_threshold: f64,
+    ) {
         self.remaining_capacity_t = remaining_t;
         self.capacity_utilization = utilization;
 
         // 判断是否为产能堵塞
-        if utilization >= 0.95 {
+        if utilization >= hard_threshold {
             self.add_bottleneck_type(BottleneckType::Capacity);
         }
     }
 
     /// 设置结构信息
-    pub fn set_structure_info(&mut self, violations: i32) {
+    pub fn set_structure_info(&mut self, violations: i32, has_deviation: bool) {
         self.structure_violations = violations;
 
         // 判断是否为结构堵塞
-        if violations > 0 {
+        if violations > 0 || has_deviation {
             self.add_bottleneck_type(BottleneckType::Structure);
         }
     }
@@ -245,7 +255,7 @@ impl MachineBottleneckProfile {
         self.recalculate_score();
     }
 
-    /// 重新计算堵塞分数
+    /// 重新计算堵塞分数（默认阈值）
     fn recalculate_score(&mut self) {
         if self.reasons.is_empty() {
             self.bottleneck_score = 0.0;
@@ -270,6 +280,44 @@ impl MachineBottleneckProfile {
             s if s >= 50.0 => "MEDIUM".to_string(),
             s if s > 0.0 => "LOW".to_string(),
             _ => "NONE".to_string(),
+        };
+    }
+
+    /// 使用自定义阈值重新计算堵塞等级
+    pub fn apply_scoring_thresholds(
+        &mut self,
+        low_threshold: f64,
+        medium_threshold: f64,
+        high_threshold: f64,
+        critical_threshold: f64,
+    ) {
+        if self.reasons.is_empty() {
+            self.bottleneck_score = 0.0;
+            self.bottleneck_level = "NONE".to_string();
+            return;
+        }
+
+        let max_severity = self
+            .reasons
+            .iter()
+            .map(|r| r.severity)
+            .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap_or(0.0)
+            .max(0.0);
+
+        self.bottleneck_score = (max_severity * 100.0).min(100.0);
+
+        let sev = max_severity;
+        self.bottleneck_level = if sev >= critical_threshold {
+            "CRITICAL".to_string()
+        } else if sev >= high_threshold {
+            "HIGH".to_string()
+        } else if sev >= medium_threshold {
+            "MEDIUM".to_string()
+        } else if sev >= low_threshold {
+            "LOW".to_string()
+        } else {
+            "NONE".to_string()
         };
     }
 
@@ -427,7 +475,7 @@ mod tests {
         );
 
         profile.set_capacity_info(50.0, 0.96);
-        profile.set_structure_info(3);
+        profile.set_structure_info(3, false);
 
         assert!(profile.bottleneck_types.contains(&BottleneckType::Mixed));
     }

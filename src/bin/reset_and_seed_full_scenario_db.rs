@@ -198,6 +198,48 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
         params![now_sql_dt],
     )?;
 
+    // D4 堵塞评分参数
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','d4_capacity_hard_threshold','0.95',?1)",
+        params![now_sql_dt],
+    )?;
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','d4_capacity_full_threshold','1.0',?1)",
+        params![now_sql_dt],
+    )?;
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','d4_structure_dev_threshold','0.1',?1)",
+        params![now_sql_dt],
+    )?;
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','d4_structure_dev_full_multiplier','2.0',?1)",
+        params![now_sql_dt],
+    )?;
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','d4_structure_small_category_threshold','0.05',?1)",
+        params![now_sql_dt],
+    )?;
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','d4_structure_violation_full_count','10',?1)",
+        params![now_sql_dt],
+    )?;
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','d4_bottleneck_low_threshold','0.30',?1)",
+        params![now_sql_dt],
+    )?;
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','d4_bottleneck_medium_threshold','0.60',?1)",
+        params![now_sql_dt],
+    )?;
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','d4_bottleneck_high_threshold','0.90',?1)",
+        params![now_sql_dt],
+    )?;
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','d4_bottleneck_critical_threshold','0.95',?1)",
+        params![now_sql_dt],
+    )?;
+
     // Machines (frontend defaults include H031-H034)
     let machines = [
         ("H031", "Finishing Line 31", 60.0, 1400.0, 1.15),

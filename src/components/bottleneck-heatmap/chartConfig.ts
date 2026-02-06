@@ -4,7 +4,8 @@
 
 import type { EChartsOption } from 'echarts';
 import type { BottleneckPoint } from '../../types/decision';
-import { BOTTLENECK_LEVEL_COLORS, getBottleneckColor } from './types';
+import { BOTTLENECK_LEVEL_COLORS } from './types';
+import { BOTTLENECK_LEVEL_LABELS } from '../../types/decision';
 
 interface ChartConfigParams {
   data: BottleneckPoint[];
@@ -35,17 +36,20 @@ export function createChartOption({
 
         if (!pointData) return '';
 
+        const levelLabel = BOTTLENECK_LEVEL_LABELS[pointData.bottleneckLevel] || pointData.bottleneckLevel;
+        const levelColor = BOTTLENECK_LEVEL_COLORS[pointData.bottleneckLevel] || '#999';
+
         return `
           <div style="padding: 8px;">
             <div style="font-weight: bold; margin-bottom: 8px;">
               ${machine} - ${date}
             </div>
-            <div>堵塞分数: <span style="color: ${getBottleneckColor(bottleneckScore)}; font-weight: bold;">${bottleneckScore.toFixed(1)}</span></div>
-            <div>堵塞等级: <span style="color: ${BOTTLENECK_LEVEL_COLORS[pointData.bottleneckLevel]};">${pointData.bottleneckLevel}</span></div>
+            <div>堵塞分数: <span style="color: ${levelColor}; font-weight: bold;">${bottleneckScore.toFixed(1)}</span></div>
+            <div>堵塞等级: <span style="color: ${levelColor};">${levelLabel}</span></div>
             <div>容量利用率: ${pointData.capacityUtilPct.toFixed(1)}%</div>
             <div>已排材料: ${pointData.scheduledMaterialCount ?? 0}个 / ${(pointData.scheduledWeightT ?? 0).toFixed(3)}吨</div>
-            <div>缺口材料(≤当日): ${pointData.pendingMaterialCount}个</div>
-            <div>缺口重量(≤当日): ${pointData.pendingWeightT.toFixed(3)}吨</div>
+            <div>未排材料(≤当日): ${pointData.pendingMaterialCount}个</div>
+            <div>未排重量(≤当日): ${pointData.pendingWeightT.toFixed(3)}吨</div>
             ${pointData.bottleneckTypes.length > 0 ? `<div>堵塞类型: ${pointData.bottleneckTypes.join(', ')}</div>` : ''}
             <div style="margin-top: 4px; font-size: 12px; color: #8c8c8c;">点击查看详情</div>
           </div>

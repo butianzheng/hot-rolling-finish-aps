@@ -100,6 +100,7 @@ impl MaterialBuilder {
             length_m: None,
             available_width_mm: None,
             stock_age_days: None,
+            rolling_output_date: None,
             status_updated_at: None,
             contract_no: None,
             created_at: Utc::now(),
@@ -311,6 +312,8 @@ pub struct PlanItemBuilder {
     sched_state: Option<String>,
     assign_reason: Option<String>,
     steel_grade: Option<String>,
+    width_mm: Option<f64>,
+    thickness_mm: Option<f64>,
 }
 
 impl PlanItemBuilder {
@@ -335,6 +338,8 @@ impl PlanItemBuilder {
             sched_state: Some("READY".to_string()),
             assign_reason: Some("TEST".to_string()),
             steel_grade: None,
+            width_mm: None,
+            thickness_mm: None,
         }
     }
 
@@ -364,6 +369,16 @@ impl PlanItemBuilder {
         self
     }
 
+    pub fn width_mm(mut self, width: f64) -> Self {
+        self.width_mm = Some(width);
+        self
+    }
+
+    pub fn thickness_mm(mut self, thickness: f64) -> Self {
+        self.thickness_mm = Some(thickness);
+        self
+    }
+
     pub fn build(self) -> PlanItem {
         PlanItem {
             version_id: self.version_id,
@@ -380,6 +395,8 @@ impl PlanItemBuilder {
             sched_state: self.sched_state,
             assign_reason: self.assign_reason,
             steel_grade: None,
+            width_mm: self.width_mm,
+            thickness_mm: self.thickness_mm,
         }
     }
 }

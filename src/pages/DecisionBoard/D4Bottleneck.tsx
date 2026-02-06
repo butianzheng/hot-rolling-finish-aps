@@ -177,7 +177,7 @@ export const D4Bottleneck: React.FC<D4BottleneckProps> = ({ embedded, onOpenDril
             D4决策：机组堵塞矩阵
           </h2>
           <p style={{ color: '#8c8c8c', marginBottom: 16 }}>
-            展示未来{selectedDays}天各机组的堵塞情况，点击单元格查看详细原因
+            展示未来{selectedDays}天各机组的堵塞/提醒情况（仅 HIGH/CRITICAL 视为堵塞）
           </p>
 
           <Space>
@@ -215,7 +215,7 @@ export const D4Bottleneck: React.FC<D4BottleneckProps> = ({ embedded, onOpenDril
         <Col span={6}>
           <Card size={embedded ? 'small' : undefined}>
             <Statistic
-              title="高堵塞点位"
+              title="堵塞点位(HIGH/CRITICAL)"
               value={stats.highBottleneckCount}
               suffix={`/ ${data?.items.length || 0}`}
               prefix={<WarningOutlined />}
@@ -258,7 +258,7 @@ export const D4Bottleneck: React.FC<D4BottleneckProps> = ({ embedded, onOpenDril
           <Space>
             <InfoCircleOutlined />
             <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-              点击单元格查看详细原因
+              LOW/MEDIUM 为提醒，点击单元格查看详细原因
             </span>
           </Space>
         }
@@ -299,10 +299,10 @@ export const D4Bottleneck: React.FC<D4BottleneckProps> = ({ embedded, onOpenDril
             <Descriptions.Item label="已排重量">
               {(selectedPointData.scheduledWeightT ?? 0).toFixed(3)} 吨
             </Descriptions.Item>
-            <Descriptions.Item label="缺口材料数(≤当日)">
+            <Descriptions.Item label="未排材料数(≤当日)">
               {selectedPointData.pendingMaterialCount}
             </Descriptions.Item>
-            <Descriptions.Item label="缺口重量(≤当日)">
+            <Descriptions.Item label="未排重量(≤当日)">
               {selectedPointData.pendingWeightT.toFixed(3)} 吨
             </Descriptions.Item>
           </Descriptions>
