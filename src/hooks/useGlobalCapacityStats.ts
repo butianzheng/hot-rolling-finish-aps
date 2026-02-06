@@ -16,6 +16,12 @@ export interface GlobalStats {
   overLimitCount: number;
 }
 
+// C7修复：添加错误信息返回类型
+export interface GlobalStatsError {
+  machineCode: string;
+  error: string;
+}
+
 /**
  * 全局产能统计 Hook
  * 聚合多个机组的产能池数据
@@ -29,27 +35,25 @@ export function useGlobalCapacityStats(
   globalStats: GlobalStats;
   loading: boolean;
   error: boolean;
+  failedMachines: GlobalStatsError[]; // C7修复：添加失败机组列表
 } {
   // 为每个机组并行查询产能池数据
   const queries = useQueries({
     queries: machineCodes.map((machineCode) => ({
-      queryKey: ['capacityPool', versionId, machineCode, dateFrom, dateTo],
+      queryKey: ['globalCapacityStats', versionId, machineCode, dateFrom, dateTo],
       queryFn: async () => {
-        try {
-          const data = await capacityApi.getCapacityPools(
-            [machineCode],
-            dateFrom,
-            dateTo,
-            versionId
-          );
-          return data || [];
-        } catch (e) {
-          console.error(`[GlobalStats] Failed to load data for ${machineCode}:`, e);
-          return [];
-        }
+        // C7修复：移除try-catch让错误正常传播，React Query会正确设置isError状态
+        const data = await capacityApi.getCapacityPools(
+          [machineCode],
+          dateFrom,
+          dateTo,
+          versionId
+        );
+        return data || [];
       },
       enabled: !!versionId && !!machineCode && !!dateFrom && !!dateTo,
       staleTime: 60 * 1000, // 60秒缓存
+      retry: 1, // C7修复：失败后重试1次
     })),
   });
 
@@ -57,11 +61,31 @@ export function useGlobalCapacityStats(
   const loading = queries.some((q) => q.isLoading);
   const error = queries.some((q) => q.isError);
 
-  // 聚合所有机组的数据
+  // C7修复：收集失败的机组信息
+  const failedMachines = useMemo(() => {
+    const failed: GlobalStatsError[] = [];
+    queries.forEach((query, index) => {
+      if (query.isError && query.error) {
+        const machineCode = machineCodes[index];
+        const errorMsg = query.error instanceof Error
+          ? query.error.message
+          : String(query.error);
+        failed.push({
+          machineCode,
+          error: errorMsg,
+        });
+        // C7修复：在控制台输出详细错误信息
+        console.error(`[GlobalStats] Failed to load data for ${machineCode}:`, query.error);
+      }
+    });
+    return failed;
+  }, [queries, machineCodes]);
+
+  // 聚合所有机组的数据（C7修复：仅包含成功加载的数据）
   const allPools = useMemo(() => {
     const pools: CapacityPool[] = [];
     queries.forEach((query) => {
-      if (query.data) {
+      if (query.data && !query.isError) {
         pools.push(...query.data);
       }
     });
@@ -101,5 +125,6 @@ export function useGlobalCapacityStats(
     globalStats,
     loading,
     error,
+    failedMachines, // C7修复：返回失败的机组列表
   };
 }

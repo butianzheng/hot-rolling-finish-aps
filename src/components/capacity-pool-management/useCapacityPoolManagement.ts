@@ -307,19 +307,24 @@ export function useCapacityPoolManagement(): UseCapacityPoolManagementReturn {
   }, [selectedPools, batchReason, batchTargetCapacity, batchLimitCapacity, currentUser, activeVersionId, loadCapacityPools]);
 
   // 初始化加载
+  // C5修复：移除函数依赖避免循环加载，loadMachineOptions已通过useCallback稳定化
   useEffect(() => {
     loadMachineOptions().catch((e: unknown) => {
       console.error('加载机组选项失败:', getErrorMessage(e));
     });
-  }, [activeVersionId, loadMachineOptions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeVersionId]);
 
+  // C5修复：移除loadCapacityPools函数依赖避免循环加载
+  // loadCapacityPools内部已包含dateRange、selectedMachines、activeVersionId的最新值
   useEffect(() => {
     if (!activeVersionId) return;
     if (selectedMachines.length === 0) return;
     loadCapacityPools().catch((e: unknown) => {
       console.error('加载产能池失败:', getErrorMessage(e));
     });
-  }, [activeVersionId, selectedMachines, loadCapacityPools]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeVersionId, selectedMachines]);
 
   return {
     loading,

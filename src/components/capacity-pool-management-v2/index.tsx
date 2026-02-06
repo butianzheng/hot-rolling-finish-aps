@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { Row, Col, Select, Card, Space } from 'antd';
+import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useActiveVersionId } from '../../stores/use-global-store';
 import MachineConfigPanel from './MachineConfigPanel';
@@ -22,6 +23,7 @@ const AVAILABLE_MACHINES = ['H031', 'H032', 'H033', 'H034'];
 
 export const CapacityPoolManagementV2: React.FC = () => {
   const currentVersionId = useActiveVersionId();
+  const queryClient = useQueryClient();
 
   // ========== 全局状态 ==========
   const [selectedMachines, setSelectedMachines] = useState<string[]>([AVAILABLE_MACHINES[0]]);
@@ -42,9 +44,6 @@ export const CapacityPoolManagementV2: React.FC = () => {
   const [batchAdjustModalOpen, setBatchAdjustModalOpen] = useState(false);
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
 
-  // ========== 刷新标记 ==========
-  const [refreshKey, setRefreshKey] = useState(0);
-
   // ========== 全局产能统计 ==========
   const { globalStats, loading: statsLoading } = useGlobalCapacityStats(
     currentVersionId || '',
@@ -58,20 +57,26 @@ export const CapacityPoolManagementV2: React.FC = () => {
     setDateRange({ dateFrom, dateTo });
   };
 
+  // C6修复：使用React Query缓存失效机制代替refreshKey强制重新挂载
   const handleConfigUpdated = () => {
-    // 配置更新后，刷新日历数据
-    setRefreshKey((prev) => prev + 1);
+    // 配置更新后，使缓存失效以触发重新查询
+    queryClient.invalidateQueries({ queryKey: ['capacityCalendar'] });
+    queryClient.invalidateQueries({ queryKey: ['globalCapacityStats'] });
   };
 
+  // C6修复：使用React Query缓存失效机制代替refreshKey强制重新挂载
   const handleCapacityUpdated = () => {
-    // 产能调整后，刷新日历数据
-    setRefreshKey((prev) => prev + 1);
+    // 产能调整后，使缓存失效以触发重新查询
+    queryClient.invalidateQueries({ queryKey: ['capacityCalendar'] });
+    queryClient.invalidateQueries({ queryKey: ['globalCapacityStats'] });
     setDetailDrawerOpen(false);
   };
 
+  // C6修复：使用React Query缓存失效机制代替refreshKey强制重新挂载
   const handleBatchAdjustUpdated = () => {
-    // 批量调整后，刷新日历数据
-    setRefreshKey((prev) => prev + 1);
+    // 批量调整后，使缓存失效以触发重新查询
+    queryClient.invalidateQueries({ queryKey: ['capacityCalendar'] });
+    queryClient.invalidateQueries({ queryKey: ['globalCapacityStats'] });
     setBatchAdjustModalOpen(false);
     setSelectedDates([]);
   };
@@ -133,9 +138,10 @@ export const CapacityPoolManagementV2: React.FC = () => {
           {/* 右侧：日历视图区 */}
           <Col span={18}>
             <Space direction="vertical" style={{ width: '100%' }} size={12}>
+              {/* C6修复：移除refreshKey，使用稳定的key避免不必要的卸载/重载 */}
               {selectedMachines.map((machine) => (
                 <CapacityCalendar
-                  key={`${machine}-${refreshKey}`}
+                  key={machine}
                   versionId={currentVersionId || ''}
                   machineCode={machine}
                   dateFrom={dateRange.dateFrom}
