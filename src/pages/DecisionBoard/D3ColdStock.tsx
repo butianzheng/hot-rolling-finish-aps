@@ -132,47 +132,77 @@ export const D3ColdStock: React.FC<D3ColdStockProps> = ({ embedded, onOpenDrilld
     }
   }, [searchParams]);
 
-  // 按机组分组统计
+  // M1修复：优化按机组分组统计，单次遍历计算所有指标
   const machineStats = useMemo(() => {
     if (!data?.items || data.items.length === 0) return [];
 
-    const machineMap = new Map<string, ColdStockBucket[]>();
+    // 压力等级排序映射
+    const levelOrder: Record<PressureLevel, number> = {
+      LOW: 0,
+      MEDIUM: 1,
+      HIGH: 2,
+      CRITICAL: 3,
+    };
 
+    // 使用Map存储每个机组的统计信息（避免多次遍历）
+    const machineMap = new Map<
+      string,
+      {
+        buckets: ColdStockBucket[];
+        totalCount: number;
+        totalWeight: number;
+        maxPressureScore: number;
+        weightedAgeSum: number; // 用于计算加权平均库龄
+        maxAge: number;
+        highestPressureLevel: PressureLevel;
+      }
+    >();
+
+    // M1修复：单次遍历完成所有统计计算
     data.items.forEach((bucket) => {
-      const existing = machineMap.get(bucket.machineCode) || [];
-      existing.push(bucket);
-      machineMap.set(bucket.machineCode, existing);
+      const machine = bucket.machineCode;
+      const existing = machineMap.get(machine);
+
+      if (existing) {
+        // 更新现有机组的统计
+        existing.buckets.push(bucket);
+        existing.totalCount += bucket.count;
+        existing.totalWeight += bucket.weightT;
+        existing.maxPressureScore = Math.max(existing.maxPressureScore, bucket.pressureScore);
+        existing.weightedAgeSum += bucket.avgAgeDays * bucket.count;
+        existing.maxAge = Math.max(existing.maxAge, bucket.maxAgeDays);
+
+        // 更新最高压力等级
+        if (levelOrder[bucket.pressureLevel] > levelOrder[existing.highestPressureLevel]) {
+          existing.highestPressureLevel = bucket.pressureLevel;
+        }
+      } else {
+        // 新机组初始化
+        machineMap.set(machine, {
+          buckets: [bucket],
+          totalCount: bucket.count,
+          totalWeight: bucket.weightT,
+          maxPressureScore: bucket.pressureScore,
+          weightedAgeSum: bucket.avgAgeDays * bucket.count,
+          maxAge: bucket.maxAgeDays,
+          highestPressureLevel: bucket.pressureLevel,
+        });
+      }
     });
 
-    return Array.from(machineMap.entries()).map(([machine, buckets]) => {
-      const totalCount = buckets.reduce((sum, b) => sum + b.count, 0);
-      const totalWeight = buckets.reduce((sum, b) => sum + b.weightT, 0);
-      const maxPressureScore = Math.max(...buckets.map((b) => b.pressureScore));
-      const avgAge = buckets.reduce((sum, b) => sum + b.avgAgeDays * b.count, 0) / totalCount;
-      const maxAge = Math.max(...buckets.map((b) => b.maxAgeDays));
-
-      // 确定最高压力等级
-      const highestPressureLevel = buckets.reduce((max, b) => {
-        const levelOrder: Record<PressureLevel, number> = {
-          LOW: 0,
-          MEDIUM: 1,
-          HIGH: 2,
-          CRITICAL: 3,
-        };
-        return levelOrder[b.pressureLevel] > levelOrder[max] ? b.pressureLevel : max;
-      }, 'LOW' as PressureLevel);
-
-      return {
+    // 转换为最终的统计数组
+    return Array.from(machineMap.entries())
+      .map(([machine, stats]) => ({
         machine,
-        buckets,
-        totalCount,
-        totalWeight,
-        maxPressureScore,
-        avgAge,
-        maxAge,
-        highestPressureLevel,
-      };
-    }).sort((a, b) => b.maxPressureScore - a.maxPressureScore);
+        buckets: stats.buckets,
+        totalCount: stats.totalCount,
+        totalWeight: stats.totalWeight,
+        maxPressureScore: stats.maxPressureScore,
+        avgAge: stats.totalCount > 0 ? stats.weightedAgeSum / stats.totalCount : 0,
+        maxAge: stats.maxAge,
+        highestPressureLevel: stats.highestPressureLevel,
+      }))
+      .sort((a, b) => b.maxPressureScore - a.maxPressureScore);
   }, [data]);
 
   // 全局统计
