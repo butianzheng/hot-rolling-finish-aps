@@ -46,9 +46,17 @@ const SettingsCenter: React.FC = () => {
     planDate: searchParams.get('plan_date') || undefined,
   }), [searchParams]);
 
+  // H6修复：切换Tab时保留上下文参数（machine_code、plan_date）
   const handleTabChange = (key: string) => {
     const next = new URLSearchParams(searchParams);
     next.set('tab', key);
+    // 保留上下文参数
+    if (contextParams.machineCode) {
+      next.set('machine_code', contextParams.machineCode);
+    }
+    if (contextParams.planDate) {
+      next.set('plan_date', contextParams.planDate);
+    }
     setSearchParams(next, { replace: true });
   };
 

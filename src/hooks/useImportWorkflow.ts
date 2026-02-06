@@ -318,6 +318,9 @@ export function useImportWorkflow(): UseImportWorkflowReturn {
       } catch (e: any) {
         console.error('[MaterialImport] import failed:', e);
         message.error(e?.message || '导入失败');
+        // H5修复：导入失败后清空相关状态，避免显示过期的导入结果
+        setImportResult(null);
+        setBatchId(null);
       } finally {
         setImportLoading(false);
         setImportingFunc(false);

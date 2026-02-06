@@ -303,11 +303,22 @@ const RiskOverview: React.FC = () => {
           <Alert type="warning" showIcon message="当前处于离线状态，数据可能无法刷新" />
         )}
 
+        {/* H2修复：显示详细的错误信息，明确哪些维度加载失败 */}
         {data.errors.length > 0 && (
           <Alert
             type="error"
             showIcon
-            message="部分数据加载失败"
+            message={`数据加载失败 (${data.errors.length}项)`}
+            description={
+              <div>
+                <div style={{ marginBottom: 4 }}>以下数据未能加载：</div>
+                <ul style={{ margin: 0, paddingLeft: 20 }}>
+                  {data.errors.map((err, idx) => (
+                    <li key={idx}>{String(err)}</li>
+                  ))}
+                </ul>
+              </div>
+            }
             action={
               <Button size="small" onClick={data.refetchAll}>
                 重试
