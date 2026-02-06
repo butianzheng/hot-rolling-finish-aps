@@ -223,11 +223,12 @@ export default function ScheduleGanttView({
     return machines;
   }, [machineCode, machines]);
 
+  // H9修复：对机组列表排序后再join，确保queryKey稳定（避免数组顺序变化导致缓存失效）
   const capacityQuery = useQuery({
     queryKey: [
       'ganttCapacityPools',
       activeVersionId,
-      capacityMachineCodes.join(','),
+      capacityMachineCodes.slice().sort().join(','),
       dateKeys[0] || '',
       dateKeys[dateKeys.length - 1] || '',
     ],

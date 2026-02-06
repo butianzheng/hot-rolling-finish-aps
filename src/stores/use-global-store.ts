@@ -202,11 +202,14 @@ export const useGlobalStore = create<GlobalState & GlobalActions>()(
       {
         name: 'aps-global-state', // localStorage key
         storage: createJSONStorage(() => localStorage),
-        // 只持久化部分字段（临时状态不持久化）
+        // H10修复：持久化版本对比状态，避免刷新后丢失对比选择
         partialize: (state) => ({
           activeVersionId: state.activeVersionId,
           currentUser: state.currentUser,
           adminOverrideMode: state.adminOverrideMode,
+          versionComparisonMode: state.versionComparisonMode,
+          selectedVersionA: state.selectedVersionA,
+          selectedVersionB: state.selectedVersionB,
           workbenchViewMode: state.workbenchViewMode,
           workbenchFilters: state.workbenchFilters,
           userPreferences: state.userPreferences,
