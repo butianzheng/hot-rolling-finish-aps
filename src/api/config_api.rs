@@ -509,6 +509,7 @@ pub struct ConfigItem {
     pub scope_id: String,
 
     /// 作用域类型（GLOBAL, MACHINE, STEEL_GRADE, VERSION）
+    #[serde(default)]
     pub scope_type: String,
 
     /// 配置键
@@ -620,5 +621,16 @@ mod tests {
     fn test_config_api_structure() {
         // 这个测试只是验证结构是否正确定义
         // 实际的集成测试在 tests/ 目录
+    }
+
+    #[test]
+    fn test_config_item_deserialize_without_scope_type() {
+        let raw = r#"[{"scope_id":"global","key":"k1","value":"v1"}]"#;
+        let parsed: Vec<ConfigItem> = serde_json::from_str(raw).expect("反序列化应成功");
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].scope_id, "global");
+        assert_eq!(parsed[0].scope_type, "");
+        assert_eq!(parsed[0].key, "k1");
+        assert_eq!(parsed[0].value, "v1");
     }
 }
