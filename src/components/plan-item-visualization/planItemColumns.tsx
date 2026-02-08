@@ -6,6 +6,7 @@ import { Button, Space, Tag, Tooltip } from 'antd';
 import { DragOutlined, HolderOutlined, LockOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { formatNumber, formatWeight } from '../../utils/formatters';
+import { isPlanItemForceReleased } from '../../utils/planItemStatus';
 import { urgentLevelColors, sourceTypeLabels, type PlanItem } from './types';
 
 export interface PlanItemColumnsOptions {
@@ -61,6 +62,21 @@ export function createPlanItemColumns(options: PlanItemColumnsOptions): ColumnsT
       width: 100,
     },
     {
+      title: '合同号',
+      dataIndex: 'contract_no',
+      key: 'contract_no',
+      width: 130,
+      render: (v: string | null | undefined) => v || '-',
+    },
+    {
+      title: '交期',
+      dataIndex: 'due_date',
+      key: 'due_date',
+      width: 110,
+      sorter: (a, b) => String(a.due_date || '').localeCompare(String(b.due_date || '')),
+      render: (v: string | null | undefined) => v || '-',
+    },
+    {
       title: '厚度（毫米）',
       dataIndex: 'thickness_mm',
       key: 'thickness_mm',
@@ -104,6 +120,18 @@ export function createPlanItemColumns(options: PlanItemColumnsOptions): ColumnsT
       sorter: (a, b) => a.plan_date.localeCompare(b.plan_date),
     },
     {
+      title: '当前方案排程',
+      key: 'scheduled_snapshot',
+      width: 180,
+      render: (_, record: PlanItem) => {
+        const date = String(record.scheduled_date || '').trim();
+        const machine = String(record.scheduled_machine_code || '').trim();
+        if (!date && !machine) return '-';
+        if (date && machine) return `${machine} / ${date}`;
+        return date || machine;
+      },
+    },
+    {
       title: '紧急等级',
       dataIndex: 'urgent_level',
       key: 'urgent_level',
@@ -136,8 +164,8 @@ export function createPlanItemColumns(options: PlanItemColumnsOptions): ColumnsT
       render: (_, record: PlanItem) => (
         <Space size={4}>
           {record.locked_in_plan && <Tag color="purple">冻结</Tag>}
-          {record.force_release_in_plan && <Tag color="orange">强制放行</Tag>}
-          {!record.locked_in_plan && !record.force_release_in_plan && (
+          {isPlanItemForceReleased(record) && <Tag color="orange">强制放行</Tag>}
+          {!record.locked_in_plan && !isPlanItemForceReleased(record) && (
             <Tag color="green">正常</Tag>
           )}
         </Space>

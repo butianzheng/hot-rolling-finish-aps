@@ -51,6 +51,10 @@ export const PlanItemSchema = z
     steel_grade: z.string().nullable().optional(),
     width_mm: z.number().nullable().optional(),
     thickness_mm: z.number().nullable().optional(),
+    contract_no: z.string().nullable().optional(),
+    due_date: DateString.nullable().optional(),
+    scheduled_date: DateString.nullable().optional(),
+    scheduled_machine_code: z.string().nullable().optional(),
   })
   .passthrough();
 

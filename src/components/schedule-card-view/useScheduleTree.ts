@@ -5,6 +5,7 @@
  */
 
 import { useState, useMemo, useCallback } from 'react';
+import { isPlanItemForceReleased } from '../../utils/planItemStatus';
 import type { PlanItemRow, ScheduleTreeRow, DateStatusSummary } from './types';
 
 export interface UseScheduleTreeResult {
@@ -20,7 +21,7 @@ function computeDateStatus(items: PlanItemRow[]): DateStatusSummary {
   let adjustableCount = 0;
   for (const it of items) {
     if (it.locked_in_plan) lockedCount++;
-    else if (it.force_release_in_plan) forceReleaseCount++;
+    else if (isPlanItemForceReleased(it)) forceReleaseCount++;
     else adjustableCount++;
   }
   return { lockedCount, forceReleaseCount, adjustableCount };

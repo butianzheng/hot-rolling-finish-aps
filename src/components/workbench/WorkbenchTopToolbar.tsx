@@ -18,6 +18,7 @@ const WorkbenchTopToolbar: React.FC<{
   openMoveModal: () => void;
   runMaterialOperation: (materialIds: string[], type: MaterialOperationType) => void;
   runForceReleaseOperation: (materialIds: string[]) => void;
+  runClearForceReleaseOperation: (materialIds: string[]) => void;
   onBeforeOptimize: () => void;
   onAfterOptimize: () => void;
 }> = ({
@@ -31,6 +32,7 @@ const WorkbenchTopToolbar: React.FC<{
   openMoveModal,
   runMaterialOperation,
   runForceReleaseOperation,
+  runClearForceReleaseOperation,
   onBeforeOptimize,
   onAfterOptimize,
 }) => {
@@ -60,6 +62,7 @@ const WorkbenchTopToolbar: React.FC<{
             onSetUrgent={() => runMaterialOperation(selectedMaterialIds, 'urgent_on')}
             onClearUrgent={() => runMaterialOperation(selectedMaterialIds, 'urgent_off')}
             onForceRelease={() => runForceReleaseOperation(selectedMaterialIds)}
+            onClearForceRelease={() => runClearForceReleaseOperation(selectedMaterialIds)}
             onMove={openMoveModal}
             onConditional={onOpenConditionalSelect}
             onClear={onClearSelection}

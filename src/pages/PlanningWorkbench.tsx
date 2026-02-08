@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Space, Tag, message } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -116,8 +116,8 @@ const PlanningWorkbench: React.FC = () => {
     scheduleFocus,
     setScheduleFocus,
     matrixFocusRequest,
-    focusedDate: ganttFocusedDate,
-    autoOpenCell: ganttAutoOpenCell,
+    focusedDate: calendarFocusedDate,
+    autoOpenCell: calendarAutoOpenCell,
     openGanttCellDetail,
     navigateToMatrix,
   } = useWorkbenchScheduleNavigation({
@@ -132,6 +132,50 @@ const PlanningWorkbench: React.FC = () => {
     machineCode: poolSelection.machineCode,
     dateRange: workbenchDateRange,
   });
+
+  const jumpSelfCheckDoneRef = useRef<string>('');
+
+  useEffect(() => {
+    const materialId = String(deepLinkContext?.materialId || '').trim();
+    const contractNo = String(deepLinkContext?.contractNo || '').trim();
+    const target = materialId || contractNo;
+    if (!target) return;
+
+    const token = `${activeVersionId || ''}::${materialId}::${contractNo}`;
+    if (jumpSelfCheckDoneRef.current === token) return;
+
+    if (materialsQuery.isLoading || planItemsQuery.isLoading) return;
+
+    const targetLower = target.toLowerCase();
+    const hitInMaterials = materialId
+      ? materials.some((m) => String(m.material_id || '').trim().toLowerCase() === targetLower)
+      : materials.some((m) => String(m.contract_no || '').trim().toLowerCase() === targetLower);
+
+    const hitInPlanItems = materialId
+      ? planItems.some((it) => String((it as any)?.material_id || '').trim().toLowerCase() === targetLower)
+      : planItems.some((it) => String((it as any)?.contract_no || '').trim().toLowerCase() === targetLower);
+
+    const scopeText = materialId ? `材料 ${materialId}` : `合同 ${contractNo}`;
+    if (hitInMaterials || hitInPlanItems) {
+      message.info(`跳转自检通过：已命中${scopeText}`);
+    } else {
+      const hasLoadError = !!materialsQuery.error || !!planItemsQuery.error;
+      const suffix = hasLoadError ? '（数据加载异常，请点“重试”）' : '（可点“刷新”后重试）';
+      message.warning(`跳转自检：未命中${scopeText}，已自动放宽筛选${suffix}`);
+    }
+
+    jumpSelfCheckDoneRef.current = token;
+  }, [
+    activeVersionId,
+    deepLinkContext?.contractNo,
+    deepLinkContext?.materialId,
+    materials,
+    materialsQuery.error,
+    materialsQuery.isLoading,
+    planItems,
+    planItemsQuery.error,
+    planItemsQuery.isLoading,
+  ]);
 
   const { refreshAll, refreshPlanItems, refreshMaterials } = useWorkbenchRefreshActions();
 
@@ -163,7 +207,7 @@ const PlanningWorkbench: React.FC = () => {
   const applyWorkbenchMachineCode = useCallback((machineCode: string | null) => {
     setPoolSelection((prev) => {
       if (prev.machineCode === machineCode) return prev;
-      return { machineCode, schedState: null };
+      return { ...prev, machineCode, schedState: null };
     });
     setWorkbenchFilters({ machineCode });
   }, [setWorkbenchFilters]);
@@ -177,7 +221,11 @@ const PlanningWorkbench: React.FC = () => {
 
   const handlePoolSelectionChange = useCallback(
     (next: MaterialPoolSelection) => {
-      setPoolSelection(next);
+      setPoolSelection((prev) => ({
+        ...prev,
+        ...next,
+        searchText: next.searchText ?? prev.searchText,
+      }));
       setWorkbenchFilters({ machineCode: next.machineCode });
     },
     [setWorkbenchFilters]
@@ -220,7 +268,7 @@ const PlanningWorkbench: React.FC = () => {
     setSelectedMaterialIds,
   });
 
-  const { runMaterialOperation, runForceReleaseOperation } = useWorkbenchBatchOperations({
+  const { runMaterialOperation, runForceReleaseOperation, runClearForceReleaseOperation } = useWorkbenchBatchOperations({
     adminOverrideMode,
     currentUser,
     materials,
@@ -234,8 +282,9 @@ const PlanningWorkbench: React.FC = () => {
       onSetUrgent: () => runMaterialOperation(selectedMaterialIds, 'urgent_on'),
       onClearUrgent: () => runMaterialOperation(selectedMaterialIds, 'urgent_off'),
       onForceRelease: () => runForceReleaseOperation(selectedMaterialIds),
+      onClearForceRelease: () => runClearForceReleaseOperation(selectedMaterialIds),
     }),
-    [runForceReleaseOperation, runMaterialOperation, selectedMaterialIds]
+    [runClearForceReleaseOperation, runForceReleaseOperation, runMaterialOperation, selectedMaterialIds]
   );
 
   const decisionPrimaryAction = useMemo(
@@ -298,6 +347,7 @@ const PlanningWorkbench: React.FC = () => {
           openMoveModal={openMoveModal}
           runMaterialOperation={runMaterialOperation}
           runForceReleaseOperation={runForceReleaseOperation}
+          runClearForceReleaseOperation={runClearForceReleaseOperation}
           onBeforeOptimize={handleBeforeOptimize}
           onAfterOptimize={handleAfterOptimize}
         />
@@ -351,8 +401,8 @@ const PlanningWorkbench: React.FC = () => {
           matrixFocusRequest={matrixFocusRequest}
           scheduleStatusFilter={scheduleStatusFilter}
           setScheduleStatusFilter={setScheduleStatusFilter}
-          focusedDate={ganttFocusedDate}
-          autoOpenCell={ganttAutoOpenCell}
+          focusedDate={calendarFocusedDate}
+          autoOpenCell={calendarAutoOpenCell}
           openGanttCellDetail={openGanttCellDetail}
           navigateToMatrix={navigateToMatrix}
           pathOverridePendingCount={pathOverride.pendingCount}
@@ -376,6 +426,7 @@ const PlanningWorkbench: React.FC = () => {
           onSetUrgent={statusBarHandlers.onSetUrgent}
           onClearUrgent={statusBarHandlers.onClearUrgent}
           onForceRelease={statusBarHandlers.onForceRelease}
+          onClearForceRelease={statusBarHandlers.onClearForceRelease}
           onOpenMoveRecommend={openMoveModalWithRecommend}
           onOpenMoveModal={openMoveModal}
           onClearSelection={clearSelection}

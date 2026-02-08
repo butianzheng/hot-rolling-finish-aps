@@ -18,6 +18,13 @@ function getDeepLinkContextLabel(context: string): string {
   return '';
 }
 
+function normalizeDeepLinkFocus(focus: string | null): string | undefined {
+  const raw = String(focus || '').trim();
+  if (!raw) return undefined;
+  if (raw === 'gantt') return 'calendar';
+  return raw;
+}
+
 export function useWorkbenchDeepLink(params: {
   searchParams: URLSearchParams;
   globalMachineCode: WorkbenchFilters['machineCode'];
@@ -49,18 +56,72 @@ export function useWorkbenchDeepLink(params: {
     const nextMachine = globalMachineCode ?? null;
     setPoolSelection((prev) => {
       if (prev.machineCode === nextMachine) return prev;
-      return { machineCode: nextMachine, schedState: null };
+      return { ...prev, machineCode: nextMachine, schedState: null };
     });
   }, [globalMachineCode, setPoolSelection]);
 
   // 深链接：从“策略对比/变更明细”等页面跳转到工作台时，可携带 material_id 自动打开详情侧栏
+  // 并将物料池搜索词置为 material_id，提升“精准定位”命中率。
   useEffect(() => {
     const materialId = searchParams.get('material_id');
     const id = String(materialId || '').trim();
     if (!id) return;
     setInspectedMaterialId(id);
     setInspectorOpen(true);
-  }, [searchParams, setInspectedMaterialId, setInspectorOpen]);
+    setWorkbenchViewMode('MATRIX');
+    setPoolSelection((prev) => {
+      const next = {
+        ...prev,
+        machineCode: null,
+        searchText: id,
+        schedState: null,
+      };
+      if (
+        prev.machineCode === next.machineCode &&
+        prev.searchText === next.searchText &&
+        prev.schedState === next.schedState
+      ) {
+        return prev;
+      }
+      return next;
+    });
+    // 存在明确目标材料时，避免被机组/紧急度/锁定筛选误伤导致“看不见”。
+    setWorkbenchFilters({ machineCode: null, urgencyLevel: null, lockStatus: 'ALL' });
+  }, [
+    searchParams,
+    setInspectedMaterialId,
+    setInspectorOpen,
+    setPoolSelection,
+    setWorkbenchFilters,
+    setWorkbenchViewMode,
+  ]);
+
+  // 深链接：contract_no 回退定位（无法直接定位 material_id 时）
+  useEffect(() => {
+    const materialId = String(searchParams.get('material_id') || '').trim();
+    if (materialId) return; // material_id 优先
+
+    const contractNo = String(searchParams.get('contract_no') || '').trim();
+    if (!contractNo) return;
+    setWorkbenchViewMode('MATRIX');
+    setPoolSelection((prev) => {
+      const next = {
+        ...prev,
+        machineCode: null,
+        searchText: contractNo,
+        schedState: null,
+      };
+      if (
+        prev.machineCode === next.machineCode &&
+        prev.searchText === next.searchText &&
+        prev.schedState === next.schedState
+      ) {
+        return prev;
+      }
+      return next;
+    });
+    setWorkbenchFilters({ machineCode: null, urgencyLevel: null, lockStatus: 'ALL' });
+  }, [searchParams, setPoolSelection, setWorkbenchFilters, setWorkbenchViewMode]);
 
   const [deepLinkContext, setDeepLinkContext] = useState<WorkbenchDeepLinkContext | null>(null);
 
@@ -70,8 +131,11 @@ export function useWorkbenchDeepLink(params: {
     const date = searchParams.get('date');
     const urgency = searchParams.get('urgency');
     const context = searchParams.get('context');
-    const focus = searchParams.get('focus');
+    const focus = normalizeDeepLinkFocus(searchParams.get('focus'));
     const openCell = searchParams.get('openCell');
+    const materialId = String(searchParams.get('material_id') || '').trim();
+    const contractNo = String(searchParams.get('contract_no') || '').trim();
+    const hasDirectTarget = !!materialId || !!contractNo;
 
     // 如果有深链接参数，保存到状态并应用
     if (machine || date || urgency || context || focus || openCell) {
@@ -81,26 +145,28 @@ export function useWorkbenchDeepLink(params: {
         date: date || undefined,
         urgency: urgency || undefined,
         context: context || undefined,
-        focus: focus || undefined,
+        focus,
         openCell: openCellFlag,
+        materialId: materialId || undefined,
+        contractNo: contractNo || undefined,
       });
 
       // 应用机组筛选
-      if (machine) {
+      if (machine && !hasDirectTarget) {
         setPoolSelection((prev) => {
           if (prev.machineCode === machine) return prev;
-          return { machineCode: machine, schedState: null };
+          return { ...prev, machineCode: machine, schedState: null };
         });
         setWorkbenchFilters({ machineCode: machine });
       }
 
       // 应用紧急度筛选（扩展功能）
-      if (urgency) {
+      if (urgency && !hasDirectTarget) {
         setWorkbenchFilters({ urgencyLevel: urgency });
       }
 
       // 深链接日期：默认聚焦前后各 3 天，并锁定范围，避免被自动范围覆盖
-      if (date) {
+      if (date && !hasDirectTarget) {
         const focusDate = dayjs(date);
         if (focusDate.isValid()) {
           setWorkbenchDateRange([focusDate.subtract(3, 'day'), focusDate.add(3, 'day')]);
@@ -108,18 +174,23 @@ export function useWorkbenchDeepLink(params: {
         }
       }
 
-      // 深链接指定甘特图定位（风险日/瓶颈点等）
-      if (focus === 'gantt' || openCellFlag) {
-        setWorkbenchViewMode('GANTT');
+      // 深链接指定排程日历定位（风险日/瓶颈点等）
+      // 兼容历史链接 focus=gantt
+      if (focus === 'matrix') {
+        setWorkbenchViewMode('MATRIX');
+      } else if (focus === 'calendar' || openCellFlag) {
+        setWorkbenchViewMode('CALENDAR');
       }
 
       // 显示来源提示
       const contextLabel = getDeepLinkContextLabel(String(context || '').trim());
       if (contextLabel) {
         const filterHints = [];
-        if (machine) filterHints.push(`机组: ${machine}`);
-        if (urgency) filterHints.push(`紧急度: ${urgency}`);
-        if (date) filterHints.push(`日期: ${date}`);
+        if (machine && !hasDirectTarget) filterHints.push(`机组: ${machine}`);
+        if (urgency && !hasDirectTarget) filterHints.push(`紧急度: ${urgency}`);
+        if (date && !hasDirectTarget) filterHints.push(`日期: ${date}`);
+        if (hasDirectTarget && materialId) filterHints.push(`材料: ${materialId}`);
+        if (hasDirectTarget && !materialId && contractNo) filterHints.push(`合同: ${contractNo}`);
 
         const filterInfo = filterHints.length > 0 ? `（${filterHints.join('、')}）` : '';
         message.info(`已从「${contextLabel}」跳转，自动应用相关筛选条件${filterInfo}`);
@@ -141,4 +212,3 @@ export function useWorkbenchDeepLink(params: {
 
   return { deepLinkContext, deepLinkContextLabel };
 }
-

@@ -8,6 +8,8 @@ import type { RedLineViolation } from '../guards/RedLineGuard';
 export interface Material {
   material_id: string;
   machine_code?: string | null;
+  contract_no?: string | null;
+  due_date?: string | null;
   weight_t?: number | null;
   width_mm?: number | null;
   thickness_mm?: number | null;
@@ -22,9 +24,14 @@ export interface Material {
   urgent_reason?: string;
   eligibility_reason?: string;
   priority_reason?: string;
+  scheduled_date?: string | null;
+  scheduled_machine_code?: string | null;
+  seq_no?: number | null;
+  rolling_output_age_days?: number | null;
+  stock_age_days?: number | null;
 }
 
-export type OperationType = 'lock' | 'unlock' | 'urgent' | 'clearUrgent' | 'forceRelease';
+export type OperationType = 'lock' | 'unlock' | 'urgent' | 'clearUrgent' | 'forceRelease' | 'clearForceRelease';
 
 /**
  * 检查冻结区违规
@@ -95,6 +102,8 @@ export function getOperationModalTitle(modalType: OperationType, count: number):
       return `取消紧急标志 (${count} 件)`;
     case 'forceRelease':
       return `强制放行 (${count} 件)`;
+    case 'clearForceRelease':
+      return `取消强制放行 (${count} 件)`;
     default:
       return '操作';
   }

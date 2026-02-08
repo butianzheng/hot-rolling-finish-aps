@@ -164,6 +164,61 @@ export const GanttToolbar: React.FC<GanttToolbarProps> = ({
           >
             可调 {statusSummary.adjustableCount}
           </Tag>
+          <Tag
+            color={PLAN_ITEM_STATUS_FILTER_META.READY.color}
+            style={{
+              cursor: canChangeStatus ? 'pointer' : undefined,
+              boxShadow: statusFilter === 'READY' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+              userSelect: 'none',
+            }}
+            onClick={() => canChangeStatus && toggleStatus('READY')}
+          >
+            就绪
+          </Tag>
+          <Tag
+            color={PLAN_ITEM_STATUS_FILTER_META.PENDING_MATURE.color}
+            style={{
+              cursor: canChangeStatus ? 'pointer' : undefined,
+              boxShadow: statusFilter === 'PENDING_MATURE' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+              userSelect: 'none',
+            }}
+            onClick={() => canChangeStatus && toggleStatus('PENDING_MATURE')}
+          >
+            待成熟
+          </Tag>
+          <Tag
+            color={PLAN_ITEM_STATUS_FILTER_META.BLOCKED.color}
+            style={{
+              cursor: canChangeStatus ? 'pointer' : undefined,
+              boxShadow: statusFilter === 'BLOCKED' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+              userSelect: 'none',
+            }}
+            onClick={() => canChangeStatus && toggleStatus('BLOCKED')}
+          >
+            阻断
+          </Tag>
+          <Tag
+            color={PLAN_ITEM_STATUS_FILTER_META.URGENT_L3.color}
+            style={{
+              cursor: canChangeStatus ? 'pointer' : undefined,
+              boxShadow: statusFilter === 'URGENT_L3' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+              userSelect: 'none',
+            }}
+            onClick={() => canChangeStatus && toggleStatus('URGENT_L3')}
+          >
+            L3
+          </Tag>
+          <Tag
+            color={PLAN_ITEM_STATUS_FILTER_META.URGENT_L2.color}
+            style={{
+              cursor: canChangeStatus ? 'pointer' : undefined,
+              boxShadow: statusFilter === 'URGENT_L2' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+              userSelect: 'none',
+            }}
+            onClick={() => canChangeStatus && toggleStatus('URGENT_L2')}
+          >
+            L2
+          </Tag>
         </Space>
       </Space>
       {legend}

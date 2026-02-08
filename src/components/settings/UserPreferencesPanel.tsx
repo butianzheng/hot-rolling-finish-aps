@@ -21,7 +21,7 @@ const STRATEGY_OPTIONS: Array<{ value: StrategyType; label: string }> = [
 
 const WORKBENCH_VIEW_OPTIONS: Array<{ value: WorkbenchViewMode; label: string }> = [
   { value: 'MATRIX', label: '矩阵' },
-  { value: 'GANTT', label: '甘特图' },
+  { value: 'CALENDAR', label: '日历' },
   { value: 'CARD', label: '卡片' },
 ];
 

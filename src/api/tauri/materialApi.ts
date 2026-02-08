@@ -99,6 +99,24 @@ export const materialApi = {
     );
   },
 
+  async batchClearForceRelease(
+    materialIds: string[],
+    operator: string,
+    reason: string,
+  ): Promise<z.infer<typeof ImpactSummarySchema>> {
+    return IpcClient.call(
+      'batch_clear_force_release',
+      {
+        material_ids: materialIds,
+        operator,
+        reason,
+      },
+      {
+        validate: zodValidator(ImpactSummarySchema, 'batch_clear_force_release'),
+      }
+    );
+  },
+
   async batchSetUrgent(
     materialIds: string[],
     manualUrgentFlag: boolean,

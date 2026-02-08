@@ -90,6 +90,7 @@ export const configKeyLabels: Record<string, string> = {
   path_override_allowed_urgency_levels: '允许人工突破的紧急等级',
   seed_s2_percentile: '种子分位数',
   seed_s2_small_sample_threshold: '种子小样本阈值',
+  material_management_coverage_alert_threshold: '物料管理机组覆盖异常阈值',
 };
 
 // 配置键说明（完整汉化版）
@@ -152,4 +153,6 @@ export const configDescriptions: Record<string, string> = {
     '无冻结/锁定/已确认锚点时，用历史分布生成初始锚点：取宽度与厚度的该分位数（0~1）。',
   seed_s2_small_sample_threshold:
     '种子策略的小样本阈值（整数）。样本数不足时回退到“最大宽度/最大厚度”等保守规则。',
+  material_management_coverage_alert_threshold:
+    '物料管理页机组覆盖异常阈值（整数）。当前覆盖机组数低于该值时，工具栏以红色告警显示。默认 4。',
 };

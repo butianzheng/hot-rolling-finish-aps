@@ -11,6 +11,7 @@ const WorkbenchStatusBar: React.FC<{
   onSetUrgent: () => void;
   onClearUrgent: () => void;
   onForceRelease: () => void;
+  onClearForceRelease: () => void;
   onOpenMoveRecommend: () => void;
   onOpenMoveModal: () => void;
   onClearSelection: () => void;
@@ -23,6 +24,7 @@ const WorkbenchStatusBar: React.FC<{
   onSetUrgent,
   onClearUrgent,
   onForceRelease,
+  onClearForceRelease,
   onOpenMoveRecommend,
   onOpenMoveModal,
   onClearSelection,
@@ -50,6 +52,9 @@ const WorkbenchStatusBar: React.FC<{
           </Button>
           <Button danger disabled={disabled} onClick={onForceRelease}>
             强制放行
+          </Button>
+          <Button disabled={disabled} onClick={onClearForceRelease}>
+            取消强放
           </Button>
           <Button disabled={disabled} onClick={onOpenMoveRecommend}>
             最近可行

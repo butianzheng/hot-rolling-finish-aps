@@ -5,11 +5,11 @@
  * 重构后：1000 行 → ~280 行 (-72%)
  */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ProTable } from '@ant-design/pro-components';
 import type { ActionType } from '@ant-design/pro-components';
-import { Button, Modal, Space, message } from 'antd';
+import { Button, InputNumber, Modal, Space, Typography, message, type FormInstance } from 'antd';
 import {
   ReloadOutlined,
   LockOutlined,
@@ -20,6 +20,7 @@ import {
   InfoCircleOutlined,
 } from '@ant-design/icons';
 import { materialApi } from '../../api/tauri';
+import { configApi } from '../../api/tauri/configApi';
 import { useEvent } from '../../api/eventBus';
 import { MaterialInspector } from '../MaterialInspector';
 import { RedLineGuard } from '../guards/RedLineGuard';
@@ -32,6 +33,25 @@ import { MaterialOperationModal } from './MaterialOperationModal';
 import { createMaterialTableColumns } from './materialTableColumns';
 import { checkRedLineViolations, type Material, type OperationType } from './materialTypes';
 
+const MATERIAL_FETCH_PAGE_SIZE = 1000;
+const MACHINE_COVERAGE_ALERT_THRESHOLD_DEFAULT = 4;
+const MACHINE_COVERAGE_ALERT_THRESHOLD_CONFIG_KEY = 'material_management_coverage_alert_threshold';
+
+async function listAllMaterials(): Promise<Material[]> {
+  const all: Material[] = [];
+  let offset = 0;
+
+  while (true) {
+    const page = await materialApi.listMaterials({ limit: MATERIAL_FETCH_PAGE_SIZE, offset });
+    if (!Array.isArray(page) || page.length === 0) break;
+    all.push(...(page as Material[]));
+    if (page.length < MATERIAL_FETCH_PAGE_SIZE) break;
+    offset += MATERIAL_FETCH_PAGE_SIZE;
+  }
+
+  return all;
+}
+
 // M4修复：定义ProTable搜索参数类型，替换any
 interface MaterialSearchParams {
   machine_code?: string;
@@ -40,11 +60,15 @@ interface MaterialSearchParams {
   manual_urgent_flag?: string | boolean;
   lock_flag?: string | boolean;
   material_id?: string;
+  contract_no?: string;
   steel_mark?: string;
 }
 
+const { Text } = Typography;
+
 const MaterialManagement: React.FC = () => {
   const actionRef = useRef<ActionType>();
+  const formRef = useRef<FormInstance<MaterialSearchParams>>();
   const queryClient = useQueryClient();
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
@@ -52,6 +76,13 @@ const MaterialManagement: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState<OperationType>('lock');
   const [reason, setReason] = useState('');
+  const [coverageAlertThreshold, setCoverageAlertThreshold] = useState<number>(
+    MACHINE_COVERAGE_ALERT_THRESHOLD_DEFAULT
+  );
+  const [coverageAlertThresholdInput, setCoverageAlertThresholdInput] = useState<number>(
+    MACHINE_COVERAGE_ALERT_THRESHOLD_DEFAULT
+  );
+  const [savingThreshold, setSavingThreshold] = useState(false);
 
   const currentUser = useCurrentUser();
   const adminOverrideMode = useAdminOverrideMode();
@@ -66,10 +97,7 @@ const MaterialManagement: React.FC = () => {
     error: materialsError,
   } = useQuery({
     queryKey: ['materials', 'all'],
-    queryFn: async () => {
-      const result = await materialApi.listMaterials({ limit: 1000, offset: 0 });
-      return result;
-    },
+    queryFn: listAllMaterials,
     staleTime: 2 * 60 * 1000, // 2分钟内数据视为新鲜，不重新请求
     gcTime: 5 * 60 * 1000, // 缓存5分钟
   });
@@ -82,6 +110,45 @@ const MaterialManagement: React.FC = () => {
   useEvent('plan_updated', () => {
     timeline.loadTimeline();
   });
+
+
+  useEffect(() => {
+    const form = formRef.current;
+    const linkedMachine = String(timeline.timelineMachine || '').trim();
+    if (!form) {
+      if (linkedMachine) actionRef.current?.reload();
+      return;
+    }
+
+    const currentMachine = String(form.getFieldValue('machine_code') || '').trim();
+    if (linkedMachine === currentMachine) return;
+
+    form.setFieldsValue({ machine_code: linkedMachine || undefined });
+    form.submit();
+  }, [timeline.timelineMachine]);
+  useEffect(() => {
+    let mounted = true;
+    const loadThreshold = async () => {
+      try {
+        const cfg = await configApi.getConfig('global', MACHINE_COVERAGE_ALERT_THRESHOLD_CONFIG_KEY);
+        const parsed = Number(cfg?.value);
+        const resolved = Number.isFinite(parsed) && parsed >= 1
+          ? Math.trunc(parsed)
+          : MACHINE_COVERAGE_ALERT_THRESHOLD_DEFAULT;
+        if (!mounted) return;
+        setCoverageAlertThreshold(resolved);
+        setCoverageAlertThresholdInput(resolved);
+      } catch {
+        if (!mounted) return;
+        setCoverageAlertThreshold(MACHINE_COVERAGE_ALERT_THRESHOLD_DEFAULT);
+        setCoverageAlertThresholdInput(MACHINE_COVERAGE_ALERT_THRESHOLD_DEFAULT);
+      }
+    };
+    void loadThreshold();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // 查看详情
   const handleViewDetail = useCallback((record: Material) => {
@@ -229,6 +296,9 @@ const MaterialManagement: React.FC = () => {
       } else if (modalType === 'forceRelease') {
         await materialApi.batchForceRelease(materialIds, operator, reason, validationMode);
         message.success('强制放行成功');
+      } else if (modalType === 'clearForceRelease') {
+        await materialApi.batchClearForceRelease(materialIds, operator, reason);
+        message.success('取消强制放行成功');
       }
 
       setModalVisible(false);
@@ -293,6 +363,12 @@ const MaterialManagement: React.FC = () => {
             m.material_id.toLowerCase().includes(params.material_id!.toLowerCase())
           );
         }
+        if (params.contract_no) {
+          const q = String(params.contract_no).toLowerCase();
+          filtered = filtered.filter((m: Material) =>
+            String(m.contract_no || '').toLowerCase().includes(q)
+          );
+        }
         if (params.steel_mark) {
           filtered = filtered.filter((m: Material) =>
             String(m.steel_mark ?? '')
@@ -300,6 +376,21 @@ const MaterialManagement: React.FC = () => {
               .includes(String(params.steel_mark).toLowerCase())
           );
         }
+
+        if (params.keyword) {
+          const q = String(params.keyword).toLowerCase();
+          filtered = filtered.filter((m: Material) => {
+            const materialId = String(m.material_id || '').toLowerCase();
+            const contractNo = String(m.contract_no || '').toLowerCase();
+            const steelMark = String(m.steel_mark || '').toLowerCase();
+            return materialId.includes(q) || contractNo.includes(q) || steelMark.includes(q);
+          });
+        }
+
+        // 默认按材料号排序，避免首页集中展示单机组导致“仅有H031”的误判
+        filtered = [...filtered].sort((a, b) =>
+          String(a.material_id || '').localeCompare(String(b.material_id || ''))
+        );
 
         return { data: filtered, success: true, total: filtered.length };
       } catch (error) {
@@ -324,6 +415,53 @@ const MaterialManagement: React.FC = () => {
     [timeline.machineOptions, timeline.loadMachineOptions, handleViewDetail, handleSingleOperation]
   );
 
+  const machineCoverage = useMemo(() => {
+    const counts = new Map<string, number>();
+    allMaterials.forEach((item) => {
+      const code = String(item.machine_code || 'UNKNOWN').trim() || 'UNKNOWN';
+      counts.set(code, (counts.get(code) || 0) + 1);
+    });
+    return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [allMaterials]);
+
+  const machineCoverageText = useMemo(() => {
+    if (machineCoverage.length === 0) return '-';
+    return machineCoverage.map(([code, count]) => `${code}(${count})`).join(' / ');
+  }, [machineCoverage]);
+
+  const isCoverageAbnormal = useMemo(
+    () => allMaterials.length > 0 && machineCoverage.length < coverageAlertThreshold,
+    [allMaterials.length, coverageAlertThreshold, machineCoverage.length]
+  );
+
+  const saveCoverageAlertThreshold = useCallback(async () => {
+    const next = Number(coverageAlertThresholdInput);
+    if (!Number.isFinite(next) || next < 1) {
+      message.warning('阈值必须为大于等于 1 的整数');
+      return;
+    }
+
+    const normalized = Math.trunc(next);
+    setSavingThreshold(true);
+    try {
+      await configApi.updateConfig(
+        'global',
+        MACHINE_COVERAGE_ALERT_THRESHOLD_CONFIG_KEY,
+        String(normalized),
+        currentUser || 'admin',
+        '更新物料管理机组覆盖异常阈值'
+      );
+      setCoverageAlertThreshold(normalized);
+      setCoverageAlertThresholdInput(normalized);
+      message.success('机组覆盖阈值已保存');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      message.error(`保存阈值失败: ${errorMessage}`);
+    } finally {
+      setSavingThreshold(false);
+    }
+  }, [coverageAlertThresholdInput, currentUser]);
+
   return (
     <>
       {/* 产能时间线 */}
@@ -344,6 +482,7 @@ const MaterialManagement: React.FC = () => {
       <ProTable<Material>
         columns={columns}
         actionRef={actionRef}
+        formRef={formRef}
         request={loadMaterials}
         rowKey="material_id"
         search={{
@@ -355,6 +494,7 @@ const MaterialManagement: React.FC = () => {
               key="reset"
               onClick={() => {
                 formProps.form?.resetFields();
+                formProps.form?.setFieldsValue({ machine_code: timeline.timelineMachine || undefined });
                 formProps.form?.submit();
               }}
             >
@@ -406,6 +546,9 @@ const MaterialManagement: React.FC = () => {
             >
               批量强制放行
             </Button>
+            <Button size="small" onClick={() => handleBatchOperation('clearForceRelease')}>
+              批量取消强放
+            </Button>
             <Button size="small" onClick={() => setSelectedRowKeys([])}>
               取消选择
             </Button>
@@ -413,6 +556,25 @@ const MaterialManagement: React.FC = () => {
         )}
         toolbar={{
           actions: [
+            <Text key="coverage" type={isCoverageAbnormal ? 'danger' : 'secondary'}>
+              {isCoverageAbnormal ? <WarningOutlined /> : null}
+              {isCoverageAbnormal ? ` 机组覆盖异常（阈值<${coverageAlertThreshold}）: ` : '机组覆盖: '}
+              {machineCoverageText}
+            </Text>,
+            <Space key="coverage-threshold" size={6}>
+              <Text type="secondary">覆盖告警阈值</Text>
+              <InputNumber
+                min={1}
+                step={1}
+                precision={0}
+                value={coverageAlertThresholdInput}
+                onChange={(v) => setCoverageAlertThresholdInput(Number(v || 1))}
+                style={{ width: 86 }}
+              />
+              <Button size="small" loading={savingThreshold} onClick={() => void saveCoverageAlertThreshold()}>
+                保存
+              </Button>
+            </Space>,
             <Button key="reload" icon={<ReloadOutlined />} onClick={() => actionRef.current?.reload()}>
               刷新
             </Button>,

@@ -34,12 +34,19 @@ pub struct MaterialWithState {
     pub width_mm: Option<f64>,
     pub thickness_mm: Option<f64>,
     pub steel_mark: Option<String>,
+    pub contract_no: Option<String>,
+    pub due_date: Option<String>,
 
     // 状态字段
     pub sched_state: String,
     pub urgent_level: String,
     pub lock_flag: bool,
     pub manual_urgent_flag: bool,
+    pub scheduled_date: Option<String>,
+    pub scheduled_machine_code: Option<String>,
+    pub seq_no: Option<i32>,
+    pub rolling_output_age_days: Option<i32>,
+    pub stock_age_days: Option<i32>,
 }
 
 /// 物料池树形汇总（机组 × 状态）
@@ -197,10 +204,17 @@ impl MaterialApi {
                 width_mm: r.width_mm,
                 thickness_mm: r.thickness_mm,
                 steel_mark: r.steel_mark,
+                contract_no: r.contract_no,
+                due_date: r.due_date,
                 sched_state: r.sched_state,
                 urgent_level: r.urgent_level,
                 lock_flag: r.lock_flag,
                 manual_urgent_flag: r.manual_urgent_flag,
+                scheduled_date: r.scheduled_date,
+                scheduled_machine_code: r.scheduled_machine_code,
+                seq_no: r.seq_no,
+                rolling_output_age_days: r.rolling_output_age_days,
+                stock_age_days: r.stock_age_days,
             })
             .collect();
 
@@ -530,6 +544,77 @@ impl MaterialApi {
                 "immature_count": violations.len(),
                 "violations": violations,
             })),
+        })
+    }
+
+    /// 批量取消强制放行材料
+    pub fn batch_clear_force_release(
+        &self,
+        material_ids: Vec<String>,
+        operator: &str,
+        reason: &str,
+    ) -> ApiResult<ImpactSummary> {
+        if material_ids.is_empty() {
+            return Err(ApiError::InvalidInput("材料ID列表不能为空".to_string()));
+        }
+        if reason.trim().is_empty() {
+            return Err(ApiError::InvalidInput(
+                "取消强制放行必须提供原因（可审计性要求）".to_string(),
+            ));
+        }
+
+        let mut success_count = 0;
+        for material_id in &material_ids {
+            if let Some(mut state) = self
+                .material_state_repo
+                .find_by_id(material_id)
+                .map_err(|e| ApiError::DatabaseError(e.to_string()))?
+            {
+                state.force_release_flag = false;
+
+                // 保守回退：若当前仍是 FORCE_RELEASE，则降回 READY。
+                // 其余状态（如 SCHEDULED/LOCKED/BLOCKED）保持不变，避免误改业务状态。
+                if state.sched_state == SchedState::ForceRelease {
+                    state.sched_state = SchedState::Ready;
+                }
+
+                self.material_state_repo
+                    .batch_insert_material_state(vec![state])
+                    .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+                success_count += 1;
+            }
+        }
+
+        let action_log = ActionLog {
+            action_id: uuid::Uuid::new_v4().to_string(),
+            version_id: None,
+            action_type: "CLEAR_FORCE_RELEASE".to_string(),
+            action_ts: chrono::Local::now().naive_local(),
+            actor: operator.to_string(),
+            payload_json: Some(serde_json::json!({
+                "material_ids": material_ids,
+                "reason": reason,
+            })),
+            impact_summary_json: Some(serde_json::json!({
+                "success_count": success_count,
+                "fail_count": material_ids.len() - success_count,
+            })),
+            machine_code: None,
+            date_range_start: None,
+            date_range_end: None,
+            detail: Some(reason.to_string()),
+        };
+
+        if let Err(e) = self.action_log_repo.insert(&action_log) {
+            warn!(error = %e, "记录操作日志失败");
+        }
+
+        Ok(ImpactSummary {
+            success_count,
+            fail_count: material_ids.len() - success_count,
+            message: format!("成功取消强制放行{}个材料", success_count),
+            details: None,
         })
     }
 

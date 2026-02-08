@@ -69,7 +69,7 @@ export default function WorkbenchScheduleViewToolbar(props: {
         value={viewMode}
         options={[
           { label: '矩阵', value: 'MATRIX' },
-          { label: '甘特图', value: 'GANTT' },
+          { label: '日历', value: 'CALENDAR' },
           { label: '卡片', value: 'CARD' },
         ]}
         onChange={(value) => onViewModeChange(value as WorkbenchViewMode)}

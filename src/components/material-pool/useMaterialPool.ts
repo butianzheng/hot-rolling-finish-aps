@@ -2,7 +2,7 @@
  * MaterialPool 状态管理 Hook
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DataNode } from 'antd/es/tree';
 import type {
   MaterialPoolFilters,
@@ -32,7 +32,8 @@ export function useMaterialPool({
   selectedMaterialIds,
   onSelectedMaterialIdsChange,
 }: UseMaterialPoolOptions) {
-  const [searchText, setSearchText] = useState('');
+  const [searchText, setSearchText] = useState(() => String(selection.searchText || ''));
+  const lastExternalSearchRef = useRef<string | null>(null);
   const [groupByUrgency, setGroupByUrgency] = useState(true);
   const [collapsedUrgency, setCollapsedUrgency] = useState<Record<UrgencyBucket, boolean>>({
     L3: false,
@@ -45,6 +46,14 @@ export function useMaterialPool({
     () => (treeDataOverride && treeDataOverride.length > 0 ? treeDataOverride : buildTreeData(materials)),
     [materials, treeDataOverride]
   );
+
+  useEffect(() => {
+    if (selection.searchText == null) return;
+    const external = String(selection.searchText);
+    if (lastExternalSearchRef.current === external) return;
+    lastExternalSearchRef.current = external;
+    setSearchText(external);
+  }, [selection.searchText]);
   const selectedTreeKey = selectionToTreeKey(selection);
 
   const filtered = useMemo(() => {
@@ -67,7 +76,20 @@ export function useMaterialPool({
     }
     if (searchText.trim()) {
       const q = searchText.trim().toLowerCase();
-      list = list.filter((m) => String(m.material_id || '').toLowerCase().includes(q));
+      list = list.filter((m) => {
+        const materialId = String(m.material_id || '').toLowerCase();
+        const contractNo = String(m.contract_no || '').toLowerCase();
+        const dueDate = String(m.due_date || '').toLowerCase();
+        const scheduledDate = String(m.scheduled_date || '').toLowerCase();
+        const scheduledMachine = String(m.scheduled_machine_code || '').toLowerCase();
+        return (
+          materialId.includes(q) ||
+          contractNo.includes(q) ||
+          dueDate.includes(q) ||
+          scheduledDate.includes(q) ||
+          scheduledMachine.includes(q)
+        );
+      });
     }
 
     return [...list].sort((a, b) => {

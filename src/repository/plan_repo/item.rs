@@ -700,6 +700,10 @@ impl PlanItemRepository {
             steel_grade: None,
             width_mm: None,
             thickness_mm: None,
+            contract_no: None,
+            due_date: None,
+            scheduled_date: None,
+            scheduled_machine_code: None,
         })
     }
 }

@@ -2,7 +2,16 @@ import React from 'react';
 import { Button, Dropdown, Modal } from 'antd';
 import { DownOutlined } from '@ant-design/icons';
 
-type BatchOpKey = 'lock' | 'unlock' | 'urgent' | 'clear_urgent' | 'force_release' | 'move' | 'conditional' | 'clear';
+type BatchOpKey =
+  | 'lock'
+  | 'unlock'
+  | 'urgent'
+  | 'clear_urgent'
+  | 'force_release'
+  | 'clear_force_release'
+  | 'move'
+  | 'conditional'
+  | 'clear';
 
 interface BatchOperationToolbarProps {
   disabled: boolean;
@@ -11,6 +20,7 @@ interface BatchOperationToolbarProps {
   onSetUrgent: () => void;
   onClearUrgent?: () => void;
   onForceRelease?: () => void;
+  onClearForceRelease?: () => void;
   onMove: () => void;
   onConditional?: () => void;
   onClear: () => void;
@@ -23,6 +33,7 @@ const BatchOperationToolbar: React.FC<BatchOperationToolbarProps> = ({
   onSetUrgent,
   onClearUrgent,
   onForceRelease,
+  onClearForceRelease,
   onMove,
   onConditional,
   onClear,
@@ -44,6 +55,10 @@ const BatchOperationToolbar: React.FC<BatchOperationToolbarProps> = ({
             if (onForceRelease) return onForceRelease();
             Modal.info({ title: '强制放行', content: '当前页面未提供强制放行入口。' });
           }
+          if (k === 'clear_force_release') {
+            if (onClearForceRelease) return onClearForceRelease();
+            Modal.info({ title: '取消强放', content: '当前页面未提供取消强放入口。' });
+          }
           if (k === 'move') return onMove();
           if (k === 'clear') return onClear();
           if (k === 'conditional') {
@@ -57,6 +72,7 @@ const BatchOperationToolbar: React.FC<BatchOperationToolbarProps> = ({
           { key: 'urgent', label: '设为紧急' },
           { key: 'clear_urgent', label: '取消紧急' },
           { key: 'force_release', label: '强制放行' },
+          { key: 'clear_force_release', label: '取消强放' },
           { key: 'move', label: '移动到...' },
           { type: 'divider' },
           { key: 'conditional', label: '按条件选中...' },

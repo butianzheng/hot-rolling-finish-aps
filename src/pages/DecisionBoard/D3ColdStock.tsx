@@ -5,7 +5,7 @@
 // ==========================================
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Row, Col, Statistic, Tag, Spin, Alert, Space, Select, Descriptions, Table } from 'antd';
+import { Card, Row, Col, Statistic, Tag, Spin, Alert, Space, Select, Descriptions, Table, Segmented, Tooltip } from 'antd';
 import {
   WarningOutlined,
   DatabaseOutlined,
@@ -13,13 +13,111 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useColdStockProfile } from '../../hooks/queries/use-decision-queries';
+import { materialApi } from '../../api/tauri';
 import type { DrilldownSpec } from '../../hooks/useRiskOverviewData';
 import { useActivePlanRev, useActiveVersionId } from '../../stores/use-global-store';
 import { ColdStockChart } from '../../components/charts/ColdStockChart';
 import { EmptyState } from '../../components/EmptyState';
 import type { ColdStockBucket, AgeBin, PressureLevel, ReasonItem } from '../../types/decision';
 import { formatNumber, formatWeight } from '../../utils/formatters';
+
+type InventoryAgeBucket = '5+' | '4' | '3' | '2' | '1' | '0';
+type InventoryColorMode = 'STATUS' | 'URGENCY';
+
+type InventoryMaterialCell = {
+  materialId: string;
+  machineCode: string;
+  rollingOutputAgeDays: number;
+  schedState: string;
+  urgentLevel: string;
+  weightT: number;
+  contractNo: string;
+  dueDate: string;
+  scheduledDate: string;
+  scheduledMachineCode: string;
+};
+
+const INVENTORY_AGE_BUCKETS: InventoryAgeBucket[] = ['5+', '4', '3', '2', '1', '0'];
+
+const INVENTORY_STATUS_COLORS: Record<string, string> = {
+  SCHEDULED: '#1677ff',
+  READY: '#52c41a',
+  PENDING_MATURE: '#8c8c8c',
+  FORCE_RELEASE: '#fa8c16',
+  LOCKED: '#722ed1',
+  BLOCKED: '#ff4d4f',
+  UNKNOWN: '#d9d9d9',
+};
+
+const INVENTORY_URGENCY_COLORS: Record<string, string> = {
+  L3: '#ff4d4f',
+  L2: '#faad14',
+  L1: '#1677ff',
+  L0: '#8c8c8c',
+};
+
+const INVENTORY_URGENCY_ORDER: Array<keyof typeof INVENTORY_URGENCY_COLORS> = ['L3', 'L2', 'L1', 'L0'];
+
+const INVENTORY_URGENCY_MIN_VISIBLE_WIDTH_PCT = 8;
+
+function normalizeInventoryAgeBucket(ageDays: number): InventoryAgeBucket {
+  if (ageDays >= 5) return '5+';
+  if (ageDays === 4) return '4';
+  if (ageDays === 3) return '3';
+  if (ageDays === 2) return '2';
+  if (ageDays === 1) return '1';
+  return '0';
+}
+
+function parseAgeDaysFromBin(ageBin: AgeBin): number {
+  if (ageBin === '30+') return 5;
+  if (ageBin === '15-30') return 4;
+  if (ageBin === '8-14') return 3;
+  return 1;
+}
+
+function inferSchedStateFromBucket(bucket: ColdStockBucket): string {
+  const level = String(bucket.pressureLevel || '').toUpperCase();
+  if (level === 'CRITICAL') return 'BLOCKED';
+  if (level === 'HIGH') return 'PENDING_MATURE';
+  if (level === 'MEDIUM') return 'READY';
+  return 'SCHEDULED';
+}
+
+function inferUrgencyFromBucket(bucket: ColdStockBucket): string {
+  const level = String(bucket.pressureLevel || '').toUpperCase();
+  if (level === 'CRITICAL') return 'L3';
+  if (level === 'HIGH') return 'L2';
+  if (level === 'MEDIUM') return 'L1';
+  return 'L0';
+}
+
+function mapUrgencyToPressureLevel(urgentLevel: string): PressureLevel {
+  const u = String(urgentLevel || '').toUpperCase();
+  if (u === 'L3') return 'CRITICAL';
+  if (u === 'L2') return 'HIGH';
+  if (u === 'L1') return 'MEDIUM';
+  return 'LOW';
+}
+
+async function loadAllInventoryMaterials() {
+  const pageSize = 1000;
+  const maxRows = 200_000;
+  const all: Awaited<ReturnType<typeof materialApi.listMaterials>> = [];
+  let offset = 0;
+
+  while (offset < maxRows) {
+    const page = await materialApi.listMaterials({ limit: pageSize, offset });
+    if (!Array.isArray(page) || page.length === 0) break;
+    all.push(...page);
+    if (page.length < pageSize) break;
+    offset += pageSize;
+  }
+
+  return all;
+}
 
 // ==========================================
 // 压力等级颜色映射
@@ -93,12 +191,20 @@ export const D3ColdStock: React.FC<D3ColdStockProps> = ({ embedded, onOpenDrilld
   const [selectedMachine, setSelectedMachine] = useState<string | null>(null);
   const [selectedAgeBin, setSelectedAgeBin] = useState<AgeBin | null>(null);
   const [selectedPressureLevel, setSelectedPressureLevel] = useState<PressureLevel | null>(null);
+  const [inventoryColorMode, setInventoryColorMode] = useState<InventoryColorMode>('STATUS');
 
   // 获取冷料数据（不默认筛掉低/中压，避免驾驶舱 drill-down 后“页面为空”）
   const { data, isLoading, error } = useColdStockProfile(
     { versionId: versionId || '', expectedPlanRev: activePlanRev ?? undefined },
     { enabled: !!versionId }
   );
+
+  const inventoryMaterialsQuery = useQuery({
+    queryKey: ['d3InventoryMaterials', versionId],
+    enabled: !!versionId,
+    queryFn: loadAllInventoryMaterials,
+    staleTime: 30_000,
+  });
 
   const handleSelectMachine = (machine: string | null) => {
     if (embedded && onOpenDrilldown) {
@@ -252,6 +358,86 @@ export const D3ColdStock: React.FC<D3ColdStockProps> = ({ embedded, onOpenDrilld
       }) || null
     );
   }, [selectedMachineData, selectedAgeBin, selectedPressureLevel]);
+
+  const inventoryMatrixRows = useMemo(() => {
+    const materials = inventoryMaterialsQuery.data || [];
+    const grouped = new Map<string, Record<InventoryAgeBucket, InventoryMaterialCell[]>>();
+
+    materials.forEach((item) => {
+      const machineCode = String(item.machine_code || '').trim() || 'UNKNOWN';
+      const rollingOutputAgeDays = Number(item.rolling_output_age_days ?? 0);
+      const ageBucket = normalizeInventoryAgeBucket(Math.max(0, rollingOutputAgeDays));
+
+      const store =
+        grouped.get(machineCode) || {
+          '5+': [],
+          '4': [],
+          '3': [],
+          '2': [],
+          '1': [],
+          '0': [],
+        };
+
+      const schedState = String(item.sched_state || '').trim().toUpperCase() || 'UNKNOWN';
+      const urgentLevel = String(item.urgent_level || '').trim().toUpperCase() || 'L0';
+
+      store[ageBucket].push({
+        materialId: String(item.material_id || ''),
+        machineCode,
+        rollingOutputAgeDays,
+        schedState,
+        urgentLevel,
+        weightT: Number(item.weight_t || 0),
+        contractNo: String(item.contract_no || '-'),
+        dueDate: String(item.due_date || '-'),
+        scheduledDate: String(item.scheduled_date || '-'),
+        scheduledMachineCode: String(item.scheduled_machine_code || machineCode),
+      });
+      grouped.set(machineCode, store);
+    });
+
+    // 回退：若 material 列表暂不可用，用桶数据兜底展示
+    if (grouped.size === 0 && data?.items?.length) {
+      data.items.forEach((bucket) => {
+        const machineCode = String(bucket.machineCode || '').trim() || 'UNKNOWN';
+        const ageFromBin = parseAgeDaysFromBin(bucket.ageBin);
+        const ageFromMax = Number(bucket.maxAgeDays || 0);
+        const normalizedAge = normalizeInventoryAgeBucket(Math.max(ageFromBin, ageFromMax));
+        const store =
+          grouped.get(machineCode) || {
+            '5+': [],
+            '4': [],
+            '3': [],
+            '2': [],
+            '1': [],
+            '0': [],
+          };
+
+        store[normalizedAge].push({
+          materialId: `${machineCode}-${bucket.ageBin}-${bucket.pressureLevel}`,
+          machineCode,
+          rollingOutputAgeDays: Math.max(ageFromBin, ageFromMax),
+          schedState: inferSchedStateFromBucket(bucket),
+          urgentLevel: inferUrgencyFromBucket(bucket),
+          weightT: Number(bucket.weightT || 0),
+          contractNo: '-',
+          dueDate: '-',
+          scheduledDate: '-',
+          scheduledMachineCode: machineCode,
+        });
+        grouped.set(machineCode, store);
+      });
+    }
+
+    return Array.from(grouped.entries())
+      .map(([machineCode, byBucket]) => ({ machineCode, byBucket }))
+      .sort((a, b) => a.machineCode.localeCompare(b.machineCode));
+  }, [data?.items, inventoryMaterialsQuery.data]);
+
+  const inventoryMatrixLegend = useMemo(() => {
+    const palette = inventoryColorMode === 'STATUS' ? INVENTORY_STATUS_COLORS : INVENTORY_URGENCY_COLORS;
+    return Object.entries(palette);
+  }, [inventoryColorMode]);
 
   // ==========================================
   // 加载状态
@@ -416,6 +602,212 @@ export const D3ColdStock: React.FC<D3ColdStockProps> = ({ embedded, onOpenDrilld
           />
         ) : (
           <EmptyState type="data" style={{ padding: '40px 0' }} />
+        )}
+      </Card>
+
+      <Card
+        title="库存结构（机组 × rolling_output_age_days）"
+        style={{ marginBottom: '24px' }}
+        extra={
+          <Space size={8} wrap>
+            <Segmented
+              size="small"
+              value={inventoryColorMode}
+              onChange={(v) => setInventoryColorMode(v as InventoryColorMode)}
+              options={[
+                { label: '排产状态着色', value: 'STATUS' },
+                { label: '紧急等级着色', value: 'URGENCY' },
+              ]}
+            />
+            <Space size={6} wrap>
+              {inventoryMatrixLegend.map(([label, color]) => (
+                <Tag key={`${label}-${color}`} color={color} style={{ marginInlineEnd: 0 }}>
+                  {label}
+                </Tag>
+              ))}
+            </Space>
+          </Space>
+        }
+      >
+        {inventoryMatrixRows.length === 0 ? (
+          <EmptyState type="data" style={{ padding: '24px 0' }} />
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 6 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', minWidth: 100 }}>机组</th>
+                  {INVENTORY_AGE_BUCKETS.map((bucket) => (
+                    <th key={bucket} style={{ textAlign: 'center', minWidth: 88 }}>
+                      {bucket}天
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {inventoryMatrixRows.map((row) => (
+                  <tr key={row.machineCode}>
+                    <td style={{ fontWeight: 600 }}>{row.machineCode}</td>
+                    {INVENTORY_AGE_BUCKETS.map((bucket) => {
+                      const list = row.byBucket[bucket] || [];
+                      const count = list.length;
+                      const totalWeight = list.reduce((sum, item) => sum + Number(item.weightT || 0), 0);
+                      const totalCount = list.length;
+
+                      const statusWeightMap = new Map<string, number>();
+                      const urgencyWeightMap = new Map<string, number>();
+                      const urgencyCountMap = new Map<string, number>();
+                      list.forEach((item) => {
+                        const status = String(item.schedState || 'UNKNOWN').toUpperCase();
+                        const urgent = String(item.urgentLevel || 'L0').toUpperCase();
+                        const weight = Number(item.weightT || 0);
+                        statusWeightMap.set(status, (statusWeightMap.get(status) || 0) + weight);
+                        urgencyWeightMap.set(urgent, (urgencyWeightMap.get(urgent) || 0) + weight);
+                        urgencyCountMap.set(urgent, (urgencyCountMap.get(urgent) || 0) + 1);
+                      });
+
+                      const activeMap = inventoryColorMode === 'STATUS' ? statusWeightMap : urgencyWeightMap;
+                      const composition =
+                        inventoryColorMode === 'URGENCY'
+                          ? (() => {
+                              const entries = INVENTORY_URGENCY_ORDER
+                                .map((key) => {
+                                  const count = urgencyCountMap.get(key) || 0;
+                                  return {
+                                    key,
+                                    raw: count,
+                                    ratio: totalCount > 0 ? count / totalCount : 0,
+                                    color: INVENTORY_URGENCY_COLORS[key],
+                                  };
+                                })
+                                .filter((item) => item.raw > 0);
+
+                              if (entries.length === 0) return [];
+
+                              const normalized = entries.map((item) => ({
+                                ...item,
+                                ratio:
+                                  item.ratio > 0
+                                    ? Math.max(item.ratio, INVENTORY_URGENCY_MIN_VISIBLE_WIDTH_PCT / 100)
+                                    : 0,
+                              }));
+
+                              const ratioSum = normalized.reduce((sum, item) => sum + item.ratio, 0);
+                              return normalized.map((item) => ({
+                                key: item.key,
+                                weight: item.raw,
+                                ratio: ratioSum > 0 ? item.ratio / ratioSum : 0,
+                                color: item.color,
+                              }));
+                            })()
+                          : Array.from(activeMap.entries())
+                              .map(([key, weight]) => ({
+                                key,
+                                weight,
+                                ratio: totalWeight > 0 ? weight / totalWeight : 0,
+                                color: INVENTORY_STATUS_COLORS[key] || INVENTORY_STATUS_COLORS.UNKNOWN,
+                              }))
+                              .filter((item) => item.weight > 0)
+                              .sort((a, b) => b.weight - a.weight);
+
+                      const dominantUrgency = Array.from(urgencyWeightMap.entries())
+                        .sort((a, b) => b[1] - a[1])[0]?.[0] || 'L0';
+
+                      const summaryText = composition
+                        .slice(0, 3)
+                        .map((item) => `${item.key} ${formatNumber(item.ratio * 100, 1)}%`)
+                        .join(' / ');
+
+                      const urgencySummaryText = INVENTORY_URGENCY_ORDER
+                        .map((key) => ({ key, count: urgencyCountMap.get(key) || 0 }))
+                        .filter((item) => item.count > 0)
+                        .map((item) => `${item.key} ${formatNumber((item.count / totalCount) * 100, 1)}%`)
+                        .join(' / ');
+
+                      const tooltip = (
+                        <div>
+                          <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                            {row.machineCode} · {bucket}天库存摘要
+                          </div>
+                          <div>材料数：{count}</div>
+                          <div>总重量：{formatWeight(totalWeight)}</div>
+                          <div>{inventoryColorMode === 'STATUS' ? '状态构成' : '紧急构成'}：{inventoryColorMode === 'STATUS' ? (summaryText || '-') : (urgencySummaryText || '-')}</div>
+                        </div>
+                      );
+
+                      const cell = (
+                        <div
+                          style={{
+                            position: 'relative',
+                            height: 48,
+                            borderRadius: 6,
+                            border: '1px solid rgba(0,0,0,0.08)',
+                            overflow: 'hidden',
+                            cursor: count > 0 && onOpenDrilldown ? 'pointer' : 'default',
+                            userSelect: 'none',
+                            background: '#fafafa',
+                          }}
+                          onClick={() => {
+                            if (!count || !onOpenDrilldown) return;
+                            onOpenDrilldown({
+                              kind: 'coldStock',
+                              machineCode: row.machineCode,
+                              pressureLevel: mapUrgencyToPressureLevel(dominantUrgency),
+                            });
+                          }}
+                        >
+                          {count > 0 ? (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                inset: 0,
+                                display: 'flex',
+                              }}
+                            >
+                              {composition.map((item) => (
+                                <div
+                                  key={`${row.machineCode}-${bucket}-${item.key}`}
+                                  style={{
+                                    width: `${item.ratio * 100}%`,
+                                    background: item.color,
+                                    opacity: 0.28,
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          ) : null}
+
+                          <div
+                            style={{
+                              position: 'relative',
+                              zIndex: 1,
+                              height: '100%',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              lineHeight: 1.15,
+                            }}
+                          >
+                            <div style={{ fontWeight: 700, color: count > 0 ? '#262626' : '#bfbfbf' }}>
+                              {count > 0 ? formatNumber(totalWeight, 2) : '-'}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#8c8c8c' }}>{count > 0 ? `${count}件` : ''}</div>
+                          </div>
+                        </div>
+                      );
+
+                      return (
+                        <td key={`${row.machineCode}-${bucket}`}>
+                          {count > 0 ? <Tooltip title={tooltip}>{cell}</Tooltip> : cell}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
 

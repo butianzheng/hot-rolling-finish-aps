@@ -33,6 +33,8 @@ const DRILLDOWN_KEYS = {
   date: 'date',
   ageBin: 'age',
   pressure: 'pressure',
+  materialId: 'material_id',
+  contractNo: 'contract_no',
 } as const;
 
 const URGENCY_LEVELS: UrgencyLevel[] = ['L0', 'L1', 'L2', 'L3'];
@@ -197,39 +199,38 @@ const RiskOverview: React.FC = () => {
     urgencyLevel?: string | null;
     planDate?: string | null;
     context?: string;
+    materialId?: string | null;
+    contractNo?: string | null;
   }) => {
-    // 从风险概览进入工作台，默认回到"全局视角"，并带上当前问题的关键信息（如机组、紧急度）。
-    setWorkbenchFilters({
-      machineCode: opts.machineCode ?? null,
-      urgencyLevel: opts.urgencyLevel ?? null,
-      lockStatus: 'ALL',
-    });
-
-    // 轻量联动：从不同问题入口进入工作台时，默认切到更匹配的视图。
-    // - risk/bottleneck/capacityOpportunity：默认甘特图（便于定位到日期列并打开同日明细）
-    // - visualization/roll：倾向甘特图
-    // - materials：倾向卡片
     const context = String(opts.context || '').trim();
     const isCellContext = context === 'risk' || context === 'bottleneck' || context === 'capacityOpportunity';
-    if (opts.workbenchTab === 'materials') {
-      setWorkbenchViewMode('CARD');
-    } else if (opts.workbenchTab === 'capacity' || opts.workbenchTab === 'visualization' || isCellContext) {
-      setWorkbenchViewMode('GANTT');
-    }
+    const hasDirectTarget = !!String(opts.materialId || '').trim() || !!String(opts.contractNo || '').trim();
+
+    // 从风险概览进入工作台：
+    // 1) 默认统一落到矩阵视图；
+    // 2) 若携带 material/contract 目标，清空机组/紧急筛选，避免“跳转后看不见目标”。
+    setWorkbenchFilters({
+      machineCode: hasDirectTarget ? null : (opts.machineCode ?? null),
+      urgencyLevel: hasDirectTarget ? null : (opts.urgencyLevel ?? null),
+      lockStatus: 'ALL',
+    });
+    setWorkbenchViewMode('MATRIX');
 
     // 构建深链接URL参数（第三阶段：风险概览深链接）
     const params = new URLSearchParams();
-    if (opts.machineCode) params.set('machine', opts.machineCode);
-    if (opts.urgencyLevel) params.set('urgency', opts.urgencyLevel);
-    if (opts.planDate) params.set('date', opts.planDate);
+    if (!hasDirectTarget && opts.machineCode) params.set('machine', opts.machineCode);
+    if (!hasDirectTarget && opts.urgencyLevel) params.set('urgency', opts.urgencyLevel);
+    if (!hasDirectTarget && opts.planDate) params.set('date', opts.planDate);
     if (opts.context) params.set('context', opts.context);
+    if (opts.materialId) params.set('material_id', opts.materialId);
+    if (opts.contractNo) params.set('contract_no', opts.contractNo);
+
+    // 统一声明进入矩阵定位，避免受历史视图状态干扰。
+    params.set('focus', 'matrix');
 
     // 风险日/瓶颈点/机会点：定位到日期列并自动打开该单元格明细（提升问题直达效率）
-    if (isCellContext) {
-      params.set('focus', 'gantt');
-      if (opts.machineCode && opts.planDate) {
-        params.set('openCell', '1');
-      }
+    if (!hasDirectTarget && isCellContext && opts.machineCode && opts.planDate) {
+      params.set('openCell', '1');
     }
 
     const url = params.toString() ? `/workbench?${params.toString()}` : '/workbench';
@@ -259,8 +260,9 @@ const RiskOverview: React.FC = () => {
       workbenchTab: problem.workbenchTab,
       machineCode: problem.workbenchMachineCode ?? null,
       urgencyLevel: urgency,
-      planDate,
-      context,
+      planDate: planDate ?? problem.workbenchPlanDate ?? null,
+      context: problem.workbenchContext ?? context,
+      contractNo: problem.workbenchContractNo ?? null,
     });
   };
 

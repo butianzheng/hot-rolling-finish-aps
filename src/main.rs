@@ -57,6 +57,7 @@ fn main() {
             list_ready_materials,
             batch_lock_materials,
             batch_force_release,
+            batch_clear_force_release,
             batch_set_urgent,
             list_materials_by_urgent_level,
 

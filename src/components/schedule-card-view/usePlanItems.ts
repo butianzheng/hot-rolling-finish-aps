@@ -5,6 +5,7 @@ import { planApi } from '../../api/tauri';
 import { useActiveVersionId } from '../../stores/use-global-store';
 import { workbenchQueryKeys } from '../../pages/workbench/queryKeys';
 import { formatDate } from '../../utils/formatters';
+import { isPlanItemForceReleased } from '../../utils/planItemStatus';
 import type { PlanItemRow } from './types';
 
 export const usePlanItems = (machineCode: string | null | undefined, dateRange: [Dayjs, Dayjs]) => {
@@ -75,8 +76,12 @@ export const normalizePlanItems = (data: unknown): PlanItemRow[] => {
       seq_no: Number(r.seq_no ?? 0),
       weight_t: Number(r.weight_t ?? 0),
       urgent_level: r.urgent_level ? String(r.urgent_level) : undefined,
+      sched_state: r.sched_state ? String(r.sched_state) : undefined,
       locked_in_plan: !!r.locked_in_plan,
-      force_release_in_plan: !!r.force_release_in_plan,
+      force_release_in_plan: isPlanItemForceReleased({
+        force_release_in_plan: !!r.force_release_in_plan,
+        sched_state: r.sched_state ? String(r.sched_state) : undefined,
+      }),
     };
   });
 };

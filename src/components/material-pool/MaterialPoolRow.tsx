@@ -170,6 +170,24 @@ export const MaterialPoolRow = React.memo(function MaterialPoolRow({
           {m.steel_mark || '-'} · {formatWeight(Number(m.weight_t || 0))}
         </Text>
 
+        {m.contract_no ? (
+          <Text type="secondary" style={{ fontSize: 11 }} ellipsis>
+            合同:{m.contract_no}
+          </Text>
+        ) : null}
+
+        {m.due_date ? (
+          <Text type="secondary" style={{ fontSize: 11 }} ellipsis>
+            交期:{m.due_date}
+          </Text>
+        ) : null}
+
+        {m.scheduled_date ? (
+          <Text type="secondary" style={{ fontSize: 11 }} ellipsis>
+            排程:{m.scheduled_date}
+          </Text>
+        ) : null}
+
         {/* 状态标签 */}
         <Tooltip title={statusConfig.description}>
           <Text

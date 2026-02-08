@@ -14,7 +14,7 @@
 
 ### 权威 Schema 来源
 
-- **新建库**：`scripts/dev_db/schema.sql`（全量，包含所有 v0.2-v0.8 特性）
+- **新建库**：`scripts/dev_db/schema.sql`（全量，包含所有 v0.2-v0.9 特性）
 - **增量升级**：本目录的 `v0.*.sql` 文件
 
 ## 迁移文件清单
@@ -27,6 +27,7 @@
 | `v0.5_strategy_draft.sql` | 4→5 | 策略草案持久化（decision_strategy_draft 表） | v0.4 |
 | `v0.6_path_rules_complete.sql` | 5→6 | 宽厚路径规则完整实现（合并版本） | v0.5 |
 | `v0.8_path_override_reject_flow.sql` | 6→8 | 路径规则拒绝闭环（拒绝态字段 + 索引） | v0.6 |
+| `v0.9_material_management_coverage_alert_threshold.sql` | 8→9 | 物料管理机组覆盖异常阈值配置化（默认4） | v0.8 |
 
 ### ⚠️ 弃用文件
 
@@ -49,10 +50,11 @@ sqlite3 hot_rolling_aps.db < migrations/v0.4_decision_layer.sql
 sqlite3 hot_rolling_aps.db < migrations/v0.5_strategy_draft.sql
 sqlite3 hot_rolling_aps.db < migrations/v0.6_path_rules_complete.sql
 sqlite3 hot_rolling_aps.db < migrations/v0.8_path_override_reject_flow.sql
+sqlite3 hot_rolling_aps.db < migrations/v0.9_material_management_coverage_alert_threshold.sql
 
 # 3. 验证版本
 sqlite3 hot_rolling_aps.db "SELECT * FROM schema_version;"
-# 应显示 version = 8
+# 应显示 version = 9
 ```
 
 ## 迁移特性说明
@@ -103,6 +105,12 @@ sqlite3 hot_rolling_aps.db "SELECT * FROM schema_version;"
   - `path_override_reject_base_sched_state`
 - 新增索引：`idx_material_state_path_override_rejected`
 
+### v0.9: 物料管理机组覆盖异常阈值配置化
+
+- 新增配置项：`material_management_coverage_alert_threshold`
+- 默认值：`4`（global scope）
+- 用途：控制“物料管理”页面机组覆盖异常红色告警阈值
+
 ## 幂等性说明
 
 迁移脚本设计为**部分幂等**：
@@ -129,7 +137,7 @@ sqlite3 hot_rolling_aps.db "SELECT * FROM schema_version;"
 
 应用启动时会检查 `schema_version` 表：
 
-- 若版本低于 `CURRENT_SCHEMA_VERSION`（当前为 8），会输出警告日志
+- 若版本低于 `CURRENT_SCHEMA_VERSION`（当前为 9），会输出警告日志
 - 不会自动执行迁移，需要人工确认
 
 ## 历史迁移脚本
@@ -141,4 +149,4 @@ sqlite3 hot_rolling_aps.db "SELECT * FROM schema_version;"
 ---
 
 **更新日期**：2026-02-08
-**当前版本**：v0.8 (schema_version = 8)
+**当前版本**：v0.9 (schema_version = 9)

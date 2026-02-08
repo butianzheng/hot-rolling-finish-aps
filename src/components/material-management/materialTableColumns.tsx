@@ -100,6 +100,22 @@ export function createMaterialTableColumns(options: MaterialTableColumnsOptions)
       ),
     },
     {
+      title: '合同号',
+      dataIndex: 'contract_no',
+      key: 'contract_no',
+      width: 130,
+      ellipsis: true,
+      render: (_, record) => record?.contract_no || '-',
+    },
+    {
+      title: '交期',
+      dataIndex: 'due_date',
+      key: 'due_date',
+      width: 110,
+      search: false,
+      render: (_, record) => record?.due_date || '-',
+    },
+    {
       title: '机组',
       dataIndex: 'machine_code',
       key: 'machine_code',
@@ -285,10 +301,11 @@ export function createMaterialTableColumns(options: MaterialTableColumnsOptions)
           },
           {
             key: 'forceRelease',
-            label: '强制放行',
+            label: record.sched_state === 'FORCE_RELEASE' ? '取消强放' : '强制放行',
             icon: <WarningOutlined />,
-            danger: true,
-            onClick: () => onOperation(record, 'forceRelease'),
+            danger: record.sched_state !== 'FORCE_RELEASE',
+            onClick: () =>
+              onOperation(record, record.sched_state === 'FORCE_RELEASE' ? 'clearForceRelease' : 'forceRelease'),
           },
         ];
 

@@ -88,7 +88,14 @@ export const BottleneckContent: React.FC<BottleneckContentProps> = ({
             <Button
               size="small"
               type="primary"
-              onClick={() => onGoWorkbench({ workbenchTab: 'capacity', machineCode: record.machineCode })}
+              onClick={() =>
+                onGoWorkbench({
+                  workbenchTab: 'capacity',
+                  machineCode: record.machineCode,
+                  planDate: record.planDate,
+                  context: 'bottleneck',
+                })
+              }
             >
               处理
             </Button>
@@ -116,7 +123,14 @@ export const BottleneckContent: React.FC<BottleneckContentProps> = ({
               <Button
                 size="small"
                 type="primary"
-                onClick={() => onGoWorkbench({ workbenchTab: 'capacity', machineCode: selectedPoint.machineCode })}
+                onClick={() =>
+                  onGoWorkbench({
+                    workbenchTab: 'capacity',
+                    machineCode: selectedPoint.machineCode,
+                    planDate: selectedPoint.planDate,
+                    context: 'bottleneck',
+                  })
+                }
               >
                 去处理
               </Button>

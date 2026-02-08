@@ -15,6 +15,10 @@ export interface PlanItem extends Record<string, unknown> {
   seq_no: number;
   weight_t: number;
   steel_grade?: string;
+  contract_no?: string | null;
+  due_date?: string | null;
+  scheduled_date?: string | null;
+  scheduled_machine_code?: string | null;
   width_mm?: number | null;
   thickness_mm?: number | null;
   urgent_level?: string;
@@ -43,7 +47,7 @@ export interface PlanItemVisualizationProps {
   defaultDateRange?: [Dayjs, Dayjs] | null;
   statusFilter?: PlanItemStatusFilter;
   onStatusFilterChange?: (next: PlanItemStatusFilter) => void;
-  focusRequest?: { machine?: string; date: string; nonce: string | number } | null;
+  focusRequest?: { machine?: string; date: string; nonce: string | number; searchText?: string } | null;
   selectedMaterialIds?: string[];
   onSelectedMaterialIdsChange?: (ids: string[]) => void;
 }

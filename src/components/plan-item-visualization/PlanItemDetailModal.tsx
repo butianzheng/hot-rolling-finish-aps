@@ -5,6 +5,7 @@
 import React from 'react';
 import { Button, Descriptions, Modal, Space, Tag } from 'antd';
 import { formatWeight } from '../../utils/formatters';
+import { isPlanItemForceReleased } from '../../utils/planItemStatus';
 import { urgentLevelColors, sourceTypeLabels, type PlanItem } from './types';
 
 export interface PlanItemDetailModalProps {
@@ -36,9 +37,14 @@ export const PlanItemDetailModal: React.FC<PlanItemDetailModalProps> = ({
             {item.material_id}
           </Descriptions.Item>
           <Descriptions.Item label="钢种">{item.steel_grade}</Descriptions.Item>
+          <Descriptions.Item label="合同号">{item.contract_no || '-'}</Descriptions.Item>
+          <Descriptions.Item label="交期">{item.due_date || '-'}</Descriptions.Item>
           <Descriptions.Item label="吨位">{formatWeight(item.weight_t)}</Descriptions.Item>
           <Descriptions.Item label="机组">{item.machine_code}</Descriptions.Item>
           <Descriptions.Item label="排产日期">{item.plan_date}</Descriptions.Item>
+          <Descriptions.Item label="当前方案排程">
+            {item.scheduled_machine_code || '-'} / {item.scheduled_date || '-'}
+          </Descriptions.Item>
           <Descriptions.Item label="序号">{item.seq_no}</Descriptions.Item>
           <Descriptions.Item label="紧急等级">
             <Tag color={urgentLevelColors[item.urgent_level || 'L0']}>
@@ -53,8 +59,8 @@ export const PlanItemDetailModal: React.FC<PlanItemDetailModalProps> = ({
           <Descriptions.Item label="状态" span={2}>
             <Space>
               {item.locked_in_plan && <Tag color="purple">冻结</Tag>}
-              {item.force_release_in_plan && <Tag color="orange">强制放行</Tag>}
-              {!item.locked_in_plan && !item.force_release_in_plan && (
+              {isPlanItemForceReleased(item) && <Tag color="orange">强制放行</Tag>}
+              {!item.locked_in_plan && !isPlanItemForceReleased(item) && (
                 <Tag color="green">正常</Tag>
               )}
             </Space>

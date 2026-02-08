@@ -88,6 +88,10 @@ pub struct PlanItem {
     pub steel_grade: Option<String>,   // 钢种/出钢记号 (来自 material_master.steel_mark)
     pub width_mm: Option<f64>,         // 宽度快照 (来自 material_master.width_mm)
     pub thickness_mm: Option<f64>,     // 厚度快照 (来自 material_master.thickness_mm)
+    pub contract_no: Option<String>,   // 合同号快照
+    pub due_date: Option<String>,      // 合同交期快照 (YYYY-MM-DD)
+    pub scheduled_date: Option<String>, // 当前排程日期快照
+    pub scheduled_machine_code: Option<String>, // 当前排程机组快照
 }
 
 // 辅助类型别名 (兼容旧代码)

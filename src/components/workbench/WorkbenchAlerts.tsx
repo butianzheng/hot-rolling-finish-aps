@@ -100,7 +100,7 @@ const WorkbenchAlerts: React.FC<{
           type="info"
           showIcon
           message="当前版本暂无排程明细"
-          description="可点击右上角“一键优化”执行重算生成排程，然后再使用矩阵/甘特图视图进行调整。"
+          description="可点击右上角“一键优化”执行重算生成排程，然后再使用矩阵/日历视图进行调整。"
         />
       ) : null}
     </>

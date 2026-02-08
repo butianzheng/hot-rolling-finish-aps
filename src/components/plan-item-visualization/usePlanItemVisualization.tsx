@@ -58,6 +58,7 @@ export interface UsePlanItemVisualizationReturn {
   openForceReleaseModal: () => void;
   closeForceReleaseModal: () => void;
   handleBatchForceRelease: () => Promise<void>;
+  handleBatchClearForceRelease: () => Promise<void>;
 
   // 拖拽
   sensors: ReturnType<typeof useSensors>;
@@ -168,6 +169,13 @@ export function usePlanItemVisualization(
       return all.map((item: any) => ({
         key: String(item.material_id ?? ''),
         ...item,
+        // 优先使用 material_state 快照判定强放，确保取消强放后无需重算即可即时反映
+        force_release_in_plan:
+          String(item?.sched_state || '')
+            .trim()
+            .toUpperCase() === 'FORCE_RELEASE'
+            ? true
+            : !!item?.force_release_in_plan,
       }));
     },
     staleTime: 30 * 1000,
@@ -290,11 +298,22 @@ export function usePlanItemVisualization(
 
     if (searchText) {
       const searchLower = searchText.toLowerCase();
-      filtered = filtered.filter(
-        (item) =>
-          item.material_id.toLowerCase().includes(searchLower) ||
-          item.steel_grade?.toLowerCase().includes(searchLower)
-      );
+      filtered = filtered.filter((item) => {
+        const materialId = String(item.material_id || '').toLowerCase();
+        const steelGrade = String(item.steel_grade || '').toLowerCase();
+        const contractNo = String(item.contract_no || '').toLowerCase();
+        const dueDate = String(item.due_date || '').toLowerCase();
+        const scheduledDate = String(item.scheduled_date || '').toLowerCase();
+        const scheduledMachine = String(item.scheduled_machine_code || '').toLowerCase();
+        return (
+          materialId.includes(searchLower) ||
+          steelGrade.includes(searchLower) ||
+          contractNo.includes(searchLower) ||
+          dueDate.includes(searchLower) ||
+          scheduledDate.includes(searchLower) ||
+          scheduledMachine.includes(searchLower)
+        );
+      });
     }
 
     if (selectedUrgentLevel !== 'all') {
@@ -395,6 +414,33 @@ export function usePlanItemVisualization(
     setSelectedMaterialIds,
   ]);
 
+
+  const handleBatchClearForceRelease = useCallback(async () => {
+    if (selectedMaterialIds.length === 0) {
+      message.warning('请先选择材料');
+      return;
+    }
+
+    setOperationLoading(true);
+    try {
+      const res: any = await materialApi.batchClearForceRelease(
+        selectedMaterialIds,
+        currentUser || 'system',
+        '工作台批量取消强放'
+      );
+      message.success(String(res?.message || `成功取消强放 ${selectedMaterialIds.length} 个材料`));
+      setSelectedMaterialIds([]);
+      if (activeVersionId) {
+        await loadPlanItems(activeVersionId);
+      }
+    } catch (error: any) {
+      console.error('取消强放失败:', error);
+      message.error(String(error?.message || '取消强放失败'));
+    } finally {
+      setOperationLoading(false);
+    }
+  }, [selectedMaterialIds, currentUser, activeVersionId, loadPlanItems, setSelectedMaterialIds]);
+
   // 拖拽结束处理
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
@@ -486,6 +532,7 @@ export function usePlanItemVisualization(
     if (!focusRequest) return;
     const machine = String(focusRequest.machine || '').trim();
     const date = String(focusRequest.date || '').trim();
+    const nextSearchText = String(focusRequest.searchText || '').trim();
     if (machine) setSelectedMachine(machine);
     if (date) {
       const d = dayjs(date);
@@ -494,7 +541,14 @@ export function usePlanItemVisualization(
         setDateRange(null);
       }
     }
-  }, [focusRequest?.nonce]);
+    if (nextSearchText) {
+      setSearchText(nextSearchText);
+      setSelectedUrgentLevel('all');
+      setSelectedMachine('all');
+      setSelectedDate(null);
+      setDateRange(defaultDateRange ?? null);
+    }
+  }, [focusRequest?.nonce, defaultDateRange]);
 
   // 筛选条件变化时重新筛选
   useEffect(() => {
@@ -531,6 +585,7 @@ export function usePlanItemVisualization(
     openForceReleaseModal,
     closeForceReleaseModal,
     handleBatchForceRelease,
+    handleBatchClearForceRelease,
     sensors,
     handleDragEnd,
     setFilteredItems,

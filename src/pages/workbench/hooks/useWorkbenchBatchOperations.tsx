@@ -28,6 +28,7 @@ export function useWorkbenchBatchOperations(params: {
 }): {
   runMaterialOperation: (materialIds: string[], type: MaterialOperationType) => void;
   runForceReleaseOperation: (materialIds: string[]) => void;
+  runClearForceReleaseOperation: (materialIds: string[]) => void;
 } {
   const {
     adminOverrideMode,
@@ -128,7 +129,9 @@ export function useWorkbenchBatchOperations(params: {
               ? `解锁物料（${materialIds.length}）`
               : type === 'urgent_on'
                 ? `设为紧急（${materialIds.length}）`
-                : `取消紧急（${materialIds.length}）`,
+                : type === 'urgent_off'
+                  ? `取消紧急（${materialIds.length}）`
+                  : `取消强制放行（${materialIds.length}）`,
         width: 520,
         content: (
           <Space direction="vertical" style={{ width: '100%' }} size={10}>
@@ -159,9 +162,12 @@ export function useWorkbenchBatchOperations(params: {
           } else if (type === 'urgent_on') {
             await materialApi.batchSetUrgent(materialIds, true, operator, trimmed);
             message.success('已设置紧急标志');
-          } else {
+          } else if (type === 'urgent_off') {
             await materialApi.batchSetUrgent(materialIds, false, operator, trimmed);
             message.success('已取消紧急标志');
+          } else {
+            await materialApi.batchClearForceRelease(materialIds, operator, trimmed);
+            message.success('已取消强制放行');
           }
 
           // 使用统一刷新协调器
@@ -311,5 +317,10 @@ export function useWorkbenchBatchOperations(params: {
     ]
   );
 
-  return { runMaterialOperation, runForceReleaseOperation };
+  const runClearForceReleaseOperation = useCallback(
+    (materialIds: string[]) => runMaterialOperation(materialIds, 'force_release_off'),
+    [runMaterialOperation]
+  );
+
+  return { runMaterialOperation, runForceReleaseOperation, runClearForceReleaseOperation };
 }

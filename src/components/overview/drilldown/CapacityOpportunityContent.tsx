@@ -97,7 +97,14 @@ export const CapacityOpportunityContent: React.FC<CapacityOpportunityContentProp
             <Button
               size="small"
               type="primary"
-              onClick={() => onGoWorkbench({ workbenchTab: 'capacity', machineCode: record.machineCode })}
+              onClick={() =>
+                onGoWorkbench({
+                  workbenchTab: 'capacity',
+                  machineCode: record.machineCode,
+                  planDate: record.planDate,
+                  context: 'capacityOpportunity',
+                })
+              }
             >
               处理
             </Button>
@@ -123,7 +130,14 @@ export const CapacityOpportunityContent: React.FC<CapacityOpportunityContentProp
               <Button
                 size="small"
                 type="primary"
-                onClick={() => onGoWorkbench({ workbenchTab: 'capacity', machineCode: selected.machineCode })}
+                onClick={() =>
+                  onGoWorkbench({
+                    workbenchTab: 'capacity',
+                    machineCode: selected.machineCode,
+                    planDate: selected.planDate,
+                    context: 'capacityOpportunity',
+                  })
+                }
               >
                 去处理
               </Button>

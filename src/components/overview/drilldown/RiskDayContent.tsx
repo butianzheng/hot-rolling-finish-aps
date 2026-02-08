@@ -84,6 +84,8 @@ export const RiskDayContent: React.FC<RiskDayContentProps> = ({
                     Array.isArray(record.involvedMachines) && record.involvedMachines.length > 0
                       ? record.involvedMachines[0]
                       : null,
+                  planDate: record.planDate,
+                  context: 'risk',
                 })
               }
             >
@@ -118,6 +120,8 @@ export const RiskDayContent: React.FC<RiskDayContentProps> = ({
                       Array.isArray(selectedDay.involvedMachines) && selectedDay.involvedMachines.length > 0
                         ? selectedDay.involvedMachines[0]
                         : null,
+                    planDate: selectedDay.planDate,
+                    context: 'risk',
                   })
                 }
               >

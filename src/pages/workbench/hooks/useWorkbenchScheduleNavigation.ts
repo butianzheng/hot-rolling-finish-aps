@@ -44,8 +44,26 @@ export function useWorkbenchScheduleNavigation(params: {
     return { machine, date };
   }, [deepLinkContext?.date, deepLinkContext?.machine, deepLinkContext?.openCell, poolMachineCode]);
 
-  const [ganttOpenCellRequest, setGanttOpenCellRequest] = useState<WorkbenchGanttAutoOpenCell | null>(null);
-  const autoOpenCell = ganttOpenCellRequest || deepLinkAutoOpenCell;
+  const deepLinkMatrixFocus = useMemo<WorkbenchMatrixFocusRequest | null>(() => {
+    const materialId = String(deepLinkContext?.materialId || '').trim();
+    const contractNo = String(deepLinkContext?.contractNo || '').trim();
+    const searchText = materialId || contractNo;
+    if (!searchText) return null;
+
+    const machine = String(deepLinkContext?.machine || '').trim();
+    const dateRaw = String(deepLinkContext?.date || '').trim();
+    const date = dayjs(dateRaw).isValid() ? dateRaw : '';
+
+    return {
+      machine: machine || undefined,
+      date,
+      searchText,
+      nonce: `${Date.now()}-${searchText}`,
+    };
+  }, [deepLinkContext?.contractNo, deepLinkContext?.date, deepLinkContext?.machine, deepLinkContext?.materialId]);
+
+  const [calendarOpenCellRequest, setCalendarOpenCellRequest] = useState<WorkbenchGanttAutoOpenCell | null>(null);
+  const autoOpenCell = calendarOpenCellRequest || deepLinkAutoOpenCell;
 
   const openGanttCellDetail = useCallback(
     (machine: string, date: string, source: string) => {
@@ -53,8 +71,8 @@ export function useWorkbenchScheduleNavigation(params: {
       const d = dayjs(date);
       if (!machineCode || !d.isValid()) return;
       const dateKey = formatDate(d);
-      setWorkbenchViewMode('GANTT');
-      setGanttOpenCellRequest({ machine: machineCode, date: dateKey, nonce: Date.now(), source });
+      setWorkbenchViewMode('CALENDAR');
+      setCalendarOpenCellRequest({ machine: machineCode, date: dateKey, nonce: Date.now(), source });
       setScheduleFocus({ machine: machineCode, date: dateKey, source });
     },
     [setWorkbenchViewMode]
@@ -76,7 +94,7 @@ export function useWorkbenchScheduleNavigation(params: {
   return {
     scheduleFocus,
     setScheduleFocus,
-    matrixFocusRequest,
+    matrixFocusRequest: matrixFocusRequest || deepLinkMatrixFocus,
     focusedDate,
     autoOpenCell,
     openGanttCellDetail,

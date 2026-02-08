@@ -68,7 +68,7 @@ const WorkbenchMainLayout: React.FC<{
   scheduleStatusFilter: PlanItemStatusFilter;
   setScheduleStatusFilter: (next: PlanItemStatusFilter) => void;
 
-  // 甘特图定位/跳转
+  // 日历视图定位/跳转
   focusedDate: string | null;
   autoOpenCell: WorkbenchGanttAutoOpenCell | null;
   openGanttCellDetail: (machine: string, date: string, source: string) => void;
@@ -80,13 +80,13 @@ const WorkbenchMainLayout: React.FC<{
   pathOverrideIsFetching: boolean;
   onOpenPathOverrideModal: () => void;
 
-  // 排程明细加载状态（给甘特图/矩阵用）
+  // 排程明细加载状态（日历/矩阵共用）
   planItemsData: unknown;
   planItemsLoading: boolean;
   planItemsError: unknown;
   onRetryPlanItems: () => void;
 
-  // 移位弹窗入口：从甘特图单元格一键打开
+  // 移位弹窗入口：从日历单元格一键打开
   onRequestMoveToCell: (machine: string, date: string) => void;
 }> = ({
   activeVersionId,
@@ -262,7 +262,7 @@ const WorkbenchMainLayout: React.FC<{
                 onSelectedMaterialIdsChange={onSelectedMaterialIdsChange}
                 onInspectMaterialId={onInspectMaterialId}
               />
-            ) : viewMode === 'GANTT' ? (
+            ) : viewMode === 'CALENDAR' ? (
               <ScheduleGanttView
                 machineCode={poolSelection.machineCode}
                 urgentLevel={poolFilters.urgencyLevel}

@@ -15,6 +15,10 @@ export type WorkbenchCallback = (opts: {
   workbenchTab?: WorkbenchTabKey;
   machineCode?: string | null;
   urgencyLevel?: string | null;
+  planDate?: string | null;
+  context?: string;
+  materialId?: string | null;
+  contractNo?: string | null;
 }) => void;
 import {
   BOTTLENECK_LEVEL_COLORS,

@@ -189,6 +189,44 @@ pub async fn batch_force_release(
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
 
+/// 批量取消强制放行材料
+#[tauri::command(rename_all = "snake_case")]
+pub async fn batch_clear_force_release(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    material_ids: Vec<String>,
+    operator: String,
+    reason: String,
+) -> Result<String, String> {
+    let material_count = material_ids.len();
+
+    let result = state
+        .material_api
+        .batch_clear_force_release(material_ids, &operator, &reason)
+        .map_err(map_api_error)?;
+
+    if let Some(ref publisher) = state.event_publisher {
+        if let Ok(Some(version_id)) = state.plan_api.get_latest_active_version_id() {
+            let event = ScheduleEvent::full_scope(
+                version_id,
+                ScheduleEventType::MaterialStateChanged,
+                Some("batch_clear_force_release".to_string()),
+            );
+            if let Err(e) = publisher.publish(event) {
+                tracing::warn!("发布 MaterialStateChanged 事件失败: {}", e);
+            }
+        }
+    }
+
+    emit_frontend_event(
+        &app,
+        "material_state_changed",
+        serde_json::json!({ "count": material_count }),
+    );
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
+}
+
 /// 批量设置紧急标志
 #[tauri::command(rename_all = "snake_case")]
 pub async fn batch_set_urgent(

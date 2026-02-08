@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::HashMap;
 
 impl PlanApi {
     // ==========================================
@@ -201,7 +202,9 @@ impl PlanApi {
 
     /// 从 material_state 和 material_master 批量补充排产明细的快照字段
     ///
-    /// 补充字段：urgent_level, sched_state (来自 material_state)，steel_grade (来自 material_master.steel_mark)
+    /// 补充字段：
+    /// - material_state: urgent_level/sched_state/scheduled_date/scheduled_machine_code
+    /// - material_master: steel_grade/width_mm/thickness_mm/contract_no/due_date
     fn enrich_plan_items(&self, items: &mut [PlanItem]) {
         if items.is_empty() {
             return;
@@ -224,24 +227,41 @@ impl PlanApi {
                     if item.sched_state.is_none() {
                         item.sched_state = snap.sched_state.clone();
                     }
+                    if item.scheduled_date.is_none() {
+                        item.scheduled_date = snap.scheduled_date.map(|d| d.to_string());
+                    }
+                    if item.scheduled_machine_code.is_none() {
+                        item.scheduled_machine_code = snap.scheduled_machine_code.clone();
+                    }
                 }
             }
         }
 
-        // 2. 从 material_master 获取 steel_mark/宽度/厚度（用于前端展示完整规格信息）
-        if let Ok(spec_map) = self.material_master_repo.find_spec_lite_by_ids(&material_ids) {
+        // 2. 从 material_master 获取规格/合同信息（用于前端展示完整物料信息）
+        if let Ok(masters) = self.material_master_repo.find_by_ids(&material_ids) {
+            let master_map: HashMap<String, crate::domain::material::MaterialMaster> = masters
+                .into_iter()
+                .map(|m| (m.material_id.clone(), m))
+                .collect();
+
             for item in items.iter_mut() {
-                if let Some(spec) = spec_map.get(&item.material_id) {
+                if let Some(master) = master_map.get(&item.material_id) {
                     if item.steel_grade.is_none() {
-                        if let Some(mark) = spec.steel_mark.as_ref() {
+                        if let Some(mark) = master.steel_mark.as_ref() {
                             item.steel_grade = Some(mark.clone());
                         }
                     }
                     if item.width_mm.is_none() {
-                        item.width_mm = spec.width_mm;
+                        item.width_mm = master.width_mm;
                     }
                     if item.thickness_mm.is_none() {
-                        item.thickness_mm = spec.thickness_mm;
+                        item.thickness_mm = master.thickness_mm;
+                    }
+                    if item.contract_no.is_none() {
+                        item.contract_no = master.contract_no.clone();
+                    }
+                    if item.due_date.is_none() {
+                        item.due_date = master.due_date.map(|d| d.to_string());
                     }
                 }
             }

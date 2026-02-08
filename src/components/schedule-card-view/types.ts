@@ -11,7 +11,12 @@ export interface PlanItemRow {
   plan_date: string;
   seq_no: number;
   weight_t: number;
+  contract_no?: string | null;
+  due_date?: string | null;
+  scheduled_date?: string | null;
+  scheduled_machine_code?: string | null;
   urgent_level?: string;
+  sched_state?: string | null;
   locked_in_plan?: boolean;
   force_release_in_plan?: boolean;
 }

@@ -172,7 +172,13 @@ export const ColdStockContent: React.FC<ColdStockContentProps> = ({
             <Button
               size="small"
               type="primary"
-              onClick={() => onGoWorkbench({ workbenchTab: 'materials', machineCode: record.machineCode })}
+              onClick={() =>
+                onGoWorkbench({
+                  workbenchTab: 'materials',
+                  machineCode: record.machineCode,
+                  context: 'coldStock',
+                })
+              }
             >
               处理
             </Button>
@@ -198,7 +204,13 @@ export const ColdStockContent: React.FC<ColdStockContentProps> = ({
             <Button
               size="small"
               type="primary"
-              onClick={() => onGoWorkbench({ workbenchTab: 'materials', machineCode: machineCodeFilter })}
+              onClick={() =>
+                onGoWorkbench({
+                  workbenchTab: 'materials',
+                  machineCode: machineCodeFilter,
+                  context: 'coldStock',
+                })
+              }
             >
               去处理
             </Button>

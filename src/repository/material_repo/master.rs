@@ -24,10 +24,17 @@ pub struct MaterialWithStateRow {
     pub width_mm: Option<f64>,
     pub thickness_mm: Option<f64>,
     pub steel_mark: Option<String>,
+    pub contract_no: Option<String>,
+    pub due_date: Option<String>,
     pub sched_state: String,
     pub urgent_level: String,
     pub lock_flag: bool,
     pub manual_urgent_flag: bool,
+    pub scheduled_date: Option<String>,
+    pub scheduled_machine_code: Option<String>,
+    pub seq_no: Option<i32>,
+    pub rolling_output_age_days: Option<i32>,
+    pub stock_age_days: Option<i32>,
 }
 
 /// 材料主数据仓储
@@ -207,6 +214,83 @@ impl MaterialMasterRepository {
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e.into()),
         }
+    }
+
+    /// 按 material_id 列表批量查询材料主数据
+    pub fn find_by_ids(&self, material_ids: &[String]) -> RepositoryResult<Vec<MaterialMaster>> {
+        if material_ids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let conn = self.get_conn()?;
+        let placeholders = material_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql = format!(
+            r#"
+            SELECT
+                material_id, manufacturing_order_id, contract_no, due_date,
+                next_machine_code, rework_machine_code, current_machine_code,
+                width_mm, thickness_mm, length_m, weight_t, available_width_mm,
+                steel_mark, slab_id, material_status_code_src, status_updated_at,
+                output_age_days_raw, rolling_output_date, stock_age_days,
+                contract_nature, weekly_delivery_flag, export_flag,
+                created_at, updated_at
+            FROM material_master
+            WHERE material_id IN ({})
+            ORDER BY material_id
+            "#,
+            placeholders
+        );
+
+        let mut stmt = conn.prepare(&sql)?;
+        let materials = stmt
+            .query_map(params_from_iter(material_ids.iter()), |row| {
+                Ok(MaterialMaster {
+                    material_id: row.get(0)?,
+                    manufacturing_order_id: row.get(1)?,
+                    contract_no: row.get(2)?,
+                    due_date: row
+                        .get::<_, Option<String>>(3)?
+                        .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
+                    next_machine_code: row.get(4)?,
+                    rework_machine_code: row.get(5)?,
+                    current_machine_code: row.get(6)?,
+                    width_mm: row.get(7)?,
+                    thickness_mm: row.get(8)?,
+                    length_m: row.get(9)?,
+                    weight_t: row.get(10)?,
+                    available_width_mm: row.get(11)?,
+                    steel_mark: row.get(12)?,
+                    slab_id: row.get(13)?,
+                    material_status_code_src: row.get(14)?,
+                    status_updated_at: row
+                        .get::<_, Option<String>>(15)?
+                        .and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
+                        .map(|dt| dt.with_timezone(&chrono::Utc)),
+                    output_age_days_raw: row.get(16)?,
+                    rolling_output_date: row
+                        .get::<_, Option<String>>(17)?
+                        .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
+                    stock_age_days: row.get(18)?,
+                    contract_nature: row.get(19)?,
+                    weekly_delivery_flag: row.get(20)?,
+                    export_flag: row.get(21)?,
+                    created_at: row
+                        .get::<_, String>(22)?
+                        .parse::<chrono::DateTime<chrono::Utc>>()
+                        .unwrap_or_else(|_| chrono::Utc::now()),
+                    updated_at: row
+                        .get::<_, String>(23)?
+                        .parse::<chrono::DateTime<chrono::Utc>>()
+                        .unwrap_or_else(|_| chrono::Utc::now()),
+                })
+            })?
+            .collect::<SqliteResult<Vec<MaterialMaster>>>()?;
+
+        Ok(materials)
     }
 
     /// 批量检查材料是否存在（用于冲突检测）
@@ -453,10 +537,17 @@ impl MaterialMasterRepository {
                 mm.width_mm,
                 mm.thickness_mm,
                 mm.steel_mark,
+                mm.contract_no,
+                mm.due_date,
                 COALESCE(ms.sched_state, 'UNKNOWN') AS sched_state,
                 COALESCE(ms.urgent_level, 'L0') AS urgent_level,
                 COALESCE(ms.lock_flag, 0) AS lock_flag,
-                COALESCE(ms.manual_urgent_flag, 0) AS manual_urgent_flag
+                COALESCE(ms.manual_urgent_flag, 0) AS manual_urgent_flag,
+                ms.scheduled_date,
+                ms.scheduled_machine_code,
+                ms.seq_no,
+                ms.rolling_output_age_days,
+                COALESCE(ms.stock_age_days, mm.stock_age_days) AS stock_age_days
             FROM material_master mm
             LEFT JOIN material_state ms ON ms.material_id = mm.material_id
             WHERE 1=1
@@ -499,7 +590,11 @@ impl MaterialMasterRepository {
         }
 
         if let Some(q) = query_text.map(str::trim).filter(|s| !s.is_empty()) {
-            sql.push_str(&format!(" AND mm.material_id LIKE ?{}", idx));
+            // 支持风险跳转精准命中：material_id / contract_no / due_date / scheduled_date / scheduled_machine_code
+            sql.push_str(&format!(
+                " AND (mm.material_id LIKE ?{0} OR COALESCE(mm.contract_no, '') LIKE ?{0} OR COALESCE(mm.due_date, '') LIKE ?{0} OR COALESCE(ms.scheduled_date, '') LIKE ?{0} OR COALESCE(ms.scheduled_machine_code, '') LIKE ?{0})",
+                idx
+            ));
             values.push(Value::from(format!("%{}%", q)));
             idx += 1;
         }
@@ -521,10 +616,17 @@ impl MaterialMasterRepository {
                 width_mm: row.get(3)?,
                 thickness_mm: row.get(4)?,
                 steel_mark: row.get(5)?,
-                sched_state: row.get(6)?,
-                urgent_level: row.get(7)?,
-                lock_flag: row.get::<_, i32>(8)? != 0,
-                manual_urgent_flag: row.get::<_, i32>(9)? != 0,
+                contract_no: row.get(6)?,
+                due_date: row.get(7)?,
+                sched_state: row.get(8)?,
+                urgent_level: row.get(9)?,
+                lock_flag: row.get::<_, i32>(10)? != 0,
+                manual_urgent_flag: row.get::<_, i32>(11)? != 0,
+                scheduled_date: row.get(12)?,
+                scheduled_machine_code: row.get(13)?,
+                seq_no: row.get(14)?,
+                rolling_output_age_days: row.get(15)?,
+                stock_age_days: row.get(16)?,
             })
         })?;
 
@@ -584,7 +686,10 @@ impl MaterialMasterRepository {
         }
 
         if let Some(q) = query_text.map(str::trim).filter(|s| !s.is_empty()) {
-            sql.push_str(&format!(" AND mm.material_id LIKE ?{}", idx));
+            sql.push_str(&format!(
+                " AND (mm.material_id LIKE ?{0} OR COALESCE(mm.contract_no, '') LIKE ?{0} OR COALESCE(mm.due_date, '') LIKE ?{0} OR COALESCE(ms.scheduled_date, '') LIKE ?{0} OR COALESCE(ms.scheduled_machine_code, '') LIKE ?{0})",
+                idx
+            ));
             values.push(Value::from(format!("%{}%", q)));
         }
 

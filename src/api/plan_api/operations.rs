@@ -157,6 +157,10 @@ impl PlanApi {
                 steel_grade: original_item.steel_grade.clone(),
                 width_mm: original_item.width_mm,
                 thickness_mm: original_item.thickness_mm,
+                contract_no: original_item.contract_no.clone(),
+                due_date: original_item.due_date.clone(),
+                scheduled_date: original_item.scheduled_date.clone(),
+                scheduled_machine_code: original_item.scheduled_machine_code.clone(),
             };
 
             items_to_update.push(updated_item);

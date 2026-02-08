@@ -24,7 +24,7 @@ import {
 // ==========================================
 
 export type VersionComparisonMode = 'DRAFT_COMPARISON' | 'HISTORICAL';
-export type WorkbenchViewMode = 'MATRIX' | 'GANTT' | 'CARD';
+export type WorkbenchViewMode = 'MATRIX' | 'CALENDAR' | 'CARD';
 export type WorkbenchLockStatusFilter = 'ALL' | 'LOCKED' | 'UNLOCKED';
 
 export interface WorkbenchFilters {
@@ -283,7 +283,17 @@ export const useGlobalStore = create<GlobalState & GlobalActions>()(
       }),
       {
         name: 'aps-global-state', // localStorage key
+        version: 2,
         storage: createJSONStorage(() => localStorage),
+        migrate: (persistedState: unknown) => {
+          if (!persistedState || typeof persistedState !== 'object') return persistedState as GlobalState;
+          const draft = persistedState as { [key: string]: unknown; workbenchViewMode?: string };
+          const legacy = String(draft.workbenchViewMode || '').toUpperCase();
+          if (legacy === 'GANTT' || (legacy && legacy !== 'MATRIX' && legacy !== 'CALENDAR' && legacy !== 'CARD')) {
+            draft.workbenchViewMode = 'CALENDAR';
+          }
+          return draft as unknown as GlobalState;
+        },
         // H10修复：持久化版本对比状态，避免刷新后丢失对比选择
         partialize: (state) => ({
           activeVersionId: state.activeVersionId,

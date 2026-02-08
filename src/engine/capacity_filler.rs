@@ -352,6 +352,10 @@ impl CapacityFiller {
             steel_grade: None,
             width_mm: master.width_mm,
             thickness_mm: master.thickness_mm,
+            contract_no: master.contract_no.clone(),
+            due_date: master.due_date.map(|d| d.to_string()),
+            scheduled_date: state.scheduled_date.map(|d| d.to_string()),
+            scheduled_machine_code: state.scheduled_machine_code.clone(),
         }
     }
 
@@ -672,6 +676,10 @@ mod tests {
                 steel_grade: None,
                 width_mm: None,
                 thickness_mm: None,
+                contract_no: None,
+                due_date: None,
+                scheduled_date: None,
+                scheduled_machine_code: None,
             },
         ];
 
@@ -726,6 +734,10 @@ mod tests {
                 steel_grade: None,
                 width_mm: None,
                 thickness_mm: None,
+                contract_no: None,
+                due_date: None,
+                scheduled_date: None,
+                scheduled_machine_code: None,
             },
             PlanItem {
                 version_id: "version-001".to_string(),
@@ -744,6 +756,10 @@ mod tests {
                 steel_grade: None,
                 width_mm: None,
                 thickness_mm: None,
+                contract_no: None,
+                due_date: None,
+                scheduled_date: None,
+                scheduled_machine_code: None,
             },
         ];
 

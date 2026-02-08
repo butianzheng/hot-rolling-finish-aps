@@ -52,7 +52,7 @@ export type ForceReleaseViolation = {
   reason?: unknown;
 };
 
-export type MaterialOperationType = 'lock' | 'unlock' | 'urgent_on' | 'urgent_off';
+export type MaterialOperationType = 'lock' | 'unlock' | 'urgent_on' | 'urgent_off' | 'force_release_off';
 
 // =============================
 // Workbench UI: deep link context
@@ -65,6 +65,8 @@ export type WorkbenchDeepLinkContext = {
   context?: string;
   focus?: string;
   openCell?: boolean;
+  materialId?: string;
+  contractNo?: string;
 };
 
 // =============================
@@ -80,7 +82,8 @@ export type WorkbenchScheduleFocus = {
 export type WorkbenchMatrixFocusRequest = {
   machine?: string;
   date: string;
-  nonce: number;
+  nonce: string | number;
+  searchText?: string;
 };
 
 export type WorkbenchGanttAutoOpenCell = {

@@ -314,6 +314,10 @@ pub struct PlanItemBuilder {
     steel_grade: Option<String>,
     width_mm: Option<f64>,
     thickness_mm: Option<f64>,
+    contract_no: Option<String>,
+    due_date: Option<String>,
+    scheduled_date: Option<String>,
+    scheduled_machine_code: Option<String>,
 }
 
 impl PlanItemBuilder {
@@ -340,6 +344,10 @@ impl PlanItemBuilder {
             steel_grade: None,
             width_mm: None,
             thickness_mm: None,
+            contract_no: None,
+            due_date: None,
+            scheduled_date: None,
+            scheduled_machine_code: None,
         }
     }
 
@@ -397,6 +405,10 @@ impl PlanItemBuilder {
             steel_grade: None,
             width_mm: self.width_mm,
             thickness_mm: self.thickness_mm,
+            contract_no: self.contract_no,
+            due_date: self.due_date,
+            scheduled_date: self.scheduled_date,
+            scheduled_machine_code: self.scheduled_machine_code,
         }
     }
 }

@@ -69,7 +69,13 @@ export const RollAlertContent: React.FC<RollAlertContentProps> = ({
             <Button
               size="small"
               type="primary"
-              onClick={() => onGoWorkbench({ workbenchTab: 'visualization', machineCode: record.machineCode })}
+              onClick={() =>
+                onGoWorkbench({
+                  workbenchTab: 'visualization',
+                  machineCode: record.machineCode,
+                  context: 'roll',
+                })
+              }
             >
               处理
             </Button>
@@ -94,7 +100,13 @@ export const RollAlertContent: React.FC<RollAlertContentProps> = ({
             <Button
               size="small"
               type="primary"
-              onClick={() => onGoWorkbench({ workbenchTab: 'visualization', machineCode: selected.machineCode })}
+              onClick={() =>
+                onGoWorkbench({
+                  workbenchTab: 'visualization',
+                  machineCode: selected.machineCode,
+                  context: 'roll',
+                })
+              }
             >
               去处理
             </Button>

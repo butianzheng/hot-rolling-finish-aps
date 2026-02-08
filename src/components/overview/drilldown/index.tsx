@@ -362,6 +362,10 @@ interface DrilldownDrawerProps {
     workbenchTab?: WorkbenchTabKey;
     machineCode?: string | null;
     urgencyLevel?: string | null;
+    planDate?: string | null;
+    context?: string;
+    materialId?: string | null;
+    contractNo?: string | null;
   }) => void;
 
   riskDays: DaySummary[];

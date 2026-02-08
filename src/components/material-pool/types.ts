@@ -8,6 +8,13 @@ import type { WorkbenchLockStatusFilter } from '../../stores/use-global-store';
 export interface MaterialPoolMaterial {
   material_id: string;
   machine_code: string;
+  contract_no?: string | null;
+  due_date?: string | null;
+  scheduled_date?: string | null;
+  scheduled_machine_code?: string | null;
+  seq_no?: number | null;
+  rolling_output_age_days?: number | null;
+  stock_age_days?: number | null;
   weight_t: number;
   steel_mark: string;
   sched_state: string;
@@ -22,6 +29,7 @@ export interface MaterialPoolMaterial {
 export interface MaterialPoolSelection {
   machineCode: string | null;
   schedState: string | null;
+  searchText?: string | null;
 }
 
 export interface MaterialPoolFilters {

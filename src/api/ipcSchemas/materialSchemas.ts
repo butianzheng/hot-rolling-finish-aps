@@ -14,10 +14,17 @@ export const MaterialWithStateSchema = z
     width_mm: z.number().nullable().optional(),
     thickness_mm: z.number().nullable().optional(),
     steel_mark: z.string().nullable().optional(),
+    contract_no: z.string().nullable().optional(),
+    due_date: DateString.nullable().optional(),
     sched_state: z.string(),
     urgent_level: z.string(),
     lock_flag: z.boolean(),
     manual_urgent_flag: z.boolean(),
+    scheduled_date: DateString.nullable().optional(),
+    scheduled_machine_code: z.string().nullable().optional(),
+    seq_no: z.number().nullable().optional(),
+    rolling_output_age_days: z.number().nullable().optional(),
+    stock_age_days: z.number().nullable().optional(),
   })
   .passthrough();
 

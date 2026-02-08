@@ -47,6 +47,9 @@ export interface RiskProblem {
   drilldown: DrilldownSpec;
   workbenchTab?: WorkbenchTabKey;
   workbenchMachineCode?: string | null;
+  workbenchPlanDate?: string | null;
+  workbenchContext?: string | null;
+  workbenchContractNo?: string | null;
 }
 
 export interface RiskOverviewData {
@@ -172,7 +175,10 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
             ? (minDaysToDue < 0 ? `已逾期 ${Math.abs(minDaysToDue)} 天` : `距交期 ${minDaysToDue} 天`)
             : undefined,
         drilldown: { kind: 'orders', urgency: 'L3' },
-        workbenchTab: 'visualization',
+        workbenchTab: 'materials',
+        workbenchMachineCode: l3Failures[0]?.machineCode ?? null,
+        workbenchContext: 'orders',
+        workbenchContractNo: l3Failures[0]?.contractNo ?? null,
       });
     }
 
@@ -191,6 +197,8 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
         drilldown: { kind: 'risk', planDate: worstRiskDay.planDate },
         workbenchTab: 'capacity',
         workbenchMachineCode: machines.length > 0 ? machines[0] : null,
+        workbenchPlanDate: worstRiskDay.planDate,
+        workbenchContext: 'risk',
       });
     }
 
@@ -214,6 +222,8 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
         drilldown: top ? { kind: 'bottleneck', machineCode: top.machineCode, planDate: top.planDate } : { kind: 'bottleneck' },
         workbenchTab: 'capacity',
         workbenchMachineCode: top?.machineCode ?? null,
+        workbenchPlanDate: top?.planDate ?? null,
+        workbenchContext: 'bottleneck',
       });
     }
 
@@ -234,6 +244,7 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
         drilldown: { kind: 'coldStock' },
         workbenchTab: 'materials',
         workbenchMachineCode: top?.machineCode ?? null,
+        workbenchContext: 'coldStock',
       });
     }
 
@@ -256,6 +267,7 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
         drilldown: { kind: 'roll' },
         workbenchTab: 'visualization',
         workbenchMachineCode: top?.machineCode ?? null,
+        workbenchContext: 'roll',
       });
     }
 
@@ -268,6 +280,7 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
         detail: '存在紧急物料未排产或被锁定阻塞',
         drilldown: { kind: 'orders' },
         workbenchTab: 'materials',
+        workbenchContext: 'orders',
       });
     }
 

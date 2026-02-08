@@ -14,7 +14,7 @@ import { exportCSV, exportJSON } from '../../utils/exportUtils';
 import { formatWeight } from '../../utils/formatters';
 import { getErrorMessage } from '../../utils/errorUtils';
 import type { PlanItemStatusFilter } from '../../utils/planItemStatus';
-import { PLAN_ITEM_STATUS_FILTER_META } from '../../utils/planItemStatus';
+import { PLAN_ITEM_STATUS_FILTER_META, isPlanItemForceReleased } from '../../utils/planItemStatus';
 import { tableFilterEmptyConfig } from '../CustomEmpty';
 import NoActiveVersionGuide from '../NoActiveVersionGuide';
 
@@ -59,11 +59,15 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = (props) => {
         序号: item.seq_no,
         重量: formatWeight(item.weight_t),
         钢种: item.steel_grade || '-',
+        合同号: item.contract_no || '-',
+        交期: item.due_date || '-',
         紧急等级: item.urgent_level || '-',
         来源: item.source_type,
         锁定: item.locked_in_plan ? '是' : '否',
-        强制放行: item.force_release_in_plan ? '是' : '否',
+        强制放行: isPlanItemForceReleased(item) ? '是' : '否',
         排产状态: item.sched_state || '-',
+        当前方案排程日期: item.scheduled_date || '-',
+        当前方案排程机组: item.scheduled_machine_code || '-',
         原因: item.assign_reason || '-',
       }));
       exportCSV(data, '排产明细');
@@ -210,6 +214,69 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = (props) => {
             >
               可调 {state.statusSummary.adjustableCount}
             </Tag>
+            <Tag
+              color={PLAN_ITEM_STATUS_FILTER_META.READY.color}
+              style={{
+                cursor: onStatusFilterChange ? 'pointer' : undefined,
+                boxShadow: statusFilter === 'READY' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+                userSelect: 'none',
+              }}
+              onClick={() => onStatusFilterChange?.(statusFilter === 'READY' ? 'ALL' : ('READY' as PlanItemStatusFilter))}
+            >
+              就绪
+            </Tag>
+            <Tag
+              color={PLAN_ITEM_STATUS_FILTER_META.PENDING_MATURE.color}
+              style={{
+                cursor: onStatusFilterChange ? 'pointer' : undefined,
+                boxShadow: statusFilter === 'PENDING_MATURE' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+                userSelect: 'none',
+              }}
+              onClick={() =>
+                onStatusFilterChange?.(
+                  statusFilter === 'PENDING_MATURE' ? 'ALL' : ('PENDING_MATURE' as PlanItemStatusFilter)
+                )
+              }
+            >
+              待成熟
+            </Tag>
+            <Tag
+              color={PLAN_ITEM_STATUS_FILTER_META.BLOCKED.color}
+              style={{
+                cursor: onStatusFilterChange ? 'pointer' : undefined,
+                boxShadow: statusFilter === 'BLOCKED' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+                userSelect: 'none',
+              }}
+              onClick={() => onStatusFilterChange?.(statusFilter === 'BLOCKED' ? 'ALL' : ('BLOCKED' as PlanItemStatusFilter))}
+            >
+              阻断
+            </Tag>
+            <Tag
+              color={PLAN_ITEM_STATUS_FILTER_META.URGENT_L3.color}
+              style={{
+                cursor: onStatusFilterChange ? 'pointer' : undefined,
+                boxShadow: statusFilter === 'URGENT_L3' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+                userSelect: 'none',
+              }}
+              onClick={() =>
+                onStatusFilterChange?.(statusFilter === 'URGENT_L3' ? 'ALL' : ('URGENT_L3' as PlanItemStatusFilter))
+              }
+            >
+              L3
+            </Tag>
+            <Tag
+              color={PLAN_ITEM_STATUS_FILTER_META.URGENT_L2.color}
+              style={{
+                cursor: onStatusFilterChange ? 'pointer' : undefined,
+                boxShadow: statusFilter === 'URGENT_L2' ? '0 0 0 2px rgba(22, 119, 255, 0.25)' : undefined,
+                userSelect: 'none',
+              }}
+              onClick={() =>
+                onStatusFilterChange?.(statusFilter === 'URGENT_L2' ? 'ALL' : ('URGENT_L2' as PlanItemStatusFilter))
+              }
+            >
+              L2
+            </Tag>
           </Space>
 
           <Text type="secondary" style={{ fontSize: 12 }}>
@@ -238,6 +305,7 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = (props) => {
       <BatchOperationBar
         selectedCount={state.selectedMaterialIds.length}
         onForceRelease={state.openForceReleaseModal}
+        onClearForceRelease={state.handleBatchClearForceRelease}
         onCancelSelection={() => state.setSelectedMaterialIds([])}
       />
 
@@ -272,7 +340,7 @@ const PlanItemVisualization: React.FC<PlanItemVisualizationProps> = (props) => {
                   state.setSelectedMaterialIds(selectedKeys as string[]);
                 },
                 getCheckboxProps: (record) => ({
-                  disabled: record.locked_in_plan || record.force_release_in_plan,
+                  disabled: record.locked_in_plan,
                 }),
               }}
               components={{

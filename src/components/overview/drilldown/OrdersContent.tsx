@@ -63,9 +63,12 @@ export const OrdersContent: React.FC<OrdersContentProps> = ({
               type="primary"
               onClick={() =>
                 onGoWorkbench({
-                  workbenchTab: 'visualization',
+                  workbenchTab: 'materials',
                   machineCode: record.machineCode,
                   urgencyLevel: record.urgencyLevel,
+                  planDate: record.dueDate,
+                  context: 'orders',
+                  contractNo: record.contractNo,
                 })
               }
             >

@@ -40,15 +40,17 @@ export function useWorkbenchMaterials(params: {
     const schedState = selection.schedState ? String(selection.schedState).trim() : undefined;
     const urgent = urgencyLevel ? String(urgencyLevel).trim() : undefined;
     const lock = lockStatus && lockStatus !== 'ALL' ? lockStatus : undefined;
+    const queryText = String(selection.searchText || '').trim();
 
     return {
       machine_code: machineCode || undefined,
       sched_state: schedState || undefined,
       urgent_level: urgent || undefined,
       lock_status: lock || undefined,
+      query_text: queryText || undefined,
       limit: MATERIAL_PAGE_SIZE,
     };
-  }, [lockStatus, selection.machineCode, selection.schedState, urgencyLevel]);
+  }, [lockStatus, selection.machineCode, selection.schedState, selection.searchText, urgencyLevel]);
 
   const materialsQuery = useInfiniteQuery({
     queryKey: workbenchQueryKeys.materials.infiniteList(baseParams),
@@ -89,6 +91,14 @@ export function useWorkbenchMaterials(params: {
       return {
         material_id: String(m.material_id ?? '').trim(),
         machine_code: String(m.machine_code ?? '').trim(),
+        contract_no: m.contract_no ?? null,
+        due_date: m.due_date ?? null,
+        scheduled_date: m.scheduled_date ?? null,
+        scheduled_machine_code: m.scheduled_machine_code ?? null,
+        seq_no: typeof m.seq_no === 'number' ? m.seq_no : null,
+        rolling_output_age_days:
+          typeof m.rolling_output_age_days === 'number' ? m.rolling_output_age_days : null,
+        stock_age_days: typeof m.stock_age_days === 'number' ? m.stock_age_days : null,
         weight_t: Number(m.weight_t ?? 0),
         steel_mark: String(m.steel_mark ?? '').trim(),
         sched_state: String(m.sched_state ?? '').trim(),
