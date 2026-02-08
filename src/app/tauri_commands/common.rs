@@ -34,6 +34,7 @@ pub(super) fn map_api_error(err: ApiError) -> String {
             ApiError::InvalidStateTransition { .. } => "INVALID_STATE_TRANSITION",
             ApiError::OptimisticLockFailure(_) => "OPTIMISTIC_LOCK_FAILURE",
             ApiError::VersionConflict(_) => "VERSION_CONFLICT",
+            ApiError::StalePlanRevision { .. } => "STALE_PLAN_REV",
             ApiError::DatabaseError(_) => "DATABASE_ERROR",
             ApiError::DatabaseConnectionError(_) => "DATABASE_CONNECTION_ERROR",
             ApiError::DatabaseTransactionError(_) => "DATABASE_TRANSACTION_ERROR",
@@ -49,6 +50,15 @@ pub(super) fn map_api_error(err: ApiError) -> String {
             ApiError::ManualOperationValidationError { violations, .. } => {
                 Some(serde_json::json!({ "violations": violations }))
             }
+            ApiError::StalePlanRevision {
+                version_id,
+                expected_plan_rev,
+                actual_plan_rev,
+            } => Some(serde_json::json!({
+                "version_id": version_id,
+                "expected_plan_rev": expected_plan_rev,
+                "actual_plan_rev": actual_plan_rev,
+            })),
             _ => None,
         },
     };

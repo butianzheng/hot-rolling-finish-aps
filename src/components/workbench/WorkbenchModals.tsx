@@ -109,6 +109,15 @@ const WorkbenchModals: React.FC<{
             await pathOverride.recalcAfterPathOverride(pathOverride.context.planDate || '');
           }
         }}
+        onRejected={async ({ rejectedCount, autoRecalc }) => {
+          if (rejectedCount <= 0) return;
+          pathOverride.pendingRefetch();
+          pathOverride.summaryRefetch();
+          if (autoRecalc) {
+            closeModal('pathOverrideConfirm');
+            await pathOverride.recalcAfterPathOverride(pathOverride.context.planDate || '');
+          }
+        }}
       />
 
       <PathOverridePendingCenterModal
@@ -121,6 +130,15 @@ const WorkbenchModals: React.FC<{
         operator={currentUser || 'system'}
         onConfirmed={async ({ confirmedCount, autoRecalc, recalcBaseDate }) => {
           if (confirmedCount <= 0) return;
+          pathOverride.pendingRefetch();
+          pathOverride.summaryRefetch();
+          if (autoRecalc) {
+            closeModal('pathOverrideCenter');
+            await pathOverride.recalcAfterPathOverride(recalcBaseDate || '');
+          }
+        }}
+        onRejected={async ({ rejectedCount, autoRecalc, recalcBaseDate }) => {
+          if (rejectedCount <= 0) return;
           pathOverride.pendingRefetch();
           pathOverride.summaryRefetch();
           if (autoRecalc) {

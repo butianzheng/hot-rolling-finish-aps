@@ -5,8 +5,10 @@ import { ExclamationCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { planApi } from '../../api/tauri';
-import { useCurrentUser, useGlobalActions } from '../../stores/use-global-store';
+import { useCurrentUser, useGlobalActions, useGlobalStore } from '../../stores/use-global-store';
 import { formatDate } from '../../utils/formatters';
+import { DEFAULT_LATEST_RUN_TTL_MS } from '../../stores/latestRun';
+import { createRunId } from '../../utils/runId';
 import { getErrorMessage } from '../../utils/errorUtils';
 import VersionComparisonModal from '../comparison/VersionComparisonModal';
 import type { Plan, Version } from '../comparison/types';
@@ -27,7 +29,15 @@ const PlanManagement: React.FC = () => {
   const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
   const [planSearchText, setPlanSearchText] = useState('');
   const currentUser = useCurrentUser();
-  const { setRecalculating, setActiveVersion } = useGlobalActions();
+  const {
+    setRecalculating,
+    setActiveVersion,
+    beginLatestRun,
+    markLatestRunRunning,
+    markLatestRunDone,
+    markLatestRunFailed,
+    expireLatestRunIfNeeded,
+  } = useGlobalActions();
 
   const debouncedPlanSearchText = useDebounce(planSearchText, 300);
 
@@ -269,21 +279,61 @@ const PlanManagement: React.FC = () => {
 
   const handleRecalc = useCallback(
     async (versionId: string) => {
+      expireLatestRunIfNeeded();
+      const localRunId = createRunId('recalc');
+      const beginResult = beginLatestRun({
+        runId: localRunId,
+        versionId,
+        ttlMs: DEFAULT_LATEST_RUN_TTL_MS,
+      });
+
+      if (!beginResult.accepted) {
+        message.info('已存在更新的重算触发，本次请求已忽略');
+        return;
+      }
+
       setRecalculating(true);
+      markLatestRunRunning(localRunId);
       try {
         const baseDate = formatDate(dayjs());
-        await planApi.recalcFull(versionId, baseDate, undefined, currentUser);
+        const res = await planApi.recalcFull(versionId, baseDate, undefined, currentUser, undefined, undefined, localRunId);
+
+        const responseRunId = String((res as any)?.run_id ?? localRunId).trim() || localRunId;
+        const nextVersionId = String((res as any)?.version_id ?? '').trim();
+        const planRevRaw = Number((res as any)?.plan_rev);
+
+        markLatestRunDone(responseRunId, {
+          versionId: nextVersionId || versionId,
+          planRev: Number.isFinite(planRevRaw) ? planRevRaw : undefined,
+        });
+
+        const latestRunId = useGlobalStore.getState().latestRun.runId;
+        if (latestRunId !== responseRunId) {
+          return;
+        }
+
         message.success('重算完成');
         if (selectedPlanId) {
           await loadVersions(selectedPlanId);
         }
       } catch (error: unknown) {
         console.error('重算失败:', error);
+        markLatestRunFailed(localRunId, getErrorMessage(error) || '重算失败');
       } finally {
         setRecalculating(false);
       }
     },
-    [currentUser, selectedPlanId, loadVersions, setRecalculating]
+    [
+      currentUser,
+      selectedPlanId,
+      loadVersions,
+      setRecalculating,
+      beginLatestRun,
+      markLatestRunRunning,
+      markLatestRunDone,
+      markLatestRunFailed,
+      expireLatestRunIfNeeded,
+    ]
   );
 
   const planColumns = useMemo(

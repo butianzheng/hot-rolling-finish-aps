@@ -22,9 +22,11 @@ import { DecisionRefreshTag } from './components/DecisionRefreshTag';
 import { useTheme, LAYOUT } from './theme';
 import { defaultKPI } from './types/kpi';
 import { IpcClient } from './api/ipcClient';
+import { planApi } from './api/tauri';
 import {
   useActiveVersionId,
   useGlobalActions,
+  useGlobalStore,
   useIsImporting,
   useIsRecalculating,
   useUserPreferences,
@@ -33,6 +35,7 @@ import { useEvent } from './api/eventBus';
 import { useGlobalKPI } from './hooks/useGlobalKPI';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useVersionSwitchInvalidation } from './hooks/useVersionSwitchInvalidation';
+import { useStalePlanRevBootstrap } from './hooks/useStalePlanRevBootstrap';
 import { reportFrontendError } from './utils/telemetry';
 
 const { Header, Content, Sider } = Layout;
@@ -69,6 +72,33 @@ const items: MenuItem[] = [
   },
 ];
 
+export function shouldBackfillPlanContextFromRunEvent(params: {
+  hadTrackedRun: boolean;
+  incomingVersionId: string;
+  incomingPlanRev: number;
+  currentVersionId: string | null;
+  currentPlanRev: number | null;
+}): boolean {
+  if (params.hadTrackedRun) return false;
+
+  const versionId = String(params.incomingVersionId || '').trim();
+  if (!versionId) return false;
+
+  if (!Number.isFinite(Number(params.incomingPlanRev))) return false;
+
+  const currentVersionId = String(params.currentVersionId || '').trim();
+  if (currentVersionId && currentVersionId !== versionId) {
+    return false;
+  }
+
+  const currentPlanRev = Number(params.currentPlanRev);
+  if (Number.isFinite(currentPlanRev) && params.incomingPlanRev < currentPlanRev) {
+    return false;
+  }
+
+  return true;
+}
+
 const App: React.FC = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
@@ -76,7 +106,13 @@ const App: React.FC = () => {
   const activeVersionId = useActiveVersionId();
   const isImporting = useIsImporting();
   const isRecalculating = useIsRecalculating();
-  const { setActiveVersion, updateUserPreferences } = useGlobalActions();
+  const {
+    setActiveVersion,
+    setPlanContext,
+    markLatestRunDone,
+    expireLatestRunIfNeeded,
+    updateUserPreferences,
+  } = useGlobalActions();
   const { sidebarCollapsed, autoRefreshInterval } = useUserPreferences();
   const isOnline = useOnlineStatus();
 
@@ -86,6 +122,9 @@ const App: React.FC = () => {
   // 监听版本切换，自动失效决策数据缓存
   useVersionSwitchInvalidation();
 
+  // 全局注册：统一处理 STALE_PLAN_REV
+  useStalePlanRevBootstrap();
+
   const activeVersionLabel = React.useMemo(() => {
     if (!activeVersionId) return '未激活版本';
     const text = String(activeVersionId);
@@ -94,7 +133,48 @@ const App: React.FC = () => {
   }, [activeVersionId]);
 
   // 关键事件触发时刷新 KPI（联动：导入/重算/移单后 Header 指标应同步变化）
-  useEvent('plan_updated', () => {
+  useEvent('plan_updated', (payload: unknown) => {
+    expireLatestRunIfNeeded();
+
+    const raw = payload && typeof payload === 'object'
+      ? payload as Record<string, unknown>
+      : null;
+
+    const runId = String(raw?.run_id || '').trim();
+    const versionId = String(raw?.version_id || '').trim();
+    const planRevRaw = Number(raw?.plan_rev);
+    const hasPlanRev = Number.isFinite(planRevRaw);
+
+    if (runId) {
+      const before = useGlobalStore.getState();
+      const hadTrackedRun = !!before.latestRun.runId;
+
+      markLatestRunDone(runId, {
+        versionId: versionId || undefined,
+        planRev: hasPlanRev ? planRevRaw : undefined,
+      });
+
+      // 刷新/重启后可能丢失 latestRun.runId：此时允许用事件里的 version_id+plan_rev 回填 PlanContext，
+      // 但仅在“当前没有 run 跟踪上下文”且不会回退 plan_rev 时生效，避免旧事件覆盖新结果。
+      if (!hadTrackedRun && versionId && hasPlanRev) {
+        const current = useGlobalStore.getState();
+        if (shouldBackfillPlanContextFromRunEvent({
+          hadTrackedRun,
+          incomingVersionId: versionId,
+          incomingPlanRev: planRevRaw,
+          currentVersionId: current.activeVersionId,
+          currentPlanRev: current.activePlanRev,
+        })) {
+          setPlanContext({ versionId, planRev: planRevRaw });
+        }
+      }
+    } else if (versionId && hasPlanRev) {
+      const currentVersionId = useGlobalStore.getState().activeVersionId;
+      if (!currentVersionId || currentVersionId === versionId) {
+        setPlanContext({ versionId, planRev: planRevRaw });
+      }
+    }
+
     if (activeVersionId) refetchGlobalKPI();
   });
   useEvent('risk_snapshot_updated', () => {
@@ -103,6 +183,19 @@ const App: React.FC = () => {
   useEvent('material_state_changed', () => {
     if (activeVersionId) refetchGlobalKPI();
   });
+
+  // 轻量轮询：推进 latestRun TTL 过期状态，避免长驻页面卡在 RUNNING/PENDING
+  useEffect(() => {
+    expireLatestRunIfNeeded();
+
+    const timer = window.setInterval(() => {
+      expireLatestRunIfNeeded();
+    }, 5_000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [expireLatestRunIfNeeded]);
 
   // 启动时自动回填“最近激活版本”：
   // - 若持久化的 activeVersionId 已失效（例如切换/重置数据库），静默降级到最近激活版本；
@@ -140,6 +233,33 @@ const App: React.FC = () => {
       cancelled = true;
     };
   }, [activeVersionId, setActiveVersion]);
+
+  // 同步当前激活版本的 plan_rev，作为查询一致性上下文
+  useEffect(() => {
+    if (!activeVersionId) {
+      setPlanContext({ versionId: null, planRev: null });
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const detail = await planApi.getVersionDetail(activeVersionId);
+        if (cancelled) return;
+        setPlanContext({
+          versionId: activeVersionId,
+          planRev: typeof detail?.revision === 'number' ? detail.revision : null,
+        });
+      } catch {
+        if (cancelled) return;
+        setPlanContext({ versionId: activeVersionId, planRev: null });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeVersionId, setPlanContext]);
 
   // 全局错误捕获（补齐 ErrorBoundary 覆盖不到的场景：Promise rejection / 事件处理器异常等）
   useEffect(() => {

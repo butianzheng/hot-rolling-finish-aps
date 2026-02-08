@@ -3,6 +3,29 @@ use crate::engine::ScheduleStrategy;
 
 use super::common::{emit_frontend_event, map_api_error, parse_date};
 
+async fn fetch_plan_rev_best_effort(
+    plan_api: std::sync::Arc<crate::api::plan_api::PlanApi>,
+    version_id: String,
+) -> Option<i32> {
+    tauri::async_runtime::spawn_blocking(move || {
+        plan_api
+            .get_version_detail(&version_id)
+            .ok()
+            .map(|v| v.revision)
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
+fn attach_plan_rev(payload: &mut serde_json::Value, plan_rev: Option<i32>) {
+    if let Some(rev) = plan_rev {
+        if let Some(obj) = payload.as_object_mut() {
+            obj.insert("plan_rev".to_string(), serde_json::json!(rev));
+        }
+    }
+}
+
 // ==========================================
 // 排产方案相关命令
 // ==========================================
@@ -52,6 +75,20 @@ pub async fn get_latest_active_version_id(
     let result = state
         .plan_api
         .get_latest_active_version_id()
+        .map_err(map_api_error)?;
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
+}
+
+/// 查询版本详情
+#[tauri::command(rename_all = "snake_case")]
+pub async fn get_version_detail(
+    state: tauri::State<'_, AppState>,
+    version_id: String,
+) -> Result<String, String> {
+    let result = state
+        .plan_api
+        .get_version_detail(&version_id)
         .map_err(map_api_error)?;
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
@@ -108,7 +145,7 @@ pub async fn create_version(
         .transpose()?;
 
     let plan_api = state.plan_api.clone();
-    let result = tauri::async_runtime::spawn_blocking(move || {
+    let mut result = tauri::async_runtime::spawn_blocking(move || {
         plan_api.create_version(plan_id, window_days, frozen_date, note, created_by)
     })
     .await
@@ -141,6 +178,7 @@ pub async fn activate_version(
     operator: String,
 ) -> Result<String, String> {
     let plan_api = state.plan_api.clone();
+    let plan_api_for_rev = state.plan_api.clone();
     let version_id_clone = version_id.clone();
     let operator_clone = operator.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -150,8 +188,12 @@ pub async fn activate_version(
     .map_err(|e| format!("任务执行失败: {}", e))?
     .map_err(map_api_error)?;
 
+    let plan_rev = fetch_plan_rev_best_effort(plan_api_for_rev, version_id.clone()).await;
+    let mut payload = serde_json::json!({ "version_id": version_id });
+    attach_plan_rev(&mut payload, plan_rev);
+
     // 版本切换后，多个页面需要联动刷新（plan items / decision read models / KPI）。
-    emit_frontend_event(&app, "plan_updated", serde_json::json!({ "version_id": version_id }));
+    emit_frontend_event(&app, "plan_updated", payload);
     emit_frontend_event(&app, "risk_snapshot_updated", serde_json::json!({}));
 
     Ok("{}".to_string()) // 返回空JSON对象表示成功
@@ -168,6 +210,7 @@ pub async fn rollback_version(
     reason: String,
 ) -> Result<String, String> {
     let plan_api = state.plan_api.clone();
+    let plan_api_for_rev = state.plan_api.clone();
     let plan_id_clone = plan_id.clone();
     let target_version_id_clone = target_version_id.clone();
     let operator_clone = operator.clone();
@@ -184,12 +227,12 @@ pub async fn rollback_version(
     .map_err(|e| format!("任务执行失败: {}", e))?
     .map_err(map_api_error)?;
 
+    let plan_rev = fetch_plan_rev_best_effort(plan_api_for_rev, target_version_id.clone()).await;
+    let mut payload = serde_json::json!({ "version_id": target_version_id });
+    attach_plan_rev(&mut payload, plan_rev);
+
     // 回滚后，多个页面需要联动刷新（plan items / decision read models / KPI）。
-    emit_frontend_event(
-        &app,
-        "plan_updated",
-        serde_json::json!({ "version_id": target_version_id }),
-    );
+    emit_frontend_event(&app, "plan_updated", payload);
     emit_frontend_event(&app, "risk_snapshot_updated", serde_json::json!({}));
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
@@ -244,6 +287,7 @@ pub async fn recalc_full(
     operator: String,
     strategy: Option<String>,
     window_days_override: Option<i32>,
+    run_id: Option<String>,
 ) -> Result<String, String> {
     let base_date = parse_date(&base_date)?;
     let frozen_date = frozen_date.map(|s| parse_date(&s)).transpose()?;
@@ -255,7 +299,7 @@ pub async fn recalc_full(
         .map_err(|e| format!("策略类型解析失败: {}", e))?;
 
     let plan_api = state.plan_api.clone();
-    let result = tauri::async_runtime::spawn_blocking(move || {
+    let mut result = tauri::async_runtime::spawn_blocking(move || {
         plan_api.recalc_full_with_strategy(
             &version_id,
             base_date,
@@ -269,11 +313,24 @@ pub async fn recalc_full(
     .map_err(|e| format!("任务执行失败: {}", e))?
     .map_err(map_api_error)?;
 
+    if let Some(client_run_id) = run_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+    {
+        result.run_id = client_run_id.to_string();
+    }
+
     let version_id_for_event = result.version_id.clone();
+    let run_id_for_event = result.run_id.clone();
     emit_frontend_event(
         &app,
         "plan_updated",
-        serde_json::json!({ "version_id": version_id_for_event }),
+        serde_json::json!({
+            "version_id": version_id_for_event,
+            "run_id": run_id_for_event,
+            "plan_rev": result.plan_rev,
+        }),
     );
     emit_frontend_event(&app, "risk_snapshot_updated", serde_json::json!({}));
 
@@ -326,6 +383,7 @@ pub async fn apply_strategy_draft(
     operator: String,
 ) -> Result<String, String> {
     let plan_api = state.plan_api.clone();
+    let plan_api_for_rev = state.plan_api.clone();
     let draft_id_clone = draft_id.clone();
     let operator_clone = operator.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -336,11 +394,11 @@ pub async fn apply_strategy_draft(
     .map_err(map_api_error)?;
 
     let version_id_for_event = result.version_id.clone();
-    emit_frontend_event(
-        &app,
-        "plan_updated",
-        serde_json::json!({ "version_id": version_id_for_event }),
-    );
+    let plan_rev = fetch_plan_rev_best_effort(plan_api_for_rev, version_id_for_event.clone()).await;
+    let mut payload = serde_json::json!({ "version_id": version_id_for_event });
+    attach_plan_rev(&mut payload, plan_rev);
+
+    emit_frontend_event(&app, "plan_updated", payload);
     emit_frontend_event(&app, "risk_snapshot_updated", serde_json::json!({}));
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
@@ -401,6 +459,7 @@ pub async fn get_plan_item_date_bounds(
     state: tauri::State<'_, AppState>,
     version_id: String,
     machine_code: Option<String>,
+    expected_plan_rev: Option<i32>,
 ) -> Result<String, String> {
     let machine_code = machine_code
         .as_deref()
@@ -412,7 +471,11 @@ pub async fn get_plan_item_date_bounds(
     let version_id_clone = version_id.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let _perf = crate::perf::PerfGuard::new("ipc.get_plan_item_date_bounds");
-        plan_api.get_plan_item_date_bounds(&version_id_clone, machine_code.as_deref())
+        plan_api.get_plan_item_date_bounds_with_rev(
+            &version_id_clone,
+            machine_code.as_deref(),
+            expected_plan_rev,
+        )
     })
     .await
     .map_err(|e| format!("任务执行失败: {}", e))?
@@ -431,6 +494,7 @@ pub async fn list_plan_items(
     machine_code: Option<String>,
     limit: Option<i64>,
     offset: Option<i64>,
+    expected_plan_rev: Option<i32>,
 ) -> Result<String, String> {
     let from = plan_date_from
         .as_deref()
@@ -462,16 +526,17 @@ pub async fn list_plan_items(
     let result = tauri::async_runtime::spawn_blocking(move || {
         let _perf = crate::perf::PerfGuard::new("ipc.list_plan_items");
         if has_filters {
-            plan_api.list_plan_items_filtered(
+            plan_api.list_plan_items_filtered_with_rev(
                 &version_id,
                 machine_code.as_deref(),
                 from,
                 to,
                 limit,
                 offset,
+                expected_plan_rev,
             )
         } else {
-            plan_api.list_plan_items(&version_id)
+            plan_api.list_plan_items_with_rev(&version_id, expected_plan_rev)
         }
     })
     .await
@@ -573,6 +638,7 @@ pub async fn move_items(
     };
 
     let plan_api = state.plan_api.clone();
+    let plan_api_for_rev = state.plan_api.clone();
     let version_id_clone = version_id.clone();
     let operator_clone = operator.clone();
     let reason_clone = reason.clone();
@@ -589,11 +655,14 @@ pub async fn move_items(
     .map_err(|e| format!("任务执行失败: {}", e))?
     .map_err(map_api_error)?;
 
-    emit_frontend_event(
-        &app,
-        "plan_updated",
-        serde_json::json!({ "version_id": version_id, "has_violations": result.has_violations }),
-    );
+    let plan_rev = fetch_plan_rev_best_effort(plan_api_for_rev, version_id.clone()).await;
+    let mut payload = serde_json::json!({
+        "version_id": version_id,
+        "has_violations": result.has_violations,
+    });
+    attach_plan_rev(&mut payload, plan_rev);
+
+    emit_frontend_event(&app, "plan_updated", payload);
     emit_frontend_event(&app, "risk_snapshot_updated", serde_json::json!({}));
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))

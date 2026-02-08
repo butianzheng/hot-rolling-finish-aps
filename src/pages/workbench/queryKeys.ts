@@ -18,8 +18,8 @@ export const workbenchQueryKeys = {
       plan_date_from?: string;
       plan_date_to?: string;
     }) => ['workbench', 'planItems', 'list', params] as const,
-    dateBounds: (versionId: string | null, machineCode: string | null) =>
-      ['workbench', 'planItems', 'bounds', versionId, machineCode] as const,
+    dateBounds: (versionId: string | null, machineCode: string | null, planRev: number | null) =>
+      ['workbench', 'planItems', 'bounds', versionId, machineCode, planRev] as const,
   },
 
   /** materials 相关查询 */

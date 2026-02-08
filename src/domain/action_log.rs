@@ -52,6 +52,7 @@ pub enum ActionType {
     RollChange,        // 换辊
     // ===== v0.4+ 路径规则相关 =====
     PathOverrideConfirm, // 路径突破人工确认
+    PathOverrideReject,  // 路径突破人工拒绝
     RollCycleReset,      // 换辊周期重置（含锚点重置）
 }
 
@@ -144,6 +145,7 @@ impl ActionType {
             ActionType::RollChange => "RollChange",
             // v0.4+ 路径规则相关
             ActionType::PathOverrideConfirm => "PathOverrideConfirm",
+            ActionType::PathOverrideReject => "PathOverrideReject",
             ActionType::RollCycleReset => "RollCycleReset",
         }
     }
@@ -161,6 +163,7 @@ impl ActionType {
             "RollChange" => Some(ActionType::RollChange),
             // v0.4+ 路径规则相关
             "PathOverrideConfirm" => Some(ActionType::PathOverrideConfirm),
+            "PathOverrideReject" => Some(ActionType::PathOverrideReject),
             "RollCycleReset" => Some(ActionType::RollCycleReset),
             _ => None,
         }

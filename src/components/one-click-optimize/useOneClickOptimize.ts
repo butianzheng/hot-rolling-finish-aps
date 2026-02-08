@@ -7,9 +7,11 @@ import { message } from 'antd';
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import { planApi } from '../../api/tauri';
-import { useGlobalActions } from '../../stores/use-global-store';
+import { useGlobalActions, useGlobalStore } from '../../stores/use-global-store';
 import { formatDate } from '../../utils/formatters';
 import type { OptimizeStrategy, SimulateResult } from './types';
+import { DEFAULT_LATEST_RUN_TTL_MS } from '../../stores/latestRun';
+import { createRunId } from '../../utils/runId';
 import { getStrategyLabel } from './types';
 
 interface UseOneClickOptimizeOptions {
@@ -25,7 +27,14 @@ export function useOneClickOptimize({
   onBeforeExecute,
   onAfterExecute,
 }: UseOneClickOptimizeOptions) {
-  const { setActiveVersion } = useGlobalActions();
+  const {
+    setActiveVersion,
+    beginLatestRun,
+    markLatestRunRunning,
+    markLatestRunDone,
+    markLatestRunFailed,
+    expireLatestRunIfNeeded,
+  } = useGlobalActions();
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [baseDate, setBaseDate] = useState<Dayjs>(dayjs());
@@ -83,8 +92,22 @@ export function useOneClickOptimize({
       return;
     }
 
+    expireLatestRunIfNeeded();
+    const localRunId = createRunId('recalc');
+    const beginResult = beginLatestRun({
+      runId: localRunId,
+      versionId: activeVersionId,
+      ttlMs: DEFAULT_LATEST_RUN_TTL_MS,
+    });
+
+    if (!beginResult.accepted) {
+      message.info('已存在更新的重算触发，本次请求已忽略');
+      return;
+    }
+
     setExecuteLoading(true);
     onBeforeExecute?.();
+    markLatestRunRunning(localRunId);
     try {
       const res: any = await planApi.recalcFull(
         activeVersionId,
@@ -92,10 +115,25 @@ export function useOneClickOptimize({
         undefined,
         operator,
         strategy,
-        windowDaysOverride ?? undefined
+        windowDaysOverride ?? undefined,
+        localRunId,
       );
-      message.success(String(res?.message || '重算完成'));
+
+      const responseRunId = String(res?.run_id ?? localRunId).trim() || localRunId;
+      const responsePlanRev = Number(res?.plan_rev);
       const newVersionId = String(res?.version_id ?? '').trim();
+
+      markLatestRunDone(responseRunId, {
+        versionId: newVersionId || activeVersionId,
+        planRev: Number.isFinite(responsePlanRev) ? responsePlanRev : undefined,
+      });
+
+      const latestRunId = useGlobalStore.getState().latestRun.runId;
+      if (latestRunId !== responseRunId) {
+        return;
+      }
+
+      message.success(String(res?.message || '重算完成'));
       if (newVersionId) {
         setCreatedVersionId(newVersionId);
         setPostCreateOpen(true);
@@ -104,6 +142,7 @@ export function useOneClickOptimize({
       setSimulateResult(null);
     } catch (e: any) {
       console.error('【一键优化】正式执行失败：', e);
+      markLatestRunFailed(localRunId, e?.message || '重算失败');
       message.error(e?.message || '重算失败');
     } finally {
       setExecuteLoading(false);

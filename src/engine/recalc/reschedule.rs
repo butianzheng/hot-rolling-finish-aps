@@ -16,6 +16,29 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
 impl RecalcEngine {
+    fn normalize_sched_state_for_reject(raw: Option<&str>) -> Option<SchedState> {
+        let key = raw?.trim().to_uppercase();
+        match key.as_str() {
+            "PENDING_MATURE" => Some(SchedState::PendingMature),
+            "READY" => Some(SchedState::Ready),
+            "LOCKED" => Some(SchedState::Locked),
+            "FORCE_RELEASE" => Some(SchedState::ForceRelease),
+            "BLOCKED" => Some(SchedState::Blocked),
+            "SCHEDULED" => Some(SchedState::Scheduled),
+            _ => None,
+        }
+    }
+
+    fn is_reject_boost_allowed(base_sched_state: Option<&str>) -> bool {
+        matches!(
+            Self::normalize_sched_state_for_reject(base_sched_state),
+            Some(SchedState::Ready)
+                | Some(SchedState::PendingMature)
+                | Some(SchedState::Locked)
+                | Some(SchedState::ForceRelease)
+        )
+    }
+
     /// 执行重排 (调用完整引擎链)
     ///
     /// # 参数
@@ -321,6 +344,8 @@ impl RecalcEngine {
             HashMap::new();
         let mut user_confirmed_summaries_by_machine: HashMap<String, Vec<MaterialSummary>> =
             HashMap::new();
+        let mut rejection_map_by_machine: HashMap<String, HashMap<String, (Option<i32>, Option<String>)>> =
+            HashMap::new();
 
         for machine_code in machine_codes {
             let materials = self.material_master_repo.find_by_machine(machine_code)?;
@@ -354,6 +379,19 @@ impl RecalcEngine {
                     })
                     .collect();
                 user_confirmed_summaries_by_machine.insert(machine_code.clone(), summaries);
+
+                let mut rejection_map: HashMap<String, (Option<i32>, Option<String>)> =
+                    HashMap::new();
+                for row in self
+                    .material_state_repo
+                    .list_path_override_rejections_by_machine(machine_code)?
+                {
+                    rejection_map.insert(
+                        row.material_id,
+                        (row.reject_cycle_no, row.reject_base_sched_state),
+                    );
+                }
+                rejection_map_by_machine.insert(machine_code.clone(), rejection_map);
             }
         }
 
@@ -389,8 +427,23 @@ impl RecalcEngine {
                 // - READY/LOCKED/FORCE_RELEASE：直接进入候选；
                 // - PENDING_MATURE：当排产日期推进到其 ready_in_days 覆盖范围后，才能进入候选；
                 //   （同时配合 output_age_days_raw 的动态推进，确保 Eligibility 判定正确）
+                let current_campaign_no = if path_rule_config.enabled {
+                    active_campaigns
+                        .get(machine_code.as_str())
+                        .map(|c| c.campaign_no)
+                        .unwrap_or(0)
+                } else {
+                    0
+                };
+
+                let rejection_map = rejection_map_by_machine
+                    .get(machine_code)
+                    .cloned()
+                    .unwrap_or_default();
+
                 let mut candidate_materials: Vec<MaterialMaster> = Vec::new();
                 let mut candidate_states: Vec<MaterialState> = Vec::new();
+                let mut reject_boost_material_ids: HashSet<String> = HashSet::new();
                 for material in materials.iter() {
                     if scheduled_material_ids.contains(&material.material_id) {
                         continue;
@@ -405,6 +458,18 @@ impl RecalcEngine {
                     };
                     if !allow {
                         continue;
+                    }
+
+                    if let Some((reject_cycle_no_opt, base_sched_state_opt)) =
+                        rejection_map.get(&material.material_id)
+                    {
+                        let reject_cycle_no = reject_cycle_no_opt.unwrap_or(i32::MAX);
+                        if current_campaign_no <= reject_cycle_no {
+                            continue;
+                        }
+                        if Self::is_reject_boost_allowed(base_sched_state_opt.as_deref()) {
+                            reject_boost_material_ids.insert(material.material_id.clone());
+                        }
                     }
 
                     let mut m = material.clone();
@@ -626,6 +691,11 @@ impl RecalcEngine {
                         path_rule_engine_ref,
                         initial_anchor,
                         initial_anchor_material_id,
+                        if reject_boost_material_ids.is_empty() {
+                            None
+                        } else {
+                            Some(&reject_boost_material_ids)
+                        },
                     )
                     .await?;
 

@@ -196,6 +196,57 @@ impl PathRuleApi {
         }
     }
 
+    fn reject_path_override_single_internal(
+        &self,
+        version_id: &str,
+        material_id: &str,
+        rejected_by: &str,
+        reason: &str,
+    ) -> ApiResult<(String, i32, String)> {
+        let master = self
+            .material_master_repo
+            .find_by_id(material_id)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?
+            .ok_or_else(|| ApiError::NotFound(format!("材料主数据不存在: {}", material_id)))?;
+
+        let state = self
+            .material_state_repo
+            .find_by_id(material_id)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?
+            .ok_or_else(|| ApiError::NotFound(format!("材料状态不存在: {}", material_id)))?;
+
+        let machine_code = master
+            .current_machine_code
+            .clone()
+            .unwrap_or_else(|| "UNKNOWN".to_string());
+
+        let campaign = self
+            .roller_campaign_repo
+            .find_active_campaign(version_id, &machine_code)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?
+            .ok_or_else(|| {
+                ApiError::NotFound(format!(
+                    "未找到活跃换辊周期: version_id={}, machine_code={}",
+                    version_id, machine_code
+                ))
+            })?;
+
+        let reject_cycle_no = campaign.campaign_no;
+        let base_sched_state = state.sched_state.to_string();
+
+        self.material_state_repo
+            .update_path_override_rejection(
+                material_id,
+                rejected_by,
+                reason,
+                reject_cycle_no,
+                &base_sched_state,
+            )
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        Ok((machine_code, reject_cycle_no, base_sched_state))
+    }
+
     pub fn get_path_rule_config(&self) -> ApiResult<PathRuleConfigDto> {
         let enabled = Self::parse_bool(
             self.config_manager
@@ -659,6 +710,230 @@ impl PathRuleApi {
 
         if let Err(e) = self.action_log_repo.insert(&action_log) {
             tracing::warn!("写入范围批量 PathOverrideConfirm 审计失败: {}", e);
+        }
+
+        Ok(BatchConfirmResultDto {
+            success_count,
+            fail_count: failed.len() as i32,
+            failed_material_ids,
+        })
+    }
+
+    pub fn reject_path_override(
+        &self,
+        version_id: &str,
+        material_id: &str,
+        rejected_by: &str,
+        reason: &str,
+    ) -> ApiResult<()> {
+        if version_id.trim().is_empty() {
+            return Err(ApiError::InvalidInput("版本ID不能为空".to_string()));
+        }
+        if material_id.trim().is_empty() {
+            return Err(ApiError::InvalidInput("材料ID不能为空".to_string()));
+        }
+        if rejected_by.trim().is_empty() {
+            return Err(ApiError::InvalidInput("拒绝人不能为空".to_string()));
+        }
+        if reason.trim().is_empty() {
+            return Err(ApiError::InvalidInput("拒绝原因不能为空".to_string()));
+        }
+
+        let (machine_code, reject_cycle_no, base_sched_state) = self
+            .reject_path_override_single_internal(version_id, material_id, rejected_by, reason)?;
+
+        let action_log = ActionLog {
+            action_id: uuid::Uuid::new_v4().to_string(),
+            version_id: Some(version_id.to_string()),
+            action_type: ActionType::PathOverrideReject.as_str().to_string(),
+            action_ts: chrono::Local::now().naive_local(),
+            actor: rejected_by.to_string(),
+            payload_json: Some(serde_json::json!({
+                "material_id": material_id,
+                "reject_reason": reason,
+                "reject_cycle_no": reject_cycle_no,
+                "reject_base_sched_state": base_sched_state,
+                "policy": {
+                    "postpone_min_roll_cycle": 1,
+                    "boost_urgent_level_by": 1,
+                }
+            })),
+            impact_summary_json: None,
+            machine_code: Some(machine_code),
+            date_range_start: None,
+            date_range_end: None,
+            detail: Some(format!("路径规则人工拒绝: {}", material_id)),
+        };
+
+        self.action_log_repo
+            .insert(&action_log)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        Ok(())
+    }
+
+    pub fn batch_reject_path_override(
+        &self,
+        version_id: &str,
+        material_ids: &[String],
+        rejected_by: &str,
+        reason: &str,
+    ) -> ApiResult<BatchConfirmResultDto> {
+        if version_id.trim().is_empty() {
+            return Err(ApiError::InvalidInput("版本ID不能为空".to_string()));
+        }
+        if rejected_by.trim().is_empty() {
+            return Err(ApiError::InvalidInput("拒绝人不能为空".to_string()));
+        }
+        if reason.trim().is_empty() {
+            return Err(ApiError::InvalidInput("拒绝原因不能为空".to_string()));
+        }
+
+        let mut failed = Vec::new();
+        let mut success_count = 0i32;
+        let mut sample: Vec<serde_json::Value> = Vec::new();
+
+        for id in material_ids {
+            match self.reject_path_override_single_internal(version_id, id, rejected_by, reason) {
+                Ok((machine_code, reject_cycle_no, base_sched_state)) => {
+                    success_count += 1;
+                    if sample.len() < 50 {
+                        sample.push(serde_json::json!({
+                            "material_id": id,
+                            "machine_code": machine_code,
+                            "reject_cycle_no": reject_cycle_no,
+                            "reject_base_sched_state": base_sched_state,
+                        }));
+                    }
+                }
+                Err(_) => failed.push(id.clone()),
+            }
+        }
+
+        let failed_material_ids = failed.clone();
+        let action_log = ActionLog {
+            action_id: uuid::Uuid::new_v4().to_string(),
+            version_id: Some(version_id.to_string()),
+            action_type: ActionType::PathOverrideReject.as_str().to_string(),
+            action_ts: chrono::Local::now().naive_local(),
+            actor: rejected_by.to_string(),
+            payload_json: Some(serde_json::json!({
+                "material_ids": material_ids,
+                "success_count": success_count,
+                "fail_count": failed_material_ids.len(),
+                "failed_material_ids": failed_material_ids,
+                "material_samples": sample,
+                "reject_reason": reason,
+                "policy": {
+                    "postpone_min_roll_cycle": 1,
+                    "boost_urgent_level_by": 1,
+                }
+            })),
+            impact_summary_json: None,
+            machine_code: None,
+            date_range_start: None,
+            date_range_end: None,
+            detail: Some("路径规则人工拒绝（批量）".to_string()),
+        };
+
+        if let Err(e) = self.action_log_repo.insert(&action_log) {
+            tracing::warn!("写入批量 PathOverrideReject 审计失败: {}", e);
+        }
+
+        Ok(BatchConfirmResultDto {
+            success_count,
+            fail_count: failed.len() as i32,
+            failed_material_ids,
+        })
+    }
+
+    pub fn batch_reject_path_override_by_range(
+        &self,
+        version_id: &str,
+        plan_date_from: NaiveDate,
+        plan_date_to: NaiveDate,
+        machine_codes: Option<&[String]>,
+        rejected_by: &str,
+        reason: &str,
+    ) -> ApiResult<BatchConfirmResultDto> {
+        if version_id.trim().is_empty() {
+            return Err(ApiError::InvalidInput("版本ID不能为空".to_string()));
+        }
+        if rejected_by.trim().is_empty() {
+            return Err(ApiError::InvalidInput("拒绝人不能为空".to_string()));
+        }
+        if reason.trim().is_empty() {
+            return Err(ApiError::InvalidInput("拒绝原因不能为空".to_string()));
+        }
+        if plan_date_to < plan_date_from {
+            return Err(ApiError::InvalidInput("日期范围不合法: to < from".to_string()));
+        }
+
+        let ids = self
+            .path_override_pending_repo
+            .list_pending_material_ids_by_range(version_id, plan_date_from, plan_date_to, machine_codes)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        if ids.is_empty() {
+            return Ok(BatchConfirmResultDto {
+                success_count: 0,
+                fail_count: 0,
+                failed_material_ids: Vec::new(),
+            });
+        }
+
+        let mut failed = Vec::new();
+        let mut success_count = 0i32;
+        let mut sample: Vec<serde_json::Value> = Vec::new();
+
+        for id in &ids {
+            match self.reject_path_override_single_internal(version_id, id, rejected_by, reason) {
+                Ok((machine_code, reject_cycle_no, base_sched_state)) => {
+                    success_count += 1;
+                    if sample.len() < 50 {
+                        sample.push(serde_json::json!({
+                            "material_id": id,
+                            "machine_code": machine_code,
+                            "reject_cycle_no": reject_cycle_no,
+                            "reject_base_sched_state": base_sched_state,
+                        }));
+                    }
+                }
+                Err(_) => failed.push(id.clone()),
+            }
+        }
+
+        let failed_material_ids = failed.clone();
+        let action_log = ActionLog {
+            action_id: uuid::Uuid::new_v4().to_string(),
+            version_id: Some(version_id.to_string()),
+            action_type: ActionType::PathOverrideReject.as_str().to_string(),
+            action_ts: chrono::Local::now().naive_local(),
+            actor: rejected_by.to_string(),
+            payload_json: Some(serde_json::json!({
+                "plan_date_from": plan_date_from.to_string(),
+                "plan_date_to": plan_date_to.to_string(),
+                "machine_codes": machine_codes.map(|v| v.to_vec()),
+                "total_candidates": ids.len(),
+                "success_count": success_count,
+                "fail_count": failed_material_ids.len(),
+                "failed_material_ids": failed_material_ids,
+                "material_samples": sample,
+                "reject_reason": reason,
+                "policy": {
+                    "postpone_min_roll_cycle": 1,
+                    "boost_urgent_level_by": 1,
+                }
+            })),
+            impact_summary_json: None,
+            machine_code: None,
+            date_range_start: Some(plan_date_from),
+            date_range_end: Some(plan_date_to),
+            detail: Some("路径规则人工拒绝（范围批量）".to_string()),
+        };
+
+        if let Err(e) = self.action_log_repo.insert(&action_log) {
+            tracing::warn!("写入范围批量 PathOverrideReject 审计失败: {}", e);
         }
 
         Ok(BatchConfirmResultDto {

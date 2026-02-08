@@ -9,6 +9,15 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { UserPreferences } from '../types/preferences';
+import {
+  beginLatestRunState,
+  createInitialLatestRunState,
+  expireLatestRunState,
+  markLatestRunDoneState,
+  markLatestRunFailedState,
+  markLatestRunRunningState,
+  type LatestRunState,
+} from './latestRun';
 
 // ==========================================
 // 全局状态接口
@@ -27,6 +36,11 @@ export interface WorkbenchFilters {
 export interface GlobalState {
   // 当前激活的排产版本ID
   activeVersionId: string | null;
+  // 当前激活版本的 plan_rev（plan_version.revision）
+  activePlanRev: number | null;
+
+  // 重算 latest run（前端状态治理，不持久化）
+  latestRun: LatestRunState;
 
   // 任务状态标志
   isRecalculating: boolean;
@@ -58,6 +72,19 @@ export interface GlobalState {
 export interface GlobalActions {
   // 设置激活版本
   setActiveVersion: (versionId: string | null) => void;
+
+  // 设置当前计划上下文
+  setPlanContext: (context: { versionId: string | null; planRev: number | null }) => void;
+
+  // latest run 状态机
+  beginLatestRun: (input: { runId: string; triggeredAt?: number; ttlMs?: number; versionId?: string | null }) => {
+    accepted: boolean;
+    reason?: 'OLDER_TRIGGER' | 'EXPIRED_PREVIOUS';
+  };
+  markLatestRunRunning: (runId: string) => void;
+  markLatestRunDone: (runId: string, payload?: { versionId?: string | null; planRev?: number | null }) => void;
+  markLatestRunFailed: (runId: string, error?: string | null) => void;
+  expireLatestRunIfNeeded: (now?: number) => void;
 
   // 设置重算状态
   setRecalculating: (flag: boolean) => void;
@@ -97,6 +124,8 @@ const LEGACY_CURRENT_USER_KEY = 'aps_current_user';
 
 const initialState: GlobalState = {
   activeVersionId: null,
+  activePlanRev: null,
+  latestRun: createInitialLatestRunState(),
   isRecalculating: false,
   isImporting: false,
   // 兼容旧的 React Context 持久化 key，避免升级后用户选择被“重置”
@@ -144,7 +173,60 @@ export const useGlobalStore = create<GlobalState & GlobalActions>()(
         // Actions
         setActiveVersion: (versionId) =>
           set((state) => {
-            state.activeVersionId = versionId;
+            const nextVersionId = String(versionId || '').trim() || null;
+            const changed = state.activeVersionId !== nextVersionId;
+            state.activeVersionId = nextVersionId;
+            if (changed) {
+              state.activePlanRev = null;
+            }
+          }),
+
+        setPlanContext: ({ versionId, planRev }) =>
+          set((state) => {
+            state.activeVersionId = String(versionId || '').trim() || null;
+            state.activePlanRev = typeof planRev === 'number' ? planRev : null;
+          }),
+
+        beginLatestRun: (input) => {
+          let accepted = false;
+          let reason: 'OLDER_TRIGGER' | 'EXPIRED_PREVIOUS' | undefined;
+
+          set((state) => {
+            const result = beginLatestRunState(state.latestRun, input);
+            accepted = result.accepted;
+            reason = result.reason;
+            state.latestRun = result.next;
+          });
+
+          return { accepted, reason };
+        },
+
+        markLatestRunRunning: (runId) =>
+          set((state) => {
+            state.latestRun = markLatestRunRunningState(state.latestRun, runId);
+          }),
+
+        markLatestRunDone: (runId, payload) =>
+          set((state) => {
+            state.latestRun = markLatestRunDoneState(state.latestRun, runId, payload);
+            if (state.latestRun.runId === runId && state.latestRun.status === 'DONE') {
+              if (payload?.versionId) {
+                state.activeVersionId = payload.versionId;
+              }
+              if (typeof payload?.planRev === 'number') {
+                state.activePlanRev = payload.planRev;
+              }
+            }
+          }),
+
+        markLatestRunFailed: (runId, error) =>
+          set((state) => {
+            state.latestRun = markLatestRunFailedState(state.latestRun, runId, error ?? null);
+          }),
+
+        expireLatestRunIfNeeded: (now) =>
+          set((state) => {
+            state.latestRun = expireLatestRunState(state.latestRun, now);
           }),
 
         setRecalculating: (flag) =>
@@ -229,6 +311,12 @@ export const useCurrentUser = () => useGlobalStore((state) => state.currentUser)
 // 获取激活版本ID
 export const useActiveVersionId = () => useGlobalStore((state) => state.activeVersionId);
 
+// 获取激活版本 plan_rev
+export const useActivePlanRev = () => useGlobalStore((state) => state.activePlanRev);
+
+// 获取 latest run
+export const useLatestRun = () => useGlobalStore((state) => state.latestRun);
+
 // 获取重算状态
 export const useIsRecalculating = () => useGlobalStore((state) => state.isRecalculating);
 
@@ -245,6 +333,12 @@ export const useUserPreferences = () => useGlobalStore((state) => state.userPref
 export const useGlobalActions = () =>
   useGlobalStore((state) => ({
     setActiveVersion: state.setActiveVersion,
+    setPlanContext: state.setPlanContext,
+    beginLatestRun: state.beginLatestRun,
+    markLatestRunRunning: state.markLatestRunRunning,
+    markLatestRunDone: state.markLatestRunDone,
+    markLatestRunFailed: state.markLatestRunFailed,
+    expireLatestRunIfNeeded: state.expireLatestRunIfNeeded,
     setRecalculating: state.setRecalculating,
     setImporting: state.setImporting,
     setCurrentUser: state.setCurrentUser,

@@ -70,6 +70,7 @@ export type PathOverridePendingCenterModalProps = {
   machineOptions: string[];
   operator: string;
   onConfirmed?: (result: { confirmedCount: number; autoRecalc: boolean; recalcBaseDate: string }) => void;
+  onRejected?: (result: { rejectedCount: number; autoRecalc: boolean; recalcBaseDate: string }) => void;
 };
 
 const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalProps> = ({
@@ -81,6 +82,7 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
   machineOptions,
   operator,
   onConfirmed,
+  onRejected,
 }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -319,6 +321,60 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
     }
   };
 
+  const rejectByRange = async (autoRecalcAfterReject: boolean) => {
+    if (!versionId) return;
+    const cleanReason = String(reason || '').trim();
+    if (!cleanReason) {
+      message.warning('请输入拒绝原因');
+      return;
+    }
+
+    setSubmitting(true);
+    setRecalcFailed(false);
+    try {
+      const res = await pathRuleApi.batchRejectPathOverrideByRange({
+        versionId,
+        planDateFrom,
+        planDateTo,
+        machineCodes: selectedMachineCodes.length > 0 ? selectedMachineCodes : undefined,
+        rejectedBy: operator || 'system',
+        reason: cleanReason,
+      });
+      const ok = Number(res?.success_count ?? 0);
+      const fail = Number(res?.fail_count ?? 0);
+      if (ok > 0) message.success(`已拒绝 ${ok} 条突破`);
+      if (fail > 0) {
+        const failed = Array.isArray(res?.failed_material_ids) ? res.failed_material_ids : [];
+        Modal.info({
+          title: '部分拒绝失败',
+          content: (
+            <div>
+              <p style={{ marginBottom: 8 }}>成功 {ok} 条，失败 {fail} 条。</p>
+              {failed.length > 0 ? (
+                <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
+                  {failed.filter(Boolean).join('\n')}
+                </pre>
+              ) : null}
+            </div>
+          ),
+        });
+      }
+
+      onRejected?.({ rejectedCount: ok, autoRecalc: autoRecalcAfterReject, recalcBaseDate: earliestPendingDate });
+      await loadSummary();
+      if (selectedGroup) {
+        await loadDetail(selectedGroup.machineCode, selectedGroup.planDate);
+      }
+    } catch (e: unknown) {
+      console.error('【路径放行待确认中心】范围拒绝失败：', e);
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      message.error(errorMessage || '批量拒绝失败');
+      setRecalcFailed(autoRecalcAfterReject);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const summaryColumns: ColumnsType<SummaryRow> = [
     {
       title: '日期',
@@ -453,6 +509,21 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
             >
               仅确认（不重算）
             </Button>
+            <Button
+              danger
+              onClick={() => rejectByRange(true)}
+              disabled={!canQuery || totalPendingCount === 0 || submitting}
+            >
+              拒绝并重算 ({totalPendingCount})
+            </Button>
+            <Button
+              danger
+              type="dashed"
+              onClick={() => rejectByRange(false)}
+              disabled={!canQuery || totalPendingCount === 0 || submitting}
+            >
+              仅拒绝（不重算）
+            </Button>
           </Space>
           <Space>
             <Button
@@ -556,7 +627,7 @@ const PathOverridePendingCenterModal: React.FC<PathOverridePendingCenterModalPro
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           rows={2}
-          placeholder="确认原因（必填，例如：客户交付临期/现场指令/工艺例外审批等）"
+          placeholder="确认/拒绝原因（必填，例如：客户交付临期/现场指令/工艺例外审批等）"
           maxLength={200}
           showCount
         />

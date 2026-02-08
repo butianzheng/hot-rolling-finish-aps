@@ -66,6 +66,13 @@ pub enum ApiError {
     #[error("版本冲突: {0}")]
     VersionConflict(String),
 
+    #[error("计划版本已过期: version_id={version_id}, expected_plan_rev={expected_plan_rev}, actual_plan_rev={actual_plan_rev}")]
+    StalePlanRevision {
+        version_id: String,
+        expected_plan_rev: i32,
+        actual_plan_rev: i32,
+    },
+
     // ==========================================
     // 数据访问错误
     // ==========================================

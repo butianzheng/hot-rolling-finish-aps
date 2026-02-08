@@ -10,4 +10,9 @@ mod master;
 mod state;
 
 pub use master::MaterialMasterRepository;
-pub use state::{MaterialStateRepository, MaterialStateSnapshotLite, UserConfirmedMaterialSummary};
+pub use state::{
+    MaterialStateRepository,
+    MaterialStateSnapshotLite,
+    PathOverrideRejectionSummary,
+    UserConfirmedMaterialSummary,
+};

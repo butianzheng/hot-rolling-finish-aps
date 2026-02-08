@@ -123,7 +123,9 @@ export const MoveItemsResponseSchema = z
 
 export const RecalcResponseSchema = z
   .object({
+    run_id: z.string(),
     version_id: z.string(),
+    plan_rev: z.number(),
     plan_items_count: z.number(),
     frozen_items_count: z.number(),
     success: z.boolean(),

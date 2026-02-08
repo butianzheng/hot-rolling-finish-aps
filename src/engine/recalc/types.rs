@@ -9,8 +9,10 @@ use serde_json::Value as JsonValue;
 // ==========================================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecalcResult {
+    pub run_id: String,        // 重算运行ID
     pub version_id: String,    // 新版本ID
     pub version_no: i32,       // 版本号
+    pub plan_rev: i32,         // plan_version.revision
     pub total_items: usize,    // 总计划项数
     pub mature_count: usize,   // 适温材料数
     pub immature_count: usize, // 未适温材料数

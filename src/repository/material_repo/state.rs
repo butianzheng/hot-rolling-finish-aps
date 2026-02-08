@@ -53,6 +53,14 @@ pub struct UserConfirmedMaterialSummary {
     pub user_confirmed_at: Option<String>,
 }
 
+/// 路径规则拒绝摘要（用于重算候选过滤/提档）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PathOverrideRejectionSummary {
+    pub material_id: String,
+    pub reject_cycle_no: Option<i32>,
+    pub reject_base_sched_state: Option<String>,
+}
+
 impl MaterialStateRepository {
     /// 创建新的 MaterialStateRepository 实例
     ///
@@ -78,6 +86,15 @@ impl MaterialStateRepository {
         self.conn
             .lock()
             .map_err(|e| RepositoryError::LockError(e.to_string()))
+    }
+
+    fn has_material_state_column(conn: &Connection, column_name: &str) -> RepositoryResult<bool> {
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('material_state') WHERE name = ?1",
+            params![column_name],
+            |row| row.get(0),
+        )?;
+        Ok(count > 0)
     }
 
     // ==========================================
@@ -682,6 +699,32 @@ impl MaterialStateRepository {
 
         let conn = self.get_conn()?;
         let now = chrono::Utc::now().to_rfc3339();
+        let has_reject_columns = Self::has_material_state_column(&conn, "path_override_rejected")?;
+
+        if has_reject_columns {
+            conn.execute(
+                r#"
+                UPDATE material_state
+                SET
+                    user_confirmed = 1,
+                    user_confirmed_at = ?2,
+                    user_confirmed_by = ?3,
+                    user_confirmed_reason = ?4,
+                    path_override_rejected = 0,
+                    path_override_rejected_at = NULL,
+                    path_override_rejected_by = NULL,
+                    path_override_rejected_reason = NULL,
+                    path_override_reject_cycle_no = NULL,
+                    path_override_reject_base_sched_state = NULL,
+                    updated_at = ?2,
+                    updated_by = ?3
+                WHERE material_id = ?1
+                "#,
+                params![id, now, by, r],
+            )?;
+
+            return Ok(());
+        }
 
         conn.execute(
             r#"
@@ -735,6 +778,151 @@ impl MaterialStateRepository {
                 thickness_mm: row.get::<_, Option<f64>>(2)?.unwrap_or(0.0),
                 seq_no: row.get(3)?,
                 user_confirmed_at: row.get(4)?,
+            })
+        })?;
+
+        Ok(rows.collect::<SqliteResult<Vec<_>>>()?)
+    }
+
+    /// 更新材料人工拒绝状态（路径规则突破）
+    pub fn update_path_override_rejection(
+        &self,
+        material_id: &str,
+        rejected_by: &str,
+        reason: &str,
+        reject_cycle_no: i32,
+        base_sched_state: &str,
+    ) -> RepositoryResult<()> {
+        let id = material_id.trim();
+        if id.is_empty() {
+            return Err(RepositoryError::ValidationError("material_id 不能为空".to_string()));
+        }
+        let by = rejected_by.trim();
+        if by.is_empty() {
+            return Err(RepositoryError::ValidationError("rejected_by 不能为空".to_string()));
+        }
+        let r = reason.trim();
+        if r.is_empty() {
+            return Err(RepositoryError::ValidationError("reason 不能为空".to_string()));
+        }
+
+        let conn = self.get_conn()?;
+        let has_reject_columns = Self::has_material_state_column(&conn, "path_override_rejected")?;
+        if !has_reject_columns {
+            return Err(RepositoryError::ValidationError(
+                "数据库缺少字段 path_override_rejected，请先执行 migrations/v0.8_path_override_reject_flow.sql"
+                    .to_string(),
+            ));
+        }
+        let now = chrono::Utc::now().to_rfc3339();
+
+        conn.execute(
+            r#"
+            UPDATE material_state
+            SET
+                user_confirmed = 0,
+                user_confirmed_at = NULL,
+                user_confirmed_by = NULL,
+                user_confirmed_reason = NULL,
+                path_override_rejected = 1,
+                path_override_rejected_at = ?2,
+                path_override_rejected_by = ?3,
+                path_override_rejected_reason = ?4,
+                path_override_reject_cycle_no = ?5,
+                path_override_reject_base_sched_state = ?6,
+                updated_at = ?2,
+                updated_by = ?3
+            WHERE material_id = ?1
+            "#,
+            params![
+                id,
+                now,
+                by,
+                r,
+                reject_cycle_no,
+                base_sched_state.trim().to_uppercase()
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    /// 清除材料路径拒绝状态（通常在人工确认突破后调用）
+    pub fn clear_path_override_rejection(
+        &self,
+        material_id: &str,
+        cleared_by: &str,
+    ) -> RepositoryResult<()> {
+        let id = material_id.trim();
+        if id.is_empty() {
+            return Err(RepositoryError::ValidationError("material_id 不能为空".to_string()));
+        }
+        let by = cleared_by.trim();
+        if by.is_empty() {
+            return Err(RepositoryError::ValidationError("cleared_by 不能为空".to_string()));
+        }
+
+        let conn = self.get_conn()?;
+        let has_reject_columns = Self::has_material_state_column(&conn, "path_override_rejected")?;
+        if !has_reject_columns {
+            return Ok(());
+        }
+        let now = chrono::Utc::now().to_rfc3339();
+
+        conn.execute(
+            r#"
+            UPDATE material_state
+            SET
+                path_override_rejected = 0,
+                path_override_rejected_at = NULL,
+                path_override_rejected_by = NULL,
+                path_override_rejected_reason = NULL,
+                path_override_reject_cycle_no = NULL,
+                path_override_reject_base_sched_state = NULL,
+                updated_at = ?2,
+                updated_by = ?3
+            WHERE material_id = ?1
+            "#,
+            params![id, now, by],
+        )?;
+
+        Ok(())
+    }
+
+    /// 查询机组下“已拒绝路径突破”的材料摘要
+    pub fn list_path_override_rejections_by_machine(
+        &self,
+        machine_code: &str,
+    ) -> RepositoryResult<Vec<PathOverrideRejectionSummary>> {
+        let code = machine_code.trim();
+        if code.is_empty() {
+            return Err(RepositoryError::ValidationError("machine_code 不能为空".to_string()));
+        }
+
+        let conn = self.get_conn()?;
+        let has_reject_columns = Self::has_material_state_column(&conn, "path_override_rejected")?;
+        if !has_reject_columns {
+            return Ok(vec![]);
+        }
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT
+                ms.material_id,
+                ms.path_override_reject_cycle_no,
+                ms.path_override_reject_base_sched_state
+            FROM material_state ms
+            JOIN material_master mm ON ms.material_id = mm.material_id
+            WHERE mm.current_machine_code = ?1
+              AND COALESCE(ms.path_override_rejected, 0) = 1
+            ORDER BY ms.material_id
+            "#,
+        )?;
+
+        let rows = stmt.query_map(params![code], |row| {
+            Ok(PathOverrideRejectionSummary {
+                material_id: row.get(0)?,
+                reject_cycle_no: row.get(1)?,
+                reject_base_sched_state: row.get(2)?,
             })
         })?;
 

@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import ErrorBoundary from '../components/ErrorBoundary';
 import NoActiveVersionGuide from '../components/NoActiveVersionGuide';
 import {
+  useActivePlanRev,
   useActiveVersionId,
   useAdminOverrideMode,
   useCurrentUser,
@@ -38,12 +39,23 @@ const PlanningWorkbench: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const activeVersionId = useActiveVersionId();
+  const activePlanRev = useActivePlanRev();
   const currentUser = useCurrentUser();
   const adminOverrideMode = useAdminOverrideMode();
   const workbenchViewMode = useGlobalStore((state) => state.workbenchViewMode);
   const workbenchFilters = useGlobalStore((state) => state.workbenchFilters);
   const preferences = useUserPreferences();
-  const { setRecalculating, setActiveVersion, setWorkbenchViewMode, setWorkbenchFilters } = useGlobalActions();
+  const {
+    setRecalculating,
+    setActiveVersion,
+    setWorkbenchViewMode,
+    setWorkbenchFilters,
+    beginLatestRun,
+    markLatestRunRunning,
+    markLatestRunDone,
+    markLatestRunFailed,
+    expireLatestRunIfNeeded,
+  } = useGlobalActions();
 
   // 【Phase 2 重构】使用 useWorkbenchModalState 聚合 4 个弹窗状态
   const { modals, openModal, closeModal } = useWorkbenchModalState();
@@ -116,6 +128,7 @@ const PlanningWorkbench: React.FC = () => {
 
   const { planItemsQuery, planItems } = useWorkbenchPlanItems({
     activeVersionId,
+    activePlanRev,
     machineCode: poolSelection.machineCode,
     dateRange: workbenchDateRange,
   });
@@ -125,6 +138,7 @@ const PlanningWorkbench: React.FC = () => {
   // AUTO 日期范围（基于当前机组的排程日期边界）
   const { autoDateRange, applyWorkbenchDateRange, resetWorkbenchDateRangeToAuto } = useWorkbenchAutoDateRange({
     activeVersionId,
+    activePlanRev,
     machineCode: poolSelection.machineCode,
     dateRangeMode,
     setDateRangeMode,
@@ -139,6 +153,11 @@ const PlanningWorkbench: React.FC = () => {
     defaultStrategy: preferences.defaultStrategy,
     setRecalculating,
     setActiveVersion,
+    beginLatestRun,
+    markLatestRunRunning,
+    markLatestRunDone,
+    markLatestRunFailed,
+    expireLatestRunIfNeeded,
   });
 
   const applyWorkbenchMachineCode = useCallback((machineCode: string | null) => {

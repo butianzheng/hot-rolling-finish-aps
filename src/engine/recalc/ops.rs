@@ -53,6 +53,7 @@ impl RecalcEngine {
     ) -> Result<RecalcResult, Box<dyn Error>> {
         // 1. 查询激活版本 (如果存在)
         let base_version = self.version_repo.find_active_version(plan_id)?;
+        let run_id = Uuid::new_v4().to_string();
 
         // 2. 创建新版本（试算模式下也创建临时版本用于计算）
         let mut new_version = if is_dry_run {
@@ -148,9 +149,15 @@ impl RecalcEngine {
         };
 
         // 8. 更新版本的frozen_from_date（仅生产模式）
-        if !is_dry_run {
+        let plan_rev = if !is_dry_run {
             self.version_repo.update(&new_version)?;
-        }
+            match self.version_repo.find_by_id(&new_version.version_id)? {
+                Some(v) => v.revision,
+                None => new_version.revision + 1,
+            }
+        } else {
+            new_version.revision
+        };
 
         // 9. 生成风险快照（仅生产模式）
         if !is_dry_run {
@@ -196,8 +203,10 @@ impl RecalcEngine {
 
         // 13. 构建返回结果
         Ok(RecalcResult {
+            run_id,
             version_id: new_version.version_id.clone(),
             version_no: new_version.version_no,
+            plan_rev,
             total_items: inserted_count,
             mature_count,
             immature_count,
@@ -242,6 +251,7 @@ impl RecalcEngine {
             .version_repo
             .find_by_id(version_id)?
             .ok_or("Version not found")?;
+        let run_id = Uuid::new_v4().to_string();
 
         // 2. 查询冻结区明细 (用于统计)
         let frozen_items = self.item_repo.find_frozen_items(version_id)?;
@@ -315,8 +325,10 @@ impl RecalcEngine {
 
         // 11. 构建返回结果
         Ok(RecalcResult {
+            run_id,
             version_id: version.version_id.clone(),
             version_no: version.version_no,
+            plan_rev: version.revision,
             total_items: inserted_count,
             mature_count,
             immature_count,

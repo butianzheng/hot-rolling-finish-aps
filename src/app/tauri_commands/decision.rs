@@ -1,4 +1,33 @@
 use crate::app::state::AppState;
+use crate::api::error::ApiError;
+use super::common::map_api_error;
+
+fn validate_expected_plan_rev(
+    state: &tauri::State<'_, AppState>,
+    version_id: &str,
+    expected_plan_rev: Option<i32>,
+) -> Result<(), String> {
+    let expected = match expected_plan_rev {
+        Some(v) => v,
+        None => return Ok(()),
+    };
+
+    let version = state
+        .plan_api
+        .get_version_detail(version_id)
+        .map_err(map_api_error)?;
+
+    let actual = version.revision;
+    if actual != expected {
+        return Err(map_api_error(ApiError::StalePlanRevision {
+            version_id: version_id.to_string(),
+            expected_plan_rev: expected,
+            actual_plan_rev: actual,
+        }));
+    }
+
+    Ok(())
+}
 
 // ==========================================
 // 决策支持相关命令
@@ -21,6 +50,7 @@ use crate::app::state::AppState;
 pub async fn get_decision_day_summary(
     state: tauri::State<'_, AppState>,
     version_id: String,
+    expected_plan_rev: Option<i32>,
     date_from: String,
     date_to: String,
     risk_level_filter: Option<String>,
@@ -28,6 +58,8 @@ pub async fn get_decision_day_summary(
     sort_by: Option<String>,
 ) -> Result<String, String> {
     use crate::decision::api::{DecisionApi, GetDecisionDaySummaryRequest};
+
+    validate_expected_plan_rev(&state, &version_id, expected_plan_rev)?;
 
     // 解析风险等级过滤器
     let risk_level_filter = if let Some(filter_str) = risk_level_filter {
@@ -73,6 +105,7 @@ pub async fn get_decision_day_summary(
 pub async fn get_machine_bottleneck_profile(
     state: tauri::State<'_, AppState>,
     version_id: String,
+    expected_plan_rev: Option<i32>,
     date_from: String,
     date_to: String,
     machine_codes: Option<String>,
@@ -81,6 +114,8 @@ pub async fn get_machine_bottleneck_profile(
     limit: Option<u32>,
 ) -> Result<String, String> {
     use crate::decision::api::{DecisionApi, GetMachineBottleneckProfileRequest};
+
+    validate_expected_plan_rev(&state, &version_id, expected_plan_rev)?;
 
     // 解析机组代码过滤器
     let machine_codes = if let Some(codes_str) = machine_codes {
@@ -147,6 +182,7 @@ pub async fn get_machine_bottleneck_profile(
 pub async fn list_order_failure_set(
     state: tauri::State<'_, AppState>,
     version_id: String,
+    expected_plan_rev: Option<i32>,
     fail_type_filter: Option<String>,
     urgency_level_filter: Option<String>,
     machine_codes: Option<String>,
@@ -157,6 +193,8 @@ pub async fn list_order_failure_set(
     offset: Option<u32>,
 ) -> Result<String, String> {
     use crate::decision::api::{DecisionApi, ListOrderFailureSetRequest};
+
+    validate_expected_plan_rev(&state, &version_id, expected_plan_rev)?;
 
     // 解析失败类型过滤器
     let fail_type_filter = if let Some(filter_str) = fail_type_filter {
@@ -221,12 +259,15 @@ pub async fn list_order_failure_set(
 pub async fn get_cold_stock_profile(
     state: tauri::State<'_, AppState>,
     version_id: String,
+    expected_plan_rev: Option<i32>,
     machine_codes: Option<String>,
     pressure_level_filter: Option<String>,
     age_bin_filter: Option<String>,
     limit: Option<u32>,
 ) -> Result<String, String> {
     use crate::decision::api::{DecisionApi, GetColdStockProfileRequest};
+
+    validate_expected_plan_rev(&state, &version_id, expected_plan_rev)?;
 
     // 解析机组代码过滤器
     let machine_codes = if let Some(codes_str) = machine_codes {
@@ -289,6 +330,7 @@ pub async fn get_cold_stock_profile(
 pub async fn get_roll_campaign_alert(
     state: tauri::State<'_, AppState>,
     version_id: String,
+    expected_plan_rev: Option<i32>,
     machine_codes: Option<String>,
     alert_level_filter: Option<String>,
     alert_type_filter: Option<String>,
@@ -297,6 +339,8 @@ pub async fn get_roll_campaign_alert(
     limit: Option<u32>,
 ) -> Result<String, String> {
     use crate::decision::api::{DecisionApi, ListRollCampaignAlertsRequest};
+
+    validate_expected_plan_rev(&state, &version_id, expected_plan_rev)?;
 
     // 解析机组代码过滤器
     let machine_codes = if let Some(codes_str) = machine_codes {
@@ -361,6 +405,7 @@ pub async fn get_roll_campaign_alert(
 pub async fn get_capacity_opportunity(
     state: tauri::State<'_, AppState>,
     version_id: String,
+    expected_plan_rev: Option<i32>,
     date_from: Option<String>,
     date_to: Option<String>,
     machine_codes: Option<String>,
@@ -369,6 +414,8 @@ pub async fn get_capacity_opportunity(
     limit: Option<u32>,
 ) -> Result<String, String> {
     use crate::decision::api::{DecisionApi, GetCapacityOpportunityRequest};
+
+    validate_expected_plan_rev(&state, &version_id, expected_plan_rev)?;
 
     // 解析机组代码过滤器
     let machine_codes = if let Some(codes_str) = machine_codes {

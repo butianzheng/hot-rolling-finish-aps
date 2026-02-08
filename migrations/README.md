@@ -14,7 +14,7 @@
 
 ### 权威 Schema 来源
 
-- **新建库**：`scripts/dev_db/schema.sql`（全量，包含所有 v0.2-v0.6 特性）
+- **新建库**：`scripts/dev_db/schema.sql`（全量，包含所有 v0.2-v0.8 特性）
 - **增量升级**：本目录的 `v0.*.sql` 文件
 
 ## 迁移文件清单
@@ -26,6 +26,7 @@
 | `v0.4_decision_layer.sql` | 3→4 | 决策读模型 D1-D6（6 个新表） | v0.3 |
 | `v0.5_strategy_draft.sql` | 4→5 | 策略草案持久化（decision_strategy_draft 表） | v0.4 |
 | `v0.6_path_rules_complete.sql` | 5→6 | 宽厚路径规则完整实现（合并版本） | v0.5 |
+| `v0.8_path_override_reject_flow.sql` | 6→8 | 路径规则拒绝闭环（拒绝态字段 + 索引） | v0.6 |
 
 ### ⚠️ 弃用文件
 
@@ -47,10 +48,11 @@ sqlite3 hot_rolling_aps.db < migrations/v0.3_material_state_enhancement.sql
 sqlite3 hot_rolling_aps.db < migrations/v0.4_decision_layer.sql
 sqlite3 hot_rolling_aps.db < migrations/v0.5_strategy_draft.sql
 sqlite3 hot_rolling_aps.db < migrations/v0.6_path_rules_complete.sql
+sqlite3 hot_rolling_aps.db < migrations/v0.8_path_override_reject_flow.sql
 
 # 3. 验证版本
 sqlite3 hot_rolling_aps.db "SELECT * FROM schema_version;"
-# 应显示 version = 6
+# 应显示 version = 8
 ```
 
 ## 迁移特性说明
@@ -90,6 +92,17 @@ sqlite3 hot_rolling_aps.db "SELECT * FROM schema_version;"
 - `roller_campaign` 新增字段：`path_anchor_material_id`、`path_anchor_width_mm`、`path_anchor_thickness_mm`、`anchor_source`
 - 默认配置初始化：路径规则参数（6 条配置项）
 
+### v0.8: 路径规则拒绝闭环
+
+- `material_state` 新增拒绝字段：
+  - `path_override_rejected`
+  - `path_override_rejected_at`
+  - `path_override_rejected_by`
+  - `path_override_rejected_reason`
+  - `path_override_reject_cycle_no`
+  - `path_override_reject_base_sched_state`
+- 新增索引：`idx_material_state_path_override_rejected`
+
 ## 幂等性说明
 
 迁移脚本设计为**部分幂等**：
@@ -116,7 +129,7 @@ sqlite3 hot_rolling_aps.db "SELECT * FROM schema_version;"
 
 应用启动时会检查 `schema_version` 表：
 
-- 若版本低于 `CURRENT_SCHEMA_VERSION`（当前为 6），会输出警告日志
+- 若版本低于 `CURRENT_SCHEMA_VERSION`（当前为 8），会输出警告日志
 - 不会自动执行迁移，需要人工确认
 
 ## 历史迁移脚本
@@ -127,5 +140,5 @@ sqlite3 hot_rolling_aps.db "SELECT * FROM schema_version;"
 
 ---
 
-**更新日期**：2026-02-04
-**当前版本**：v0.6 (schema_version = 6)
+**更新日期**：2026-02-08
+**当前版本**：v0.8 (schema_version = 8)

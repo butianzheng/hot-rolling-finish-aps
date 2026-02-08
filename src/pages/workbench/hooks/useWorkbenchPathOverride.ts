@@ -4,6 +4,9 @@ import { message } from 'antd';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { pathRuleApi, planApi } from '../../../api/tauri';
+import { DEFAULT_LATEST_RUN_TTL_MS } from '../../../stores/latestRun';
+import { useGlobalStore } from '../../../stores/use-global-store';
+import { createRunId } from '../../../utils/runId';
 import { formatDate } from '../../../utils/formatters';
 import { getErrorMessage } from '../../../utils/errorUtils';
 import type { WorkbenchPathOverrideState, WorkbenchScheduleFocus } from '../types';
@@ -26,6 +29,14 @@ export function useWorkbenchPathOverride(params: {
   defaultStrategy: string | null | undefined;
   setRecalculating: (flag: boolean) => void;
   setActiveVersion: (versionId: string | null) => void;
+  beginLatestRun: (input: { runId: string; triggeredAt?: number; ttlMs?: number; versionId?: string | null }) => {
+    accepted: boolean;
+    reason?: 'OLDER_TRIGGER' | 'EXPIRED_PREVIOUS';
+  };
+  markLatestRunRunning: (runId: string) => void;
+  markLatestRunDone: (runId: string, payload?: { versionId?: string | null; planRev?: number | null }) => void;
+  markLatestRunFailed: (runId: string, error?: string | null) => void;
+  expireLatestRunIfNeeded: (now?: number) => void;
 }): WorkbenchPathOverrideState {
   const {
     activeVersionId,
@@ -36,6 +47,11 @@ export function useWorkbenchPathOverride(params: {
     defaultStrategy,
     setRecalculating,
     setActiveVersion,
+    beginLatestRun,
+    markLatestRunRunning,
+    markLatestRunDone,
+    markLatestRunFailed,
+    expireLatestRunIfNeeded,
   } = params;
 
   const queryClient = useQueryClient();
@@ -75,16 +91,47 @@ export function useWorkbenchPathOverride(params: {
     async (baseDate: string) => {
       if (!activeVersionId) return;
       const base = String(baseDate || '').trim() || defaultPlanDate;
+
+      expireLatestRunIfNeeded();
+      const localRunId = createRunId('recalc');
+      const beginResult = beginLatestRun({
+        runId: localRunId,
+        versionId: activeVersionId,
+        ttlMs: DEFAULT_LATEST_RUN_TTL_MS,
+      });
+
+      if (!beginResult.accepted) {
+        message.info('已存在更新的重算触发，本次请求已忽略');
+        return;
+      }
+
       setRecalculating(true);
+      markLatestRunRunning(localRunId);
       try {
         const res = await planApi.recalcFull(
           activeVersionId,
           base,
           undefined,
           currentUser || 'admin',
-          defaultStrategy || 'balanced'
+          defaultStrategy || 'balanced',
+          undefined,
+          localRunId,
         );
+
+        const responseRunId = String(res?.run_id ?? localRunId).trim() || localRunId;
+        const responsePlanRev = Number(res?.plan_rev);
         const nextVersionId = String(res?.version_id ?? '').trim();
+
+        markLatestRunDone(responseRunId, {
+          versionId: nextVersionId || activeVersionId,
+          planRev: Number.isFinite(responsePlanRev) ? responsePlanRev : undefined,
+        });
+
+        const latestRunId = useGlobalStore.getState().latestRun.runId;
+        if (latestRunId !== responseRunId) {
+          return;
+        }
+
         if (nextVersionId) {
           setActiveVersion(nextVersionId);
           message.success(`已重算并切换到新版本：${nextVersionId}`);
@@ -95,6 +142,7 @@ export function useWorkbenchPathOverride(params: {
         await queryClient.invalidateQueries({ queryKey: workbenchQueryKeys.all });
       } catch (e: unknown) {
         console.error('【工作台】路径放行后重算失败：', e);
+        markLatestRunFailed(localRunId, getErrorMessage(e) || '重算失败');
         message.error(getErrorMessage(e) || '重算失败');
       } finally {
         setRecalculating(false);
@@ -108,6 +156,11 @@ export function useWorkbenchPathOverride(params: {
       queryClient,
       setActiveVersion,
       setRecalculating,
+      beginLatestRun,
+      markLatestRunRunning,
+      markLatestRunDone,
+      markLatestRunFailed,
+      expireLatestRunIfNeeded,
     ]
   );
 

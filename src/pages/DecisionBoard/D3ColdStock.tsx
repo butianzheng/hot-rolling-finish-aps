@@ -15,7 +15,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useSearchParams } from 'react-router-dom';
 import { useColdStockProfile } from '../../hooks/queries/use-decision-queries';
 import type { DrilldownSpec } from '../../hooks/useRiskOverviewData';
-import { useActiveVersionId } from '../../stores/use-global-store';
+import { useActivePlanRev, useActiveVersionId } from '../../stores/use-global-store';
 import { ColdStockChart } from '../../components/charts/ColdStockChart';
 import { EmptyState } from '../../components/EmptyState';
 import type { ColdStockBucket, AgeBin, PressureLevel, ReasonItem } from '../../types/decision';
@@ -88,6 +88,7 @@ interface D3ColdStockProps {
 
 export const D3ColdStock: React.FC<D3ColdStockProps> = ({ embedded, onOpenDrilldown }) => {
   const versionId = useActiveVersionId();
+  const activePlanRev = useActivePlanRev();
   const [searchParams] = useSearchParams();
   const [selectedMachine, setSelectedMachine] = useState<string | null>(null);
   const [selectedAgeBin, setSelectedAgeBin] = useState<AgeBin | null>(null);
@@ -95,7 +96,7 @@ export const D3ColdStock: React.FC<D3ColdStockProps> = ({ embedded, onOpenDrilld
 
   // 获取冷料数据（不默认筛掉低/中压，避免驾驶舱 drill-down 后“页面为空”）
   const { data, isLoading, error } = useColdStockProfile(
-    { versionId: versionId || '' },
+    { versionId: versionId || '', expectedPlanRev: activePlanRev ?? undefined },
     { enabled: !!versionId }
   );
 

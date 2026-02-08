@@ -94,9 +94,9 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
 
     let tx = conn.unchecked_transaction()?;
 
-    // schema_version (dev schema.sql already includes v0.6 features; keep it aligned for startup warnings)
+    // schema_version (dev schema.sql already includes v0.8 features; keep it aligned for startup warnings)
     tx.execute(
-        "INSERT INTO schema_version (version, applied_at) VALUES (6, ?1)",
+        "INSERT INTO schema_version (version, applied_at) VALUES (8, ?1)",
         params![now_sql_dt],
     )?;
 

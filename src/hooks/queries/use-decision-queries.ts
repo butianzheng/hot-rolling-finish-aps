@@ -36,6 +36,20 @@ import type {
   GetCapacityOpportunityRequest,
   CapacityOpportunityResponse,
 } from '../../types/decision';
+import { useActivePlanRev } from '../../stores/use-global-store';
+
+function withExpectedPlanRev<T extends { expectedPlanRev?: number }>(
+  request: T,
+  expectedPlanRev: number | null,
+): T {
+  if (!Number.isFinite(Number(expectedPlanRev))) {
+    return request;
+  }
+  return {
+    ...request,
+    expectedPlanRev: Number(expectedPlanRev),
+  };
+}
 
 // ==========================================
 // Query Keys（用于缓存管理）
@@ -131,9 +145,12 @@ export function useDecisionDaySummary(
     'queryKey' | 'queryFn'
   >
 ): UseQueryResult<DecisionDaySummaryResponse, DecisionApiError | ValidationError> {
+  const activePlanRev = useActivePlanRev();
+  const requestWithRev = withExpectedPlanRev(request, activePlanRev);
+
   return useQuery({
-    queryKey: decisionQueryKeys.daySummary(request),
-    queryFn: () => getDecisionDaySummary(request),
+    queryKey: decisionQueryKeys.daySummary(requestWithRev),
+    queryFn: () => getDecisionDaySummary(requestWithRev),
     ...DEFAULT_DECISION_QUERY_OPTIONS,
     ...options,
   });
@@ -150,13 +167,15 @@ export function useRecentDaysRisk(
     'queryKey' | 'queryFn'
   >
 ): UseQueryResult<DecisionDaySummaryResponse, DecisionApiError | ValidationError> {
+  const activePlanRev = useActivePlanRev();
+
   return useQuery({
-    queryKey: decisionQueryKeys.recentDaysRisk(versionId || '', days),
+    queryKey: [...decisionQueryKeys.recentDaysRisk(versionId || '', days), activePlanRev] as const,
     queryFn: () => {
       if (!versionId) {
         throw new DecisionApiError('MISSING_VERSION_ID', '未选择排产版本');
       }
-      return getRiskSummaryForRecentDays(versionId, days);
+      return getRiskSummaryForRecentDays(versionId, days, activePlanRev ?? undefined);
     },
     enabled: !!versionId, // 只有当versionId存在时才启用查询
     ...DEFAULT_DECISION_QUERY_OPTIONS,
@@ -178,9 +197,12 @@ export function useMachineBottleneckProfile(
     'queryKey' | 'queryFn'
   >
 ): UseQueryResult<MachineBottleneckProfileResponse, DecisionApiError | ValidationError> {
+  const activePlanRev = useActivePlanRev();
+  const requestWithRev = withExpectedPlanRev(request, activePlanRev);
+
   return useQuery({
-    queryKey: decisionQueryKeys.bottleneck(request),
-    queryFn: () => getMachineBottleneckProfile(request),
+    queryKey: decisionQueryKeys.bottleneck(requestWithRev),
+    queryFn: () => getMachineBottleneckProfile(requestWithRev),
     ...DEFAULT_DECISION_QUERY_OPTIONS,
     ...options,
   });
@@ -197,13 +219,15 @@ export function useRecentDaysBottleneck(
     'queryKey' | 'queryFn'
   >
 ): UseQueryResult<MachineBottleneckProfileResponse, DecisionApiError | ValidationError> {
+  const activePlanRev = useActivePlanRev();
+
   return useQuery({
-    queryKey: decisionQueryKeys.recentDaysBottleneck(versionId || '', days),
+    queryKey: [...decisionQueryKeys.recentDaysBottleneck(versionId || '', days), activePlanRev] as const,
     queryFn: () => {
       if (!versionId) {
         throw new DecisionApiError('MISSING_VERSION_ID', '未选择排产版本');
       }
-      return getBottleneckForRecentDays(versionId, days);
+      return getBottleneckForRecentDays(versionId, days, activePlanRev ?? undefined);
     },
     enabled: !!versionId,
     ...DEFAULT_DECISION_QUERY_OPTIONS,
@@ -225,9 +249,12 @@ export function useOrderFailureSet(
     'queryKey' | 'queryFn'
   >
 ): UseQueryResult<OrderFailureSetResponse, DecisionApiError | ValidationError> {
+  const activePlanRev = useActivePlanRev();
+  const requestWithRev = withExpectedPlanRev(request, activePlanRev);
+
   return useQuery({
-    queryKey: decisionQueryKeys.orderFailureSet(request),
-    queryFn: () => listOrderFailureSet(request),
+    queryKey: decisionQueryKeys.orderFailureSet(requestWithRev),
+    queryFn: () => listOrderFailureSet(requestWithRev),
     ...DEFAULT_DECISION_QUERY_OPTIONS,
     ...options,
   });
@@ -243,13 +270,15 @@ export function useAllFailedOrders(
     'queryKey' | 'queryFn'
   >
 ): UseQueryResult<OrderFailureSetResponse, DecisionApiError | ValidationError> {
+  const activePlanRev = useActivePlanRev();
+
   return useQuery({
-    queryKey: decisionQueryKeys.allFailedOrders(versionId || ''),
+    queryKey: [...decisionQueryKeys.allFailedOrders(versionId || ''), activePlanRev] as const,
     queryFn: () => {
       if (!versionId) {
         throw new DecisionApiError('MISSING_VERSION_ID', '未选择排产版本');
       }
-      return getAllFailedOrders(versionId);
+      return getAllFailedOrders(versionId, activePlanRev ?? undefined);
     },
     enabled: !!versionId,
     ...DEFAULT_DECISION_QUERY_OPTIONS,
@@ -271,9 +300,12 @@ export function useColdStockProfile(
     'queryKey' | 'queryFn'
   >
 ): UseQueryResult<ColdStockProfileResponse, DecisionApiError | ValidationError> {
+  const activePlanRev = useActivePlanRev();
+  const requestWithRev = withExpectedPlanRev(request, activePlanRev);
+
   return useQuery({
-    queryKey: decisionQueryKeys.coldStockProfile(request),
-    queryFn: () => getColdStockProfile(request),
+    queryKey: decisionQueryKeys.coldStockProfile(requestWithRev),
+    queryFn: () => getColdStockProfile(requestWithRev),
     ...DEFAULT_DECISION_QUERY_OPTIONS,
     ...options,
   });
@@ -289,13 +321,15 @@ export function useHighPressureColdStock(
     'queryKey' | 'queryFn'
   >
 ): UseQueryResult<ColdStockProfileResponse, DecisionApiError | ValidationError> {
+  const activePlanRev = useActivePlanRev();
+
   return useQuery({
-    queryKey: decisionQueryKeys.highPressureColdStock(versionId || ''),
+    queryKey: [...decisionQueryKeys.highPressureColdStock(versionId || ''), activePlanRev] as const,
     queryFn: () => {
       if (!versionId) {
         throw new DecisionApiError('MISSING_VERSION_ID', '未选择排产版本');
       }
-      return getHighPressureColdStock(versionId);
+      return getHighPressureColdStock(versionId, activePlanRev ?? undefined);
     },
     enabled: !!versionId,
     ...DEFAULT_DECISION_QUERY_OPTIONS,
@@ -317,9 +351,12 @@ export function useRollCampaignAlert(
     'queryKey' | 'queryFn'
   >
 ): UseQueryResult<RollCampaignAlertResponse, DecisionApiError | ValidationError> {
+  const activePlanRev = useActivePlanRev();
+  const requestWithRev = withExpectedPlanRev(request, activePlanRev);
+
   return useQuery({
-    queryKey: decisionQueryKeys.rollCampaignAlert(request),
-    queryFn: () => getRollCampaignAlert(request),
+    queryKey: decisionQueryKeys.rollCampaignAlert(requestWithRev),
+    queryFn: () => getRollCampaignAlert(requestWithRev),
     ...DEFAULT_DECISION_QUERY_OPTIONS,
     ...options,
   });
@@ -335,13 +372,15 @@ export function useAllRollCampaignAlerts(
     'queryKey' | 'queryFn'
   >
 ): UseQueryResult<RollCampaignAlertResponse, DecisionApiError | ValidationError> {
+  const activePlanRev = useActivePlanRev();
+
   return useQuery({
-    queryKey: decisionQueryKeys.allRollCampaignAlerts(versionId || ''),
+    queryKey: [...decisionQueryKeys.allRollCampaignAlerts(versionId || ''), activePlanRev] as const,
     queryFn: () => {
       if (!versionId) {
         throw new DecisionApiError('MISSING_VERSION_ID', '未选择排产版本');
       }
-      return getAllRollCampaignAlerts(versionId);
+      return getAllRollCampaignAlerts(versionId, activePlanRev ?? undefined);
     },
     enabled: !!versionId,
     ...DEFAULT_DECISION_QUERY_OPTIONS,
@@ -363,9 +402,12 @@ export function useCapacityOpportunity(
     'queryKey' | 'queryFn'
   >
 ): UseQueryResult<CapacityOpportunityResponse, DecisionApiError | ValidationError> {
+  const activePlanRev = useActivePlanRev();
+  const requestWithRev = withExpectedPlanRev(request, activePlanRev);
+
   return useQuery({
-    queryKey: decisionQueryKeys.capacityOpportunity(request),
-    queryFn: () => getCapacityOpportunity(request),
+    queryKey: decisionQueryKeys.capacityOpportunity(requestWithRev),
+    queryFn: () => getCapacityOpportunity(requestWithRev),
     ...DEFAULT_DECISION_QUERY_OPTIONS,
     ...options,
   });
@@ -382,13 +424,15 @@ export function useRecentDaysCapacityOpportunity(
     'queryKey' | 'queryFn'
   >
 ): UseQueryResult<CapacityOpportunityResponse, DecisionApiError | ValidationError> {
+  const activePlanRev = useActivePlanRev();
+
   return useQuery({
-    queryKey: decisionQueryKeys.recentDaysCapacityOpportunity(versionId || '', days),
+    queryKey: [...decisionQueryKeys.recentDaysCapacityOpportunity(versionId || '', days), activePlanRev] as const,
     queryFn: () => {
       if (!versionId) {
         throw new DecisionApiError('MISSING_VERSION_ID', '未选择排产版本');
       }
-      return getCapacityOpportunityForRecentDays(versionId, days);
+      return getCapacityOpportunityForRecentDays(versionId, days, activePlanRev ?? undefined);
     },
     enabled: !!versionId,
     ...DEFAULT_DECISION_QUERY_OPTIONS,

@@ -63,6 +63,7 @@ export type PathOverrideConfirmModalProps = {
   planDate: string | null; // YYYY-MM-DD
   operator: string;
   onConfirmed?: (result: { confirmedCount: number; autoRecalc: boolean }) => void;
+  onRejected?: (result: { rejectedCount: number; autoRecalc: boolean }) => void;
 };
 
 const PathOverrideConfirmModal: React.FC<PathOverrideConfirmModalProps> = ({
@@ -73,6 +74,7 @@ const PathOverrideConfirmModal: React.FC<PathOverrideConfirmModalProps> = ({
   planDate,
   operator,
   onConfirmed,
+  onRejected,
 }) => {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -221,6 +223,58 @@ const PathOverrideConfirmModal: React.FC<PathOverrideConfirmModalProps> = ({
     }
   };
 
+  const rejectBatch = async (materialIds: string[], autoRecalcAfterReject: boolean) => {
+    if (!versionId) return;
+    const ids = Array.from(new Set(materialIds.map((id) => String(id || '').trim()))).filter(Boolean);
+    if (ids.length === 0) {
+      message.warning('请选择要拒绝的物料');
+      return;
+    }
+    const cleanReason = String(reason || '').trim();
+    if (!cleanReason) {
+      message.warning('请输入拒绝原因');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await pathRuleApi.batchRejectPathOverride({
+        versionId,
+        materialIds: ids,
+        rejectedBy: operator || 'system',
+        reason: cleanReason,
+      });
+      const ok = Number(res?.success_count ?? 0);
+      const fail = Number(res?.fail_count ?? 0);
+      if (ok > 0) message.success(`已拒绝 ${ok} 条突破`);
+      if (fail > 0) {
+        const failed = Array.isArray(res?.failed_material_ids) ? res.failed_material_ids : [];
+        Modal.info({
+          title: '部分拒绝失败',
+          content: (
+            <div>
+              <p style={{ marginBottom: 8 }}>成功 {ok} 条，失败 {fail} 条。</p>
+              {failed.length > 0 ? (
+                <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
+                  {failed.filter(Boolean).join('\n')}
+                </pre>
+              ) : null}
+            </div>
+          ),
+        });
+      }
+      onRejected?.({ rejectedCount: ok, autoRecalc: autoRecalcAfterReject });
+      setSelectedIds([]);
+      await loadPending();
+    } catch (e: unknown) {
+      console.error('【路径放行确认弹窗】批量拒绝失败：', e);
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      message.error(errorMessage || '批量拒绝失败');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const columns: ColumnsType<PendingRow> = [
     {
       title: '物料',
@@ -319,6 +373,21 @@ const PathOverrideConfirmModal: React.FC<PathOverrideConfirmModalProps> = ({
             <Button onClick={() => confirmBatch(rows.map((r) => r.material_id))} disabled={rows.length === 0 || submitting}>
               全部确认 ({rows.length})
             </Button>
+            <Button
+              danger
+              onClick={() => rejectBatch(selectedIds, true)}
+              disabled={selectedIds.length === 0 || submitting}
+            >
+              拒绝并重算 ({selectedIds.length})
+            </Button>
+            <Button
+              danger
+              type="dashed"
+              onClick={() => rejectBatch(selectedIds, false)}
+              disabled={selectedIds.length === 0 || submitting}
+            >
+              仅拒绝（不重算）
+            </Button>
           </Space>
           <Button onClick={onClose}>关闭</Button>
         </Space>
@@ -359,7 +428,7 @@ const PathOverrideConfirmModal: React.FC<PathOverrideConfirmModalProps> = ({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={2}
-            placeholder="确认原因（必填，例如：客户交付临期/现场指令/工艺例外审批等）"
+            placeholder="确认/拒绝原因（必填，例如：客户交付临期/现场指令/工艺例外审批等）"
             maxLength={200}
             showCount
           />

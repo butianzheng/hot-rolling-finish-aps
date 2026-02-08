@@ -141,6 +141,18 @@ impl PlanApi {
             .map_err(|e| ApiError::DatabaseError(e.to_string()))
     }
 
+    /// 查询版本详情（包含 revision）
+    pub fn get_version_detail(&self, version_id: &str) -> ApiResult<PlanVersion> {
+        if version_id.trim().is_empty() {
+            return Err(ApiError::InvalidInput("版本ID不能为空".to_string()));
+        }
+
+        self.plan_version_repo
+            .find_by_id(version_id)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?
+            .ok_or_else(|| ApiError::NotFound(format!("版本{}不存在", version_id)))
+    }
+
     /// 删除版本（仅允许删除非激活版本）
     pub fn delete_version(&self, version_id: &str, operator: &str) -> ApiResult<()> {
         if version_id.trim().is_empty() {

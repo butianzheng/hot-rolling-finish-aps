@@ -157,6 +157,80 @@ pub async fn batch_confirm_path_override_by_range(
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
 
+/// 单个材料人工拒绝路径突破
+#[tauri::command(rename_all = "snake_case")]
+pub async fn reject_path_override(
+    state: tauri::State<'_, AppState>,
+    version_id: String,
+    material_id: String,
+    rejected_by: String,
+    reason: String,
+) -> Result<String, String> {
+    state
+        .path_rule_api
+        .reject_path_override(&version_id, &material_id, &rejected_by, &reason)
+        .map_err(map_api_error)?;
+
+    Ok("{}".to_string())
+}
+
+/// 批量人工拒绝路径突破
+#[tauri::command(rename_all = "snake_case")]
+pub async fn batch_reject_path_override(
+    state: tauri::State<'_, AppState>,
+    version_id: String,
+    material_ids: String,
+    rejected_by: String,
+    reason: String,
+) -> Result<String, String> {
+    let ids: Vec<String> =
+        serde_json::from_str(&material_ids).map_err(|e| format!("解析材料ID列表失败: {}", e))?;
+
+    let result = state
+        .path_rule_api
+        .batch_reject_path_override(&version_id, &ids, &rejected_by, &reason)
+        .map_err(map_api_error)?;
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
+}
+
+/// 按日期范围/机组范围批量人工拒绝路径突破
+#[tauri::command(rename_all = "snake_case")]
+pub async fn batch_reject_path_override_by_range(
+    state: tauri::State<'_, AppState>,
+    version_id: String,
+    plan_date_from: String,
+    plan_date_to: String,
+    machine_codes: Option<String>, // JSON数组字符串（可选）
+    rejected_by: String,
+    reason: String,
+) -> Result<String, String> {
+    let from = parse_date(&plan_date_from)?;
+    let to = parse_date(&plan_date_to)?;
+
+    let machine_codes = if let Some(raw) = machine_codes {
+        let list: Vec<String> =
+            serde_json::from_str(&raw).map_err(|e| format!("machine_codes 解析失败: {}", e))?;
+        Some(list)
+    } else {
+        None
+    };
+
+    let result = state
+        .path_rule_api
+        .batch_reject_path_override_by_range(
+            &version_id,
+            from,
+            to,
+            machine_codes.as_deref(),
+            &rejected_by,
+            &reason,
+        )
+        .map_err(map_api_error)?;
+
+    serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
+}
+
 /// 查询当前活跃换辊周期的路径锚点
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_roll_cycle_anchor(
@@ -188,4 +262,3 @@ pub async fn reset_roll_cycle(
 
     Ok("{}".to_string())
 }
-

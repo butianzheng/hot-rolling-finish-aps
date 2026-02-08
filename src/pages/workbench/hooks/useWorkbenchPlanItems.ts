@@ -17,13 +17,14 @@ type IpcPlanItem = Awaited<ReturnType<typeof planApi.listPlanItems>>[number];
  */
 export function useWorkbenchPlanItems(params: {
   activeVersionId: string | null;
+  activePlanRev: number | null;
   machineCode: string | null;
   dateRange: [Dayjs, Dayjs];
 }): {
   planItemsQuery: UseQueryResult<IpcPlanItem[], unknown>;
   planItems: IpcPlanItem[];
 } {
-  const { activeVersionId, machineCode, dateRange } = params;
+  const { activeVersionId, activePlanRev, machineCode, dateRange } = params;
 
   const planDateFrom = useMemo(() => formatDate(dateRange[0]), [dateRange]);
   const planDateTo = useMemo(() => formatDate(dateRange[1]), [dateRange]);
@@ -38,8 +39,9 @@ export function useWorkbenchPlanItems(params: {
       machine_code: normalizedMachineCode,
       plan_date_from: planDateFrom,
       plan_date_to: planDateTo,
+      expected_plan_rev: activePlanRev,
     }),
-    [activeVersionId, normalizedMachineCode, planDateFrom, planDateTo]
+    [activeVersionId, normalizedMachineCode, planDateFrom, planDateTo, activePlanRev]
   );
 
   const planItemsQuery = useQuery({
@@ -65,6 +67,7 @@ export function useWorkbenchPlanItems(params: {
           plan_date_to: planDateTo,
           limit: pageSize,
           offset,
+          expected_plan_rev: activePlanRev ?? undefined,
         });
 
         all.push(...page);

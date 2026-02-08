@@ -16,6 +16,9 @@ export interface GetRollCampaignAlertRequest {
   /** 方案版本 ID（必填） */
   versionId: string;
 
+  /** 期望计划修订号（可选，用于防陈旧读取） */
+  expectedPlanRev?: number;
+
   /** 机组代码过滤（可选，为空则查询所有机组） */
   machineCodes?: string[];
 

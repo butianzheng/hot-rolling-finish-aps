@@ -151,6 +151,7 @@ where
             None,
             None,
             None,
+            None,
         )
         .await
     }
@@ -170,6 +171,7 @@ where
         path_rule_engine: Option<&'a PathRuleEngine>,
         initial_anchor: Option<Anchor>,
         initial_anchor_material_id: Option<String>,
+        priority_boost_material_ids: Option<&std::collections::HashSet<String>>,
     ) -> Result<ScheduleResult, Box<dyn Error>> {
         info!(
             machine_code = %capacity_pool.machine_code,
@@ -252,6 +254,33 @@ where
             urgent_levels_count = urgent_levels.len(),
             "紧急等级判定完成"
         );
+
+        if let Some(boost_ids) = priority_boost_material_ids {
+            if !boost_ids.is_empty() {
+                for (material, state) in &mut eligible_materials {
+                    if !boost_ids.contains(&material.material_id) {
+                        continue;
+                    }
+
+                    let boosted = match state.urgent_level {
+                        UrgentLevel::L0 => UrgentLevel::L1,
+                        UrgentLevel::L1 => UrgentLevel::L2,
+                        UrgentLevel::L2 => UrgentLevel::L3,
+                        UrgentLevel::L3 => UrgentLevel::L3,
+                    };
+                    if boosted != state.urgent_level {
+                        state.urgent_level = boosted;
+                        let reason_suffix = "PATH_OVERRIDE_REJECT_BOOST(+1)";
+                        state.urgent_reason = Some(match state.urgent_reason.take() {
+                            Some(prev) if !prev.trim().is_empty() => {
+                                format!("{}; {}", prev, reason_suffix)
+                            }
+                            _ => reason_suffix.to_string(),
+                        });
+                    }
+                }
+            }
+        }
 
         // ==========================================
         // 步骤3: Priority Sorter - 等级内排序

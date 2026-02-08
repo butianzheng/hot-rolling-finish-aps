@@ -7,6 +7,7 @@ import {
   useRecentDaysCapacityOpportunity,
   useRecentDaysRisk,
 } from './queries/use-decision-queries';
+import { useActivePlanRev } from '../stores/use-global-store';
 import { useGlobalKPI } from './useGlobalKPI';
 import { parseAlertLevel } from '../types/decision';
 import type { UrgencyLevel } from '../types/decision';
@@ -124,11 +125,15 @@ function getRiskSeverity(level: DaySummary['riskLevel'] | null): ProblemSeverity
 }
 
 export function useRiskOverviewData(versionId: string | null): RiskOverviewData {
+  const activePlanRev = useActivePlanRev();
   const kpiQuery = useGlobalKPI(versionId);
   const riskQuery = useRecentDaysRisk(versionId, 30);
   const bottleneckQuery = useRecentDaysBottleneck(versionId, 30);
   const ordersQuery = useAllFailedOrders(versionId);
-  const coldStockQuery = useColdStockProfile({ versionId: versionId || '' }, { enabled: !!versionId });
+  const coldStockQuery = useColdStockProfile(
+    { versionId: versionId || '', expectedPlanRev: activePlanRev ?? undefined },
+    { enabled: !!versionId },
+  );
   const rollQuery = useAllRollCampaignAlerts(versionId);
   const capacityOpportunityQuery = useRecentDaysCapacityOpportunity(versionId, 30);
 

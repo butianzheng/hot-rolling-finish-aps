@@ -113,8 +113,14 @@ mod operations;
 /// 重算响应
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecalcResponse {
+    /// 重算运行ID
+    pub run_id: String,
+
     /// 版本ID
     pub version_id: String,
+
+    /// 版本修订号（plan_rev）
+    pub plan_rev: i32,
 
     /// 排产材料数量
     pub plan_items_count: usize,

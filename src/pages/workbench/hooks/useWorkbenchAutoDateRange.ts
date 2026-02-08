@@ -9,6 +9,7 @@ import { workbenchQueryKeys } from '../queryKeys';
 
 export function useWorkbenchAutoDateRange(params: {
   activeVersionId: string | null;
+  activePlanRev: number | null;
   machineCode: string | null;
   dateRangeMode: WorkbenchDateRangeMode;
   setDateRangeMode: Dispatch<SetStateAction<WorkbenchDateRangeMode>>;
@@ -18,17 +19,17 @@ export function useWorkbenchAutoDateRange(params: {
   applyWorkbenchDateRange: (next: [dayjs.Dayjs, dayjs.Dayjs]) => void;
   resetWorkbenchDateRangeToAuto: () => void;
 } {
-  const { activeVersionId, machineCode, dateRangeMode, setDateRangeMode, setWorkbenchDateRange } = params;
+  const { activeVersionId, activePlanRev, machineCode, dateRangeMode, setDateRangeMode, setWorkbenchDateRange } = params;
 
   const normalizedMachineCode =
     machineCode && machineCode !== 'all' ? String(machineCode).trim() : undefined;
 
   const boundsQuery = useQuery({
-    queryKey: workbenchQueryKeys.planItems.dateBounds(activeVersionId, normalizedMachineCode ?? null),
+    queryKey: workbenchQueryKeys.planItems.dateBounds(activeVersionId, normalizedMachineCode ?? null, activePlanRev),
     enabled: !!activeVersionId,
     queryFn: async () => {
       if (!activeVersionId) return null;
-      return planApi.getPlanItemDateBounds(activeVersionId, normalizedMachineCode);
+      return planApi.getPlanItemDateBounds(activeVersionId, normalizedMachineCode, activePlanRev ?? undefined);
     },
     staleTime: 30 * 1000,
   });

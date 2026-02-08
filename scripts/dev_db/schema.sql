@@ -141,6 +141,12 @@ CREATE TABLE material_state (
   user_confirmed_at TEXT,
   user_confirmed_by TEXT,
   user_confirmed_reason TEXT,
+  path_override_rejected INTEGER NOT NULL DEFAULT 0,
+  path_override_rejected_at TEXT,
+  path_override_rejected_by TEXT,
+  path_override_rejected_reason TEXT,
+  path_override_reject_cycle_no INTEGER,
+  path_override_reject_base_sched_state TEXT,
   in_frozen_zone INTEGER NOT NULL DEFAULT 0,
 
   updated_by TEXT,
@@ -171,6 +177,10 @@ CREATE INDEX idx_state_manual_urgent
 CREATE INDEX idx_material_state_user_confirmed
   ON material_state(user_confirmed)
   WHERE user_confirmed = 0;
+
+CREATE INDEX idx_material_state_path_override_rejected
+  ON material_state(path_override_rejected)
+  WHERE path_override_rejected = 1;
 
 -- ==========================================
 -- Plan / version / items

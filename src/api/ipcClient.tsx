@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/tauri';
 import { Modal } from 'antd';
 import { reportFrontendEvent } from '../utils/telemetry';
+import { handleStalePlanRevError } from '../services/stalePlanRev';
 
 export interface IpcError {
   code: string;
@@ -121,7 +122,11 @@ export class IpcClient {
       }
     }
 
-    if (lastError && showError) {
+    const staleHandled = lastError
+      ? await handleStalePlanRevError(lastError, { source: 'ipc', command })
+      : false;
+
+    if (lastError && showError && !staleHandled) {
       // best-effort: 将"会弹窗的错误"同步写入后端 action_log，便于线下排查
       const paramsKeys = (typeof params === 'object' && params !== null && !Array.isArray(params))
         ? Object.keys(params)
@@ -133,7 +138,7 @@ export class IpcClient {
       });
     }
 
-    if (showError && lastError) {
+    if (showError && lastError && !staleHandled) {
       this.showError(lastError);
     }
     throw lastError;

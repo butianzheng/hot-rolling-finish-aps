@@ -90,7 +90,9 @@ impl PlanApi {
 
         // 返回结果（不记录ActionLog）
         Ok(RecalcResponse {
+            run_id: result.run_id,
             version_id: result.version_id,
+            plan_rev: result.plan_rev,
             plan_items_count: result.total_items,
             frozen_items_count: result.frozen_items,
             success: true,
@@ -234,7 +236,9 @@ impl PlanApi {
 
         // 返回结果
         Ok(RecalcResponse {
+            run_id: recalc_result.run_id,
             version_id: recalc_result.version_id,
+            plan_rev: recalc_result.plan_rev,
             plan_items_count,
             frozen_items_count,
             success: true,

@@ -5,8 +5,14 @@
 // ==========================================
 
 import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  MutationCache,
+  QueryCache,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query';
 import { message } from 'antd';
+import { handleStalePlanRevError } from '../services/stalePlanRev';
 
 // ==========================================
 // QueryClient 实例
@@ -16,6 +22,21 @@ import { message } from 'antd';
  * 全局QueryClient实例
  */
 export const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error) => {
+      void handleStalePlanRevError(error, { source: 'query' });
+    },
+  }),
+  mutationCache: new MutationCache({
+    onError: (error: unknown) => {
+      void handleStalePlanRevError(error, { source: 'mutation' }).then((handled) => {
+        if (handled) return;
+        console.error('【变更执行错误】', error);
+        const msg = error instanceof Error ? error.message : '操作失败，请重试';
+        message.error(msg);
+      });
+    },
+  }),
   defaultOptions: {
     queries: {
       // 默认配置
@@ -33,13 +54,6 @@ export const queryClient = new QueryClient({
       // Mutation默认配置
       retry: 1,
       retryDelay: 1000,
-
-      // 全局错误处理
-      onError: (error: unknown) => {
-        console.error('【变更执行错误】', error);
-        const msg = error instanceof Error ? error.message : '操作失败，请重试';
-        message.error(msg);
-      },
     },
   },
 });

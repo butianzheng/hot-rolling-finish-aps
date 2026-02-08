@@ -67,6 +67,7 @@ fn main() {
             list_plans,
             get_plan_detail,
             get_latest_active_version_id,
+            get_version_detail,
             delete_plan,
             delete_version,
             create_version,
@@ -126,6 +127,9 @@ fn main() {
             confirm_path_override,
             batch_confirm_path_override,
             batch_confirm_path_override_by_range,
+            reject_path_override,
+            batch_reject_path_override,
+            batch_reject_path_override_by_range,
             get_roll_cycle_anchor,
             reset_roll_cycle,
 

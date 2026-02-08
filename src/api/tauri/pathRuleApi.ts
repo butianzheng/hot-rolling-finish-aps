@@ -138,6 +138,70 @@ export const pathRuleApi = {
     );
   },
 
+  async rejectPathOverride(params: {
+    versionId: string;
+    materialId: string;
+    rejectedBy: string;
+    reason: string;
+  }): Promise<void> {
+    await IpcClient.call(
+      'reject_path_override',
+      {
+        version_id: params.versionId,
+        material_id: params.materialId,
+        rejected_by: params.rejectedBy,
+        reason: params.reason,
+      },
+      {
+        validate: zodValidator(EmptyOkResponseSchema, 'reject_path_override'),
+      }
+    );
+  },
+
+  async batchRejectPathOverride(params: {
+    versionId: string;
+    materialIds: string[];
+    rejectedBy: string;
+    reason: string;
+  }): Promise<z.infer<typeof BatchConfirmPathOverrideResultSchema>> {
+    return IpcClient.call(
+      'batch_reject_path_override',
+      {
+        version_id: params.versionId,
+        material_ids: JSON.stringify(params.materialIds),
+        rejected_by: params.rejectedBy,
+        reason: params.reason,
+      },
+      {
+        validate: zodValidator(BatchConfirmPathOverrideResultSchema, 'batch_reject_path_override'),
+      }
+    );
+  },
+
+  async batchRejectPathOverrideByRange(params: {
+    versionId: string;
+    planDateFrom: string; // YYYY-MM-DD
+    planDateTo: string; // YYYY-MM-DD
+    machineCodes?: string[];
+    rejectedBy: string;
+    reason: string;
+  }): Promise<z.infer<typeof BatchConfirmPathOverrideResultSchema>> {
+    return IpcClient.call(
+      'batch_reject_path_override_by_range',
+      {
+        version_id: params.versionId,
+        plan_date_from: params.planDateFrom,
+        plan_date_to: params.planDateTo,
+        machine_codes: params.machineCodes ? JSON.stringify(params.machineCodes) : undefined,
+        rejected_by: params.rejectedBy,
+        reason: params.reason,
+      },
+      {
+        validate: zodValidator(BatchConfirmPathOverrideResultSchema, 'batch_reject_path_override_by_range'),
+      }
+    );
+  },
+
   async getRollCycleAnchor(params: {
     versionId: string;
     machineCode: string;
@@ -174,4 +238,3 @@ export const pathRuleApi = {
     );
   },
 };
-

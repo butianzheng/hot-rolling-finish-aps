@@ -57,6 +57,15 @@ impl PathOverridePendingRepository {
             .map_err(|e| RepositoryError::LockError(e.to_string()))
     }
 
+    fn has_material_state_reject_column(conn: &Connection) -> RepositoryResult<bool> {
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('material_state') WHERE name = 'path_override_rejected'",
+            [],
+            |row| row.get(0),
+        )?;
+        Ok(count > 0)
+    }
+
     pub fn ensure_schema(&self) -> RepositoryResult<()> {
         let conn = self.get_conn()?;
         conn.execute_batch(
@@ -151,6 +160,7 @@ impl PathOverridePendingRepository {
     ) -> RepositoryResult<Vec<PathOverridePendingSummaryRow>> {
         self.ensure_schema()?;
         let conn = self.get_conn()?;
+        let has_reject_column = Self::has_material_state_reject_column(&conn)?;
 
         let mut sql = String::from(
             r#"
@@ -163,6 +173,9 @@ impl PathOverridePendingRepository {
               AND s.user_confirmed = 0
             "#,
         );
+        if has_reject_column {
+            sql.push_str("\n              AND COALESCE(s.path_override_rejected, 0) = 0\n");
+        }
 
         let mut params: Vec<Value> = vec![
             Value::from(version_id.to_string()),
@@ -216,6 +229,7 @@ impl PathOverridePendingRepository {
     ) -> RepositoryResult<Vec<String>> {
         self.ensure_schema()?;
         let conn = self.get_conn()?;
+        let has_reject_column = Self::has_material_state_reject_column(&conn)?;
 
         let mut sql = String::from(
             r#"
@@ -228,6 +242,9 @@ impl PathOverridePendingRepository {
               AND s.user_confirmed = 0
             "#,
         );
+        if has_reject_column {
+            sql.push_str("\n              AND COALESCE(s.path_override_rejected, 0) = 0\n");
+        }
         let mut params: Vec<Value> = vec![
             Value::from(version_id.to_string()),
             Value::from(date_from.format("%Y-%m-%d").to_string()),
@@ -269,9 +286,10 @@ impl PathOverridePendingRepository {
     ) -> RepositoryResult<Vec<PathOverridePendingRecord>> {
         self.ensure_schema()?;
         let conn = self.get_conn()?;
+        let has_reject_column = Self::has_material_state_reject_column(&conn)?;
 
         let date_str = plan_date.format("%Y-%m-%d").to_string();
-        let mut stmt = conn.prepare(
+        let mut sql = String::from(
             r#"
             SELECT
               p.version_id, p.machine_code, p.plan_date, p.material_id,
@@ -285,9 +303,13 @@ impl PathOverridePendingRepository {
               AND p.machine_code = ?2
               AND p.plan_date = ?3
               AND s.user_confirmed = 0
-            ORDER BY p.urgent_level DESC, p.material_id ASC
             "#,
-        )?;
+        );
+        if has_reject_column {
+            sql.push_str("\n              AND COALESCE(s.path_override_rejected, 0) = 0\n");
+        }
+        sql.push_str(" ORDER BY p.urgent_level DESC, p.material_id ASC");
+        let mut stmt = conn.prepare(&sql)?;
 
         let rows = stmt
             .query_map(params![version_id, machine_code, date_str], |row| {

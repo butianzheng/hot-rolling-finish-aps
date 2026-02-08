@@ -5,6 +5,34 @@ impl PlanApi {
     // 明细查询接口
     // ==========================================
 
+    fn validate_expected_plan_rev(
+        &self,
+        version_id: &str,
+        expected_plan_rev: Option<i32>,
+    ) -> ApiResult<()> {
+        let expected = match expected_plan_rev {
+            Some(v) => v,
+            None => return Ok(()),
+        };
+
+        let version = self
+            .plan_version_repo
+            .find_by_id(version_id)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?
+            .ok_or_else(|| ApiError::NotFound(format!("版本{}不存在", version_id)))?;
+
+        let actual = version.revision;
+        if actual != expected {
+            return Err(ApiError::StalePlanRevision {
+                version_id: version_id.to_string(),
+                expected_plan_rev: expected,
+                actual_plan_rev: actual,
+            });
+        }
+
+        Ok(())
+    }
+
     /// 查询排产明细（按版本）
     ///
     /// # 参数
@@ -14,9 +42,19 @@ impl PlanApi {
     /// - Ok(Vec<PlanItem>): 排产明细列表
     /// - Err(ApiError): API错误
     pub fn list_plan_items(&self, version_id: &str) -> ApiResult<Vec<PlanItem>> {
+        self.list_plan_items_with_rev(version_id, None)
+    }
+
+    pub fn list_plan_items_with_rev(
+        &self,
+        version_id: &str,
+        expected_plan_rev: Option<i32>,
+    ) -> ApiResult<Vec<PlanItem>> {
         if version_id.trim().is_empty() {
             return Err(ApiError::InvalidInput("版本ID不能为空".to_string()));
         }
+
+        self.validate_expected_plan_rev(version_id, expected_plan_rev)?;
 
         let mut items = self.plan_item_repo
             .find_by_version(version_id)
@@ -40,9 +78,32 @@ impl PlanApi {
         limit: Option<i64>,
         offset: Option<i64>,
     ) -> ApiResult<Vec<PlanItem>> {
+        self.list_plan_items_filtered_with_rev(
+            version_id,
+            machine_code,
+            plan_date_from,
+            plan_date_to,
+            limit,
+            offset,
+            None,
+        )
+    }
+
+    pub fn list_plan_items_filtered_with_rev(
+        &self,
+        version_id: &str,
+        machine_code: Option<&str>,
+        plan_date_from: Option<NaiveDate>,
+        plan_date_to: Option<NaiveDate>,
+        limit: Option<i64>,
+        offset: Option<i64>,
+        expected_plan_rev: Option<i32>,
+    ) -> ApiResult<Vec<PlanItem>> {
         if version_id.trim().is_empty() {
             return Err(ApiError::InvalidInput("版本ID不能为空".to_string()));
         }
+
+        self.validate_expected_plan_rev(version_id, expected_plan_rev)?;
 
         if let Some(limit) = limit {
             if limit <= 0 || limit > 20_000 {
@@ -109,9 +170,20 @@ impl PlanApi {
         version_id: &str,
         machine_code: Option<&str>,
     ) -> ApiResult<PlanItemDateBoundsResponse> {
+        self.get_plan_item_date_bounds_with_rev(version_id, machine_code, None)
+    }
+
+    pub fn get_plan_item_date_bounds_with_rev(
+        &self,
+        version_id: &str,
+        machine_code: Option<&str>,
+        expected_plan_rev: Option<i32>,
+    ) -> ApiResult<PlanItemDateBoundsResponse> {
         if version_id.trim().is_empty() {
             return Err(ApiError::InvalidInput("版本ID不能为空".to_string()));
         }
+
+        self.validate_expected_plan_rev(version_id, expected_plan_rev)?;
 
         let (min_date, max_date, total_count) = self
             .plan_item_repo

@@ -18,6 +18,9 @@ export interface GetColdStockProfileRequest {
   /** 方案版本 ID */
   versionId: string;
 
+  /** 期望计划修订号（可选，用于防陈旧读取） */
+  expectedPlanRev?: number;
+
   /** 机组代码过滤（可选） */
   machineCodes?: string[];
 

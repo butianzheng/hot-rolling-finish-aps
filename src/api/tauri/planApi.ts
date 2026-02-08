@@ -43,6 +43,12 @@ export const planApi = {
     return IpcClient.call('get_latest_active_version_id');
   },
 
+  async getVersionDetail(versionId: string): Promise<z.infer<typeof PlanVersionSchema>> {
+    return IpcClient.call('get_version_detail', { version_id: versionId }, {
+      validate: zodValidator(PlanVersionSchema, 'get_version_detail'),
+    });
+  },
+
   async deletePlan(planId: string, operator: string): Promise<void> {
     return IpcClient.call('delete_plan', {
       plan_id: planId,
@@ -143,7 +149,8 @@ export const planApi = {
     frozenDate?: string,
     operator: string = 'admin',
     strategy?: string,
-    windowDaysOverride?: number
+    windowDaysOverride?: number,
+    runId?: string
   ): Promise<z.infer<typeof RecalcResponseSchema>> {
     return IpcClient.call(
       'recalc_full',
@@ -154,6 +161,7 @@ export const planApi = {
         operator,
         strategy,
         window_days_override: windowDaysOverride,
+        run_id: runId,
       },
       {
         timeout: IPC_TIMEOUT.VERY_SLOW,
@@ -256,13 +264,15 @@ export const planApi = {
 
   async getPlanItemDateBounds(
     versionId: string,
-    machineCode?: string
+    machineCode?: string,
+    expectedPlanRev?: number
   ): Promise<z.infer<typeof PlanItemDateBoundsResponseSchema>> {
     return IpcClient.call(
       'get_plan_item_date_bounds',
       {
         version_id: versionId,
         machine_code: machineCode,
+        expected_plan_rev: expectedPlanRev,
       },
       {
         validate: zodValidator(PlanItemDateBoundsResponseSchema, 'get_plan_item_date_bounds'),
@@ -279,6 +289,7 @@ export const planApi = {
       machine_code?: string;
       limit?: number;
       offset?: number;
+      expected_plan_rev?: number;
     }
   ): Promise<Array<z.infer<typeof PlanItemSchema>>> {
     return IpcClient.call(
@@ -290,6 +301,7 @@ export const planApi = {
         machine_code: opts?.machine_code,
         limit: opts?.limit,
         offset: opts?.offset,
+        expected_plan_rev: opts?.expected_plan_rev,
       },
       {
         validate: zodValidator(z.array(PlanItemSchema), 'list_plan_items'),

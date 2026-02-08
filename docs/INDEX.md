@@ -30,10 +30,10 @@
 **Master Spec（最高权威）**
 - [Claude_Dev_Master_Spec.md](../spec/Claude_Dev_Master_Spec.md) - 项目主控文档 v1.0
 
-**集成规范（v0.3）**
+**集成规范（v0.3 主版本）**
 - [Engine_Specs_v0.3_Integrated.md](../spec/Engine_Specs_v0.3_Integrated.md) - 排产引擎工程规格书
 - [Field_Mapping_Spec_v0.3_Integrated.md](../spec/Field_Mapping_Spec_v0.3_Integrated.md) - 字段映射与口径说明
-- [Tauri_API_Contract_v0.3_Integrated.md](../spec/Tauri_API_Contract_v0.3_Integrated.md) - Tauri API 契约
+- [Tauri_API_Contract_v0.3_Integrated.md](../spec/Tauri_API_Contract_v0.3_Integrated.md) - Tauri API 契约（当前小版本 v0.3.1）
 
 **单独规范**
 - [DecisionApi_Contract_v1.0.md](../spec/DecisionApi_Contract_v1.0.md) - 决策 API 契约 v1.0
@@ -88,6 +88,7 @@
 - **[工业防护组件指南](./guides/GUARDS_COMPONENT_GUIDE.md)** - 红线保护组件使用、工业约束实现
 - **[数据库 Schema / 迁移指南](./guides/DB_SCHEMA_MIGRATION_GUIDE.md)** - 建库/迁移权威来源与执行路径（v0.6）
 - **[测试数据指南](./guides/TEST_DATA_GUIDE.md)** - 测试数据集说明、模拟数据生成
+- **[重算与版本一致性运行规约](./guides/RUN_PLAN_REV_CONTRACT.md)** - run_id / plan_rev / STALE_PLAN_REV 统一约束与 PR 自检
 
 ### 🗃️ 历史文档与归档 (`docs/archived/`)
 已完成的任务、历史报告、过期计划。

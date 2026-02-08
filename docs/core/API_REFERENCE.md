@@ -157,4 +157,7 @@ const summary = await invoke('get_decision_day_summary', {
 
 ---
 
-详细 API 规范请参考: [spec/Tauri_API_Contract_v0.3_Integrated.md](../spec/Tauri_API_Contract_v0.3_Integrated.md)
+详细 API 规范请参考: [spec/Tauri_API_Contract_v0.3_Integrated.md](../spec/Tauri_API_Contract_v0.3_Integrated.md)（当前小版本 v0.3.1）
+
+重算与版本一致性工程规约：
+- [docs/guides/RUN_PLAN_REV_CONTRACT.md](../guides/RUN_PLAN_REV_CONTRACT.md)

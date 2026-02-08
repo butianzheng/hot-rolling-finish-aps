@@ -175,6 +175,37 @@
 
 ---
 
+### recalc_full（一致性补充）
+- 入参（关键字段）：
+```json
+{
+  "version_id": "...",
+  "base_date": "2026-01-10",
+  "operator": "admin",
+  "strategy": "balanced",
+  "window_days_override": 7,
+  "run_id": "recalc_20260208_xxx"
+}
+```
+
+- 返回（关键字段）：
+```json
+{
+  "run_id": "recalc_20260208_xxx",
+  "version_id": "...",
+  "plan_rev": 12,
+  "success": true,
+  "message": "重算完成"
+}
+```
+
+说明：
+- 每次重算调用必须携带唯一 `run_id`；
+- 可展示结果必须绑定 `plan_rev`；
+- 前端只渲染 latest run 对应结果。
+
+---
+
 ### compare_versions
 - 入参：
 ```json
@@ -182,6 +213,12 @@
 ```
 
 - 返回：diff（移动/挤出/风险变化）
+
+---
+
+### list_plan_items / get_plan_item_date_bounds（一致性补充）
+- 入参补充：`expected_plan_rev`（可选）
+- 约束：当传入 `expected_plan_rev` 且与当前版本 `revision` 不一致时，必须返回 `STALE_PLAN_REV`
 
 ---
 
@@ -293,6 +330,18 @@
 { "event": "xxx", "payload": { } }
 ```
 
+`plan_updated` 推荐 payload（关键字段）：
+```json
+{
+  "version_id": "...",
+  "run_id": "recalc_20260208_xxx",
+  "plan_rev": 12
+}
+```
+
+说明：
+- 非重算触发（如激活版本/回滚）可无 `run_id`，但建议带 `plan_rev`。
+
 ---
 
 # 4. 错误码（MVP 冻结）
@@ -305,6 +354,7 @@
 - ConstraintViolation  
 - NotFound  
 - RuleEvalError  
+- STALE_PLAN_REV  
 
 ---
 
@@ -314,6 +364,11 @@
 2. 所有长任务必须支持 progress event  
 3. 所有规则类错误必须返回可解释 error code  
 4. 所有跨版本操作必须可回滚（基于 plan_version）  
+5. 所有重算触发必须携带唯一 `run_id`  
+6. 所有可展示查询建议携带 `expected_plan_rev`；不一致返回 `STALE_PLAN_REV`  
+7. 前端遇到 `STALE_PLAN_REV` 必须集中处理（统一提示 + 自动刷新到最新 `PlanContext`）  
+
+补充工程规约：见 `docs/guides/RUN_PLAN_REV_CONTRACT.md`
 
 ---
 
@@ -335,3 +390,4 @@
 v0.1：基础 Command/Event 契约框架  
 v0.2：补充配置控制 + 催料诊断接口  
 v0.3：统一冻结为单一 API Contract 文档
+v0.3.1：补充 run_id / plan_rev / STALE_PLAN_REV 一致性契约

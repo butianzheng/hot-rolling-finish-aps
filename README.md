@@ -146,7 +146,7 @@ hot-rolling-finish-aps/
 |-----|------|
 | [spec/Claude_Dev_Master_Spec.md](spec/Claude_Dev_Master_Spec.md) | 最高权威规范 |
 | [spec/Engine_Specs_v0.3_Integrated.md](spec/Engine_Specs_v0.3_Integrated.md) | 引擎规格 |
-| [spec/Tauri_API_Contract_v0.3_Integrated.md](spec/Tauri_API_Contract_v0.3_Integrated.md) | API 契约 |
+| [spec/Tauri_API_Contract_v0.3_Integrated.md](spec/Tauri_API_Contract_v0.3_Integrated.md) | API 契约（当前小版本 v0.3.1） |
 | [spec/DecisionApi_Contract_v1.0.md](spec/DecisionApi_Contract_v1.0.md) | 决策 API 规范 |
 
 ### 项目文档

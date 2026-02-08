@@ -71,9 +71,31 @@ pub async fn batch_update_configs(
     reason: String,
 ) -> Result<String, String> {
     use crate::api::config_api::ConfigItem;
+    use serde::Deserialize;
 
-    let configs: Vec<ConfigItem> =
+    #[derive(Debug, Deserialize)]
+    struct LooseConfigItem {
+        scope_id: String,
+        #[serde(default)]
+        scope_type: String,
+        key: String,
+        value: String,
+        #[serde(default)]
+        updated_at: Option<String>,
+    }
+
+    let loose_items: Vec<LooseConfigItem> =
         serde_json::from_str(&configs).map_err(|e| format!("解析配置列表失败: {}", e))?;
+    let configs: Vec<ConfigItem> = loose_items
+        .into_iter()
+        .map(|item| ConfigItem {
+            scope_id: item.scope_id,
+            scope_type: item.scope_type,
+            key: item.key,
+            value: item.value,
+            updated_at: item.updated_at,
+        })
+        .collect();
 
     let count = state
         .config_api
@@ -157,4 +179,3 @@ pub async fn list_custom_strategies(
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
-

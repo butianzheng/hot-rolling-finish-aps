@@ -21,9 +21,11 @@ mod path_rule_e2e_test {
     use chrono::{Duration, NaiveDate};
     use hot_rolling_aps::api::{PathRuleApi, PlanApi};
     use hot_rolling_aps::config::config_manager::ConfigManager;
+    use hot_rolling_aps::domain::types::{SchedState, UrgentLevel};
     use hot_rolling_aps::engine::{
         CapacityFiller, EligibilityEngine, PrioritySorter, RecalcEngine, RiskEngine, UrgencyEngine,
     };
+    use hot_rolling_aps::engine::strategy::ScheduleStrategy;
     use hot_rolling_aps::repository::{
         action_log_repo::ActionLogRepository,
         capacity_repo::CapacityPoolRepository,
@@ -42,6 +44,7 @@ mod path_rule_e2e_test {
         NamedTempFile,
         String,
         Arc<PlanApi>,
+        Arc<RecalcEngine>,
         Arc<PathRuleApi>,
         Arc<PlanItemRepository>,
         Arc<ActionLogRepository>,
@@ -108,7 +111,7 @@ mod path_rule_e2e_test {
             action_log_repo.clone(),
             risk_snapshot_repo,
             config_manager.clone(),
-            recalc_engine,
+            recalc_engine.clone(),
             risk_engine,
             None,
         ));
@@ -128,6 +131,7 @@ mod path_rule_e2e_test {
             temp_file,
             db_path,
             plan_api,
+            recalc_engine,
             path_rule_api,
             plan_item_repo,
             action_log_repo,
@@ -142,6 +146,7 @@ mod path_rule_e2e_test {
             _temp_file,
             _db_path,
             plan_api,
+            _recalc_engine,
             path_rule_api,
             plan_item_repo,
             action_log_repo,
@@ -256,6 +261,324 @@ mod path_rule_e2e_test {
         assert!(
             !pending_v2.iter().any(|p| p.material_id == candidate_id),
             "已确认材料不应再次出现在待确认列表"
+        );
+    }
+
+    #[test]
+    fn test_path_rule_reject_restore_next_campaign_and_boost() {
+        let (
+            _temp_file,
+            _db_path,
+            plan_api,
+            recalc_engine,
+            path_rule_api,
+            plan_item_repo,
+            _action_log_repo,
+            material_master_repo,
+            material_state_repo,
+        ) = setup_env();
+
+        let base_date = NaiveDate::from_ymd_opt(2026, 2, 2).unwrap();
+        let machine_code = "H032";
+        let anchor_id = "MAT_REJECT_ANCHOR";
+        let candidate_id = "MAT_REJECT_CAND";
+
+        // 1) 首次重算：anchor 入池后作为锚点，candidate 触发待确认
+        let mut anchor_master = MaterialBuilder::new(anchor_id)
+            .machine(machine_code)
+            .weight(10.0)
+            .output_age_days(10)
+            .due_date(base_date + Duration::days(30))
+            .build();
+        anchor_master.width_mm = Some(1000.0);
+        anchor_master.thickness_mm = Some(10.0);
+
+        let mut candidate_master = MaterialBuilder::new(candidate_id)
+            .machine(machine_code)
+            .weight(10.0)
+            .output_age_days(5)
+            .due_date(base_date + Duration::days(1)) // 基础应为 L2，拒绝恢复后提到 L3
+            .build();
+        candidate_master.width_mm = Some(1300.0);
+        candidate_master.thickness_mm = Some(12.5);
+
+        let anchor_state = MaterialStateBuilder::new(anchor_id)
+            .sched_state(SchedState::Ready)
+            .build();
+        let candidate_state = MaterialStateBuilder::new(candidate_id)
+            .sched_state(SchedState::Ready)
+            .build();
+
+        material_master_repo
+            .batch_insert_material_master(vec![anchor_master, candidate_master])
+            .expect("insert material_master failed");
+        material_state_repo
+            .batch_insert_material_state(vec![anchor_state, candidate_state])
+            .expect("insert material_state failed");
+
+        let plan_id = plan_api
+            .create_plan("PathRule Reject E2E".to_string(), "tester".to_string())
+            .expect("create_plan failed");
+        let base_version_id = plan_api
+            .create_version(plan_id, 1, None, None, "tester".to_string())
+            .expect("create_version failed");
+
+        let res1 = plan_api
+            .recalc_full(&base_version_id, base_date, None, "tester")
+            .expect("recalc_full (1st) failed");
+        let version_1 = res1.version_id.clone();
+
+        let pending_v1 = path_rule_api
+            .list_path_override_pending(&version_1, machine_code, base_date)
+            .expect("list_path_override_pending (before reject) failed");
+        assert!(
+            pending_v1.iter().any(|p| p.material_id == candidate_id),
+            "首次重算后，candidate 应进入待确认"
+        );
+
+        // 2) 拒绝突破：应从 pending 消失（不确认）
+        path_rule_api
+            .reject_path_override(&version_1, candidate_id, "tester", "拒绝后移一周期")
+            .expect("reject_path_override failed");
+
+        let pending_after_reject = path_rule_api
+            .list_path_override_pending(&version_1, machine_code, base_date)
+            .expect("list_path_override_pending (after reject) failed");
+        assert!(
+            !pending_after_reject.iter().any(|p| p.material_id == candidate_id),
+            "拒绝后 candidate 不应继续出现在待确认"
+        );
+
+        // 为了稳定验证“下一周期恢复”，将 anchor 临时设为 BLOCKED，避免继续参与锚点解析
+        let mut anchor_after_first = material_state_repo
+            .find_by_id(anchor_id)
+            .expect("find anchor state failed")
+            .expect("anchor state missing");
+        anchor_after_first.sched_state = SchedState::Blocked;
+        material_state_repo
+            .batch_insert_material_state(vec![anchor_after_first])
+            .expect("update anchor state failed");
+
+        // 3) 同周期重排：candidate 必须被拒绝规则拦截（至少后移一周期）
+        recalc_engine
+            .recalc_partial(
+                &version_1,
+                base_date,
+                base_date,
+                "tester",
+                false,
+                ScheduleStrategy::UrgentFirst,
+            )
+            .expect("recalc_partial (same campaign) failed");
+
+        let items_same_campaign = plan_item_repo
+            .find_by_version(&version_1)
+            .expect("find_by_version same campaign failed");
+        assert!(
+            !items_same_campaign.iter().any(|i| i.material_id == candidate_id),
+            "同周期下 candidate 不应被排入"
+        );
+
+        let state_same_campaign = material_state_repo
+            .find_by_id(candidate_id)
+            .expect("find candidate state (same campaign) failed")
+            .expect("candidate state missing (same campaign)");
+        assert_eq!(
+            state_same_campaign.urgent_level,
+            UrgentLevel::L2,
+            "同周期尚未恢复，不应触发提档"
+        );
+
+        // 4) 手动切到下一换辊周期，再重排：candidate 恢复可排，且提升一档
+        path_rule_api
+            .reset_roll_cycle(&version_1, machine_code, "tester", "进入下一周期")
+            .expect("reset_roll_cycle failed");
+
+        recalc_engine
+            .recalc_partial(
+                &version_1,
+                base_date,
+                base_date,
+                "tester",
+                false,
+                ScheduleStrategy::UrgentFirst,
+            )
+            .expect("recalc_partial (next campaign) failed");
+
+        let items_next_campaign = plan_item_repo
+            .find_by_version(&version_1)
+            .expect("find_by_version next campaign failed");
+        assert!(
+            items_next_campaign.iter().any(|i| i.material_id == candidate_id),
+            "下一周期应恢复 candidate 的可排性"
+        );
+
+        let state_next_campaign = material_state_repo
+            .find_by_id(candidate_id)
+            .expect("find candidate state (next campaign) failed")
+            .expect("candidate state missing (next campaign)");
+        assert_eq!(
+            state_next_campaign.urgent_level,
+            UrgentLevel::L3,
+            "下一周期恢复后应按拒绝策略提升一档"
+        );
+    }
+
+    #[test]
+    fn test_path_rule_reject_with_blocked_base_state_should_not_boost() {
+        let (
+            _temp_file,
+            _db_path,
+            plan_api,
+            recalc_engine,
+            path_rule_api,
+            plan_item_repo,
+            _action_log_repo,
+            material_master_repo,
+            material_state_repo,
+        ) = setup_env();
+
+        let base_date = NaiveDate::from_ymd_opt(2026, 2, 2).unwrap();
+        let machine_code = "H032";
+        let anchor_id = "MAT_BLOCKED_ANCHOR";
+        let candidate_id = "MAT_BLOCKED_CAND";
+
+        let mut anchor_master = MaterialBuilder::new(anchor_id)
+            .machine(machine_code)
+            .weight(10.0)
+            .output_age_days(10)
+            .due_date(base_date + Duration::days(30))
+            .build();
+        anchor_master.width_mm = Some(1000.0);
+        anchor_master.thickness_mm = Some(10.0);
+
+        let mut candidate_master = MaterialBuilder::new(candidate_id)
+            .machine(machine_code)
+            .weight(10.0)
+            .output_age_days(5)
+            .due_date(base_date + Duration::days(1)) // 基础应为 L2
+            .build();
+        candidate_master.width_mm = Some(1300.0);
+        candidate_master.thickness_mm = Some(12.5);
+
+        let anchor_state = MaterialStateBuilder::new(anchor_id)
+            .sched_state(SchedState::Ready)
+            .build();
+        let candidate_state = MaterialStateBuilder::new(candidate_id)
+            .sched_state(SchedState::Ready)
+            .build();
+
+        material_master_repo
+            .batch_insert_material_master(vec![anchor_master, candidate_master])
+            .expect("insert material_master failed");
+        material_state_repo
+            .batch_insert_material_state(vec![anchor_state, candidate_state])
+            .expect("insert material_state failed");
+
+        let plan_id = plan_api
+            .create_plan("PathRule Reject Blocked Base E2E".to_string(), "tester".to_string())
+            .expect("create_plan failed");
+        let base_version_id = plan_api
+            .create_version(plan_id, 1, None, None, "tester".to_string())
+            .expect("create_version failed");
+
+        let res1 = plan_api
+            .recalc_full(&base_version_id, base_date, None, "tester")
+            .expect("recalc_full (1st) failed");
+        let version_1 = res1.version_id.clone();
+
+        let pending_v1 = path_rule_api
+            .list_path_override_pending(&version_1, machine_code, base_date)
+            .expect("list_path_override_pending (before reject) failed");
+        assert!(
+            pending_v1.iter().any(|p| p.material_id == candidate_id),
+            "首次重算后，candidate 应进入待确认"
+        );
+
+        // 在拒绝前将 candidate 改为 BLOCKED，模拟“基础状态不满足”的反例
+        let mut candidate_blocked = material_state_repo
+            .find_by_id(candidate_id)
+            .expect("find candidate state before reject failed")
+            .expect("candidate state missing before reject");
+        candidate_blocked.sched_state = SchedState::Blocked;
+        material_state_repo
+            .batch_insert_material_state(vec![candidate_blocked])
+            .expect("set candidate blocked failed");
+
+        path_rule_api
+            .reject_path_override(&version_1, candidate_id, "tester", "BLOCKED基态拒绝")
+            .expect("reject_path_override failed");
+
+        // 同周期重排：仍需被拒绝规则拦截
+        recalc_engine
+            .recalc_partial(
+                &version_1,
+                base_date,
+                base_date,
+                "tester",
+                false,
+                ScheduleStrategy::UrgentFirst,
+            )
+            .expect("recalc_partial (same campaign) failed");
+        let items_same_campaign = plan_item_repo
+            .find_by_version(&version_1)
+            .expect("find_by_version same campaign failed");
+        assert!(
+            !items_same_campaign.iter().any(|i| i.material_id == candidate_id),
+            "同周期下 candidate 不应被排入"
+        );
+
+        // 切换到下一周期；为了让材料可排，将当前状态恢复 READY
+        path_rule_api
+            .reset_roll_cycle(&version_1, machine_code, "tester", "进入下一周期")
+            .expect("reset_roll_cycle failed");
+
+        let mut candidate_ready = material_state_repo
+            .find_by_id(candidate_id)
+            .expect("find candidate state before next campaign failed")
+            .expect("candidate state missing before next campaign");
+        candidate_ready.sched_state = SchedState::Ready;
+        material_state_repo
+            .batch_insert_material_state(vec![candidate_ready])
+            .expect("set candidate ready failed");
+
+        // 为稳定验证，避免 anchor 再次成为路径门控锚点
+        let mut anchor_blocked = material_state_repo
+            .find_by_id(anchor_id)
+            .expect("find anchor state before next campaign failed")
+            .expect("anchor state missing before next campaign");
+        anchor_blocked.sched_state = SchedState::Blocked;
+        material_state_repo
+            .batch_insert_material_state(vec![anchor_blocked])
+            .expect("set anchor blocked failed");
+
+        recalc_engine
+            .recalc_partial(
+                &version_1,
+                base_date,
+                base_date,
+                "tester",
+                false,
+                ScheduleStrategy::UrgentFirst,
+            )
+            .expect("recalc_partial (next campaign) failed");
+
+        let items_next_campaign = plan_item_repo
+            .find_by_version(&version_1)
+            .expect("find_by_version next campaign failed");
+        assert!(
+            items_next_campaign.iter().any(|i| i.material_id == candidate_id),
+            "下一周期应恢复 candidate 的可排性"
+        );
+
+        let state_next_campaign = material_state_repo
+            .find_by_id(candidate_id)
+            .expect("find candidate state (next campaign) failed")
+            .expect("candidate state missing (next campaign)");
+        assert_eq!(
+            state_next_campaign.urgent_level,
+            UrgentLevel::L2,
+            "拒绝基态为 BLOCKED 时，下一周期恢复后不应提档"
         );
     }
 }

@@ -303,7 +303,8 @@ export async function getMostRiskyDate(
  */
 export async function getRiskSummaryForRecentDays(
   versionId: string,
-  days: number = 30
+  days: number = 30,
+  expectedPlanRev?: number,
 ): Promise<DecisionDaySummaryResponse> {
   const today = new Date();
   const dateFrom = new Date(today);
@@ -313,6 +314,7 @@ export async function getRiskSummaryForRecentDays(
 
   return getDecisionDaySummary({
     versionId,
+    expectedPlanRev,
     dateFrom: dateFrom.toISOString().split('T')[0],
     dateTo: dateTo.toISOString().split('T')[0],
     limit: days,
@@ -347,7 +349,8 @@ export async function getAllRiskSnapshots(
  */
 export async function getBottleneckForRecentDays(
   versionId: string,
-  days: number = 30
+  days: number = 30,
+  expectedPlanRev?: number,
 ): Promise<MachineBottleneckProfileResponse> {
   const today = new Date();
   const dateFrom = new Date(today);
@@ -357,6 +360,7 @@ export async function getBottleneckForRecentDays(
 
   return getMachineBottleneckProfile({
     versionId,
+    expectedPlanRev,
     dateFrom: dateFrom.toISOString().split('T')[0],
     dateTo: dateTo.toISOString().split('T')[0],
   });
@@ -389,10 +393,12 @@ export async function getMostCongestedMachine(
  * 获取所有失败订单（不分页）
  */
 export async function getAllFailedOrders(
-  versionId: string
+  versionId: string,
+  expectedPlanRev?: number,
 ): Promise<OrderFailureSetResponse> {
   return listOrderFailureSet({
     versionId,
+    expectedPlanRev,
     limit: 1000, // 较大的限制，获取所有数据
   });
 }
@@ -404,10 +410,12 @@ export async function getAllFailedOrders(
  * - limit: 100
  */
 export async function getUnsatisfiedUrgentMaterials(
-  versionId: string
+  versionId: string,
+  expectedPlanRev?: number,
 ): Promise<OrderFailureSetResponse> {
   return listOrderFailureSet({
     versionId,
+    expectedPlanRev,
     limit: 100,
   });
 }
@@ -422,10 +430,12 @@ export async function getUnsatisfiedUrgentMaterials(
  */
 export async function getColdStockMaterials(
   versionId: string,
-  _thresholdDays?: number
+  _thresholdDays?: number,
+  expectedPlanRev?: number,
 ): Promise<ColdStockProfileResponse> {
   return getColdStockProfile({
     versionId,
+    expectedPlanRev,
     limit: 100,
   });
 }
@@ -434,10 +444,12 @@ export async function getColdStockMaterials(
  * 获取高压力冷料（压力等级 >= HIGH）
  */
 export async function getHighPressureColdStock(
-  versionId: string
+  versionId: string,
+  expectedPlanRev?: number,
 ): Promise<ColdStockProfileResponse> {
   return getColdStockProfile({
     versionId,
+    expectedPlanRev,
     pressureLevelFilter: ['HIGH', 'CRITICAL'],
   });
 }
@@ -463,10 +475,12 @@ export async function getRollCampaignAlert(
  * 获取所有机组的换辊警报（简化版）
  */
 export async function getAllRollCampaignAlerts(
-  versionId: string
+  versionId: string,
+  expectedPlanRev?: number,
 ): Promise<RollCampaignAlertResponse> {
   return getRollCampaignAlert({
     versionId,
+    expectedPlanRev,
   });
 }
 
@@ -492,7 +506,8 @@ export async function getCapacityOpportunity(
  */
 export async function getCapacityOpportunityForRecentDays(
   versionId: string,
-  days: number = 30
+  days: number = 30,
+  expectedPlanRev?: number,
 ): Promise<CapacityOpportunityResponse> {
   const today = new Date();
   const dateFrom = new Date(today);
@@ -502,6 +517,7 @@ export async function getCapacityOpportunityForRecentDays(
 
   return getCapacityOpportunity({
     versionId,
+    expectedPlanRev,
     dateFrom: dateFrom.toISOString().split('T')[0],
     dateTo: dateTo.toISOString().split('T')[0],
     minOpportunityT: 10.0,

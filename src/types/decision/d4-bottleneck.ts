@@ -18,6 +18,9 @@ export interface GetMachineBottleneckProfileRequest {
   /** 方案版本 ID（必填） */
   versionId: string;
 
+  /** 期望计划修订号（可选，用于防陈旧读取） */
+  expectedPlanRev?: number;
+
   /** 日期范围起始（必填，ISO DATE） */
   dateFrom: string;
 
