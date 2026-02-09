@@ -17,7 +17,6 @@ use crate::config::ConfigManager;
 use crate::domain::plan::{Plan, PlanVersion, PlanItem};
 use crate::domain::types::PlanVersionStatus;
 use crate::domain::action_log::ActionLog;
-use crate::domain::capacity::CapacityPool;
 use crate::repository::plan_repo::{PlanItemRepository, PlanItemVersionAgg, PlanRepository, PlanVersionRepository};
 use crate::repository::action_log_repo::ActionLogRepository;
 use crate::repository::material_repo::{MaterialMasterRepository, MaterialStateRepository, MaterialStateSnapshotLite};

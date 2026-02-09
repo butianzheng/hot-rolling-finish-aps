@@ -94,9 +94,9 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
 
     let tx = conn.unchecked_transaction()?;
 
-    // schema_version (dev schema.sql + migrations 当前对齐到 v0.10)
+    // schema_version (dev schema.sql + migrations 当前对齐到 v0.11)
     tx.execute(
-        "INSERT INTO schema_version (version, applied_at) VALUES (10, ?1)",
+        "INSERT INTO schema_version (version, applied_at) VALUES (11, ?1)",
         params![now_sql_dt],
     )?;
 
@@ -139,6 +139,14 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
     )?;
     tx.execute(
         "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','empty_day_recover_threshold_t','200',?1)",
+        params![now_sql_dt],
+    )?;
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','latest_run_ttl_ms','120000',?1)",
+        params![now_sql_dt],
+    )?;
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','stale_plan_rev_toast_cooldown_ms','4000',?1)",
         params![now_sql_dt],
     )?;
     tx.execute(

@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Button, Card, Form, InputNumber, Select, Space, Switch } from 'antd';
+import { useQuery } from '@tanstack/react-query';
+import { configApi } from '../../api/tauri';
 import { useGlobalActions, useGlobalStore, useUserPreferences, type WorkbenchViewMode } from '../../stores/use-global-store';
 import type { StrategyType, UserPreferences } from '../../types/preferences';
+import { BUILTIN_STRATEGY_OPTIONS, normalizeStrategyKey } from '../../types/strategy';
 import { useTheme } from '../../theme';
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -10,14 +13,6 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   sidebarCollapsed: false,
   defaultStrategy: 'balanced',
 };
-
-const STRATEGY_OPTIONS: Array<{ value: StrategyType; label: string }> = [
-  { value: 'balanced', label: '均衡方案' },
-  { value: 'urgent_first', label: '紧急优先' },
-  { value: 'capacity_first', label: '产能优先' },
-  { value: 'cold_stock_first', label: '冷料消化' },
-  { value: 'manual', label: '手动调整' },
-];
 
 const WORKBENCH_VIEW_OPTIONS: Array<{ value: WorkbenchViewMode; label: string }> = [
   { value: 'MATRIX', label: '矩阵' },
@@ -30,6 +25,33 @@ const UserPreferencesPanel: React.FC = () => {
   const workbenchViewMode = useGlobalStore((state) => state.workbenchViewMode);
   const { updateUserPreferences, setWorkbenchViewMode } = useGlobalActions();
   const { setTheme } = useTheme();
+
+  const customStrategyQuery = useQuery({
+    queryKey: ['custom-strategies', 'user-preferences'],
+    queryFn: () => configApi.listCustomStrategies(),
+    staleTime: 60_000,
+  });
+
+  const strategyOptions = useMemo<Array<{ value: StrategyType; label: string }>>(
+    () => [
+      ...BUILTIN_STRATEGY_OPTIONS,
+      ...(customStrategyQuery.data || []).map((profile) => ({
+        value: `custom:${String(profile.strategy_id || '').trim()}` as StrategyType,
+        label: `自定义 · ${String(profile.title || profile.strategy_id || '').trim()}`,
+      })),
+    ],
+    [customStrategyQuery.data],
+  );
+
+  const strategyOptionValues = useMemo(
+    () => new Set(strategyOptions.map((option) => option.value)),
+    [strategyOptions],
+  );
+
+  const selectedStrategy = normalizeStrategyKey(preferences.defaultStrategy) as StrategyType;
+  const strategyValue: StrategyType = strategyOptionValues.has(selectedStrategy)
+    ? selectedStrategy
+    : 'balanced';
 
   return (
     <Card>
@@ -69,10 +91,11 @@ const UserPreferencesPanel: React.FC = () => {
 
         <Form.Item label="默认策略">
           <Select
-            value={preferences.defaultStrategy}
+            value={strategyValue}
             style={{ width: 200 }}
-            onChange={(val) => updateUserPreferences({ defaultStrategy: val })}
-            options={STRATEGY_OPTIONS}
+            onChange={(val) => updateUserPreferences({ defaultStrategy: normalizeStrategyKey(val) as StrategyType })}
+            options={strategyOptions}
+            loading={customStrategyQuery.isLoading}
           />
         </Form.Item>
 

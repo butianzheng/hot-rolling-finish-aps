@@ -7,9 +7,56 @@ import { message, Modal } from 'antd';
 import { configApi } from '../../api/tauri';
 import { useCurrentUser } from '../../stores/use-global-store';
 import { useDebounce } from '../../hooks/useDebounce';
+import { bootstrapFrontendRuntimeConfig } from '../../services/frontendRuntimeConfig';
 import { save, open } from '@tauri-apps/api/dialog';
 import { writeTextFile, readTextFile } from '@tauri-apps/api/fs';
 import type { ConfigItem } from './types';
+
+const DEFAULT_FRONTEND_RUNTIME_CONFIGS: Array<{ key: string; value: string }> = [
+  { key: 'latest_run_ttl_ms', value: '120000' },
+  { key: 'stale_plan_rev_toast_cooldown_ms', value: '4000' },
+];
+
+const FRONTEND_RUNTIME_CONFIG_RULES: Record<string, { min: number; max: number }> = {
+  latest_run_ttl_ms: { min: 5_000, max: 15 * 60_000 },
+  stale_plan_rev_toast_cooldown_ms: { min: 1_000, max: 60_000 },
+};
+
+function ensureGlobalConfigRows(configs: ConfigItem[]): ConfigItem[] {
+  const existing = new Set(configs.map((item) => `${item.scope_id}::${item.key}`));
+  const append: ConfigItem[] = [];
+
+  for (const row of DEFAULT_FRONTEND_RUNTIME_CONFIGS) {
+    const marker = `global::${row.key}`;
+    if (existing.has(marker)) continue;
+    append.push({
+      scope_id: 'global',
+      scope_type: 'GLOBAL',
+      key: row.key,
+      value: row.value,
+    });
+  }
+
+  if (append.length === 0) return configs;
+  return [...configs, ...append];
+}
+
+function validateConfigValue(config: ConfigItem, nextValue: string): string | null {
+  const rule = FRONTEND_RUNTIME_CONFIG_RULES[config.key];
+  if (!rule) return null;
+
+  const parsed = Number(nextValue);
+  if (!Number.isFinite(parsed)) {
+    return `${config.key} 必须为数字`;
+  }
+
+  const rounded = Math.round(parsed);
+  if (rounded < rule.min || rounded > rule.max) {
+    return `${config.key} 必须在 ${rule.min} ~ ${rule.max} 之间`;
+  }
+
+  return null;
+}
 
 export interface UseConfigManagementReturn {
   // 加载状态
@@ -66,7 +113,7 @@ export function useConfigManagement(): UseConfigManagementReturn {
     setLoading(true);
     setLoadError(null);
     try {
-      const result = await configApi.listConfigs();
+      const result = ensureGlobalConfigRows(await configApi.listConfigs());
       setConfigs(result);
       setFilteredConfigs(result);
       message.success(`成功加载 ${result.length} 条配置`);
@@ -99,6 +146,12 @@ export function useConfigManagement(): UseConfigManagementReturn {
       return;
     }
 
+    const validationError = validateConfigValue(editingConfig, editValue);
+    if (validationError) {
+      message.warning(validationError);
+      return;
+    }
+
     setLoading(true);
     try {
       await configApi.updateConfig(
@@ -108,6 +161,13 @@ export function useConfigManagement(): UseConfigManagementReturn {
         currentUser,
         updateReason
       );
+
+      try {
+        await bootstrapFrontendRuntimeConfig();
+      } catch (reloadError) {
+        console.warn('前端运行治理配置即时重载失败，将使用当前运行参数:', reloadError);
+      }
+
       message.success('配置更新成功');
       setEditModalVisible(false);
       await loadConfigs();
@@ -158,6 +218,13 @@ export function useConfigManagement(): UseConfigManagementReturn {
                 currentUser,
                 '从快照恢复配置'
               );
+
+              try {
+                await bootstrapFrontendRuntimeConfig();
+              } catch (reloadError) {
+                console.warn('前端运行治理配置即时重载失败，将使用当前运行参数:', reloadError);
+              }
+
               message.success('配置恢复成功');
               await loadConfigs();
             } catch (error: any) {

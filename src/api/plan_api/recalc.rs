@@ -1,5 +1,7 @@
 use super::*;
 
+const CUSTOM_STRATEGY_PREFIX: &str = "custom:";
+
 impl PlanApi {
     // ==========================================
     // 排产计算接口
@@ -50,10 +52,32 @@ impl PlanApi {
         strategy: ScheduleStrategy,
         window_days_override: Option<i32>,
     ) -> ApiResult<RecalcResponse> {
+        self.simulate_recalc_with_strategy_key(
+            version_id,
+            base_date,
+            _frozen_date,
+            operator,
+            strategy.as_str(),
+            window_days_override,
+        )
+    }
+
+    /// 试算接口（沙盘模式）- 指定策略键（支持 custom:*）
+    pub fn simulate_recalc_with_strategy_key(
+        &self,
+        version_id: &str,
+        base_date: NaiveDate,
+        _frozen_date: Option<NaiveDate>,
+        operator: &str,
+        strategy_key: &str,
+        window_days_override: Option<i32>,
+    ) -> ApiResult<RecalcResponse> {
         // 参数验证
         if version_id.trim().is_empty() {
             return Err(ApiError::InvalidInput("版本ID不能为空".to_string()));
         }
+
+        let strategy_key = self.normalize_strategy_key(strategy_key)?;
 
         // 加载版本信息
         let version = self
@@ -78,13 +102,13 @@ impl PlanApi {
         // 调用RecalcEngine执行试算（dry-run模式）
         let result = self
             .recalc_engine
-            .recalc_full(
+            .recalc_full_with_strategy_key(
                 &version.plan_id,
                 base_date,
                 window_days,
                 operator,
                 true,
-                strategy,
+                &strategy_key,
             )
             .map_err(|e| ApiError::InternalError(format!("试算失败: {}", e)))?;
 
@@ -98,7 +122,7 @@ impl PlanApi {
             success: true,
             message: format!(
                 "试算完成（{}），共排产{}个材料（冻结{}个，重算{}个）",
-                strategy.as_str(),
+                strategy_key,
                 result.total_items, result.frozen_items, result.recalc_items
             ),
         })
@@ -149,10 +173,32 @@ impl PlanApi {
         strategy: ScheduleStrategy,
         window_days_override: Option<i32>,
     ) -> ApiResult<RecalcResponse> {
+        self.recalc_full_with_strategy_key(
+            version_id,
+            base_date,
+            frozen_date,
+            operator,
+            strategy.as_str(),
+            window_days_override,
+        )
+    }
+
+    /// 一键重算（核心方法）- 指定策略键（支持 custom:*）
+    pub fn recalc_full_with_strategy_key(
+        &self,
+        version_id: &str,
+        base_date: NaiveDate,
+        frozen_date: Option<NaiveDate>,
+        operator: &str,
+        strategy_key: &str,
+        window_days_override: Option<i32>,
+    ) -> ApiResult<RecalcResponse> {
         // 参数验证
         if version_id.trim().is_empty() {
             return Err(ApiError::InvalidInput("版本ID不能为空".to_string()));
         }
+
+        let strategy_key = self.normalize_strategy_key(strategy_key)?;
 
         // 加载版本信息
         let version = self
@@ -189,13 +235,13 @@ impl PlanApi {
         // 调用 RecalcEngine 执行实际重算
         let recalc_result = self
             .recalc_engine
-            .recalc_full(
+            .recalc_full_with_strategy_key(
                 &version.plan_id,
                 base_date,
                 window_days,
                 operator,
                 false,
-                strategy,
+                &strategy_key,
             )
             .map_err(|e| ApiError::InternalError(format!("重算失败: {}", e)))?;
 
@@ -213,7 +259,7 @@ impl PlanApi {
                 "base_date": base_date.to_string(),
                 "window_days": window_days,
                 "frozen_from_date": frozen_date.map(|d| d.to_string()),
-                "strategy": strategy.as_str(),
+                "strategy": strategy_key,
             })),
             impact_summary_json: Some(serde_json::json!({
                 "plan_items_count": plan_items_count,
@@ -242,8 +288,48 @@ impl PlanApi {
             plan_items_count,
             frozen_items_count,
             success: true,
-            message: format!("重算完成（{}），共排产{}个材料", strategy.as_str(), plan_items_count),
+            message: format!("重算完成（{}），共排产{}个材料", strategy_key, plan_items_count),
         })
+    }
+
+    fn normalize_strategy_key(&self, raw: &str) -> ApiResult<String> {
+        let normalized = raw.trim();
+        if normalized.is_empty() {
+            return Ok(ScheduleStrategy::Balanced.as_str().to_string());
+        }
+
+        if let Some(custom_id_raw) = normalized.strip_prefix(CUSTOM_STRATEGY_PREFIX) {
+            let custom_id = custom_id_raw.trim();
+            if custom_id.is_empty() {
+                tracing::warn!("自定义策略ID为空，回退 balanced");
+                return Ok(ScheduleStrategy::Balanced.as_str().to_string());
+            }
+
+            let profile = self
+                .config_manager
+                .get_custom_strategy_profile(custom_id)
+                .map_err(|e| ApiError::DatabaseError(format!("读取自定义策略失败: {}", e)))?;
+
+            let Some(profile) = profile else {
+                tracing::warn!(strategy_key = normalized, "自定义策略不存在，回退 balanced");
+                return Ok(ScheduleStrategy::Balanced.as_str().to_string());
+            };
+
+            if profile.base_strategy.parse::<ScheduleStrategy>().is_err() {
+                tracing::warn!(strategy_key = normalized, "自定义策略基线异常，回退 balanced");
+                return Ok(ScheduleStrategy::Balanced.as_str().to_string());
+            }
+
+            return Ok(format!("{}{}", CUSTOM_STRATEGY_PREFIX, custom_id));
+        }
+
+        match normalized.parse::<ScheduleStrategy>() {
+            Ok(preset) => Ok(preset.as_str().to_string()),
+            Err(_) => {
+                tracing::warn!(strategy_key = normalized, "策略无效，回退 balanced");
+                Ok(ScheduleStrategy::Balanced.as_str().to_string())
+            }
+        }
     }
 
     // ==========================================

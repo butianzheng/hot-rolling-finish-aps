@@ -7,7 +7,12 @@ import { useRecentDaysRisk } from './queries/use-decision-queries';
 import { useStalePlanRevBootstrap } from './useStalePlanRevBootstrap';
 import { useGlobalStore } from '../stores/use-global-store';
 import * as tauriApi from '../api/tauri';
-import { handleStalePlanRevError, registerStalePlanRevRefreshHandler } from '../services/stalePlanRev';
+import {
+  configureStalePlanRevToastCooldownMs,
+  DEFAULT_STALE_PLAN_REV_TOAST_COOLDOWN_MS,
+  handleStalePlanRevError,
+  registerStalePlanRevRefreshHandler,
+} from '../services/stalePlanRev';
 
 vi.mock('../api/tauri', () => {
   class DecisionApiError extends Error {
@@ -78,6 +83,7 @@ describe('Decision stale plan_rev 集成', () => {
     vi.clearAllMocks();
     window.history.replaceState({}, '', '/');
     registerStalePlanRevRefreshHandler(null);
+    configureStalePlanRevToastCooldownMs(DEFAULT_STALE_PLAN_REV_TOAST_COOLDOWN_MS);
     useGlobalStore.getState().reset();
     useGlobalStore.getState().setPlanContext({ versionId: 'v1', planRev: 1 });
   });
@@ -271,5 +277,37 @@ describe('Decision stale plan_rev 集成', () => {
     expect(refreshCalls).toBe(3);
 
     nowSpy.mockRestore();
+  });
+
+  it('配置冷却为 2s 时，2.1s 后再次命中应再次 warning', async () => {
+    configureStalePlanRevToastCooldownMs(2_000);
+
+    const base = 40_000_000_000_000;
+    const times = [base, base + 1_000, base + 2_100];
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => times.shift() ?? base + 2_100);
+    const warningSpy = vi.spyOn(message, 'warning').mockImplementation(() => (() => {}) as any);
+
+    registerStalePlanRevRefreshHandler(async () => {
+      await Promise.resolve();
+    });
+
+    const staleError = {
+      code: 'STALE_PLAN_REV',
+      message: '计划版本已过期',
+      details: {
+        version_id: 'v1',
+        expected_plan_rev: 1,
+        actual_plan_rev: 2,
+      },
+    };
+
+    await handleStalePlanRevError(staleError, { source: 'query' });
+    await handleStalePlanRevError(staleError, { source: 'query' });
+    await handleStalePlanRevError(staleError, { source: 'query' });
+
+    expect(warningSpy).toHaveBeenCalledTimes(2);
+
+    nowSpy.mockRestore();
+    configureStalePlanRevToastCooldownMs(DEFAULT_STALE_PLAN_REV_TOAST_COOLDOWN_MS);
   });
 });

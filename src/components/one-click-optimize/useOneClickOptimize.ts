@@ -10,7 +10,7 @@ import { planApi } from '../../api/tauri';
 import { useGlobalActions, useGlobalStore } from '../../stores/use-global-store';
 import { formatDate } from '../../utils/formatters';
 import type { OptimizeStrategy, SimulateResult } from './types';
-import { DEFAULT_LATEST_RUN_TTL_MS } from '../../stores/latestRun';
+import { getLatestRunTtlMs } from '../../stores/latestRun';
 import { createRunId } from '../../utils/runId';
 import { getStrategyLabel } from './types';
 
@@ -97,7 +97,7 @@ export function useOneClickOptimize({
     const beginResult = beginLatestRun({
       runId: localRunId,
       versionId: activeVersionId,
-      ttlMs: DEFAULT_LATEST_RUN_TTL_MS,
+      ttlMs: getLatestRunTtlMs(),
     });
 
     if (!beginResult.accepted) {

@@ -1,5 +1,29 @@
 export const DEFAULT_LATEST_RUN_TTL_MS = 120_000;
 
+const MIN_LATEST_RUN_TTL_MS = 5_000;
+const MAX_LATEST_RUN_TTL_MS = 15 * 60_000;
+
+let configuredLatestRunTtlMs = DEFAULT_LATEST_RUN_TTL_MS;
+
+function sanitizeLatestRunTtlMs(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return DEFAULT_LATEST_RUN_TTL_MS;
+
+  const rounded = Math.round(parsed);
+  if (rounded < MIN_LATEST_RUN_TTL_MS) return MIN_LATEST_RUN_TTL_MS;
+  if (rounded > MAX_LATEST_RUN_TTL_MS) return MAX_LATEST_RUN_TTL_MS;
+  return rounded;
+}
+
+export function configureLatestRunTtlMs(value: unknown): number {
+  configuredLatestRunTtlMs = sanitizeLatestRunTtlMs(value);
+  return configuredLatestRunTtlMs;
+}
+
+export function getLatestRunTtlMs(): number {
+  return configuredLatestRunTtlMs;
+}
+
 export type LatestRunStatus = 'IDLE' | 'PENDING' | 'RUNNING' | 'DONE' | 'FAILED' | 'EXPIRED';
 
 export interface LatestRunState {
@@ -61,7 +85,7 @@ export function beginLatestRunState(prev: LatestRunState, input: BeginRunInput):
   const now = typeof input.triggeredAt === 'number' ? input.triggeredAt : Date.now();
   const ttlMs = Number.isFinite(Number(input.ttlMs)) && Number(input.ttlMs) > 0
     ? Number(input.ttlMs)
-    : DEFAULT_LATEST_RUN_TTL_MS;
+    : configuredLatestRunTtlMs;
 
   const runId = String(input.runId || '').trim();
   if (!runId) {

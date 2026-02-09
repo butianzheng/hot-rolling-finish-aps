@@ -16,6 +16,7 @@ mod test_helpers;
 use chrono::NaiveDate;
 use helpers::api_test_helper::*;
 use helpers::test_data_builder::{CapacityPoolBuilder, MaterialBuilder, MaterialStateBuilder, PlanItemBuilder};
+use hot_rolling_aps::config::strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
 use hot_rolling_aps::api::ApiError;
 use hot_rolling_aps::domain::types::{PlanVersionStatus, SchedState};
 
@@ -282,6 +283,295 @@ fn test_recalc_full_基本场景() {
 
     // 验证: ActionLog已记录
     assert_action_logged(&env, "RECALC_FULL", 1).unwrap();
+}
+
+fn prepare_recalc_strategy_test_env() -> (ApiTestEnv, String, NaiveDate) {
+    let env = ApiTestEnv::new().expect("无法创建测试环境");
+
+    let materials = vec![
+        MaterialBuilder::new("M_STRATEGY_001")
+            .machine("M1")
+            .weight(100.0)
+            .build(),
+        MaterialBuilder::new("M_STRATEGY_002")
+            .machine("M1")
+            .weight(150.0)
+            .build(),
+    ];
+    let states = vec![
+        MaterialStateBuilder::new("M_STRATEGY_001")
+            .sched_state(SchedState::Ready)
+            .build(),
+        MaterialStateBuilder::new("M_STRATEGY_002")
+            .sched_state(SchedState::Ready)
+            .build(),
+    ];
+    env.prepare_materials(materials, states)
+        .expect("准备材料失败");
+
+    let plan_id = env
+        .plan_api
+        .create_plan("策略回退测试方案".to_string(), "admin".to_string())
+        .expect("创建方案失败");
+
+    let version_id = env
+        .plan_api
+        .create_version(
+            plan_id,
+            7,
+            None,
+            Some("策略测试版本".to_string()),
+            "admin".to_string(),
+        )
+        .expect("创建版本失败");
+
+    let base_date = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
+    let pools = vec![
+        CapacityPoolBuilder::new("M1", base_date)
+            .version_id(&version_id)
+            .target(800.0)
+            .limit(900.0)
+            .build(),
+        CapacityPoolBuilder::new("M1", base_date + chrono::Duration::days(1))
+            .version_id(&version_id)
+            .target(800.0)
+            .limit(900.0)
+            .build(),
+    ];
+    env.prepare_capacity_pools(pools)
+        .expect("准备产能池失败");
+
+    (env, version_id, base_date)
+}
+
+#[test]
+fn test_recalc_full_with_strategy_key_自定义策略成功并写入审计() {
+    let (env, version_id, base_date) = prepare_recalc_strategy_test_env();
+
+    let profile = CustomStrategyProfile {
+        strategy_id: "e2e_custom_1".to_string(),
+        title: "E2E自定义策略".to_string(),
+        description: Some("用于重算端到端测试".to_string()),
+        base_strategy: "balanced".to_string(),
+        parameters: CustomStrategyParameters {
+            urgent_weight: Some(9.0),
+            ..Default::default()
+        },
+    };
+    env.config_api
+        .save_custom_strategy(profile, "admin", "e2e 测试")
+        .expect("保存自定义策略失败");
+
+    let result = env
+        .plan_api
+        .recalc_full_with_strategy_key(
+            &version_id,
+            base_date,
+            None,
+            "admin",
+            "custom:e2e_custom_1",
+            None,
+        )
+        .expect("重算失败");
+
+    assert!(result.success, "重算应成功");
+    assert!(
+        result.message.contains("custom:e2e_custom_1"),
+        "返回消息应携带生效策略"
+    );
+
+    let logs = env
+        .action_log_repo
+        .find_by_action_type("RECALC_FULL", 1)
+        .expect("查询ActionLog失败");
+    assert_eq!(logs.len(), 1, "应写入一条重算日志");
+    let strategy = logs[0]
+        .payload_json
+        .as_ref()
+        .and_then(|payload| payload.get("strategy"))
+        .and_then(|value| value.as_str())
+        .expect("payload.strategy 应存在");
+    assert_eq!(strategy, "custom:e2e_custom_1");
+}
+
+#[test]
+fn test_recalc_full_with_strategy_key_自定义策略不存在时回退_balanced() {
+    let (env, version_id, base_date) = prepare_recalc_strategy_test_env();
+
+    let result = env
+        .plan_api
+        .recalc_full_with_strategy_key(
+            &version_id,
+            base_date,
+            None,
+            "admin",
+            "custom:not_exist",
+            None,
+        )
+        .expect("重算失败");
+
+    assert!(result.success, "重算应成功");
+    assert!(
+        result.message.contains("balanced"),
+        "不存在的自定义策略应回退 balanced"
+    );
+
+    let logs = env
+        .action_log_repo
+        .find_by_action_type("RECALC_FULL", 1)
+        .expect("查询ActionLog失败");
+    assert_eq!(logs.len(), 1, "应写入一条重算日志");
+    let strategy = logs[0]
+        .payload_json
+        .as_ref()
+        .and_then(|payload| payload.get("strategy"))
+        .and_then(|value| value.as_str())
+        .expect("payload.strategy 应存在");
+    assert_eq!(strategy, "balanced");
+}
+
+#[test]
+fn test_recalc_full_with_strategy_key_非法策略时回退_balanced() {
+    let (env, version_id, base_date) = prepare_recalc_strategy_test_env();
+
+    let result = env
+        .plan_api
+        .recalc_full_with_strategy_key(
+            &version_id,
+            base_date,
+            None,
+            "admin",
+            "bad_strategy_xxx",
+            None,
+        )
+        .expect("重算失败");
+
+    assert!(result.success, "重算应成功");
+    assert!(
+        result.message.contains("balanced"),
+        "非法策略应回退 balanced"
+    );
+
+    let logs = env
+        .action_log_repo
+        .find_by_action_type("RECALC_FULL", 1)
+        .expect("查询ActionLog失败");
+    assert_eq!(logs.len(), 1, "应写入一条重算日志");
+    let strategy = logs[0]
+        .payload_json
+        .as_ref()
+        .and_then(|payload| payload.get("strategy"))
+        .and_then(|value| value.as_str())
+        .expect("payload.strategy 应存在");
+    assert_eq!(strategy, "balanced");
+}
+
+#[test]
+fn test_recalc_full_with_strategy_key_custom空id时回退_balanced() {
+    let (env, version_id, base_date) = prepare_recalc_strategy_test_env();
+
+    let result = env
+        .plan_api
+        .recalc_full_with_strategy_key(
+            &version_id,
+            base_date,
+            None,
+            "admin",
+            "custom:   ",
+            None,
+        )
+        .expect("重算失败");
+
+    assert!(result.success, "重算应成功");
+    assert!(
+        result.message.contains("balanced"),
+        "custom 空 ID 应回退 balanced"
+    );
+
+    let logs = env
+        .action_log_repo
+        .find_by_action_type("RECALC_FULL", 1)
+        .expect("查询ActionLog失败");
+    assert_eq!(logs.len(), 1, "应写入一条重算日志");
+    let strategy = logs[0]
+        .payload_json
+        .as_ref()
+        .and_then(|payload| payload.get("strategy"))
+        .and_then(|value| value.as_str())
+        .expect("payload.strategy 应存在");
+    assert_eq!(strategy, "balanced");
+}
+
+#[test]
+fn test_simulate_recalc_with_strategy_key_非法策略回退_balanced且不写审计() {
+    let (env, version_id, base_date) = prepare_recalc_strategy_test_env();
+
+    let result = env
+        .plan_api
+        .simulate_recalc_with_strategy_key(
+            &version_id,
+            base_date,
+            None,
+            "admin",
+            "bad_strategy_xxx",
+            None,
+        )
+        .expect("试算失败");
+
+    assert!(result.success, "试算应成功");
+    assert!(
+        result.message.contains("balanced"),
+        "非法策略应回退 balanced"
+    );
+
+    let logs = env
+        .action_log_repo
+        .find_by_action_type("RECALC_FULL", 10)
+        .expect("查询ActionLog失败");
+    assert!(logs.is_empty(), "试算不应写入 RECALC_FULL 审计日志");
+}
+
+#[test]
+fn test_simulate_recalc_with_strategy_key_自定义策略生效且不写审计() {
+    let (env, version_id, base_date) = prepare_recalc_strategy_test_env();
+
+    let profile = CustomStrategyProfile {
+        strategy_id: "e2e_custom_simulate_1".to_string(),
+        title: "E2E试算自定义策略".to_string(),
+        description: Some("用于试算端到端测试".to_string()),
+        base_strategy: "balanced".to_string(),
+        parameters: CustomStrategyParameters {
+            urgent_weight: Some(8.0),
+            ..Default::default()
+        },
+    };
+    env.config_api
+        .save_custom_strategy(profile, "admin", "e2e simulate 测试")
+        .expect("保存自定义策略失败");
+
+    let result = env
+        .plan_api
+        .simulate_recalc_with_strategy_key(
+            &version_id,
+            base_date,
+            None,
+            "admin",
+            "custom:e2e_custom_simulate_1",
+            None,
+        )
+        .expect("试算失败");
+
+    assert!(result.success, "试算应成功");
+    assert!(
+        result.message.contains("custom:e2e_custom_simulate_1"),
+        "返回消息应携带生效策略"
+    );
+
+    let logs = env
+        .action_log_repo
+        .find_by_action_type("RECALC_FULL", 10)
+        .expect("查询ActionLog失败");
+    assert!(logs.is_empty(), "试算不应写入 RECALC_FULL 审计日志");
 }
 
 // ==========================================

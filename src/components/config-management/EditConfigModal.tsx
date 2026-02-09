@@ -7,6 +7,11 @@ import { Descriptions, Input, Modal, Space, Tag } from 'antd';
 import type { ConfigItem } from './types';
 import { scopeTypeColors, scopeTypeLabels, configDescriptions } from './types';
 
+const FRONTEND_RUNTIME_CONFIG_HINTS: Record<string, string> = {
+  latest_run_ttl_ms: '建议范围 5000~900000（毫秒）',
+  stale_plan_rev_toast_cooldown_ms: '建议范围 1000~60000（毫秒）',
+};
+
 export interface EditConfigModalProps {
   open: boolean;
   config: ConfigItem | null;
@@ -66,6 +71,11 @@ export const EditConfigModal: React.FC<EditConfigModalProps> = ({
               onChange={(e) => onEditValueChange(e.target.value)}
               placeholder="请输入配置值"
             />
+            {FRONTEND_RUNTIME_CONFIG_HINTS[config.key] ? (
+              <div style={{ marginTop: 6, color: '#8c8c8c', fontSize: 12 }}>
+                {FRONTEND_RUNTIME_CONFIG_HINTS[config.key]}
+              </div>
+            ) : null}
           </div>
 
           <div>

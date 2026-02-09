@@ -2,7 +2,7 @@ use super::core::ActionLogRepository;
 use crate::domain::action_log::ActionLog;
 use crate::repository::error::RepositoryResult;
 use chrono::{NaiveDate, NaiveDateTime};
-use rusqlite::{params, Connection, Result as SqliteResult, Row};
+use rusqlite::{params, Result as SqliteResult, Row};
 
 impl ActionLogRepository {
     // ==========================================

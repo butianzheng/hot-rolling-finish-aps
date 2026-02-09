@@ -1,5 +1,4 @@
 use crate::app::state::AppState;
-use crate::engine::ScheduleStrategy;
 
 use super::common::{emit_frontend_event, map_api_error, parse_date};
 
@@ -145,7 +144,7 @@ pub async fn create_version(
         .transpose()?;
 
     let plan_api = state.plan_api.clone();
-    let mut result = tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         plan_api.create_version(plan_id, window_days, frozen_date, note, created_by)
     })
     .await
@@ -252,20 +251,21 @@ pub async fn simulate_recalc(
     let base_date = parse_date(&base_date)?;
     let frozen_date = frozen_date.map(|s| parse_date(&s)).transpose()?;
 
-    let strategy = strategy
+    let strategy_key = strategy
         .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
         .unwrap_or("balanced")
-        .parse::<ScheduleStrategy>()
-        .map_err(|e| format!("策略类型解析失败: {}", e))?;
+        .to_string();
 
     let plan_api = state.plan_api.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        plan_api.simulate_recalc_with_strategy(
+        plan_api.simulate_recalc_with_strategy_key(
             &version_id,
             base_date,
             frozen_date,
             &operator,
-            strategy,
+            &strategy_key,
             window_days_override,
         )
     })
@@ -292,20 +292,21 @@ pub async fn recalc_full(
     let base_date = parse_date(&base_date)?;
     let frozen_date = frozen_date.map(|s| parse_date(&s)).transpose()?;
 
-    let strategy = strategy
+    let strategy_key = strategy
         .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
         .unwrap_or("balanced")
-        .parse::<ScheduleStrategy>()
-        .map_err(|e| format!("策略类型解析失败: {}", e))?;
+        .to_string();
 
     let plan_api = state.plan_api.clone();
     let mut result = tauri::async_runtime::spawn_blocking(move || {
-        plan_api.recalc_full_with_strategy(
+        plan_api.recalc_full_with_strategy_key(
             &version_id,
             base_date,
             frozen_date,
             &operator,
-            strategy,
+            &strategy_key,
             window_days_override,
         )
     })

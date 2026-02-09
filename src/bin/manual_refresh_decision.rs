@@ -7,7 +7,7 @@
 
 use hot_rolling_aps::decision::services::{DecisionRefreshService, RefreshScope, RefreshTrigger};
 use hot_rolling_aps::db::open_sqlite_connection;
-use rusqlite::{Connection, OptionalExtension};
+use rusqlite::OptionalExtension;
 use std::sync::{Arc, Mutex};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

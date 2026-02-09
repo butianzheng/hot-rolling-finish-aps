@@ -635,25 +635,15 @@ impl PlanApi {
             Some(format!("manual_refresh_decision by {}", operator)),
         );
 
-        let mut task_id: Option<String> = None;
-        let mut message = String::new();
-        let mut success = true;
-
-        match self.event_publisher.publish(event) {
-            Ok(id) => {
-                if id.trim().is_empty() {
-                    success = false;
-                    message = "已收到刷新请求，但当前未配置决策刷新组件（可能不会执行）".to_string();
-                } else {
-                    task_id = Some(id.clone());
-                    message = format!("已触发决策刷新: task_id={}", id);
-                }
-            }
-            Err(e) => {
-                success = false;
-                message = format!("触发决策刷新失败: {}", e);
-            }
-        }
+        let (task_id, success, message) = match self.event_publisher.publish(event) {
+            Ok(id) if id.trim().is_empty() => (
+                None,
+                false,
+                "已收到刷新请求，但当前未配置决策刷新组件（可能不会执行）".to_string(),
+            ),
+            Ok(id) => (Some(id.clone()), true, format!("已触发决策刷新: task_id={}", id)),
+            Err(e) => (None, false, format!("触发决策刷新失败: {}", e)),
+        };
 
         // 记录 ActionLog（best-effort）
         let log = ActionLog {

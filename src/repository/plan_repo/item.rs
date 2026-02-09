@@ -220,7 +220,6 @@ impl PlanItemRepository {
         if let Some(offset) = offset {
             sql.push_str(&format!(" OFFSET ?{}", idx));
             values.push(Value::from(offset));
-            idx += 1;
         }
 
         let mut stmt = conn.prepare(&sql)?;

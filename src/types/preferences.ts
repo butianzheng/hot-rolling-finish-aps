@@ -1,9 +1,11 @@
-export type StrategyType =
+export type BuiltinStrategyType =
   | 'balanced'
   | 'urgent_first'
   | 'capacity_first'
   | 'cold_stock_first'
   | 'manual';
+
+export type StrategyType = BuiltinStrategyType | `custom:${string}`;
 
 export interface UserPreferences {
   defaultTheme: 'light' | 'dark';
@@ -11,4 +13,3 @@ export interface UserPreferences {
   sidebarCollapsed: boolean;
   defaultStrategy: StrategyType;
 }
-

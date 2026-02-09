@@ -140,8 +140,8 @@ impl MaterialCandidate {
     }
 
     /// 判断是否临期 (距离交货期 < 阈值)
-    pub fn is_near_due(&self, threshold_days: i32) -> bool {
-        if let Some(due_date_str) = &self.due_date {
+    pub fn is_near_due(&self, _threshold_days: i32) -> bool {
+        if let Some(_due_date_str) = &self.due_date {
             // 简化实现，实际需要解析日期并计算天数差
             // 这里假设 due_date 格式为 YYYY-MM-DD
             return true; // TODO: 实现日期比较逻辑

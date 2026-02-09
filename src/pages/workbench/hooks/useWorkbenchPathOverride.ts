@@ -4,7 +4,7 @@ import { message } from 'antd';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { pathRuleApi, planApi } from '../../../api/tauri';
-import { DEFAULT_LATEST_RUN_TTL_MS } from '../../../stores/latestRun';
+import { getLatestRunTtlMs } from '../../../stores/latestRun';
 import { useGlobalStore } from '../../../stores/use-global-store';
 import { createRunId } from '../../../utils/runId';
 import { formatDate } from '../../../utils/formatters';
@@ -97,7 +97,7 @@ export function useWorkbenchPathOverride(params: {
       const beginResult = beginLatestRun({
         runId: localRunId,
         versionId: activeVersionId,
-        ttlMs: DEFAULT_LATEST_RUN_TTL_MS,
+        ttlMs: getLatestRunTtlMs(),
       });
 
       if (!beginResult.accepted) {

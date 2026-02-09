@@ -36,6 +36,7 @@ import { useGlobalKPI } from './hooks/useGlobalKPI';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useVersionSwitchInvalidation } from './hooks/useVersionSwitchInvalidation';
 import { useStalePlanRevBootstrap } from './hooks/useStalePlanRevBootstrap';
+import { bootstrapFrontendRuntimeConfig } from './services/frontendRuntimeConfig';
 import { reportFrontendError } from './utils/telemetry';
 
 const { Header, Content, Sider } = Layout;
@@ -183,6 +184,10 @@ const App: React.FC = () => {
   useEvent('material_state_changed', () => {
     if (activeVersionId) refetchGlobalKPI();
   });
+
+  useEffect(() => {
+    void bootstrapFrontendRuntimeConfig();
+  }, []);
 
   // 轻量轮询：推进 latestRun TTL 过期状态，避免长驻页面卡在 RUNNING/PENDING
   useEffect(() => {

@@ -7,7 +7,7 @@ import dayjs from 'dayjs';
 import { planApi } from '../../api/tauri';
 import { useCurrentUser, useGlobalActions, useGlobalStore } from '../../stores/use-global-store';
 import { formatDate } from '../../utils/formatters';
-import { DEFAULT_LATEST_RUN_TTL_MS } from '../../stores/latestRun';
+import { getLatestRunTtlMs } from '../../stores/latestRun';
 import { createRunId } from '../../utils/runId';
 import { getErrorMessage } from '../../utils/errorUtils';
 import VersionComparisonModal from '../comparison/VersionComparisonModal';
@@ -284,7 +284,7 @@ const PlanManagement: React.FC = () => {
       const beginResult = beginLatestRun({
         runId: localRunId,
         versionId,
-        ttlMs: DEFAULT_LATEST_RUN_TTL_MS,
+        ttlMs: getLatestRunTtlMs(),
       });
 
       if (!beginResult.accepted) {
@@ -469,4 +469,3 @@ const PlanManagement: React.FC = () => {
 };
 
 export default PlanManagement;
-

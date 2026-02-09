@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   beginLatestRunState,
+  configureLatestRunTtlMs,
+  DEFAULT_LATEST_RUN_TTL_MS,
   createInitialLatestRunState,
   expireLatestRunState,
+  getLatestRunTtlMs,
   isLatestRunExpired,
   markLatestRunDoneState,
 } from './latestRun';
@@ -86,5 +89,19 @@ describe('latestRun 状态机', () => {
 
     expect(next.accepted).toBe(true);
     expect(next.next.runId).toBe('run-after-done');
+  });
+
+  it('支持通过配置覆盖默认 TTL', () => {
+    configureLatestRunTtlMs(30_000);
+    expect(getLatestRunTtlMs()).toBe(30_000);
+
+    const result = beginLatestRunState(createInitialLatestRunState(), {
+      runId: 'run-config-ttl',
+      triggeredAt: 1_000,
+    });
+
+    expect(result.next.expiresAt).toBe(31_000);
+
+    configureLatestRunTtlMs(DEFAULT_LATEST_RUN_TTL_MS);
   });
 });

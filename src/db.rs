@@ -18,7 +18,7 @@ pub const DEFAULT_BUSY_TIMEOUT_MS: u64 = 5_000;
 /// 说明：
 /// - 目前项目存在多套“迁移/建库”方式（schema.sql / migrations / scripts/migrations）。
 /// - 这里的版本号用于**提示/告警**（不做自动迁移），避免静默在旧库上运行导致隐性错误。
-pub const CURRENT_SCHEMA_VERSION: i64 = 10;
+pub const CURRENT_SCHEMA_VERSION: i64 = 11;
 
 /// 配置 SQLite 连接的统一 PRAGMA
 ///

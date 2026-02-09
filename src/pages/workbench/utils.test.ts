@@ -137,6 +137,10 @@ describe('workbench/utils 工具函数', () => {
       expect(getStrategyLabel('unknown_strategy')).toBe('均衡方案');
     });
 
+    it('应该支持自定义策略标签', () => {
+      expect(getStrategyLabel('custom:night_shift')).toBe('自定义策略（night_shift）');
+    });
+
     it('应该处理所有标准策略', () => {
       const strategies = [
         { key: 'urgent_first', label: '紧急优先' },

@@ -14,7 +14,7 @@
 
 ### 权威 Schema 来源
 
-- **新建库**：`scripts/dev_db/schema.sql`（全量，包含所有 v0.2-v0.10 特性）
+- **新建库**：`scripts/dev_db/schema.sql`（全量，包含所有 v0.2-v0.11 特性）
 - **增量升级**：本目录的 `v0.*.sql` 文件
 
 ## 迁移文件清单
@@ -29,6 +29,7 @@
 | `v0.8_path_override_reject_flow.sql` | 6→8 | 路径规则拒绝闭环（拒绝态字段 + 索引） | v0.6 |
 | `v0.9_material_management_coverage_alert_threshold.sql` | 8→9 | 物料管理机组覆盖异常阈值配置化（默认4） | v0.8 |
 | `v0.10_empty_day_recover_threshold.sql` | 9→10 | 连续排程空白日兜底阈值配置化（默认200吨） | v0.9 |
+| `v0.11_frontend_runtime_config.sql` | 10→11 | 前端运行治理参数配置化（latest run TTL / stale toast cooldown） | v0.10 |
 
 ### ⚠️ 弃用文件
 
@@ -53,10 +54,11 @@ sqlite3 hot_rolling_aps.db < migrations/v0.6_path_rules_complete.sql
 sqlite3 hot_rolling_aps.db < migrations/v0.8_path_override_reject_flow.sql
 sqlite3 hot_rolling_aps.db < migrations/v0.9_material_management_coverage_alert_threshold.sql
 sqlite3 hot_rolling_aps.db < migrations/v0.10_empty_day_recover_threshold.sql
+sqlite3 hot_rolling_aps.db < migrations/v0.11_frontend_runtime_config.sql
 
 # 3. 验证版本
 sqlite3 hot_rolling_aps.db "SELECT * FROM schema_version;"
-# 应显示 version = 10
+# 应显示 version = 11
 ```
 
 ## 迁移特性说明
@@ -119,6 +121,16 @@ sqlite3 hot_rolling_aps.db "SELECT * FROM schema_version;"
 - 默认值：`200`（global scope）
 - 用途：作为连续排程“最小可排量阈值（开机阈值）”。当某机组当日直接可排量低于阈值，且“直接可排量+仅因拒绝待下一周期恢复而阻塞的吨位”达到阈值时，自动后移一套换辊周期并重试当日排程
 
+### v0.11: 前端运行治理参数配置化
+
+- 新增配置项：`latest_run_ttl_ms`
+- 默认值：`120000`（global scope）
+- 用途：控制前端 latest run（PENDING/RUNNING）超时转 EXPIRED 的阈值
+
+- 新增配置项：`stale_plan_rev_toast_cooldown_ms`
+- 默认值：`4000`（global scope）
+- 用途：控制 STALE_PLAN_REV 统一 warning 提示的冷却窗口，防止提示风暴
+
 ## 幂等性说明
 
 迁移脚本设计为**部分幂等**：
@@ -145,7 +157,7 @@ sqlite3 hot_rolling_aps.db "SELECT * FROM schema_version;"
 
 应用启动时会检查 `schema_version` 表：
 
-- 若版本低于 `CURRENT_SCHEMA_VERSION`（当前为 10），会输出警告日志
+- 若版本低于 `CURRENT_SCHEMA_VERSION`（当前为 11），会输出警告日志
 - 不会自动执行迁移，需要人工确认
 
 ## 历史迁移脚本
@@ -156,5 +168,5 @@ sqlite3 hot_rolling_aps.db "SELECT * FROM schema_version;"
 
 ---
 
-**更新日期**：2026-02-08
-**当前版本**：v0.10 (schema_version = 10)
+**更新日期**：2026-02-09
+**当前版本**：v0.11 (schema_version = 11)

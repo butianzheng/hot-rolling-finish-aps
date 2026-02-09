@@ -1,6 +1,5 @@
 use crate::domain::action_log::ActionLog;
 use crate::repository::error::{RepositoryError, RepositoryResult};
-use chrono::NaiveDate;
 use rusqlite::{params, Connection};
 use std::sync::{Arc, Mutex};
 
