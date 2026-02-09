@@ -1,25 +1,20 @@
 use crate::decision::api::decision_api::DecisionApi;
 use crate::decision::api::dto::*;
 use crate::decision::use_cases::{
-    d1_most_risky_day::MostRiskyDayUseCase,
-    d2_order_failure::OrderFailureUseCase,
-    d3_cold_stock::ColdStockUseCase,
+    d1_most_risky_day::MostRiskyDayUseCase, d2_order_failure::OrderFailureUseCase,
+    d3_cold_stock::ColdStockUseCase, d4_machine_bottleneck::MachineBottleneckProfile,
     d4_machine_bottleneck::MachineBottleneckUseCase,
     d5_roll_campaign_alert::RollCampaignAlertUseCase,
-    d6_capacity_opportunity::CapacityOpportunityUseCase,
-    impls::*,
+    d6_capacity_opportunity::CapacityOpportunityUseCase, impls::*,
 };
+use chrono::NaiveDate;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use super::conversions::{
-    bottleneck_type_to_string,
-    convert_bottleneck_profile_to_dto,
-    convert_capacity_opportunity_to_dto,
-    convert_cold_stock_to_dto,
-    convert_day_summary_to_dto,
-    convert_order_failure_to_dto,
-    convert_roll_alert_to_dto,
-    generate_heatmap_stats,
+    bottleneck_type_to_string, convert_bottleneck_profile_to_dto,
+    convert_capacity_opportunity_to_dto, convert_cold_stock_to_dto, convert_day_summary_to_dto,
+    convert_order_failure_to_dto, convert_roll_alert_to_dto, generate_heatmap_stats,
 };
 
 /// DecisionApi 实现 (P2 版本: 支持 D1-D6)
@@ -70,6 +65,86 @@ impl DecisionApiImpl {
             d4_use_case,
             d5_use_case: Some(d5_use_case),
             d6_use_case: Some(d6_use_case),
+        }
+    }
+
+    fn list_target_machine_codes(
+        &self,
+        request: &GetMachineBottleneckProfileRequest,
+    ) -> Vec<String> {
+        if let Some(ref codes) = request.machine_codes {
+            if !codes.is_empty() {
+                return codes.clone();
+            }
+        }
+
+        self.d4_use_case
+            .list_active_machine_codes()
+            .unwrap_or_else(|e| {
+                tracing::warn!("D4 查询活跃机组失败，跳过缺失机组补齐: {}", e);
+                Vec::new()
+            })
+    }
+
+    fn build_date_axis(date_from: &str, date_to: &str) -> Vec<String> {
+        let Ok(mut date_cursor) = NaiveDate::parse_from_str(date_from, "%Y-%m-%d") else {
+            return vec![date_from.to_string()];
+        };
+        let Ok(date_end) = NaiveDate::parse_from_str(date_to, "%Y-%m-%d") else {
+            return vec![date_from.to_string()];
+        };
+        if date_cursor > date_end {
+            return vec![date_from.to_string()];
+        }
+
+        let mut dates = Vec::new();
+        while date_cursor <= date_end {
+            dates.push(date_cursor.to_string());
+            if dates.len() > 366 {
+                break;
+            }
+            let Some(next_date) = date_cursor.succ_opt() else {
+                break;
+            };
+            date_cursor = next_date;
+        }
+        if dates.is_empty() {
+            vec![date_from.to_string()]
+        } else {
+            dates
+        }
+    }
+
+    fn fill_missing_machine_profiles(
+        &self,
+        request: &GetMachineBottleneckProfileRequest,
+        profiles: &mut Vec<MachineBottleneckProfile>,
+    ) {
+        let target_machine_codes = self.list_target_machine_codes(request);
+        if target_machine_codes.is_empty() {
+            return;
+        }
+
+        let existing_machines: HashSet<&str> =
+            profiles.iter().map(|p| p.machine_code.as_str()).collect();
+        let missing_machines: Vec<String> = target_machine_codes
+            .into_iter()
+            .filter(|m| !existing_machines.contains(m.as_str()))
+            .collect();
+
+        if missing_machines.is_empty() {
+            return;
+        }
+
+        let dates = Self::build_date_axis(&request.date_from, &request.date_to);
+        for machine_code in missing_machines {
+            for plan_date in &dates {
+                profiles.push(MachineBottleneckProfile::new(
+                    request.version_id.clone(),
+                    machine_code.clone(),
+                    plan_date.clone(),
+                ));
+            }
         }
     }
 }
@@ -166,6 +241,9 @@ impl DecisionApi for DecisionApiImpl {
             }
         }
 
+        // 补齐“无 capacity_pool 记录”的活跃机组，避免热力图缺行。
+        self.fill_missing_machine_profiles(&request, &mut filtered_profiles);
+
         // 应用堵塞等级过滤
         if let Some(ref levels) = request.bottleneck_level_filter {
             filtered_profiles.retain(|p| levels.contains(&p.bottleneck_level));
@@ -212,18 +290,19 @@ impl DecisionApi for DecisionApiImpl {
         request: ListOrderFailureSetRequest,
     ) -> Result<OrderFailureSetResponse, String> {
         // 检查是否已配置 D2 用例
-        let d2_use_case = self.d2_use_case.as_ref()
+        let d2_use_case = self
+            .d2_use_case
+            .as_ref()
             .ok_or("D2 用例未配置,请使用 new_full() 创建 DecisionApiImpl 实例".to_string())?;
 
         // 调用用例层查询失败订单
-        let fail_type_param = request.fail_type_filter.as_ref()
+        let fail_type_param = request
+            .fail_type_filter
+            .as_ref()
             .and_then(|v| v.first())
             .map(|s| s.as_str());
 
-        let failures = d2_use_case.list_order_failures(
-            &request.version_id,
-            fail_type_param,
-        )?;
+        let failures = d2_use_case.list_order_failures(&request.version_id, fail_type_param)?;
 
         // 获取统计信息
         let stats = d2_use_case.count_failures(&request.version_id)?;
@@ -310,7 +389,9 @@ impl DecisionApi for DecisionApiImpl {
         &self,
         request: GetColdStockProfileRequest,
     ) -> Result<ColdStockProfileResponse, String> {
-        let d3_use_case = self.d3_use_case.as_ref()
+        let d3_use_case = self
+            .d3_use_case
+            .as_ref()
             .ok_or("D3 用例未配置,请使用 new_full() 创建 DecisionApiImpl 实例".to_string())?;
 
         // 调用用例层
@@ -324,7 +405,8 @@ impl DecisionApi for DecisionApiImpl {
             None
         };
 
-        let profiles = d3_use_case.get_cold_stock_profile(&request.version_id, machine_code_filter)?;
+        let profiles =
+            d3_use_case.get_cold_stock_profile(&request.version_id, machine_code_filter)?;
         let summary = d3_use_case.get_cold_stock_summary(&request.version_id)?;
 
         // 应用过滤器
@@ -352,24 +434,35 @@ impl DecisionApi for DecisionApiImpl {
         Ok(ColdStockProfileResponse {
             version_id: request.version_id,
             as_of: chrono::Utc::now().to_rfc3339(),
-            items: items.into_iter().map(|p| convert_cold_stock_to_dto(&p)).collect(),
+            items: items
+                .into_iter()
+                .map(|p| convert_cold_stock_to_dto(&p))
+                .collect(),
             total_count,
             summary: ColdStockSummaryDto {
                 total_cold_stock_count: summary.total_count as u32,
                 total_cold_stock_weight_t: summary.total_weight_t,
                 avg_age_days: summary.avg_age_days,
                 high_pressure_count: summary.high_pressure_machines as u32,
-                by_machine: summary.by_machine.into_iter().map(|m| MachineStockStatsDto {
-                    machine_code: m.machine_code,
-                    count: m.count as u32,
-                    weight_t: m.weight_t,
-                    avg_pressure_score: m.pressure_score,
-                }).collect(),
-                by_age_bin: summary.by_age.into_iter().map(|a| AgeBinStatsDto {
-                    age_bin: a.age_bin,
-                    count: a.count as u32,
-                    weight_t: a.weight_t,
-                }).collect(),
+                by_machine: summary
+                    .by_machine
+                    .into_iter()
+                    .map(|m| MachineStockStatsDto {
+                        machine_code: m.machine_code,
+                        count: m.count as u32,
+                        weight_t: m.weight_t,
+                        avg_pressure_score: m.pressure_score,
+                    })
+                    .collect(),
+                by_age_bin: summary
+                    .by_age
+                    .into_iter()
+                    .map(|a| AgeBinStatsDto {
+                        age_bin: a.age_bin,
+                        count: a.count as u32,
+                        weight_t: a.weight_t,
+                    })
+                    .collect(),
             },
         })
     }
@@ -378,15 +471,20 @@ impl DecisionApi for DecisionApiImpl {
         &self,
         request: ListRollCampaignAlertsRequest,
     ) -> Result<RollCampaignAlertsResponse, String> {
-        let d5_use_case = self.d5_use_case.as_ref()
+        let d5_use_case = self
+            .d5_use_case
+            .as_ref()
             .ok_or("D5 用例未配置,请使用 new_full() 创建 DecisionApiImpl 实例".to_string())?;
 
         // 调用用例层
-        let alert_level_param = request.alert_level_filter.as_ref()
+        let alert_level_param = request
+            .alert_level_filter
+            .as_ref()
             .and_then(|v| v.first())
             .map(|s| s.as_str());
 
-        let alerts = d5_use_case.list_roll_campaign_alerts(&request.version_id, alert_level_param)?;
+        let alerts =
+            d5_use_case.list_roll_campaign_alerts(&request.version_id, alert_level_param)?;
         let summary = d5_use_case.get_roll_alert_summary(&request.version_id)?;
 
         // 应用过滤器
@@ -410,7 +508,10 @@ impl DecisionApi for DecisionApiImpl {
         Ok(RollCampaignAlertsResponse {
             version_id: request.version_id,
             as_of: chrono::Utc::now().to_rfc3339(),
-            items: items.into_iter().map(|a| convert_roll_alert_to_dto(&a)).collect(),
+            items: items
+                .into_iter()
+                .map(|a| convert_roll_alert_to_dto(&a))
+                .collect(),
             total_count,
             summary: RollAlertSummaryDto {
                 total_alerts: summary.total_alerts as u32,
@@ -441,11 +542,15 @@ impl DecisionApi for DecisionApiImpl {
         &self,
         request: GetCapacityOpportunityRequest,
     ) -> Result<CapacityOpportunityResponse, String> {
-        let d6_use_case = self.d6_use_case.as_ref()
+        let d6_use_case = self
+            .d6_use_case
+            .as_ref()
             .ok_or("D6 用例未配置,请使用 new_full() 创建 DecisionApiImpl 实例".to_string())?;
 
         // 调用用例层
-        let machine_code_param = request.machine_codes.as_ref()
+        let machine_code_param = request
+            .machine_codes
+            .as_ref()
             .and_then(|v| v.first())
             .map(|s| s.as_str());
 
@@ -459,11 +564,8 @@ impl DecisionApi for DecisionApiImpl {
             end_date,
         )?;
 
-        let summary = d6_use_case.get_optimization_summary(
-            &request.version_id,
-            start_date,
-            end_date,
-        )?;
+        let summary =
+            d6_use_case.get_optimization_summary(&request.version_id, start_date, end_date)?;
 
         // 应用过滤器
         let mut filtered_opportunities = opportunities;
@@ -486,7 +588,10 @@ impl DecisionApi for DecisionApiImpl {
         Ok(CapacityOpportunityResponse {
             version_id: request.version_id,
             as_of: chrono::Utc::now().to_rfc3339(),
-            items: items.into_iter().map(|o| convert_capacity_opportunity_to_dto(&o)).collect(),
+            items: items
+                .into_iter()
+                .map(|o| convert_capacity_opportunity_to_dto(&o))
+                .collect(),
             total_count,
             summary: CapacityOpportunitySummaryDto {
                 total_opportunities: total_count,

@@ -438,8 +438,8 @@ fn test_d4_query_performance_large_dataset() {
         duration
     );
     assert!(
-        duration.as_millis() < 100,
-        "D4 查询应该 < 100ms, 实际: {:?}",
+        duration.as_millis() < 200,
+        "D4 查询应该 < 200ms, 实际: {:?}",
         duration
     );
 

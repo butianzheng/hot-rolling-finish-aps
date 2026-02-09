@@ -22,18 +22,19 @@ mod path_rule_e2e_test {
     use hot_rolling_aps::api::{PathRuleApi, PlanApi};
     use hot_rolling_aps::config::config_manager::ConfigManager;
     use hot_rolling_aps::domain::types::{SchedState, UrgentLevel};
+    use hot_rolling_aps::engine::strategy::ScheduleStrategy;
     use hot_rolling_aps::engine::{
         CapacityFiller, EligibilityEngine, PrioritySorter, RecalcEngine, RiskEngine, UrgencyEngine,
     };
-    use hot_rolling_aps::engine::strategy::ScheduleStrategy;
     use hot_rolling_aps::repository::{
         action_log_repo::ActionLogRepository,
         capacity_repo::CapacityPoolRepository,
         material_repo::{MaterialMasterRepository, MaterialStateRepository},
         path_override_pending_repo::PathOverridePendingRepository,
         plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository},
-        roller_repo::RollerCampaignRepository,
         risk_repo::RiskSnapshotRepository,
+        roll_campaign_plan_repo::RollCampaignPlanRepository,
+        roller_repo::RollerCampaignRepository,
         strategy_draft_repo::StrategyDraftRepository,
     };
     use rusqlite::Connection;
@@ -52,28 +53,41 @@ mod path_rule_e2e_test {
         Arc<MaterialStateRepository>,
     ) {
         let (temp_file, db_path) = create_test_db().expect("create_test_db failed");
-        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).expect("open db failed")));
+        let conn = Arc::new(Mutex::new(
+            test_helpers::open_test_connection(&db_path).expect("open db failed"),
+        ));
 
         // === Repository ===
-        let material_master_repo =
-            Arc::new(MaterialMasterRepository::new(&db_path).expect("MaterialMasterRepository init failed"));
-        let material_state_repo =
-            Arc::new(MaterialStateRepository::new(&db_path).expect("MaterialStateRepository init failed"));
+        let material_master_repo = Arc::new(
+            MaterialMasterRepository::new(&db_path).expect("MaterialMasterRepository init failed"),
+        );
+        let material_state_repo = Arc::new(
+            MaterialStateRepository::new(&db_path).expect("MaterialStateRepository init failed"),
+        );
         let plan_repo = Arc::new(PlanRepository::new(conn.clone()));
         let plan_version_repo = Arc::new(PlanVersionRepository::new(conn.clone()));
         let plan_item_repo = Arc::new(PlanItemRepository::new(conn.clone()));
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
         let strategy_draft_repo = Arc::new(StrategyDraftRepository::new(conn.clone()));
-        let risk_snapshot_repo =
-            Arc::new(RiskSnapshotRepository::new(&db_path).expect("RiskSnapshotRepository init failed"));
-        let capacity_pool_repo =
-            Arc::new(CapacityPoolRepository::new(db_path.clone()).expect("CapacityPoolRepository init failed"));
-        let roller_campaign_repo =
-            Arc::new(RollerCampaignRepository::new(&db_path).expect("RollerCampaignRepository init failed"));
+        let risk_snapshot_repo = Arc::new(
+            RiskSnapshotRepository::new(&db_path).expect("RiskSnapshotRepository init failed"),
+        );
+        let capacity_pool_repo = Arc::new(
+            CapacityPoolRepository::new(db_path.clone())
+                .expect("CapacityPoolRepository init failed"),
+        );
+        let roller_campaign_repo = Arc::new(
+            RollerCampaignRepository::new(&db_path).expect("RollerCampaignRepository init failed"),
+        );
+        let roll_campaign_plan_repo = Arc::new(
+            RollCampaignPlanRepository::new(&db_path)
+                .expect("RollCampaignPlanRepository init failed"),
+        );
         let path_override_pending_repo = Arc::new(PathOverridePendingRepository::new(conn.clone()));
 
         // === Engine ===
-        let config_manager = Arc::new(ConfigManager::new(&db_path).expect("ConfigManager init failed"));
+        let config_manager =
+            Arc::new(ConfigManager::new(&db_path).expect("ConfigManager init failed"));
         let eligibility_engine = Arc::new(EligibilityEngine::new(config_manager.clone()));
         let urgency_engine = Arc::new(UrgencyEngine::new());
         let priority_sorter = Arc::new(PrioritySorter::new());
@@ -123,6 +137,7 @@ mod path_rule_e2e_test {
             material_master_repo.clone(),
             material_state_repo.clone(),
             roller_campaign_repo,
+            roll_campaign_plan_repo,
             action_log_repo.clone(),
             path_override_pending_repo,
         ));
@@ -345,7 +360,9 @@ mod path_rule_e2e_test {
             .list_path_override_pending(&version_1, machine_code, base_date)
             .expect("list_path_override_pending (after reject) failed");
         assert!(
-            !pending_after_reject.iter().any(|p| p.material_id == candidate_id),
+            !pending_after_reject
+                .iter()
+                .any(|p| p.material_id == candidate_id),
             "拒绝后 candidate 不应继续出现在待确认"
         );
 
@@ -375,7 +392,9 @@ mod path_rule_e2e_test {
             .find_by_version(&version_1)
             .expect("find_by_version same campaign failed");
         assert!(
-            !items_same_campaign.iter().any(|i| i.material_id == candidate_id),
+            !items_same_campaign
+                .iter()
+                .any(|i| i.material_id == candidate_id),
             "同周期下 candidate 不应被排入"
         );
 
@@ -409,7 +428,9 @@ mod path_rule_e2e_test {
             .find_by_version(&version_1)
             .expect("find_by_version next campaign failed");
         assert!(
-            items_next_campaign.iter().any(|i| i.material_id == candidate_id),
+            items_next_campaign
+                .iter()
+                .any(|i| i.material_id == candidate_id),
             "下一周期应恢复 candidate 的可排性"
         );
 
@@ -476,7 +497,10 @@ mod path_rule_e2e_test {
             .expect("insert material_state failed");
 
         let plan_id = plan_api
-            .create_plan("PathRule Reject Blocked Base E2E".to_string(), "tester".to_string())
+            .create_plan(
+                "PathRule Reject Blocked Base E2E".to_string(),
+                "tester".to_string(),
+            )
             .expect("create_plan failed");
         let base_version_id = plan_api
             .create_version(plan_id, 1, None, None, "tester".to_string())
@@ -524,7 +548,9 @@ mod path_rule_e2e_test {
             .find_by_version(&version_1)
             .expect("find_by_version same campaign failed");
         assert!(
-            !items_same_campaign.iter().any(|i| i.material_id == candidate_id),
+            !items_same_campaign
+                .iter()
+                .any(|i| i.material_id == candidate_id),
             "同周期下 candidate 不应被排入"
         );
 
@@ -567,7 +593,9 @@ mod path_rule_e2e_test {
             .find_by_version(&version_1)
             .expect("find_by_version next campaign failed");
         assert!(
-            items_next_campaign.iter().any(|i| i.material_id == candidate_id),
+            items_next_campaign
+                .iter()
+                .any(|i| i.material_id == candidate_id),
             "下一周期应恢复 candidate 的可排性"
         );
 
@@ -647,7 +675,10 @@ mod path_rule_e2e_test {
             .expect("insert material_state failed");
 
         let plan_id = plan_api
-            .create_plan("PathRule Auto Reset Threshold E2E".to_string(), "tester".to_string())
+            .create_plan(
+                "PathRule Auto Reset Threshold E2E".to_string(),
+                "tester".to_string(),
+            )
             .expect("create_plan failed");
         let base_version_id = plan_api
             .create_version(plan_id, 1, None, None, "tester".to_string())
@@ -688,7 +719,9 @@ mod path_rule_e2e_test {
             .find_by_version(&version_1)
             .expect("find_by_version failed");
         assert!(
-            items_after_recalc.iter().any(|i| i.material_id == candidate_id),
+            items_after_recalc
+                .iter()
+                .any(|i| i.material_id == candidate_id),
             "当 direct<阈值 且 direct+blocked>=阈值 时，应自动后移一周期并恢复排入"
         );
 
@@ -769,7 +802,10 @@ mod path_rule_e2e_test {
             .expect("insert material_state failed");
 
         let plan_id = plan_api
-            .create_plan("PathRule No Auto Reset When Direct Enough E2E".to_string(), "tester".to_string())
+            .create_plan(
+                "PathRule No Auto Reset When Direct Enough E2E".to_string(),
+                "tester".to_string(),
+            )
             .expect("create_plan failed");
         let base_version_id = plan_api
             .create_version(plan_id, 1, None, None, "tester".to_string())
@@ -830,11 +866,15 @@ mod path_rule_e2e_test {
             .find_by_version(&version_1)
             .expect("find_by_version failed");
         assert!(
-            items_after_recalc.iter().any(|i| i.material_id == direct_id),
+            items_after_recalc
+                .iter()
+                .any(|i| i.material_id == direct_id),
             "direct>=阈值时，直接可排材料应被排入"
         );
         assert!(
-            !items_after_recalc.iter().any(|i| i.material_id == candidate_id),
+            !items_after_recalc
+                .iter()
+                .any(|i| i.material_id == candidate_id),
             "direct>=阈值时不应触发自动后移，拒绝材料仍应保持阻塞"
         );
 

@@ -14,7 +14,9 @@ mod helpers;
 
 #[cfg(test)]
 mod path_rule_integration_test {
-    use crate::helpers::test_data_builder::{CapacityPoolBuilder, MaterialBuilder, MaterialStateBuilder};
+    use crate::helpers::test_data_builder::{
+        CapacityPoolBuilder, MaterialBuilder, MaterialStateBuilder,
+    };
     use crate::test_helpers;
     use crate::test_helpers::create_test_db;
     use chrono::NaiveDate;
@@ -24,9 +26,14 @@ mod path_rule_integration_test {
     use hot_rolling_aps::domain::types::{AnchorSource, RollStatus, SchedState, UrgentLevel};
     use hot_rolling_aps::engine::{Anchor, CapacityFiller, PathRuleConfig, PathRuleEngine};
     use hot_rolling_aps::repository::action_log_repo::ActionLogRepository;
-    use hot_rolling_aps::repository::material_repo::{MaterialMasterRepository, MaterialStateRepository};
-    use hot_rolling_aps::repository::path_override_pending_repo::{PathOverridePendingRecord, PathOverridePendingRepository};
+    use hot_rolling_aps::repository::material_repo::{
+        MaterialMasterRepository, MaterialStateRepository,
+    };
+    use hot_rolling_aps::repository::path_override_pending_repo::{
+        PathOverridePendingRecord, PathOverridePendingRepository,
+    };
     use hot_rolling_aps::repository::plan_repo::PlanItemRepository;
+    use hot_rolling_aps::repository::roll_campaign_plan_repo::RollCampaignPlanRepository;
     use hot_rolling_aps::repository::roller_repo::RollerCampaignRepository;
     use rusqlite::{params, Connection};
     use std::sync::{Arc, Mutex};
@@ -64,9 +71,11 @@ mod path_rule_integration_test {
             .unwrap();
         }
 
-        let material_master_repo = Arc::new(MaterialMasterRepository::from_connection(conn.clone()));
+        let material_master_repo =
+            Arc::new(MaterialMasterRepository::from_connection(conn.clone()));
         let material_state_repo = Arc::new(MaterialStateRepository::from_connection(conn.clone()));
-        let roller_campaign_repo = Arc::new(RollerCampaignRepository::from_connection(conn.clone()));
+        let roller_campaign_repo =
+            Arc::new(RollerCampaignRepository::from_connection(conn.clone()));
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
 
         // 构造：锚点材料（更窄更薄） + 候选材料（更宽更厚，需人工突破）
@@ -123,6 +132,8 @@ mod path_rule_integration_test {
 
         // PathRuleApi：待确认列表应包含候选材料
         let plan_item_repo = Arc::new(PlanItemRepository::new(conn.clone()));
+        let roll_campaign_plan_repo =
+            Arc::new(RollCampaignPlanRepository::from_connection(conn.clone()).unwrap());
         let config_manager = Arc::new(ConfigManager::new(&db_path).unwrap());
         let path_override_pending_repo = Arc::new(PathOverridePendingRepository::new(conn.clone()));
         let path_rule_api = PathRuleApi::new(
@@ -132,6 +143,7 @@ mod path_rule_integration_test {
             material_master_repo.clone(),
             material_state_repo.clone(),
             roller_campaign_repo.clone(),
+            roll_campaign_plan_repo,
             action_log_repo.clone(),
             path_override_pending_repo.clone(),
         );
@@ -175,12 +187,17 @@ mod path_rule_integration_test {
             vec![],
             version_id,
             Some(&engine),
-            Some(Anchor { width_mm: 1000.0, thickness_mm: 10.0 }),
+            Some(Anchor {
+                width_mm: 1000.0,
+                thickness_mm: 10.0,
+            }),
             Some(anchor_material_id.to_string()),
         );
         assert!(res.plan_items.is_empty());
         assert_eq!(res.skipped_materials.len(), 1);
-        assert!(res.skipped_materials[0].2.contains("PATH_OVERRIDE_REQUIRED"));
+        assert!(res.skipped_materials[0]
+            .2
+            .contains("PATH_OVERRIDE_REQUIRED"));
 
         // API：人工确认突破
         path_rule_api
@@ -204,7 +221,10 @@ mod path_rule_integration_test {
             "tester"
         );
         assert_eq!(
-            confirmed_state.user_confirmed_reason.as_deref().unwrap_or(""),
+            confirmed_state
+                .user_confirmed_reason
+                .as_deref()
+                .unwrap_or(""),
             "交付临期"
         );
 
@@ -221,7 +241,10 @@ mod path_rule_integration_test {
             vec![],
             version_id,
             Some(&engine),
-            Some(Anchor { width_mm: 1000.0, thickness_mm: 10.0 }),
+            Some(Anchor {
+                width_mm: 1000.0,
+                thickness_mm: 10.0,
+            }),
             Some(anchor_material_id.to_string()),
         );
         assert_eq!(res2.plan_items.len(), 1);
@@ -259,7 +282,8 @@ mod path_rule_integration_test {
             .unwrap();
         }
 
-        let roller_campaign_repo = Arc::new(RollerCampaignRepository::from_connection(conn.clone()));
+        let roller_campaign_repo =
+            Arc::new(RollerCampaignRepository::from_connection(conn.clone()));
         let campaign = RollerCampaign {
             version_id: version_id.to_string(),
             machine_code: machine_code.to_string(),
@@ -278,8 +302,11 @@ mod path_rule_integration_test {
         roller_campaign_repo.create(&campaign).unwrap();
 
         let plan_item_repo = Arc::new(PlanItemRepository::new(conn.clone()));
+        let roll_campaign_plan_repo =
+            Arc::new(RollCampaignPlanRepository::from_connection(conn.clone()).unwrap());
         let config_manager = Arc::new(ConfigManager::new(&db_path).unwrap());
-        let material_master_repo = Arc::new(MaterialMasterRepository::from_connection(conn.clone()));
+        let material_master_repo =
+            Arc::new(MaterialMasterRepository::from_connection(conn.clone()));
         let material_state_repo = Arc::new(MaterialStateRepository::from_connection(conn.clone()));
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
         let path_override_pending_repo = Arc::new(PathOverridePendingRepository::new(conn.clone()));
@@ -291,6 +318,7 @@ mod path_rule_integration_test {
             material_master_repo,
             material_state_repo,
             roller_campaign_repo.clone(),
+            roll_campaign_plan_repo,
             action_log_repo,
             path_override_pending_repo,
         );
@@ -309,5 +337,90 @@ mod path_rule_integration_test {
         assert!(anchor.anchor_width_mm.is_none());
         assert!(anchor.anchor_thickness_mm.is_none());
         assert!(anchor.anchor_material_id.is_none());
+    }
+
+    #[test]
+    fn test_roll_cycle_reset_without_active_campaign_initializes_and_syncs_plan() {
+        let (_tmp, db_path) = create_test_db().expect("create_test_db failed");
+
+        let conn = test_helpers::open_test_connection(&db_path).expect("open db failed");
+        conn.execute("PRAGMA foreign_keys = ON", []).unwrap();
+        let conn = Arc::new(Mutex::new(conn));
+
+        let plan_id = "P_ROLL_RESET_EMPTY";
+        let version_id = "V_ROLL_RESET_EMPTY";
+        let machine_code = "H032";
+
+        {
+            let c = conn.lock().unwrap();
+            c.execute(
+                "INSERT INTO plan (plan_id, plan_name, plan_type, base_plan_id, created_by) VALUES (?1, ?2, ?3, NULL, ?4)",
+                params![plan_id, "RollReset 空周期测试方案", "SCENARIO", "tester"],
+            )
+            .unwrap();
+            c.execute(
+                "INSERT INTO plan_version (version_id, plan_id, version_no, status, created_by) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![version_id, plan_id, 1, "ACTIVE", "tester"],
+            )
+            .unwrap();
+        }
+
+        let roller_campaign_repo =
+            Arc::new(RollerCampaignRepository::from_connection(conn.clone()));
+        let roll_campaign_plan_repo =
+            Arc::new(RollCampaignPlanRepository::from_connection(conn.clone()).unwrap());
+        let plan_item_repo = Arc::new(PlanItemRepository::new(conn.clone()));
+        let config_manager = Arc::new(ConfigManager::new(&db_path).unwrap());
+        let material_master_repo =
+            Arc::new(MaterialMasterRepository::from_connection(conn.clone()));
+        let material_state_repo = Arc::new(MaterialStateRepository::from_connection(conn.clone()));
+        let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
+        let path_override_pending_repo = Arc::new(PathOverridePendingRepository::new(conn.clone()));
+
+        roll_campaign_plan_repo
+            .upsert(
+                &hot_rolling_aps::repository::roll_campaign_plan_repo::RollCampaignPlanEntity {
+                    version_id: version_id.to_string(),
+                    machine_code: machine_code.to_string(),
+                    initial_start_at: "2026-02-01 08:00:00".to_string(),
+                    next_change_at: Some("2026-02-10 10:00:00".to_string()),
+                    downtime_minutes: Some(60),
+                    updated_at: "2026-02-01 08:00:00".to_string(),
+                    updated_by: Some("seed".to_string()),
+                },
+            )
+            .expect("seed roll_campaign_plan failed");
+
+        let path_rule_api = PathRuleApi::new(
+            conn.clone(),
+            config_manager,
+            plan_item_repo,
+            material_master_repo,
+            material_state_repo,
+            roller_campaign_repo.clone(),
+            roll_campaign_plan_repo.clone(),
+            action_log_repo,
+            path_override_pending_repo,
+        );
+
+        path_rule_api
+            .reset_roll_cycle(version_id, machine_code, "tester", "现场换辊")
+            .expect("reset_roll_cycle failed");
+
+        let anchor = path_rule_api
+            .get_roll_cycle_anchor(version_id, machine_code)
+            .expect("get_roll_cycle_anchor failed")
+            .expect("active campaign missing after reset");
+        assert_eq!(anchor.campaign_no, 1);
+        assert_eq!(anchor.anchor_source.to_uppercase(), "NONE");
+
+        let synced_plan = roll_campaign_plan_repo
+            .find_by_key(version_id, machine_code)
+            .expect("find_by_key failed")
+            .expect("roll_campaign_plan should exist after reset");
+        assert_eq!(synced_plan.downtime_minutes, Some(60));
+        assert!(synced_plan.next_change_at.is_none());
+        assert_eq!(synced_plan.updated_by.as_deref(), Some("tester"));
+        assert_ne!(synced_plan.initial_start_at, "2026-02-01 08:00:00");
     }
 }

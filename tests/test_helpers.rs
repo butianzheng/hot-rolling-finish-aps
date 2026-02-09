@@ -78,6 +78,12 @@ fn init_schema(conn: &Connection) -> Result<(), Box<dyn Error>> {
         [],
     )?;
 
+    // 插入当前 schema 版本号，确保 AppState::new() 版本检查通过
+    conn.execute(
+        "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (?1, datetime('now'))",
+        rusqlite::params![hot_rolling_aps::db::CURRENT_SCHEMA_VERSION],
+    )?;
+
     // 创建 config_scope 表
     conn.execute(
         r#"

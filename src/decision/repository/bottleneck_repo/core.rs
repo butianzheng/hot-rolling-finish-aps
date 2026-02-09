@@ -13,7 +13,6 @@ pub struct BottleneckRepository {
     pub(super) conn: Arc<Mutex<Connection>>,
 }
 
-
 impl BottleneckRepository {
     /// 创建新的 BottleneckRepository 实例
     pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
@@ -41,7 +40,9 @@ impl BottleneckRepository {
         end_date: &str,
     ) -> Result<Vec<MachineBottleneckProfile>, Box<dyn Error>> {
         // 优先尝试从读模型表读取
-        if let Ok(profiles) = self.get_bottleneck_from_read_model(version_id, machine_code, start_date, end_date) {
+        if let Ok(profiles) =
+            self.get_bottleneck_from_read_model(version_id, machine_code, start_date, end_date)
+        {
             if !profiles.is_empty() {
                 tracing::debug!(
                     version_id = version_id,
@@ -98,5 +99,49 @@ impl BottleneckRepository {
         }
 
         Ok(heatmap)
+    }
+
+    /// 查询 machine_master 中启用的机组代码（按编码升序）
+    pub fn list_active_machine_codes(&self) -> Result<Vec<String>, Box<dyn Error>> {
+        let conn = self.conn.lock().map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("获取数据库连接失败: {}", e),
+            )
+        })?;
+
+        let has_is_active = Self::table_has_column_local(&conn, "machine_master", "is_active")?;
+        let mut sql = String::from("SELECT machine_code FROM machine_master");
+        if has_is_active {
+            sql.push_str(" WHERE is_active = 1");
+        }
+        sql.push_str(" ORDER BY machine_code ASC");
+
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        let mut machines = Vec::new();
+        for row in rows {
+            let machine_code = row?;
+            if !machine_code.trim().is_empty() {
+                machines.push(machine_code);
+            }
+        }
+        Ok(machines)
+    }
+
+    fn table_has_column_local(
+        conn: &Connection,
+        table: &str,
+        column: &str,
+    ) -> Result<bool, Box<dyn Error>> {
+        let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", table))?;
+        let mut rows = stmt.query([])?;
+        while let Some(row) = rows.next()? {
+            let name: String = row.get(1)?;
+            if name == column {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 }

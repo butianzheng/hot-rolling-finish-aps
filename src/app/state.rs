@@ -5,49 +5,46 @@
 // 依据: 实施计划 Phase 5
 // ==========================================
 
-use std::sync::{Arc, Mutex};
 use rusqlite::{Connection, OpenFlags};
+use std::sync::{Arc, Mutex};
 
-use crate::api::{ConfigApi, ImportApi, ManualOperationValidator, MaterialApi, PathRuleApi, PlanApi, DashboardApi, RollerApi, RhythmApi};
+use crate::api::{
+    ConfigApi, DashboardApi, ImportApi, ManualOperationValidator, MaterialApi, PathRuleApi,
+    PlanApi, RhythmApi, RollerApi,
+};
+use crate::config::config_manager::ConfigManager;
 use crate::db::open_sqlite_connection;
 use crate::decision::api::DecisionApiImpl;
 use crate::decision::repository::{
-    DaySummaryRepository, BottleneckRepository,
-    OrderFailureRepository, ColdStockRepository,
-    RollAlertRepository, CapacityOpportunityRepository,
-};
-use crate::decision::use_cases::impls::{
-    MostRiskyDayUseCaseImpl, MachineBottleneckUseCaseImpl,
-    OrderFailureUseCaseImpl, ColdStockUseCaseImpl,
-    RollCampaignAlertUseCaseImpl, CapacityOpportunityUseCaseImpl,
+    BottleneckRepository, CapacityOpportunityRepository, ColdStockRepository, DaySummaryRepository,
+    OrderFailureRepository, RollAlertRepository,
 };
 use crate::decision::services::{
     DecisionRefreshService, RefreshQueue, RefreshQueueAdapter, RefreshScope, RefreshTask,
     RefreshTrigger,
 };
+use crate::decision::use_cases::impls::{
+    CapacityOpportunityUseCaseImpl, ColdStockUseCaseImpl, MachineBottleneckUseCaseImpl,
+    MostRiskyDayUseCaseImpl, OrderFailureUseCaseImpl, RollCampaignAlertUseCaseImpl,
+};
 use crate::engine::ScheduleEventPublisher;
-use crate::repository::{
-    material_repo::{MaterialMasterRepository, MaterialStateRepository},
-    plan_repo::{PlanRepository, PlanVersionRepository, PlanItemRepository},
-    action_log_repo::ActionLogRepository,
-    risk_repo::RiskSnapshotRepository,
-    capacity_repo::CapacityPoolRepository,
-    roller_repo::RollerCampaignRepository,
-    path_override_pending_repo::PathOverridePendingRepository,
-    roll_campaign_plan_repo::RollCampaignPlanRepository,
-    plan_rhythm_repo::PlanRhythmRepository,
-    strategy_draft_repo::StrategyDraftRepository,
-    decision_refresh_repo::DecisionRefreshRepository,
-};
 use crate::engine::{
-    eligibility::EligibilityEngine,
-    urgency::UrgencyEngine,
-    recalc::RecalcEngine,
-    risk::RiskEngine,
-    priority::PrioritySorter,
-    capacity_filler::CapacityFiller,
+    capacity_filler::CapacityFiller, eligibility::EligibilityEngine, priority::PrioritySorter,
+    recalc::RecalcEngine, risk::RiskEngine, urgency::UrgencyEngine,
 };
-use crate::config::config_manager::ConfigManager;
+use crate::repository::{
+    action_log_repo::ActionLogRepository,
+    capacity_repo::CapacityPoolRepository,
+    decision_refresh_repo::DecisionRefreshRepository,
+    material_repo::{MaterialMasterRepository, MaterialStateRepository},
+    path_override_pending_repo::PathOverridePendingRepository,
+    plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository},
+    plan_rhythm_repo::PlanRhythmRepository,
+    risk_repo::RiskSnapshotRepository,
+    roll_campaign_plan_repo::RollCampaignPlanRepository,
+    roller_repo::RollerCampaignRepository,
+    strategy_draft_repo::StrategyDraftRepository,
+};
 
 /// 应用状态
 ///
@@ -113,12 +110,11 @@ impl AppState {
         tracing::info!("初始化AppState，数据库路径: {}", db_path);
 
         // 创建数据库连接（共享连接）
-        let conn = open_sqlite_connection(&db_path)
-            .map_err(|e| format!("无法打开数据库: {}", e))?;
+        let conn =
+            open_sqlite_connection(&db_path).map_err(|e| format!("无法打开数据库: {}", e))?;
 
         // 确保 Schema 存在（首次启动自动建表）
-        crate::db::ensure_schema(&conn)
-            .map_err(|e| format!("ensure_schema 失败: {}", e))?;
+        crate::db::ensure_schema(&conn).map_err(|e| format!("ensure_schema 失败: {}", e))?;
 
         // Best-effort: keep DB optimizations from blocking app startup.
         if let Err(e) = ensure_action_log_indexes(&conn) {
@@ -158,7 +154,8 @@ impl AppState {
         // ==========================================
 
         // 材料相关Repository
-        let material_master_repo = Arc::new(MaterialMasterRepository::from_connection(conn.clone()));
+        let material_master_repo =
+            Arc::new(MaterialMasterRepository::from_connection(conn.clone()));
         let material_state_repo = Arc::new(MaterialStateRepository::from_connection(conn.clone()));
 
         // 排产相关Repository
@@ -174,24 +171,25 @@ impl AppState {
         let risk_snapshot_repo = Arc::new(RiskSnapshotRepository::from_connection(conn.clone()));
         let capacity_pool_repo = Arc::new(CapacityPoolRepository::from_connection(conn.clone()));
 
-        let roller_campaign_repo = Arc::new(RollerCampaignRepository::from_connection(conn.clone()));
+        let roller_campaign_repo =
+            Arc::new(RollerCampaignRepository::from_connection(conn.clone()));
 
         let roll_campaign_plan_repo = Arc::new(
             RollCampaignPlanRepository::from_connection(conn.clone())
-                .map_err(|e| format!("无法创建RollCampaignPlanRepository: {}", e))?
+                .map_err(|e| format!("无法创建RollCampaignPlanRepository: {}", e))?,
         );
 
         let plan_rhythm_repo = Arc::new(
             PlanRhythmRepository::from_connection(conn.clone())
-                .map_err(|e| format!("无法创建PlanRhythmRepository: {}", e))?
+                .map_err(|e| format!("无法创建PlanRhythmRepository: {}", e))?,
         );
 
         // 决策层Repository (D1-D6)
-        let day_summary_repo = Arc::new(DaySummaryRepository::new(conn.clone()));           // D1
-        let order_failure_repo = Arc::new(OrderFailureRepository::new(conn.clone()));       // D2
-        let cold_stock_repo = Arc::new(ColdStockRepository::new(conn.clone()));             // D3
-        let bottleneck_repo = Arc::new(BottleneckRepository::new(conn.clone()));            // D4
-        let roll_alert_repo = Arc::new(RollAlertRepository::new(conn.clone()));             // D5
+        let day_summary_repo = Arc::new(DaySummaryRepository::new(conn.clone())); // D1
+        let order_failure_repo = Arc::new(OrderFailureRepository::new(conn.clone())); // D2
+        let cold_stock_repo = Arc::new(ColdStockRepository::new(conn.clone())); // D3
+        let bottleneck_repo = Arc::new(BottleneckRepository::new(conn.clone())); // D4
+        let roll_alert_repo = Arc::new(RollAlertRepository::new(conn.clone())); // D5
         let capacity_opportunity_repo = Arc::new(CapacityOpportunityRepository::new(conn.clone())); // D6
 
         // ==========================================
@@ -201,7 +199,7 @@ impl AppState {
         // 配置管理器
         let config_manager = Arc::new(
             ConfigManager::from_connection(conn.clone())
-                .map_err(|e| format!("无法创建ConfigManager: {}", e))?
+                .map_err(|e| format!("无法创建ConfigManager: {}", e))?,
         );
 
         // 适温判定引擎
@@ -223,16 +221,15 @@ impl AppState {
         let refresh_worker_conn: Arc<Mutex<Connection>> = match open_sqlite_connection(&db_path) {
             Ok(c) => Arc::new(Mutex::new(c)),
             Err(e) => {
-                tracing::warn!(
-                    "无法创建决策刷新独立连接(将退回共享连接): {}",
-                    e
-                );
+                tracing::warn!("无法创建决策刷新独立连接(将退回共享连接): {}", e);
                 conn.clone()
             }
         };
         let decision_refresh_service = Arc::new(DecisionRefreshService::new(refresh_worker_conn));
-        let event_publisher: Option<Arc<dyn ScheduleEventPublisher>> =
-            match RefreshQueue::new(conn.clone(), decision_refresh_service) {
+        let event_publisher: Option<Arc<dyn ScheduleEventPublisher>> = match RefreshQueue::new(
+            conn.clone(),
+            decision_refresh_service,
+        ) {
             Ok(queue) => {
                 tracing::info!("RefreshQueue 初始化成功");
                 let queue_arc = Arc::new(queue);
@@ -255,11 +252,13 @@ impl AppState {
                 // 启动时对“当前激活版本”做一次兜底刷新：
                 // - 典型场景：上次运行时刷新逻辑/数据源缺失导致 D1/D3 等读模型为空；
                 // - 若不主动刷新，会出现“驾驶舱/决策看板数据为空且不联动”的问题。
-                if let Ok(Some(active_version_id)) = plan_version_repo.find_latest_active_version_id()
+                if let Ok(Some(active_version_id)) =
+                    plan_version_repo.find_latest_active_version_id()
                 {
                     // 注意：不要在持有 conn 锁时调用 queue 方法，避免死锁。
                     let needs_refresh = {
-                        let c = conn.lock()
+                        let c = conn
+                            .lock()
                             .map_err(|e| format!("启动时锁获取失败: {}", e))?;
                         let d1_count: i64 = c
                             .query_row(
@@ -312,7 +311,8 @@ impl AppState {
                 }
 
                 // 创建适配器，实现 Engine → Decision 的事件传递
-                Some(Arc::new(RefreshQueueAdapter::new(queue_arc)) as Arc<dyn ScheduleEventPublisher>)
+                Some(Arc::new(RefreshQueueAdapter::new(queue_arc))
+                    as Arc<dyn ScheduleEventPublisher>)
             }
             Err(e) => {
                 tracing::warn!("RefreshQueue 初始化失败: {}, 将跳过决策视图刷新", e);
@@ -394,7 +394,9 @@ impl AppState {
         let d3_use_case = Arc::new(ColdStockUseCaseImpl::new(cold_stock_repo));
         let d4_use_case = Arc::new(MachineBottleneckUseCaseImpl::new(bottleneck_repo));
         let d5_use_case = Arc::new(RollCampaignAlertUseCaseImpl::new(roll_alert_repo));
-        let d6_use_case = Arc::new(CapacityOpportunityUseCaseImpl::new(capacity_opportunity_repo));
+        let d6_use_case = Arc::new(CapacityOpportunityUseCaseImpl::new(
+            capacity_opportunity_repo,
+        ));
 
         // 使用 new_full() 创建完整的 DecisionApiImpl (支持 D1-D6)
         let decision_api = Arc::new(DecisionApiImpl::new_full(
@@ -410,10 +412,7 @@ impl AppState {
         let refresh_read_conn: Arc<Mutex<Connection>> = match open_sqlite_connection(&db_path) {
             Ok(c) => Arc::new(Mutex::new(c)),
             Err(e) => {
-                tracing::warn!(
-                    "无法创建决策刷新状态独立连接(将退回共享连接): {}",
-                    e
-                );
+                tracing::warn!("无法创建决策刷新状态独立连接(将退回共享连接): {}", e);
                 conn.clone()
             }
         };
@@ -439,6 +438,7 @@ impl AppState {
             material_master_repo.clone(),
             material_state_repo.clone(),
             roller_campaign_repo.clone(),
+            roll_campaign_plan_repo.clone(),
             action_log_repo.clone(),
             path_override_pending_repo.clone(),
         ));

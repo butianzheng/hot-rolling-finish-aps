@@ -33,6 +33,29 @@ function getCapacityColor(utilization: number): string {
   return CAPACITY_COLORS.超限;
 }
 
+// 生成“无排程量”原因概述（前端推断）
+function getZeroScheduleReasons(data: CapacityPoolCalendarData): string[] {
+  const reasons: string[] = [];
+
+  if (data.target_capacity_t <= 0) {
+    reasons.push('当日目标产能为0，可能未配置目标或已被清空');
+  }
+
+  if (data.limit_capacity_t <= 0) {
+    reasons.push('当日极限产能为0，产能窗口不可用');
+  }
+
+  if (data.target_capacity_t > 0 && data.used_capacity_t <= 0) {
+    reasons.push('当日未分配计划项，可尝试重算或一键优化');
+  }
+
+  if (reasons.length === 0) {
+    reasons.push('当前日期暂无可执行排程量');
+  }
+
+  return reasons;
+}
+
 // 生成单个月的网格数据
 function generateMonthGrid(year: number, month: number): (number | null)[][] {
   const firstDay = dayjs(new Date(year, month, 1));
@@ -169,6 +192,9 @@ export const CapacityCalendar: React.FC<CapacityCalendarProps> = ({
     );
 
     if (hasData && data) {
+      const isZeroSchedule = data.used_capacity_t <= 0;
+      const zeroScheduleReasons = isZeroSchedule ? getZeroScheduleReasons(data) : [];
+
       return (
         <Tooltip
           key={`${rowIndex}-${colIndex}`}
@@ -183,6 +209,17 @@ export const CapacityCalendar: React.FC<CapacityCalendarProps> = ({
               目标: {formatNumber(data.target_capacity_t, 3)}吨
               <br />
               极限: {formatNumber(data.limit_capacity_t, 3)}吨
+              {isZeroSchedule && (
+                <>
+                  <br />
+                  <span style={{ color: '#d46b08', fontWeight: 600 }}>无排程量原因概述：</span>
+                  {zeroScheduleReasons.map((reason, idx) => (
+                    <div key={`${dateStr}-zero-reason-${idx}`} style={{ color: '#fa8c16' }}>
+                      {idx + 1}. {reason}
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           }
         >

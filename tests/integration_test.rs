@@ -191,7 +191,7 @@ async fn test_scenario_2_frozen_zone_protection() {
             .build(),
     ];
 
-    let mut capacity_pool = create_capacity_pool("H032", today, 800.0, 900.0, 300.0);
+    let mut capacity_pool = create_capacity_pool("H032", today, 800.0, 900.0, 0.0);
 
     let mut target_ratio = HashMap::new();
     target_ratio.insert("Q345".to_string(), 0.6);

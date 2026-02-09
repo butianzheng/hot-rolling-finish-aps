@@ -23,6 +23,9 @@ use crate::repository::action_log_repo::ActionLogRepository;
 use crate::repository::material_repo::{MaterialMasterRepository, MaterialStateRepository};
 use crate::repository::path_override_pending_repo::PathOverridePendingRepository;
 use crate::repository::plan_repo::PlanItemRepository;
+use crate::repository::roll_campaign_plan_repo::{
+    RollCampaignPlanEntity, RollCampaignPlanRepository,
+};
 use crate::repository::roller_repo::RollerCampaignRepository;
 
 // ==========================================
@@ -91,6 +94,7 @@ pub struct PathRuleApi {
     material_master_repo: Arc<MaterialMasterRepository>,
     material_state_repo: Arc<MaterialStateRepository>,
     roller_campaign_repo: Arc<RollerCampaignRepository>,
+    roll_campaign_plan_repo: Arc<RollCampaignPlanRepository>,
     action_log_repo: Arc<ActionLogRepository>,
     path_override_pending_repo: Arc<PathOverridePendingRepository>,
 }
@@ -104,6 +108,7 @@ impl PathRuleApi {
         material_master_repo: Arc<MaterialMasterRepository>,
         material_state_repo: Arc<MaterialStateRepository>,
         roller_campaign_repo: Arc<RollerCampaignRepository>,
+        roll_campaign_plan_repo: Arc<RollCampaignPlanRepository>,
         action_log_repo: Arc<ActionLogRepository>,
         path_override_pending_repo: Arc<PathOverridePendingRepository>,
     ) -> Self {
@@ -114,6 +119,7 @@ impl PathRuleApi {
             material_master_repo,
             material_state_repo,
             roller_campaign_repo,
+            roll_campaign_plan_repo,
             action_log_repo,
             path_override_pending_repo,
         }
@@ -334,9 +340,18 @@ impl PathRuleApi {
             Ok(())
         };
 
-        upsert("path_rule_enabled", if config.enabled { "true" } else { "false" })?;
-        upsert("path_width_tolerance_mm", &config.width_tolerance_mm.to_string())?;
-        upsert("path_thickness_tolerance_mm", &config.thickness_tolerance_mm.to_string())?;
+        upsert(
+            "path_rule_enabled",
+            if config.enabled { "true" } else { "false" },
+        )?;
+        upsert(
+            "path_width_tolerance_mm",
+            &config.width_tolerance_mm.to_string(),
+        )?;
+        upsert(
+            "path_thickness_tolerance_mm",
+            &config.thickness_tolerance_mm.to_string(),
+        )?;
         upsert(
             "path_override_allowed_urgency_levels",
             &config.override_allowed_urgency_levels.join(","),
@@ -429,7 +444,9 @@ impl PathRuleApi {
             return Err(ApiError::InvalidInput("版本ID不能为空".to_string()));
         }
         if plan_date_to < plan_date_from {
-            return Err(ApiError::InvalidInput("日期范围不合法: to < from".to_string()));
+            return Err(ApiError::InvalidInput(
+                "日期范围不合法: to < from".to_string(),
+            ));
         }
 
         let rows = self
@@ -516,29 +533,35 @@ impl PathRuleApi {
             .ok()
             .flatten();
 
-        let (violation_type, anchor_width_mm, anchor_thickness_mm, width_delta_mm, thickness_delta_mm, urgent_level) =
-            if let Some(p) = pending_snapshot {
-                (
-                    p.violation_type,
-                    p.anchor_width_mm,
-                    p.anchor_thickness_mm,
-                    p.width_delta_mm,
-                    p.thickness_delta_mm,
-                    p.urgent_level,
-                )
-            } else {
-                (
-                    check
-                        .violation_type
-                        .map(|v| v.to_string())
-                        .unwrap_or_else(|| "UNKNOWN".to_string()),
-                    anchor.as_ref().map(|a| a.width_mm).unwrap_or(0.0),
-                    anchor.as_ref().map(|a| a.thickness_mm).unwrap_or(0.0),
-                    check.width_delta_mm,
-                    check.thickness_delta_mm,
-                    state.urgent_level.to_string(),
-                )
-            };
+        let (
+            violation_type,
+            anchor_width_mm,
+            anchor_thickness_mm,
+            width_delta_mm,
+            thickness_delta_mm,
+            urgent_level,
+        ) = if let Some(p) = pending_snapshot {
+            (
+                p.violation_type,
+                p.anchor_width_mm,
+                p.anchor_thickness_mm,
+                p.width_delta_mm,
+                p.thickness_delta_mm,
+                p.urgent_level,
+            )
+        } else {
+            (
+                check
+                    .violation_type
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "UNKNOWN".to_string()),
+                anchor.as_ref().map(|a| a.width_mm).unwrap_or(0.0),
+                anchor.as_ref().map(|a| a.thickness_mm).unwrap_or(0.0),
+                check.width_delta_mm,
+                check.thickness_delta_mm,
+                state.urgent_level.to_string(),
+            )
+        };
 
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
@@ -654,12 +677,19 @@ impl PathRuleApi {
             return Err(ApiError::InvalidInput("确认原因不能为空".to_string()));
         }
         if plan_date_to < plan_date_from {
-            return Err(ApiError::InvalidInput("日期范围不合法: to < from".to_string()));
+            return Err(ApiError::InvalidInput(
+                "日期范围不合法: to < from".to_string(),
+            ));
         }
 
         let ids = self
             .path_override_pending_repo
-            .list_pending_material_ids_by_range(version_id, plan_date_from, plan_date_to, machine_codes)
+            .list_pending_material_ids_by_range(
+                version_id,
+                plan_date_from,
+                plan_date_to,
+                machine_codes,
+            )
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         if ids.is_empty() {
@@ -866,12 +896,19 @@ impl PathRuleApi {
             return Err(ApiError::InvalidInput("拒绝原因不能为空".to_string()));
         }
         if plan_date_to < plan_date_from {
-            return Err(ApiError::InvalidInput("日期范围不合法: to < from".to_string()));
+            return Err(ApiError::InvalidInput(
+                "日期范围不合法: to < from".to_string(),
+            ));
         }
 
         let ids = self
             .path_override_pending_repo
-            .list_pending_material_ids_by_range(version_id, plan_date_from, plan_date_to, machine_codes)
+            .list_pending_material_ids_by_range(
+                version_id,
+                plan_date_from,
+                plan_date_to,
+                machine_codes,
+            )
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         if ids.is_empty() {
@@ -965,10 +1002,7 @@ impl PathRuleApi {
             machine_code: c.machine_code.clone(),
             campaign_no: c.campaign_no,
             cum_weight_t: c.cum_weight_t,
-            anchor_source: c
-                .anchor_source
-                .unwrap_or(AnchorSource::None)
-                .to_string(),
+            anchor_source: c.anchor_source.unwrap_or(AnchorSource::None).to_string(),
             anchor_material_id: c.path_anchor_material_id,
             anchor_width_mm: c.path_anchor_width_mm,
             anchor_thickness_mm: c.path_anchor_thickness_mm,
@@ -1001,43 +1035,73 @@ impl PathRuleApi {
             .find_active_campaign(version_id, machine_code)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
-        let Some(active) = active else {
-            return Err(ApiError::NotFound(format!(
-                "未找到活跃换辊周期: version_id={}, machine_code={}",
-                version_id, machine_code
-            )));
+        let previous_campaign_no = if let Some(ref campaign) = active {
+            campaign.campaign_no
+        } else {
+            self.roller_campaign_repo
+                .find_by_machine(version_id, machine_code, 1)
+                .map_err(|e| ApiError::DatabaseError(e.to_string()))?
+                .first()
+                .map(|c| c.campaign_no)
+                .unwrap_or(0)
         };
-
-        let previous_campaign_no = active.campaign_no;
         let new_campaign_no = previous_campaign_no + 1;
-        let today = chrono::Local::now().date_naive();
+        let now = chrono::Local::now();
+        let today = now.date_naive();
+        let now_str = now.format("%Y-%m-%d %H:%M:%S").to_string();
 
         self.roller_campaign_repo
             .reset_campaign_for_roll_change(version_id, machine_code, new_campaign_no, today)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        // 对齐 D5 微调口径：重置后将周期起点回收至当前时刻，并清空过期/陈旧的计划换辊时刻。
+        let downtime_minutes = self
+            .roll_campaign_plan_repo
+            .find_by_key(version_id, machine_code)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?
+            .and_then(|plan| plan.downtime_minutes);
+
+        let synced_plan = RollCampaignPlanEntity {
+            version_id: version_id.to_string(),
+            machine_code: machine_code.to_string(),
+            initial_start_at: now_str.clone(),
+            next_change_at: None,
+            downtime_minutes,
+            updated_at: now_str.clone(),
+            updated_by: Some(actor.to_string()),
+        };
+        self.roll_campaign_plan_repo
+            .upsert(&synced_plan)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         let action_log = ActionLog {
             action_id: uuid::Uuid::new_v4().to_string(),
             version_id: Some(version_id.to_string()),
             action_type: ActionType::RollCycleReset.as_str().to_string(),
-            action_ts: chrono::Local::now().naive_local(),
+            action_ts: now.naive_local(),
             actor: actor.to_string(),
             payload_json: Some(serde_json::json!({
                 "machine_code": machine_code,
-                "previous_campaign_no": previous_campaign_no,
+                "previous_campaign_no": if previous_campaign_no > 0 { Some(previous_campaign_no) } else { None },
                 "new_campaign_no": new_campaign_no,
                 "reset_trigger": "MANUAL",
-                "previous_cum_weight_t": active.cum_weight_t,
+                "previous_cum_weight_t": active.as_ref().map(|c| c.cum_weight_t),
                 "previous_anchor": {
-                    "material_id": active.path_anchor_material_id,
-                    "width_mm": active.path_anchor_width_mm,
-                    "thickness_mm": active.path_anchor_thickness_mm,
+                    "material_id": active.as_ref().and_then(|c| c.path_anchor_material_id.clone()),
+                    "width_mm": active.as_ref().and_then(|c| c.path_anchor_width_mm),
+                    "thickness_mm": active.as_ref().and_then(|c| c.path_anchor_thickness_mm),
                 },
                 "reason": reason,
+                "sync_plan": {
+                    "initial_start_at": now_str,
+                    "next_change_at": serde_json::Value::Null,
+                    "downtime_minutes": downtime_minutes,
+                }
             })),
             impact_summary_json: Some(serde_json::json!({
                 "anchor_reset": true,
                 "cum_weight_reset": true,
+                "plan_synced": true,
             })),
             machine_code: Some(machine_code.to_string()),
             date_range_start: None,

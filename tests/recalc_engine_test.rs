@@ -110,6 +110,10 @@ fn create_test_plan_item(
         steel_grade: None,
         width_mm: None,
         thickness_mm: None,
+        contract_no: None,
+        due_date: None,
+        scheduled_date: None,
+        scheduled_machine_code: None,
     }
 }
 
@@ -451,6 +455,10 @@ fn test_plan_item_batch_insert() {
             steel_grade: None,
             width_mm: None,
             thickness_mm: None,
+            contract_no: None,
+            due_date: None,
+            scheduled_date: None,
+            scheduled_machine_code: None,
         },
         PlanItem {
             version_id: "v001".to_string(),
@@ -469,6 +477,10 @@ fn test_plan_item_batch_insert() {
             steel_grade: None,
             width_mm: None,
             thickness_mm: None,
+            contract_no: None,
+            due_date: None,
+            scheduled_date: None,
+            scheduled_machine_code: None,
         },
         PlanItem {
             version_id: "v001".to_string(),
@@ -487,6 +499,10 @@ fn test_plan_item_batch_insert() {
             steel_grade: None,
             width_mm: None,
             thickness_mm: None,
+            contract_no: None,
+            due_date: None,
+            scheduled_date: None,
+            scheduled_machine_code: None,
         },
     ];
 

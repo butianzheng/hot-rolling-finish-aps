@@ -252,6 +252,10 @@ fn test_e2e_scheduling_with_frozen_zone() {
             steel_grade: None,
             width_mm: None,
             thickness_mm: None,
+            contract_no: None,
+            due_date: None,
+            scheduled_date: None,
+            scheduled_machine_code: None,
         },
     ];
 
@@ -275,7 +279,7 @@ fn test_e2e_scheduling_with_frozen_zone() {
     let sorted_materials = priority_sorter.sort(materials.clone());
 
     // Step 4: 填充产能池 (含冻结区)
-    let mut capacity_pool = create_capacity_pool("H032", plan_date, 100.0, 120.0);
+    let mut capacity_pool = create_capacity_pool("H032", plan_date, 100.0, 150.0);
     let (plan_items, _rejected) = capacity_filler.fill_single_day(
         &mut capacity_pool,
         sorted_materials,

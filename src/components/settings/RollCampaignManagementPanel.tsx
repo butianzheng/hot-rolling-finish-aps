@@ -31,6 +31,11 @@ function parseToDayjs(value?: string | null): Dayjs | null {
   return d.isValid() ? d : null;
 }
 
+function isExpiredDateTime(value?: string | null): boolean {
+  const d = parseToDayjs(value);
+  return !!(d && d.isValid() && d.isBefore(dayjs()));
+}
+
 const SAMPLE_CONFIGS = [
   { key: 'roll_suggest_threshold_t', value: '2000' },
   { key: 'roll_hard_limit_t', value: '2300' },
@@ -70,6 +75,11 @@ const RollCampaignManagementPanel: React.FC = () => {
       plan: plansByMachine[machineCode] || null,
     }));
   }, [plansByMachine, rollAlerts]);
+
+  const expiredPlanMachineCodes = useMemo(
+    () => rows.filter((row) => isExpiredDateTime(row.plan?.nextChangeAt)).map((row) => row.machineCode),
+    [rows]
+  );
 
   const loadPlans = async () => {
     if (!versionId) return;
@@ -142,6 +152,17 @@ const RollCampaignManagementPanel: React.FC = () => {
 
     const nextChangeAt: Dayjs | null = values?.nextChangeAt ?? null;
     const downtimeMinutes: number | undefined = values?.downtimeMinutes;
+
+    if (nextChangeAt && nextChangeAt.isValid()) {
+      if (nextChangeAt.isBefore(initialStartAt)) {
+        message.warning('计划换辊时刻不能早于周期起点');
+        return;
+      }
+      if (nextChangeAt.isBefore(dayjs())) {
+        message.warning('计划换辊时刻不能早于当前时间（过期时刻会被系统忽略）');
+        return;
+      }
+    }
 
     setLoading(true);
     try {
@@ -248,14 +269,36 @@ const RollCampaignManagementPanel: React.FC = () => {
     {
       title: '周期起点',
       key: 'campaignStartAt',
-      width: 170,
-      render: (_, row) => row.alert?.campaignStartAt || row.plan?.initialStartAt || '-',
+      width: 260,
+      render: (_, row) => (
+        <div>
+          <div>
+            <Typography.Text type="secondary">监控：{row.alert?.campaignStartAt || '-'}</Typography.Text>
+          </div>
+          <div>
+            <Typography.Text>微调：{row.plan?.initialStartAt || '-'}</Typography.Text>
+          </div>
+        </div>
+      ),
     },
     {
       title: '计划换辊时刻',
       key: 'plannedChangeAt',
-      width: 170,
-      render: (_, row) => row.alert?.plannedChangeAt || row.plan?.nextChangeAt || '-',
+      width: 300,
+      render: (_, row) => {
+        const expired = isExpiredDateTime(row.plan?.nextChangeAt);
+        return (
+          <div>
+            <div>
+              <Typography.Text type="secondary">监控：{row.alert?.plannedChangeAt || '-'}</Typography.Text>
+            </div>
+            <div>
+              <Typography.Text>微调：{row.plan?.nextChangeAt || '-'}</Typography.Text>
+              {expired ? <Tag color="warning" style={{ marginInlineStart: 8 }}>已过期</Tag> : null}
+            </div>
+          </div>
+        );
+      },
     },
     {
       title: '预计触达软/硬',
@@ -269,8 +312,19 @@ const RollCampaignManagementPanel: React.FC = () => {
     {
       title: '停机时长(分钟)',
       key: 'downtime',
-      width: 140,
-      render: (_, row) => (row.alert?.plannedDowntimeMinutes != null ? row.alert.plannedDowntimeMinutes : '-'),
+      width: 220,
+      render: (_, row) => (
+        <div>
+          <div>
+            <Typography.Text type="secondary">
+              监控：{row.alert?.plannedDowntimeMinutes != null ? row.alert.plannedDowntimeMinutes : '-'}
+            </Typography.Text>
+          </div>
+          <div>
+            <Typography.Text>微调：{row.plan?.downtimeMinutes != null ? row.plan.downtimeMinutes : '-'}</Typography.Text>
+          </div>
+        </div>
+      ),
     },
     {
       title: '覆盖记录',
@@ -280,10 +334,14 @@ const RollCampaignManagementPanel: React.FC = () => {
         if (!row.plan) return <span style={{ color: '#8c8c8c' }}>未微调</span>;
         const who = row.plan.updatedBy ? ` · ${row.plan.updatedBy}` : '';
         const when = row.plan.updatedAt ? formatDateTime(row.plan.updatedAt) : '';
+        const expired = isExpiredDateTime(row.plan?.nextChangeAt);
         return (
-          <span style={{ color: '#1677ff' }}>
-            已微调{who}{when ? ` · ${when}` : ''}
-          </span>
+          <Space size={4}>
+            <span style={{ color: '#1677ff' }}>
+              已微调{who}{when ? ` · ${when}` : ''}
+            </span>
+            {expired ? <Tag color="warning">换辊时刻过期</Tag> : null}
+          </Space>
         );
       },
     },
@@ -350,6 +408,16 @@ const RollCampaignManagementPanel: React.FC = () => {
           </Space>
         }
       >
+        {expiredPlanMachineCodes.length > 0 ? (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 12 }}
+            message="检测到过期的人工计划换辊时刻"
+            description={`机组：${expiredPlanMachineCodes.join('、')}。过期时刻不会参与系统推算，建议重新微调或清空该字段。`}
+          />
+        ) : null}
+
         <Table<TableRow>
           rowKey={(r) => r.machineCode}
           size="small"
@@ -357,7 +425,7 @@ const RollCampaignManagementPanel: React.FC = () => {
           columns={columns}
           dataSource={rows}
           pagination={{ pageSize: 20, showSizeChanger: true }}
-          scroll={{ x: 1550 }}
+          scroll={{ x: 1900 }}
         />
       </Card>
 

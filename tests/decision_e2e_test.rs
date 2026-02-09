@@ -241,12 +241,12 @@ mod decision_e2e_test {
         .unwrap();
 
         // 2. 创建产能池数据（2 个机组）
-        // M01: 95% 利用率 - 高堵塞
+        // M01: 99.5% 利用率 - 高堵塞（超过 capacity_hard_threshold 0.95）
         conn.execute(
             "INSERT INTO capacity_pool (version_id, machine_code, plan_date,
              target_capacity_t, limit_capacity_t, used_capacity_t,
              overflow_t, frozen_capacity_t, accumulated_tonnage_t)
-             VALUES (?1, ?2, ?3, 1000.0, 1000.0, 950.0, 0.0, 0.0, 950.0)",
+             VALUES (?1, ?2, ?3, 1000.0, 1000.0, 995.0, 0.0, 0.0, 995.0)",
             rusqlite::params![version_id, "M01", date.to_string()],
         )
         .unwrap();
@@ -265,7 +265,7 @@ mod decision_e2e_test {
         conn.execute(
             "INSERT INTO material_master (material_id, contract_no,
              width_mm, thickness_mm, weight_t, due_date, created_at, updated_at)
-             VALUES ('MAT_M01_001', 'C001', 1500.0, 5.0, 950.0, ?1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+             VALUES ('MAT_M01_001', 'C001', 1500.0, 5.0, 995.0, ?1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
             rusqlite::params![date.to_string()],
         )
         .unwrap();
@@ -282,7 +282,7 @@ mod decision_e2e_test {
         conn.execute(
             "INSERT INTO plan_item (version_id, material_id, machine_code, plan_date,
              seq_no, weight_t, source_type)
-             VALUES (?1, 'MAT_M01_001', 'M01', ?2, 1, 950.0, 'scheduled')",
+             VALUES (?1, 'MAT_M01_001', 'M01', ?2, 1, 995.0, 'scheduled')",
             rusqlite::params![version_id, date.to_string()],
         )
         .unwrap();

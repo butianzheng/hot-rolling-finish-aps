@@ -38,6 +38,9 @@ pub trait MachineBottleneckUseCase {
         start_date: &str,
         end_date: &str,
     ) -> Result<BottleneckHeatmap, String>;
+
+    /// 查询活跃机组代码列表（用于补齐热力图缺失机组）
+    fn list_active_machine_codes(&self) -> Result<Vec<String>, String>;
 }
 
 /// 机组堵塞概况
@@ -338,9 +341,11 @@ impl MachineBottleneckProfile {
 
     /// 获取主要堵塞原因
     pub fn primary_reason(&self) -> Option<&BottleneckReason> {
-        self.reasons
-            .iter()
-            .max_by(|a, b| a.severity.partial_cmp(&b.severity).unwrap_or(std::cmp::Ordering::Equal))
+        self.reasons.iter().max_by(|a, b| {
+            a.severity
+                .partial_cmp(&b.severity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 }
 
@@ -504,9 +509,24 @@ mod tests {
             "2026-01-25".to_string(),
         );
 
-        heatmap.add_cell("H032".to_string(), "2026-01-23".to_string(), 85.0, "HIGH".to_string());
-        heatmap.add_cell("H032".to_string(), "2026-01-24".to_string(), 60.0, "MEDIUM".to_string());
-        heatmap.add_cell("H033".to_string(), "2026-01-23".to_string(), 40.0, "LOW".to_string());
+        heatmap.add_cell(
+            "H032".to_string(),
+            "2026-01-23".to_string(),
+            85.0,
+            "HIGH".to_string(),
+        );
+        heatmap.add_cell(
+            "H032".to_string(),
+            "2026-01-24".to_string(),
+            60.0,
+            "MEDIUM".to_string(),
+        );
+        heatmap.add_cell(
+            "H033".to_string(),
+            "2026-01-23".to_string(),
+            40.0,
+            "LOW".to_string(),
+        );
 
         assert_eq!(heatmap.machines.len(), 2);
         assert_eq!(heatmap.data.len(), 3);

@@ -62,6 +62,12 @@ impl MachineBottleneckUseCase for MachineBottleneckUseCaseImpl {
             .get_bottleneck_heatmap(version_id, start_date, end_date)
             .map_err(|e| format!("获取堵塞热力图失败: {}", e))
     }
+
+    fn list_active_machine_codes(&self) -> Result<Vec<String>, String> {
+        self.repo
+            .list_active_machine_codes()
+            .map_err(|e| format!("查询活跃机组失败: {}", e))
+    }
 }
 
 #[cfg(test)]
@@ -377,7 +383,10 @@ mod tests {
 
         // 第一个应该是 H033（产能超载）
         assert_eq!(profiles[0].machine_code, "H033");
-        assert!(profiles[0].reasons.iter().any(|r| r.code == "CAPACITY_UTILIZATION"));
+        assert!(profiles[0]
+            .reasons
+            .iter()
+            .any(|r| r.code == "CAPACITY_UTILIZATION"));
 
         // 第二个应该是 H032（高利用率）
         assert_eq!(profiles[1].machine_code, "H032");
@@ -416,7 +425,10 @@ mod tests {
         assert!(!h033.reasons.is_empty());
 
         // 应该包含产能超载原因
-        assert!(h033.reasons.iter().any(|r| r.code == "CAPACITY_UTILIZATION"));
+        assert!(h033
+            .reasons
+            .iter()
+            .any(|r| r.code == "CAPACITY_UTILIZATION"));
 
         // 应该包含结构冲突原因（5 个违规）
         assert!(h033.reasons.iter().any(|r| r.code == "STRUCTURE_VIOLATION"));
@@ -444,12 +456,8 @@ mod tests {
         let use_case = setup_test_use_case();
 
         // 查询不存在的版本
-        let result = use_case.get_machine_bottleneck_profile(
-            "V999",
-            None,
-            "2026-01-24",
-            "2026-01-24",
-        );
+        let result =
+            use_case.get_machine_bottleneck_profile("V999", None, "2026-01-24", "2026-01-24");
 
         // 应该成功（版本不存在时返回空列表）
         assert!(result.is_ok());

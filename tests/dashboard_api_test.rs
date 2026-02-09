@@ -310,11 +310,15 @@ fn test_get_most_congested_machine_无材料() {
         .expect("创建失败");
 
     // 测试: 查询最拥堵机组（没有材料，使用 _full 版本传入 version_id）
+    // 注意: fill_missing_machine_profiles 会补齐活跃机组的空记录，因此结果可能不为空
+    // 但所有堵塞分数应该为 0
     let result = env.dashboard_api
         .get_most_congested_machine(&version_id, None, None, None, None, Some(10))
         .expect("查询失败");
 
-    assert!(result.items.is_empty(), "没有材料时应该返回空列表");
+    for item in &result.items {
+        assert_eq!(item.bottleneck_score, 0.0, "没有材料时堵塞分数应为0");
+    }
 }
 
 #[test]

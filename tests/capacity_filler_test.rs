@@ -229,6 +229,10 @@ fn test_capacity_filler_frozen_zone_priority() {
             steel_grade: None,
             width_mm: None,
             thickness_mm: None,
+            contract_no: None,
+            due_date: None,
+            scheduled_date: None,
+            scheduled_machine_code: None,
         },
         PlanItem {
             version_id: "V001".to_string(),
@@ -247,6 +251,10 @@ fn test_capacity_filler_frozen_zone_priority() {
             steel_grade: None,
             width_mm: None,
             thickness_mm: None,
+            contract_no: None,
+            due_date: None,
+            scheduled_date: None,
+            scheduled_machine_code: None,
         },
     ];
 

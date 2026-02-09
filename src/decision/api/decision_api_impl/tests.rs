@@ -1,10 +1,10 @@
 use super::DecisionApiImpl;
 use crate::decision::api::decision_api::DecisionApi;
 use crate::decision::api::dto::*;
-use crate::decision::use_cases::impls::{MachineBottleneckUseCaseImpl, MostRiskyDayUseCaseImpl};
 use crate::decision::repository::{
     bottleneck_repo::BottleneckRepository, day_summary_repo::DaySummaryRepository,
 };
+use crate::decision::use_cases::impls::{MachineBottleneckUseCaseImpl, MostRiskyDayUseCaseImpl};
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
 
@@ -129,6 +129,18 @@ fn setup_test_api() -> DecisionApiImpl {
         )
         .unwrap();
 
+        c.execute(
+            r#"
+            CREATE TABLE IF NOT EXISTS machine_master (
+                machine_code TEXT PRIMARY KEY,
+                machine_name TEXT,
+                is_active INTEGER NOT NULL DEFAULT 1
+            )
+            "#,
+            [],
+        )
+        .unwrap();
+
         // 插入测试数据
         c.execute(
             r#"
@@ -146,6 +158,17 @@ fn setup_test_api() -> DecisionApiImpl {
                 'V001', 'MAT001', 'H032', '2026-01-24', 1, 150.0, 'AUTO', 0, 0, ''
             )
             "#,
+            [],
+        )
+        .unwrap();
+
+        c.execute(
+            "INSERT INTO machine_master (machine_code, machine_name, is_active) VALUES ('H031', '机组31', 1)",
+            [],
+        )
+        .unwrap();
+        c.execute(
+            "INSERT INTO machine_master (machine_code, machine_name, is_active) VALUES ('H032', '机组32', 1)",
             [],
         )
         .unwrap();
@@ -199,13 +222,25 @@ fn test_get_machine_bottleneck_profile() {
     let response = api.get_machine_bottleneck_profile(request).unwrap();
 
     assert_eq!(response.version_id, "V001");
-    assert_eq!(response.items.len(), 1);
-    assert_eq!(response.total_count, 1);
+    assert_eq!(response.items.len(), 2);
+    assert_eq!(response.total_count, 2);
 
-    let bottleneck = &response.items[0];
-    assert_eq!(bottleneck.machine_code, "H032");
-    assert_eq!(bottleneck.plan_date, "2026-01-24");
-    assert!(bottleneck.bottleneck_score >= 0.0);
+    let h032 = response
+        .items
+        .iter()
+        .find(|p| p.machine_code == "H032")
+        .expect("H032 should exist");
+    assert_eq!(h032.plan_date, "2026-01-24");
+    assert!(h032.bottleneck_score >= 0.0);
+
+    let h031 = response
+        .items
+        .iter()
+        .find(|p| p.machine_code == "H031")
+        .expect("H031 placeholder should exist");
+    assert_eq!(h031.plan_date, "2026-01-24");
+    assert_eq!(h031.bottleneck_level, "NONE");
+    assert_eq!(h031.bottleneck_score, 0.0);
 }
 
 #[test]

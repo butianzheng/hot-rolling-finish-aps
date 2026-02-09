@@ -514,6 +514,10 @@ fn test_integration_frozen_zone_priority_with_risk() {
             steel_grade: None,
             width_mm: None,
             thickness_mm: None,
+            contract_no: None,
+            due_date: None,
+            scheduled_date: None,
+            scheduled_machine_code: None,
         },
     ];
 

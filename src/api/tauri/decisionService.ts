@@ -363,6 +363,7 @@ export async function getBottleneckForRecentDays(
     expectedPlanRev,
     dateFrom: dateFrom.toISOString().split('T')[0],
     dateTo: dateTo.toISOString().split('T')[0],
+    limit: 2000, // 防止默认 50 截断导致机组/日期缺失
   });
 }
 

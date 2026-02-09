@@ -1,4 +1,5 @@
 use crate::app::state::AppState;
+use crate::engine::{ScheduleEvent, ScheduleEventType};
 
 use super::common::{map_api_error, parse_date};
 
@@ -259,6 +260,20 @@ pub async fn reset_roll_cycle(
         .path_rule_api
         .reset_roll_cycle(&version_id, &machine_code, &actor, &reason)
         .map_err(map_api_error)?;
+
+    // 发布 ScheduleEvent 触发决策读模型刷新（D5 等）
+    if let Some(ref publisher) = state.event_publisher {
+        let event = ScheduleEvent::incremental(
+            version_id.clone(),
+            ScheduleEventType::RollCampaignChanged,
+            Some(format!("reset_roll_cycle: {}", machine_code)),
+            Some(vec![machine_code.clone()]),
+            None,
+        );
+        if let Err(e) = publisher.publish(event) {
+            tracing::warn!("发布 RollCampaignChanged 事件失败: {}", e);
+        }
+    }
 
     Ok("{}".to_string())
 }
