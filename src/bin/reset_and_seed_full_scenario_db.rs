@@ -94,9 +94,9 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
 
     let tx = conn.unchecked_transaction()?;
 
-    // schema_version (dev schema.sql + migrations 当前对齐到 v0.9)
+    // schema_version (dev schema.sql + migrations 当前对齐到 v0.10)
     tx.execute(
-        "INSERT INTO schema_version (version, applied_at) VALUES (9, ?1)",
+        "INSERT INTO schema_version (version, applied_at) VALUES (10, ?1)",
         params![now_sql_dt],
     )?;
 
@@ -135,6 +135,10 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
     )?;
     tx.execute(
         "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','material_management_coverage_alert_threshold','4',?1)",
+        params![now_sql_dt],
+    )?;
+    tx.execute(
+        "INSERT INTO config_kv (scope_id, key, value, updated_at) VALUES ('global','empty_day_recover_threshold_t','200',?1)",
         params![now_sql_dt],
     )?;
     tx.execute(

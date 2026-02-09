@@ -541,6 +541,9 @@ pub mod config_keys {
     pub const ROLL_HARD_LIMIT_T: &str = "roll_hard_limit_t";
     pub const ROLL_CHANGE_DOWNTIME_MINUTES: &str = "roll_change_downtime_minutes";
 
+    // 连续排程兜底
+    pub const EMPTY_DAY_RECOVER_THRESHOLD_T: &str = "empty_day_recover_threshold_t";
+
     // 产能
     pub const OVERFLOW_PCT: &str = "overflow_pct";
 

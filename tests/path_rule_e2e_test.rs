@@ -581,4 +581,271 @@ mod path_rule_e2e_test {
             "拒绝基态为 BLOCKED 时，下一周期恢复后不应提档"
         );
     }
+
+    #[test]
+    fn test_path_rule_reject_auto_restore_when_min_schedulable_threshold_met() {
+        let (
+            _temp_file,
+            db_path,
+            plan_api,
+            recalc_engine,
+            path_rule_api,
+            plan_item_repo,
+            _action_log_repo,
+            material_master_repo,
+            material_state_repo,
+        ) = setup_env();
+
+        let base_date = NaiveDate::from_ymd_opt(2026, 2, 2).unwrap();
+        let machine_code = "H032";
+        let anchor_id = "MAT_AUTO_RESET_ANCHOR";
+        let candidate_id = "MAT_AUTO_RESET_CAND";
+
+        // 将空白日恢复阈值配置为 5 吨，便于验证“最小可排量阈值”触发逻辑
+        let conn = Connection::open(&db_path).expect("open db for threshold config failed");
+        conn.execute(
+            "
+            INSERT INTO config_kv (scope_id, key, value, updated_at)
+            VALUES ('global', 'empty_day_recover_threshold_t', '5', datetime('now', 'localtime'))
+            ON CONFLICT(scope_id, key)
+            DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+            ",
+            [],
+        )
+        .expect("upsert empty_day_recover_threshold_t failed");
+
+        let mut anchor_master = MaterialBuilder::new(anchor_id)
+            .machine(machine_code)
+            .weight(10.0)
+            .output_age_days(10)
+            .due_date(base_date + Duration::days(30))
+            .build();
+        anchor_master.width_mm = Some(1000.0);
+        anchor_master.thickness_mm = Some(10.0);
+
+        let mut candidate_master = MaterialBuilder::new(candidate_id)
+            .machine(machine_code)
+            .weight(10.0)
+            .output_age_days(5)
+            .due_date(base_date + Duration::days(1))
+            .build();
+        candidate_master.width_mm = Some(1300.0);
+        candidate_master.thickness_mm = Some(12.5);
+
+        let anchor_state = MaterialStateBuilder::new(anchor_id)
+            .sched_state(SchedState::Ready)
+            .build();
+        let candidate_state = MaterialStateBuilder::new(candidate_id)
+            .sched_state(SchedState::Ready)
+            .build();
+
+        material_master_repo
+            .batch_insert_material_master(vec![anchor_master, candidate_master])
+            .expect("insert material_master failed");
+        material_state_repo
+            .batch_insert_material_state(vec![anchor_state, candidate_state])
+            .expect("insert material_state failed");
+
+        let plan_id = plan_api
+            .create_plan("PathRule Auto Reset Threshold E2E".to_string(), "tester".to_string())
+            .expect("create_plan failed");
+        let base_version_id = plan_api
+            .create_version(plan_id, 1, None, None, "tester".to_string())
+            .expect("create_version failed");
+
+        let res1 = plan_api
+            .recalc_full(&base_version_id, base_date, None, "tester")
+            .expect("recalc_full (1st) failed");
+        let version_1 = res1.version_id.clone();
+
+        path_rule_api
+            .reject_path_override(&version_1, candidate_id, "tester", "拒绝并等待下一周期恢复")
+            .expect("reject_path_override failed");
+
+        // 让 anchor 暂时不可排，制造 direct=0、blocked=10 的场景
+        let mut anchor_blocked = material_state_repo
+            .find_by_id(anchor_id)
+            .expect("find anchor state failed")
+            .expect("anchor state missing");
+        anchor_blocked.sched_state = SchedState::Blocked;
+        material_state_repo
+            .batch_insert_material_state(vec![anchor_blocked])
+            .expect("set anchor blocked failed");
+
+        // 不手动 reset 周期，直接重排：应由“最小可排量阈值”自动触发后移周期并恢复 candidate
+        recalc_engine
+            .recalc_partial(
+                &version_1,
+                base_date,
+                base_date,
+                "tester",
+                false,
+                ScheduleStrategy::UrgentFirst,
+            )
+            .expect("recalc_partial (auto reset expected) failed");
+
+        let items_after_recalc = plan_item_repo
+            .find_by_version(&version_1)
+            .expect("find_by_version failed");
+        assert!(
+            items_after_recalc.iter().any(|i| i.material_id == candidate_id),
+            "当 direct<阈值 且 direct+blocked>=阈值 时，应自动后移一周期并恢复排入"
+        );
+
+        let candidate_state_after = material_state_repo
+            .find_by_id(candidate_id)
+            .expect("find candidate state after recalc failed")
+            .expect("candidate state missing after recalc");
+        assert_eq!(
+            candidate_state_after.urgent_level,
+            UrgentLevel::L3,
+            "自动恢复后应按拒绝恢复规则提档"
+        );
+    }
+
+    #[test]
+    fn test_path_rule_reject_should_not_auto_restore_when_direct_meets_threshold() {
+        let (
+            _temp_file,
+            db_path,
+            plan_api,
+            recalc_engine,
+            path_rule_api,
+            plan_item_repo,
+            _action_log_repo,
+            material_master_repo,
+            material_state_repo,
+        ) = setup_env();
+
+        let base_date = NaiveDate::from_ymd_opt(2026, 2, 2).unwrap();
+        let machine_code = "H032";
+        let anchor_id = "MAT_NO_AUTO_RESET_ANCHOR";
+        let candidate_id = "MAT_NO_AUTO_RESET_CAND";
+        let direct_id = "MAT_NO_AUTO_RESET_DIRECT";
+
+        // 设置最小可排量阈值为 5 吨：若 direct>=5，不应触发自动后移周期
+        let conn = Connection::open(&db_path).expect("open db for threshold config failed");
+        conn.execute(
+            "
+            INSERT INTO config_kv (scope_id, key, value, updated_at)
+            VALUES ('global', 'empty_day_recover_threshold_t', '5', datetime('now', 'localtime'))
+            ON CONFLICT(scope_id, key)
+            DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+            ",
+            [],
+        )
+        .expect("upsert empty_day_recover_threshold_t failed");
+
+        let mut anchor_master = MaterialBuilder::new(anchor_id)
+            .machine(machine_code)
+            .weight(10.0)
+            .output_age_days(10)
+            .due_date(base_date + Duration::days(30))
+            .build();
+        anchor_master.width_mm = Some(1000.0);
+        anchor_master.thickness_mm = Some(10.0);
+
+        let mut candidate_master = MaterialBuilder::new(candidate_id)
+            .machine(machine_code)
+            .weight(10.0)
+            .output_age_days(5)
+            .due_date(base_date + Duration::days(1))
+            .build();
+        candidate_master.width_mm = Some(1300.0);
+        candidate_master.thickness_mm = Some(12.5);
+
+        let anchor_state = MaterialStateBuilder::new(anchor_id)
+            .sched_state(SchedState::Ready)
+            .build();
+        let candidate_state = MaterialStateBuilder::new(candidate_id)
+            .sched_state(SchedState::Ready)
+            .build();
+
+        material_master_repo
+            .batch_insert_material_master(vec![anchor_master, candidate_master])
+            .expect("insert material_master failed");
+        material_state_repo
+            .batch_insert_material_state(vec![anchor_state, candidate_state])
+            .expect("insert material_state failed");
+
+        let plan_id = plan_api
+            .create_plan("PathRule No Auto Reset When Direct Enough E2E".to_string(), "tester".to_string())
+            .expect("create_plan failed");
+        let base_version_id = plan_api
+            .create_version(plan_id, 1, None, None, "tester".to_string())
+            .expect("create_version failed");
+
+        let res1 = plan_api
+            .recalc_full(&base_version_id, base_date, None, "tester")
+            .expect("recalc_full (1st) failed");
+        let version_1 = res1.version_id.clone();
+
+        path_rule_api
+            .reject_path_override(&version_1, candidate_id, "tester", "拒绝后至少下一周期恢复")
+            .expect("reject_path_override failed");
+
+        // 让 anchor 不可排，避免 direct 由 anchor 构成
+        let mut anchor_blocked = material_state_repo
+            .find_by_id(anchor_id)
+            .expect("find anchor state failed")
+            .expect("anchor state missing");
+        anchor_blocked.sched_state = SchedState::Blocked;
+        material_state_repo
+            .batch_insert_material_state(vec![anchor_blocked])
+            .expect("set anchor blocked failed");
+
+        // 增加一块“直接可排”材料，重量 6 吨（>= 阈值 5）
+        let mut direct_master = MaterialBuilder::new(direct_id)
+            .machine(machine_code)
+            .weight(6.0)
+            .output_age_days(4)
+            .due_date(base_date + Duration::days(20))
+            .build();
+        direct_master.width_mm = Some(900.0);
+        direct_master.thickness_mm = Some(9.0);
+
+        let direct_state = MaterialStateBuilder::new(direct_id)
+            .sched_state(SchedState::Ready)
+            .build();
+
+        material_master_repo
+            .batch_insert_material_master(vec![direct_master])
+            .expect("insert direct material_master failed");
+        material_state_repo
+            .batch_insert_material_state(vec![direct_state])
+            .expect("insert direct material_state failed");
+
+        recalc_engine
+            .recalc_partial(
+                &version_1,
+                base_date,
+                base_date,
+                "tester",
+                false,
+                ScheduleStrategy::UrgentFirst,
+            )
+            .expect("recalc_partial failed");
+
+        let items_after_recalc = plan_item_repo
+            .find_by_version(&version_1)
+            .expect("find_by_version failed");
+        assert!(
+            items_after_recalc.iter().any(|i| i.material_id == direct_id),
+            "direct>=阈值时，直接可排材料应被排入"
+        );
+        assert!(
+            !items_after_recalc.iter().any(|i| i.material_id == candidate_id),
+            "direct>=阈值时不应触发自动后移，拒绝材料仍应保持阻塞"
+        );
+
+        let candidate_state_after = material_state_repo
+            .find_by_id(candidate_id)
+            .expect("find candidate state after recalc failed")
+            .expect("candidate state missing after recalc");
+        assert_eq!(
+            candidate_state_after.urgent_level,
+            UrgentLevel::L2,
+            "未触发自动后移时，不应提前提档"
+        );
+    }
 }

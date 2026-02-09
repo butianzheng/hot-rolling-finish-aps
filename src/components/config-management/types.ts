@@ -91,6 +91,7 @@ export const configKeyLabels: Record<string, string> = {
   seed_s2_percentile: '种子分位数',
   seed_s2_small_sample_threshold: '种子小样本阈值',
   material_management_coverage_alert_threshold: '物料管理机组覆盖异常阈值',
+  empty_day_recover_threshold_t: '连续排程最小可排量阈值（吨）',
 };
 
 // 配置键说明（完整汉化版）
@@ -155,4 +156,6 @@ export const configDescriptions: Record<string, string> = {
     '种子策略的小样本阈值（整数）。样本数不足时回退到“最大宽度/最大厚度”等保守规则。',
   material_management_coverage_alert_threshold:
     '物料管理页机组覆盖异常阈值（整数）。当前覆盖机组数低于该值时，工具栏以红色告警显示。默认 4。',
+  empty_day_recover_threshold_t:
+    '连续排程最小可排量阈值（吨，开机阈值）。当机组当日“直接可排量”低于该值、但加上“仅因拒绝后待下一周期恢复而被阻塞的吨位”后可达到该值时，自动后移一套换辊周期并重试一次。默认 200。',
 };

@@ -4,7 +4,7 @@ use crate::config::strategy_profile::CustomStrategyParameters;
 use crate::domain::material::{MaterialMaster, MaterialState};
 use crate::domain::plan::PlanItem;
 use crate::domain::roller::RollerCampaign;
-use crate::domain::types::{AnchorSource, SchedState, UrgentLevel};
+use crate::domain::types::{AnchorSource, RollStatus, SchedState, UrgentLevel};
 use crate::engine::orchestrator::ScheduleOrchestrator;
 use crate::engine::strategy::ScheduleStrategy;
 use crate::engine::{
@@ -279,6 +279,15 @@ impl RecalcEngine {
                 (1500.0, 2500.0)
             };
 
+        let min_schedulable_t = parse_f64(
+            self.config_manager
+                .get_global_config_value(config_keys::EMPTY_DAY_RECOVER_THRESHOLD_T)
+                .ok()
+                .flatten(),
+            200.0,
+        )
+        .max(0.0);
+
         // ===== Step 3: 多日循环 =====
         let (start_date, end_date) = date_range;
 
@@ -441,44 +450,73 @@ impl RecalcEngine {
                     .cloned()
                     .unwrap_or_default();
 
-                let mut candidate_materials: Vec<MaterialMaster> = Vec::new();
-                let mut candidate_states: Vec<MaterialState> = Vec::new();
-                let mut reject_boost_material_ids: HashSet<String> = HashSet::new();
-                for material in materials.iter() {
-                    if scheduled_material_ids.contains(&material.material_id) {
-                        continue;
-                    }
-                    let Some(state) = state_map.get(&material.material_id) else {
-                        continue;
-                    };
-                    let allow = match state.sched_state {
-                        SchedState::Ready | SchedState::Locked | SchedState::ForceRelease => true,
-                        SchedState::PendingMature => state.ready_in_days <= delta_days_i32,
-                        _ => false,
-                    };
-                    if !allow {
-                        continue;
-                    }
+                let build_candidates_for_campaign = |campaign_no: i32| {
+                    let mut candidate_materials: Vec<MaterialMaster> = Vec::new();
+                    let mut candidate_states: Vec<MaterialState> = Vec::new();
+                    let mut reject_boost_material_ids: HashSet<String> = HashSet::new();
+                    let mut direct_schedulable_weight_t: f64 = 0.0;
+                    let mut reject_blocked_weight_t: f64 = 0.0;
 
-                    if let Some((reject_cycle_no_opt, base_sched_state_opt)) =
-                        rejection_map.get(&material.material_id)
-                    {
-                        let reject_cycle_no = reject_cycle_no_opt.unwrap_or(i32::MAX);
-                        if current_campaign_no <= reject_cycle_no {
+                    for material in materials.iter() {
+                        if scheduled_material_ids.contains(&material.material_id) {
                             continue;
                         }
-                        if Self::is_reject_boost_allowed(base_sched_state_opt.as_deref()) {
-                            reject_boost_material_ids.insert(material.material_id.clone());
+                        let Some(state) = state_map.get(&material.material_id) else {
+                            continue;
+                        };
+                        let allow = match state.sched_state {
+                            SchedState::Ready | SchedState::Locked | SchedState::ForceRelease => true,
+                            SchedState::PendingMature => state.ready_in_days <= delta_days_i32,
+                            _ => false,
+                        };
+                        if !allow {
+                            continue;
                         }
+
+                        if let Some((reject_cycle_no_opt, base_sched_state_opt)) =
+                            rejection_map.get(&material.material_id)
+                        {
+                            let reject_cycle_no = reject_cycle_no_opt.unwrap_or(i32::MAX);
+                            if campaign_no <= reject_cycle_no {
+                                let weight = material.weight_t.unwrap_or(0.0);
+                                if weight.is_finite() && weight > 0.0 {
+                                    reject_blocked_weight_t += weight;
+                                }
+                                continue;
+                            }
+                            if Self::is_reject_boost_allowed(base_sched_state_opt.as_deref()) {
+                                reject_boost_material_ids.insert(material.material_id.clone());
+                            }
+                        }
+
+                        let mut m = material.clone();
+                        if let Some(raw) = m.output_age_days_raw {
+                            m.output_age_days_raw = Some(raw.saturating_add(delta_days_i32));
+                        }
+                        let weight = material.weight_t.unwrap_or(0.0);
+                        if weight.is_finite() && weight > 0.0 {
+                            direct_schedulable_weight_t += weight;
+                        }
+                        candidate_materials.push(m);
+                        candidate_states.push(state.clone());
                     }
 
-                    let mut m = material.clone();
-                    if let Some(raw) = m.output_age_days_raw {
-                        m.output_age_days_raw = Some(raw.saturating_add(delta_days_i32));
-                    }
-                    candidate_materials.push(m);
-                    candidate_states.push(state.clone());
-                }
+                    (
+                        candidate_materials,
+                        candidate_states,
+                        reject_boost_material_ids,
+                        direct_schedulable_weight_t,
+                        reject_blocked_weight_t,
+                    )
+                };
+
+                let (
+                    mut candidate_materials,
+                    mut candidate_states,
+                    mut reject_boost_material_ids,
+                    mut direct_schedulable_weight_t,
+                    mut reject_blocked_weight_t,
+                ) = build_candidates_for_campaign(current_campaign_no);
 
                 // ----- 4.4 查询或创建产能池 -----
                 let mut capacity_pool = self
@@ -494,6 +532,61 @@ impl RecalcEngine {
                     .and_then(|m| m.get(machine_code))
                     .cloned()
                     .unwrap_or_default();
+
+                if path_rule_config.enabled
+                    && min_schedulable_t > 0.0
+                    && frozen_for_today.is_empty()
+                    && direct_schedulable_weight_t < min_schedulable_t
+                    && (direct_schedulable_weight_t + reject_blocked_weight_t) >= min_schedulable_t
+                {
+                    if let Some(campaign) = active_campaigns.get_mut(machine_code.as_str()) {
+                        let previous_campaign_no = campaign.campaign_no;
+                        let next_campaign_no = previous_campaign_no.saturating_add(1);
+
+                        if !is_dry_run {
+                            self.roller_campaign_repo.reset_campaign_for_roll_change(
+                                version_id,
+                                machine_code,
+                                next_campaign_no,
+                                current_date,
+                            )?;
+                            if let Some(latest_campaign) = self
+                                .roller_campaign_repo
+                                .find_active_campaign(version_id, machine_code)?
+                            {
+                                *campaign = latest_campaign;
+                            }
+                        } else {
+                            campaign.campaign_no = next_campaign_no;
+                            campaign.start_date = current_date;
+                            campaign.end_date = None;
+                            campaign.cum_weight_t = 0.0;
+                            campaign.status = RollStatus::Normal;
+                            campaign.reset_anchor();
+                            campaign.anchor_source = Some(AnchorSource::None);
+                        }
+
+                        (
+                            candidate_materials,
+                            candidate_states,
+                            reject_boost_material_ids,
+                            direct_schedulable_weight_t,
+                            reject_blocked_weight_t,
+                        ) = build_candidates_for_campaign(campaign.campaign_no);
+
+                        tracing::warn!(
+                            version_id = %version_id,
+                            machine_code = %machine_code,
+                            plan_date = %current_date,
+                            previous_campaign_no = previous_campaign_no,
+                            current_campaign_no = campaign.campaign_no,
+                            direct_schedulable_weight_t = direct_schedulable_weight_t,
+                            blocked_weight_t = reject_blocked_weight_t,
+                            min_schedulable_t = min_schedulable_t,
+                            "连续排程兜底触发：当前可排量不足阈值，自动后移一套换辊周期并重试"
+                        );
+                    }
+                }
 
                 // 无候选且无冻结项：跳过本次排产
                 if candidate_materials.is_empty() && frozen_for_today.is_empty() {
