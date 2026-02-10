@@ -60,12 +60,12 @@ impl fmt::Display for RushLevel {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum SchedState {
-    PendingMature,  // 未成熟(冷料)
-    Ready,          // 适温待排
-    Locked,         // 人工锁定
-    ForceRelease,   // 强制放行
-    Blocked,        // 数据质量阻断
-    Scheduled,      // 已排产
+    PendingMature, // 未成熟(冷料)
+    Ready,         // 适温待排
+    Locked,        // 人工锁定
+    ForceRelease,  // 强制放行
+    Blocked,       // 数据质量阻断
+    Scheduled,     // 已排产
 }
 
 impl fmt::Display for SchedState {
@@ -152,9 +152,9 @@ impl fmt::Display for RiskLevel {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RollStatus {
-    Normal,    // 正常
-    Suggest,   // 建议换辊
-    HardStop,  // 强制换辊
+    Normal,   // 正常
+    Suggest,  // 建议换辊
+    HardStop, // 强制换辊
 }
 
 impl fmt::Display for RollStatus {

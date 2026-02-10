@@ -21,4 +21,3 @@ mod tests;
 
 pub use core::StructureCorrector;
 pub use report::StructureViolationReport;
-

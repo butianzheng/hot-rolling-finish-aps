@@ -174,11 +174,7 @@ impl DqValidatorTrait for DqValidator {
     }
 
     /// 生成 DQ 报告
-    fn generate_dq_report(
-        &self,
-        batch_id: String,
-        violations: Vec<DqViolation>,
-    ) -> DqReport {
+    fn generate_dq_report(&self, batch_id: String, violations: Vec<DqViolation>) -> DqReport {
         // 统计各级别数量
         let error_count = violations
             .iter()
@@ -272,8 +268,9 @@ mod tests {
 
         let violations = validator.validate_required_fields(&record);
 
-        assert!(violations.iter().any(|v| v.field == "output_age_days_raw"
-            && matches!(v.level, DqLevel::Error)));
+        assert!(violations
+            .iter()
+            .any(|v| v.field == "output_age_days_raw" && matches!(v.level, DqLevel::Error)));
     }
 
     #[test]
@@ -284,8 +281,9 @@ mod tests {
 
         let violations = validator.validate_ranges(&record);
 
-        assert!(violations.iter().any(|v| v.field == "weight_t"
-            && matches!(v.level, DqLevel::Warning)));
+        assert!(violations
+            .iter()
+            .any(|v| v.field == "weight_t" && matches!(v.level, DqLevel::Warning)));
     }
 
     #[test]
@@ -296,7 +294,8 @@ mod tests {
 
         let violations = validator.validate_ranges(&record);
 
-        assert!(violations.iter().any(|v| v.field == "weight_t"
-            && v.message.contains("重量异常")));
+        assert!(violations
+            .iter()
+            .any(|v| v.field == "weight_t" && v.message.contains("重量异常")));
     }
 }

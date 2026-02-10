@@ -9,9 +9,7 @@
 // 输出: action_log.impact_summary_json
 // ==========================================
 
-use crate::domain::action_log::{
-    CapacityChange, ImpactSummary, MaterialChange, RiskChange,
-};
+use crate::domain::action_log::{CapacityChange, ImpactSummary, MaterialChange, RiskChange};
 use crate::domain::capacity::CapacityPool;
 use crate::domain::material::MaterialState;
 use crate::domain::plan::PlanItem;
@@ -82,7 +80,8 @@ impl ImpactSummaryEngine {
 
         // 3. 风险影响分析
         let risk_changes = self.analyze_risk_changes(before_risks, after_risks);
-        let (risk_level_before, risk_level_after) = self.get_overall_risk_levels(before_risks, after_risks);
+        let (risk_level_before, risk_level_after) =
+            self.get_overall_risk_levels(before_risks, after_risks);
 
         // 4. 换辊影响分析
         let (roll_campaign_affected, roll_tonnage_delta_t) =
@@ -574,7 +573,11 @@ mod tests {
         }
     }
 
-    fn make_material_state(material_id: &str, urgency: crate::domain::types::UrgentLevel, is_locked: bool) -> MaterialState {
+    fn make_material_state(
+        material_id: &str,
+        urgency: crate::domain::types::UrgentLevel,
+        is_locked: bool,
+    ) -> MaterialState {
         MaterialState {
             material_id: material_id.to_string(),
             sched_state: if is_locked {
@@ -668,7 +671,7 @@ mod tests {
         let engine = ImpactSummaryEngine::new();
 
         let materials = vec![
-            make_material_state("M001", crate::domain::types::UrgentLevel::L2, true),  // 锁定
+            make_material_state("M001", crate::domain::types::UrgentLevel::L2, true), // 锁定
             make_material_state("M002", crate::domain::types::UrgentLevel::L1, false), // 未锁定
         ];
 

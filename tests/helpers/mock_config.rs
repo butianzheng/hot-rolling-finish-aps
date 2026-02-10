@@ -32,11 +32,7 @@ impl MockConfig {
             min_temp_days_summer: 4,
             n1_threshold_days: 3,
             n2_threshold_days: 7,
-            standard_machines: vec![
-                "H032".to_string(),
-                "H033".to_string(),
-                "H034".to_string(),
-            ],
+            standard_machines: vec!["H032".to_string(), "H033".to_string(), "H034".to_string()],
             offset_days: 4,
             manual_season: Season::Winter,
         }

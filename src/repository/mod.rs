@@ -16,12 +16,12 @@ pub mod machine_config_repo;
 pub mod material_import_repo;
 pub mod material_import_repo_impl;
 pub mod material_repo;
-pub mod plan_repo;
-pub mod risk_repo;
-pub mod roller_repo;
 pub mod path_override_pending_repo;
-pub mod roll_campaign_plan_repo;
+pub mod plan_repo;
 pub mod plan_rhythm_repo;
+pub mod risk_repo;
+pub mod roll_campaign_plan_repo;
+pub mod roller_repo;
 pub mod strategy_draft_repo;
 
 // 重导出核心仓储
@@ -36,12 +36,14 @@ pub use machine_config_repo::{MachineConfigEntity, MachineConfigRepository};
 pub use material_import_repo::MaterialImportRepository;
 pub use material_import_repo_impl::MaterialImportRepositoryImpl;
 pub use material_repo::{MaterialMasterRepository, MaterialStateRepository};
+pub use path_override_pending_repo::{
+    PathOverridePendingRecord, PathOverridePendingRepository, PathOverridePendingSummaryRow,
+};
 pub use plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository};
-pub use risk_repo::RiskSnapshotRepository;
-pub use roller_repo::RollerCampaignRepository;
-pub use path_override_pending_repo::{PathOverridePendingRecord, PathOverridePendingRepository, PathOverridePendingSummaryRow};
-pub use roll_campaign_plan_repo::{RollCampaignPlanEntity, RollCampaignPlanRepository};
 pub use plan_rhythm_repo::{PlanRhythmPresetEntity, PlanRhythmRepository, PlanRhythmTargetEntity};
+pub use risk_repo::RiskSnapshotRepository;
+pub use roll_campaign_plan_repo::{RollCampaignPlanEntity, RollCampaignPlanRepository};
+pub use roller_repo::RollerCampaignRepository;
 pub use strategy_draft_repo::{StrategyDraftEntity, StrategyDraftRepository, StrategyDraftStatus};
 
 // TODO: 添加数据库连接池管理模块

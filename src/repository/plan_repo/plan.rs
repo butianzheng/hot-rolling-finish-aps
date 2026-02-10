@@ -154,10 +154,28 @@ impl PlanRepository {
             plan_type: row.get(2)?,
             base_plan_id: row.get(3)?,
             created_by: row.get(4)?,
-            created_at: NaiveDateTime::parse_from_str(&row.get::<_, String>(5)?, "%Y-%m-%d %H:%M:%S")
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(5, rusqlite::types::Type::Text, Box::new(e)))?,
-            updated_at: NaiveDateTime::parse_from_str(&row.get::<_, String>(6)?, "%Y-%m-%d %H:%M:%S")
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(6, rusqlite::types::Type::Text, Box::new(e)))?,
+            created_at: NaiveDateTime::parse_from_str(
+                &row.get::<_, String>(5)?,
+                "%Y-%m-%d %H:%M:%S",
+            )
+            .map_err(|e| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    5,
+                    rusqlite::types::Type::Text,
+                    Box::new(e),
+                )
+            })?,
+            updated_at: NaiveDateTime::parse_from_str(
+                &row.get::<_, String>(6)?,
+                "%Y-%m-%d %H:%M:%S",
+            )
+            .map_err(|e| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    6,
+                    rusqlite::types::Type::Text,
+                    Box::new(e),
+                )
+            })?,
         })
     }
 }

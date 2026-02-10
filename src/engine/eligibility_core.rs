@@ -94,10 +94,7 @@ impl EligibilityCore {
     /// # 参数
     /// - rolling_output_age_days: 等效轧制产出天数
     /// - min_temp_days: 最小适温天数(冬季3天/夏季4天)
-    pub fn calculate_ready_in_days(
-        rolling_output_age_days: i32,
-        min_temp_days: i32,
-    ) -> i32 {
+    pub fn calculate_ready_in_days(rolling_output_age_days: i32, min_temp_days: i32) -> i32 {
         (min_temp_days - rolling_output_age_days).max(0)
     }
 
@@ -109,10 +106,7 @@ impl EligibilityCore {
     /// # 参数
     /// - today: 当前日期
     /// - ready_in_days: 距离适温还需天数
-    pub fn calculate_earliest_sched_date(
-        today: NaiveDate,
-        ready_in_days: i32,
-    ) -> NaiveDate {
+    pub fn calculate_earliest_sched_date(today: NaiveDate, ready_in_days: i32) -> NaiveDate {
         today + Duration::days(ready_in_days as i64)
     }
 
@@ -388,36 +382,24 @@ mod tests {
     #[test]
     fn test_calculate_rolling_output_age_days_standard_machine() {
         let standard_machines = vec!["H032".to_string(), "H033".to_string(), "H034".to_string()];
-        let result = EligibilityCore::calculate_rolling_output_age_days(
-            5,
-            "H032",
-            &standard_machines,
-            4,
-        );
+        let result =
+            EligibilityCore::calculate_rolling_output_age_days(5, "H032", &standard_machines, 4);
         assert_eq!(result, 5); // 标准机组不加偏移
     }
 
     #[test]
     fn test_calculate_rolling_output_age_days_non_standard_machine() {
         let standard_machines = vec!["H032".to_string(), "H033".to_string(), "H034".to_string()];
-        let result = EligibilityCore::calculate_rolling_output_age_days(
-            5,
-            "H030",
-            &standard_machines,
-            4,
-        );
+        let result =
+            EligibilityCore::calculate_rolling_output_age_days(5, "H030", &standard_machines, 4);
         assert_eq!(result, 9); // 非标准机组 +4
     }
 
     #[test]
     fn test_calculate_rolling_output_age_days_zero_offset() {
         let standard_machines = vec!["H032".to_string()];
-        let result = EligibilityCore::calculate_rolling_output_age_days(
-            10,
-            "H030",
-            &standard_machines,
-            0,
-        );
+        let result =
+            EligibilityCore::calculate_rolling_output_age_days(10, "H030", &standard_machines, 0);
         assert_eq!(result, 10); // 偏移为0
     }
 
@@ -434,10 +416,10 @@ mod tests {
         let result = EligibilityCore::calculate_actual_output_age_days(
             Some(output_date),
             today,
-            999,  // fallback 值（不应被使用）
+            999, // fallback 值（不应被使用）
         );
 
-        assert_eq!(result, 7);  // 7天产出 (2025-01-20 - 2025-01-13)
+        assert_eq!(result, 7); // 7天产出 (2025-01-20 - 2025-01-13)
     }
 
     #[test]
@@ -445,13 +427,9 @@ mod tests {
         // 边界情况：当天产出
         let today = NaiveDate::from_ymd_opt(2025, 1, 14).unwrap();
 
-        let result = EligibilityCore::calculate_actual_output_age_days(
-            Some(today),
-            today,
-            999,
-        );
+        let result = EligibilityCore::calculate_actual_output_age_days(Some(today), today, 999);
 
-        assert_eq!(result, 0);  // 0天产出
+        assert_eq!(result, 0); // 0天产出
     }
 
     #[test]
@@ -460,13 +438,10 @@ mod tests {
         let output_date = NaiveDate::from_ymd_opt(2024, 11, 25).unwrap();
         let today = NaiveDate::from_ymd_opt(2025, 1, 14).unwrap();
 
-        let result = EligibilityCore::calculate_actual_output_age_days(
-            Some(output_date),
-            today,
-            999,
-        );
+        let result =
+            EligibilityCore::calculate_actual_output_age_days(Some(output_date), today, 999);
 
-        assert_eq!(result, 50);  // 50天产出
+        assert_eq!(result, 50); // 50天产出
     }
 
     #[test]
@@ -475,12 +450,10 @@ mod tests {
         let today = NaiveDate::from_ymd_opt(2025, 1, 20).unwrap();
 
         let result = EligibilityCore::calculate_actual_output_age_days(
-            None,
-            today,
-            5,  // fallback 值（静态快照）
+            None, today, 5, // fallback 值（静态快照）
         );
 
-        assert_eq!(result, 5);  // 使用 fallback 值
+        assert_eq!(result, 5); // 使用 fallback 值
     }
 
     // ==========================================
@@ -526,10 +499,7 @@ mod tests {
     fn test_calculate_earliest_sched_date_future() {
         let today = NaiveDate::from_ymd_opt(2025, 1, 14).unwrap();
         let result = EligibilityCore::calculate_earliest_sched_date(today, 3);
-        assert_eq!(
-            result,
-            NaiveDate::from_ymd_opt(2025, 1, 17).unwrap()
-        ); // 3天后
+        assert_eq!(result, NaiveDate::from_ymd_opt(2025, 1, 17).unwrap()); // 3天后
     }
 
     // ==========================================
@@ -715,7 +685,7 @@ mod tests {
             7,
             RushLevel::L0,
             None,
-            true,  // manual_urgent_flag
+            true, // manual_urgent_flag
             false,
         );
         assert_eq!(level, UrgentLevel::L3);

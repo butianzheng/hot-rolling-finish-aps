@@ -5,18 +5,18 @@
 // 运行：cargo test --test e2e_full_scenario_test -- --nocapture
 // ==========================================
 
+use chrono::Local;
 use hot_rolling_aps::app::AppState;
+use hot_rolling_aps::config::config_manager::ConfigManager;
 use hot_rolling_aps::decision::api::DecisionApi;
+use hot_rolling_aps::engine::MaterialStateDerivationService;
 use hot_rolling_aps::importer::{
-    MaterialImporter, MaterialImporterImpl, CsvParser, FieldMapperImpl, DataCleanerImpl,
-    DerivationServiceImpl, DqValidatorImpl, ConflictHandlerImpl,
+    ConflictHandlerImpl, CsvParser, DataCleanerImpl, DerivationServiceImpl, DqValidatorImpl,
+    FieldMapperImpl, MaterialImporter, MaterialImporterImpl,
 };
 use hot_rolling_aps::repository::MaterialImportRepositoryImpl;
-use hot_rolling_aps::config::config_manager::ConfigManager;
-use hot_rolling_aps::engine::MaterialStateDerivationService;
 use std::path::PathBuf;
 use std::sync::Arc;
-use chrono::Local;
 
 // 复用统一的测试 DB schema 初始化（包含 material_master/material_state 等必要表）
 #[path = "test_helpers.rs"]
@@ -35,10 +35,7 @@ async fn test_full_scenario_workflow() {
     println!("测试数据库创建成功: {}", test_db_path);
 
     // 创建AppState
-    let app_state = Arc::new(
-        AppState::new(test_db_path.to_string())
-            .expect("初始化AppState失败")
-    );
+    let app_state = Arc::new(AppState::new(test_db_path.to_string()).expect("初始化AppState失败"));
     println!("AppState初始化成功");
 
     // 2. 导入大规模测试数据
@@ -80,7 +77,10 @@ async fn test_full_scenario_workflow() {
     println!("  - 阻断记录: {} 条", import_result.summary.blocked);
     println!("  - 冲突记录: {} 条", import_result.summary.conflict);
     println!("  - 耗时: {:.2}秒", elapsed.as_secs_f64());
-    println!("  - 吞吐量: {:.0} 条/秒", import_result.summary.success as f64 / elapsed.as_secs_f64());
+    println!(
+        "  - 吞吐量: {:.0} 条/秒",
+        import_result.summary.success as f64 / elapsed.as_secs_f64()
+    );
 
     assert!(import_result.summary.success >= 900, "导入成功率过低");
     assert!(elapsed.as_secs() < 10, "导入性能不达标（应<10秒）");
@@ -137,7 +137,9 @@ async fn test_full_scenario_workflow() {
     // 6. 测试D1：日期风险摘要
     println!("\n[步骤6] 测试D1：日期风险摘要...");
     let date_from = today.format("%Y-%m-%d").to_string();
-    let date_to = (today + chrono::Duration::days(30)).format("%Y-%m-%d").to_string();
+    let date_to = (today + chrono::Duration::days(30))
+        .format("%Y-%m-%d")
+        .to_string();
 
     let d1_request = hot_rolling_aps::decision::api::GetDecisionDaySummaryRequest {
         version_id: version_id.clone(),
@@ -188,7 +190,10 @@ async fn test_full_scenario_workflow() {
     println!("  - 堵塞点数量: {}", d4_response.total_count);
 
     if let Some(first_item) = d4_response.items.first() {
-        println!("  - 第一个堵塞点: {} @ {}", first_item.machine_code, first_item.plan_date);
+        println!(
+            "  - 第一个堵塞点: {} @ {}",
+            first_item.machine_code, first_item.plan_date
+        );
         println!("    - 堵塞评分: {:.1}", first_item.bottleneck_score);
         println!("    - 堵塞等级: {:?}", first_item.bottleneck_level);
         println!("    - 容量利用率: {:.1}%", first_item.capacity_util_pct);
@@ -215,7 +220,10 @@ async fn test_full_scenario_workflow() {
     println!("  - 版本ID: {}", d5_response.version_id);
     println!("  - 数据时间: {}", d5_response.as_of);
     println!("  - 警报总数: {}", d5_response.summary.total_alerts);
-    println!("  - 近硬停止数: {}", d5_response.summary.near_hard_stop_count);
+    println!(
+        "  - 近硬停止数: {}",
+        d5_response.summary.near_hard_stop_count
+    );
 
     if let Some(first_item) = d5_response.items.first() {
         println!("  - 机组: {}", first_item.machine_code);
@@ -223,8 +231,10 @@ async fn test_full_scenario_workflow() {
         println!("    - 当前吨位: {:.1}吨", first_item.current_tonnage_t);
         println!("    - 软限制: {:.1}吨", first_item.soft_limit_t);
         println!("    - 硬限制: {:.1}吨", first_item.hard_limit_t);
-        println!("    - 利用率: {:.1}%",
-            (first_item.current_tonnage_t / first_item.hard_limit_t) * 100.0);
+        println!(
+            "    - 利用率: {:.1}%",
+            (first_item.current_tonnage_t / first_item.hard_limit_t) * 100.0
+        );
     }
 
     // 9. 测试D6：容量优化机会
@@ -248,12 +258,24 @@ async fn test_full_scenario_workflow() {
     println!("  - 版本ID: {}", d6_response.version_id);
     println!("  - 数据时间: {}", d6_response.as_of);
     println!("  - 机会总数: {}", d6_response.summary.total_opportunities);
-    println!("  - 总机会空间: {:.1}吨", d6_response.summary.total_opportunity_space_t);
-    println!("  - 平均当前利用率: {:.1}%", d6_response.summary.avg_current_util_pct);
-    println!("  - 平均优化利用率: {:.1}%", d6_response.summary.avg_optimized_util_pct);
+    println!(
+        "  - 总机会空间: {:.1}吨",
+        d6_response.summary.total_opportunity_space_t
+    );
+    println!(
+        "  - 平均当前利用率: {:.1}%",
+        d6_response.summary.avg_current_util_pct
+    );
+    println!(
+        "  - 平均优化利用率: {:.1}%",
+        d6_response.summary.avg_optimized_util_pct
+    );
 
     if let Some(first_item) = d6_response.items.first() {
-        println!("  - 最优机会: {} @ {}", first_item.machine_code, first_item.plan_date);
+        println!(
+            "  - 最优机会: {} @ {}",
+            first_item.machine_code, first_item.plan_date
+        );
         println!("    - 机会类型: {}", first_item.opportunity_type);
         println!("    - 当前利用率: {:.1}%", first_item.current_util_pct);
         println!("    - 优化利用率: {:.1}%", first_item.optimized_util_pct);
@@ -294,14 +316,23 @@ async fn test_full_scenario_workflow() {
     println!("全场景测试完成！");
     println!("==========================================");
     println!("\n测试摘要：");
-    println!("  - 数据导入: {} 条材料成功导入", import_result.summary.success);
+    println!(
+        "  - 数据导入: {} 条材料成功导入",
+        import_result.summary.success
+    );
     println!("  - 排产方案: {} ({} 天)", plan_id, plan_days);
     println!("  - 排产版本: {} (已激活)", version_id);
     println!("  - 排产计算: 完成 ({:.2}秒)", recalc_elapsed.as_secs_f64());
     println!("  - D1 日期风险: {} 个风险日期", d1_response.total_count);
     println!("  - D4 机组堵塞: {} 个堵塞点", d4_response.total_count);
-    println!("  - D5 换辊警报: {} 个警报", d5_response.summary.total_alerts);
-    println!("  - D6 容量机会: {} 个机会", d6_response.summary.total_opportunities);
+    println!(
+        "  - D5 换辊警报: {} 个警报",
+        d5_response.summary.total_alerts
+    );
+    println!(
+        "  - D6 容量机会: {} 个机会",
+        d6_response.summary.total_opportunities
+    );
     println!("  - 排产项总数: {}", plan_items.len());
     println!("\n数据库文件: {}", test_db_path);
     println!("可以使用此数据库进行前端UI测试！");

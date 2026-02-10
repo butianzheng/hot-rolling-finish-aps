@@ -55,7 +55,11 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
                 conflict.row_number as i64,
                 format!("{:?}", conflict.conflict_type),
                 conflict.raw_data,
-                if conflict.resolved { "RESOLVED" } else { "OPEN" },
+                if conflict.resolved {
+                    "RESOLVED"
+                } else {
+                    "OPEN"
+                },
                 conflict.reason,
                 conflict.created_at.to_rfc3339(),
             ],
@@ -91,7 +95,11 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
                 conflict.row_number as i64,
                 format!("{:?}", conflict.conflict_type),
                 conflict.raw_data,
-                if conflict.resolved { "RESOLVED" } else { "OPEN" },
+                if conflict.resolved {
+                    "RESOLVED"
+                } else {
+                    "OPEN"
+                },
                 conflict.reason,
                 conflict.created_at.to_rfc3339(),
             ])?;
@@ -230,25 +238,28 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
                     LIMIT ?2 OFFSET ?3
                     "#,
                 )?;
-                let result = stmt.query_map(params![s, limit, offset], |row| {
-                    let material_id_str: Option<String> = row.get(2)?;
-                    let resolution_status: String = row.get(6)?;
-                    let conflict_type_raw: String = row.get(4)?;
-                    Ok(ImportConflict {
-                        conflict_id: row.get(0)?,
-                        batch_id: row.get(1)?,
-                        material_id: material_id_str.filter(|s| !s.is_empty()),
-                        row_number: row.get::<_, i64>(3)? as usize,
-                        conflict_type: parse_conflict_type(&conflict_type_raw),
-                        raw_data: row.get(5)?,
-                        reason: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
-                        resolved: resolution_status == "RESOLVED",
-                        created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(8)?)
+                let result = stmt
+                    .query_map(params![s, limit, offset], |row| {
+                        let material_id_str: Option<String> = row.get(2)?;
+                        let resolution_status: String = row.get(6)?;
+                        let conflict_type_raw: String = row.get(4)?;
+                        Ok(ImportConflict {
+                            conflict_id: row.get(0)?,
+                            batch_id: row.get(1)?,
+                            material_id: material_id_str.filter(|s| !s.is_empty()),
+                            row_number: row.get::<_, i64>(3)? as usize,
+                            conflict_type: parse_conflict_type(&conflict_type_raw),
+                            raw_data: row.get(5)?,
+                            reason: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
+                            resolved: resolution_status == "RESOLVED",
+                            created_at: chrono::DateTime::parse_from_rfc3339(
+                                &row.get::<_, String>(8)?,
+                            )
                             .map(|dt| dt.with_timezone(&chrono::Utc))
                             .unwrap_or_else(|_| chrono::Utc::now()),
-                    })
-                })?
-                .collect::<Result<Vec<_>, _>>()?;
+                        })
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
                 result
             }
             None => {
@@ -262,25 +273,28 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
                     LIMIT ?1 OFFSET ?2
                     "#,
                 )?;
-                let result = stmt.query_map(params![limit, offset], |row| {
-                    let material_id_str: Option<String> = row.get(2)?;
-                    let resolution_status: String = row.get(6)?;
-                    let conflict_type_raw: String = row.get(4)?;
-                    Ok(ImportConflict {
-                        conflict_id: row.get(0)?,
-                        batch_id: row.get(1)?,
-                        material_id: material_id_str.filter(|s| !s.is_empty()),
-                        row_number: row.get::<_, i64>(3)? as usize,
-                        conflict_type: parse_conflict_type(&conflict_type_raw),
-                        raw_data: row.get(5)?,
-                        reason: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
-                        resolved: resolution_status == "RESOLVED",
-                        created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(8)?)
+                let result = stmt
+                    .query_map(params![limit, offset], |row| {
+                        let material_id_str: Option<String> = row.get(2)?;
+                        let resolution_status: String = row.get(6)?;
+                        let conflict_type_raw: String = row.get(4)?;
+                        Ok(ImportConflict {
+                            conflict_id: row.get(0)?,
+                            batch_id: row.get(1)?,
+                            material_id: material_id_str.filter(|s| !s.is_empty()),
+                            row_number: row.get::<_, i64>(3)? as usize,
+                            conflict_type: parse_conflict_type(&conflict_type_raw),
+                            raw_data: row.get(5)?,
+                            reason: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
+                            resolved: resolution_status == "RESOLVED",
+                            created_at: chrono::DateTime::parse_from_rfc3339(
+                                &row.get::<_, String>(8)?,
+                            )
                             .map(|dt| dt.with_timezone(&chrono::Utc))
                             .unwrap_or_else(|_| chrono::Utc::now()),
-                    })
-                })?
-                .collect::<Result<Vec<_>, _>>()?;
+                        })
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
                 result
             }
         };
@@ -289,10 +303,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
     }
 
     /// 统计指定状态的冲突数量
-    async fn count_conflicts_by_status(
-        &self,
-        status: Option<&str>,
-    ) -> Result<i64, Box<dyn Error>> {
+    async fn count_conflicts_by_status(&self, status: Option<&str>) -> Result<i64, Box<dyn Error>> {
         let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         let count: i64 = match status {
@@ -301,11 +312,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
                 params![s],
                 |row| row.get(0),
             )?,
-            None => conn.query_row(
-                "SELECT COUNT(*) FROM import_conflict",
-                [],
-                |row| row.get(0),
-            )?,
+            None => conn.query_row("SELECT COUNT(*) FROM import_conflict", [], |row| row.get(0))?,
         };
 
         Ok(count)
@@ -396,12 +403,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
                 resolved_at = ?4
             WHERE conflict_id = ?1
             "#,
-            params![
-                conflict_id,
-                action,
-                note,
-                chrono::Utc::now().to_rfc3339(),
-            ],
+            params![conflict_id, action, note, chrono::Utc::now().to_rfc3339(),],
         )?;
 
         Ok(())
@@ -464,7 +466,8 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
                     blocked_rows: row.get(5)?,
                     warning_rows: row.get(6)?,
                     conflict_rows: row.get(7)?,
-                    imported_at: row.get::<_, Option<String>>(8)?
+                    imported_at: row
+                        .get::<_, Option<String>>(8)?
                         .and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
                         .map(|dt| dt.with_timezone(&chrono::Utc)),
                     imported_by: row.get(9)?,
@@ -528,11 +531,8 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
     async fn count_materials(&self) -> Result<usize, Box<dyn Error>> {
         let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM material_master",
-            [],
-            |row| row.get(0),
-        )?;
+        let count: i64 =
+            conn.query_row("SELECT COUNT(*) FROM material_master", [], |row| row.get(0))?;
 
         Ok(count as usize)
     }
@@ -541,11 +541,8 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
     async fn count_states(&self) -> Result<usize, Box<dyn Error>> {
         let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM material_state",
-            [],
-            |row| row.get(0),
-        )?;
+        let count: i64 =
+            conn.query_row("SELECT COUNT(*) FROM material_state", [], |row| row.get(0))?;
 
         Ok(count as usize)
     }
@@ -557,19 +554,13 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
     /// # 说明
     /// MaterialMaster 表中无 batch_id 字段，无法直接按批次删除材料
     /// 已导入的材料需要用户手动删除
-    async fn delete_materials_by_batch(
-        &self,
-        _batch_id: &str,
-    ) -> Result<usize, Box<dyn Error>> {
+    async fn delete_materials_by_batch(&self, _batch_id: &str) -> Result<usize, Box<dyn Error>> {
         // 方案1：不删除材料，返回0
         Ok(0)
     }
 
     /// 按批次ID删除所有关联的冲突记录
-    async fn delete_conflicts_by_batch(
-        &self,
-        batch_id: &str,
-    ) -> Result<usize, Box<dyn Error>> {
+    async fn delete_conflicts_by_batch(&self, batch_id: &str) -> Result<usize, Box<dyn Error>> {
         let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         let affected = conn.execute(
@@ -587,10 +578,7 @@ impl MaterialImportRepository for MaterialImportRepositoryImpl {
     }
 
     /// 删除导入批次记录
-    async fn delete_batch(
-        &self,
-        batch_id: &str,
-    ) -> Result<(), Box<dyn Error>> {
+    async fn delete_batch(&self, batch_id: &str) -> Result<(), Box<dyn Error>> {
         let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         conn.execute(

@@ -279,9 +279,7 @@ mod tests {
         assert_eq!(profiles.len(), 0);
 
         // 查询不存在的机组
-        let profiles = use_case
-            .get_machine_cold_stock("V001", "H999")
-            .unwrap();
+        let profiles = use_case.get_machine_cold_stock("V001", "H999").unwrap();
         assert_eq!(profiles.len(), 0);
     }
 }

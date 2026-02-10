@@ -222,9 +222,8 @@ where
 
         // === 步骤 6: 冲突检测 ===
         debug!("步骤 6: 冲突检测");
-        let (valid_records, conflict_count) = self
-            .detect_and_handle_conflicts(&batch_id, records)
-            .await?;
+        let (valid_records, conflict_count) =
+            self.detect_and_handle_conflicts(&batch_id, records).await?;
         info!(
             valid = valid_records.len(),
             conflicts = conflict_count,
@@ -241,7 +240,8 @@ where
         let today = chrono::Local::now().date_naive();
         let mut material_states = Vec::new();
         for material in &materials {
-            match self.state_derivation_service
+            match self
+                .state_derivation_service
                 .derive(material, &self.config, today)
                 .await
             {
@@ -390,29 +390,41 @@ where
     /// 清洗单条记录
     fn clean_record(&self, record: &mut RawMaterialRecord) {
         // 清洗合同性质（TRIM + UPPER）
-        record.contract_nature = record.contract_nature.as_ref()
+        record.contract_nature = record
+            .contract_nature
+            .as_ref()
             .map(|v| self.data_cleaner.clean_text(v, true))
             .and_then(|v| self.data_cleaner.normalize_null(Some(v)));
 
         // 清洗周交期标记（TRIM + UPPER）
-        record.weekly_delivery_flag = record.weekly_delivery_flag.as_ref()
+        record.weekly_delivery_flag = record
+            .weekly_delivery_flag
+            .as_ref()
             .map(|v| self.data_cleaner.clean_text(v, true))
             .and_then(|v| self.data_cleaner.normalize_null(Some(v)));
 
         // 清洗出口标记（标准化为 '1'/'0'）
-        record.export_flag = self.data_cleaner.clean_export_flag(record.export_flag.take());
+        record.export_flag = self
+            .data_cleaner
+            .clean_export_flag(record.export_flag.take());
 
         // 清洗钢种标记（TRIM + UPPER）
-        record.steel_mark = record.steel_mark.as_ref()
+        record.steel_mark = record
+            .steel_mark
+            .as_ref()
             .map(|v| self.data_cleaner.clean_text(v, true))
             .and_then(|v| self.data_cleaner.normalize_null(Some(v)));
 
         // 清洗机组代码（TRIM + UPPER）
-        record.next_machine_code = record.next_machine_code.as_ref()
+        record.next_machine_code = record
+            .next_machine_code
+            .as_ref()
             .map(|v| self.data_cleaner.clean_text(v, true))
             .and_then(|v| self.data_cleaner.normalize_null(Some(v)));
 
-        record.rework_machine_code = record.rework_machine_code.as_ref()
+        record.rework_machine_code = record
+            .rework_machine_code
+            .as_ref()
             .map(|v| self.data_cleaner.clean_text(v, true))
             .and_then(|v| self.data_cleaner.normalize_null(Some(v)));
     }
@@ -557,10 +569,7 @@ where
     }
 
     /// 转换为 MaterialMaster
-    fn convert_to_material_master(
-        &self,
-        records: Vec<RawMaterialRecord>,
-    ) -> Vec<MaterialMaster> {
+    fn convert_to_material_master(&self, records: Vec<RawMaterialRecord>) -> Vec<MaterialMaster> {
         // 获取当前导入时间（用于 rolling_output_date 计算）
         let import_date = chrono::Local::now().date_naive();
 
@@ -574,10 +583,9 @@ where
                 );
 
                 // 派生 rolling_output_date（v0.7 新增）
-                let rolling_output_date = self.derivation_service.derive_rolling_output_date(
-                    import_date,
-                    record.output_age_days_raw,
-                );
+                let rolling_output_date = self
+                    .derivation_service
+                    .derive_rolling_output_date(import_date, record.output_age_days_raw);
 
                 MaterialMaster {
                     material_id: record.material_id.unwrap_or_default(),
@@ -596,7 +604,7 @@ where
                     due_date: record.due_date,
                     stock_age_days: record.stock_age_days,
                     output_age_days_raw: record.output_age_days_raw,
-                    rolling_output_date,  // v0.7 新增字段
+                    rolling_output_date, // v0.7 新增字段
                     status_updated_at: record.status_updated_at,
                     contract_no: record.contract_no,
                     contract_nature: record.contract_nature,

@@ -38,7 +38,7 @@ use uuid::Uuid;
 /// - 不含UI逻辑
 /// - 所有数据库操作通过Repository
 /// - 不修改物理状态,只写入material_master和material_state
-pub struct MaterialImporter<R:?Sized, C>
+pub struct MaterialImporter<R: ?Sized, C>
 where
     R: MaterialImportRepository,
     C: ImportConfigReader,
@@ -96,16 +96,13 @@ where
         let total_rows = raw_records.len();
 
         // === 步骤 2: 数据质量检查 ===
-        let (valid_records, violations, conflicts) =
-            self.validate_records(raw_records, &batch_id);
+        let (valid_records, violations, conflicts) = self.validate_records(raw_records, &batch_id);
 
         // === 步骤 3: 字段映射与派生 ===
         let masters = self.map_to_material_master(valid_records.clone())?;
 
         // === 步骤 4: 状态派生 ===
-        let states = self
-            .derive_material_states(&masters, today)
-            .await?;
+        let states = self.derive_material_states(&masters, today).await?;
 
         // === 步骤 5: 批量保存(事务化) ===
         let success_count = self.save_materials_and_states(masters, states).await?;
@@ -187,16 +184,16 @@ where
                 material_id: Self::get_string_field(&record, 0), // 材料号
                 manufacturing_order_id: Self::get_string_field(&record, 1), // 制造命令号
                 material_status_code_src: Self::get_string_field(&record, 2), // 材料状态码
-                steel_mark: Self::get_string_field(&record, 7), // 出钢记号
-                slab_id: Self::get_string_field(&record, 8), // 板坯号
+                steel_mark: Self::get_string_field(&record, 7),  // 出钢记号
+                slab_id: Self::get_string_field(&record, 8),     // 板坯号
                 next_machine_code: Self::get_string_field(&record, 9), // 下道机组代码
                 rework_machine_code: Self::get_string_field(&record, 10), // 精整返修机组
-                width_mm: Self::get_f64_field(&record, 11), // 材料实际宽度
-                thickness_mm: Self::get_f64_field(&record, 12), // 材料实际厚度
-                length_m: Self::get_f64_field(&record, 13), // 材料实际长度
-                weight_t: Self::get_f64_field(&record, 14), // 材料实际重量
+                width_mm: Self::get_f64_field(&record, 11),      // 材料实际宽度
+                thickness_mm: Self::get_f64_field(&record, 12),  // 材料实际厚度
+                length_m: Self::get_f64_field(&record, 13),      // 材料实际长度
+                weight_t: Self::get_f64_field(&record, 14),      // 材料实际重量
                 available_width_mm: Self::get_f64_field(&record, 15), // 可利用宽度
-                due_date: Self::get_date_field(&record, 3), // 合同交货期
+                due_date: Self::get_date_field(&record, 3),      // 合同交货期
                 stock_age_days: Self::get_i32_field(&record, 4), // 状态时间(天)
                 output_age_days_raw: Self::get_i32_field(&record, 5), // 产出时间(天)
                 status_updated_at: Self::get_datetime_field(&record, 6), // 物料状态修改时间
@@ -424,9 +421,7 @@ where
 
             // 派生 rolling_output_date (v0.7)
             let rolling_output_date = match record.output_age_days_raw {
-                Some(days) if days >= 0 => {
-                    Some(import_date - chrono::Duration::days(days as i64))
-                }
+                Some(days) if days >= 0 => Some(import_date - chrono::Duration::days(days as i64)),
                 _ => None,
             };
 
@@ -447,7 +442,7 @@ where
                 due_date: record.due_date,
                 stock_age_days: record.stock_age_days,
                 output_age_days_raw: record.output_age_days_raw,
-                rolling_output_date,  // v0.7 新增字段
+                rolling_output_date, // v0.7 新增字段
                 status_updated_at: record.status_updated_at,
                 contract_no: record.contract_no,
                 contract_nature: record.contract_nature,
@@ -501,10 +496,7 @@ where
     }
 
     /// 保存冲突记录
-    async fn save_conflicts(
-        &self,
-        conflicts: Vec<ImportConflict>,
-    ) -> Result<(), Box<dyn Error>> {
+    async fn save_conflicts(&self, conflicts: Vec<ImportConflict>) -> Result<(), Box<dyn Error>> {
         if !conflicts.is_empty() {
             self.repo.batch_insert_conflicts(conflicts).await?;
         }
@@ -564,15 +556,11 @@ where
     }
 
     fn get_f64_field(record: &csv::StringRecord, index: usize) -> Option<f64> {
-        record
-            .get(index)
-            .and_then(|s| s.trim().parse::<f64>().ok())
+        record.get(index).and_then(|s| s.trim().parse::<f64>().ok())
     }
 
     fn get_i32_field(record: &csv::StringRecord, index: usize) -> Option<i32> {
-        record
-            .get(index)
-            .and_then(|s| s.trim().parse::<i32>().ok())
+        record.get(index).and_then(|s| s.trim().parse::<i32>().ok())
     }
 
     fn get_date_field(record: &csv::StringRecord, index: usize) -> Option<NaiveDate> {
@@ -648,10 +636,7 @@ mod tests {
         ) -> Result<usize, Box<dyn Error>> {
             Ok(0)
         }
-        async fn insert_conflict(
-            &self,
-            _conflict: ImportConflict,
-        ) -> Result<(), Box<dyn Error>> {
+        async fn insert_conflict(&self, _conflict: ImportConflict) -> Result<(), Box<dyn Error>> {
             Ok(())
         }
         async fn batch_insert_conflicts(
@@ -672,10 +657,7 @@ mod tests {
         ) -> Result<Vec<ImportConflict>, Box<dyn Error>> {
             Ok(vec![])
         }
-        async fn mark_conflict_resolved(
-            &self,
-            _conflict_id: &str,
-        ) -> Result<(), Box<dyn Error>> {
+        async fn mark_conflict_resolved(&self, _conflict_id: &str) -> Result<(), Box<dyn Error>> {
             Ok(())
         }
         async fn insert_batch(&self, _batch: ImportBatch) -> Result<(), Box<dyn Error>> {
@@ -749,10 +731,7 @@ mod tests {
         ) -> Result<usize, Box<dyn Error>> {
             Ok(0)
         }
-        async fn delete_batch(
-            &self,
-            _batch_id: &str,
-        ) -> Result<(), Box<dyn Error>> {
+        async fn delete_batch(&self, _batch_id: &str) -> Result<(), Box<dyn Error>> {
             Ok(())
         }
     }
@@ -760,7 +739,9 @@ mod tests {
     struct DummyConfig;
     #[async_trait::async_trait]
     impl ImportConfigReader for DummyConfig {
-        async fn get_season_mode(&self) -> Result<crate::domain::types::SeasonMode, Box<dyn Error>> {
+        async fn get_season_mode(
+            &self,
+        ) -> Result<crate::domain::types::SeasonMode, Box<dyn Error>> {
             Ok(crate::domain::types::SeasonMode::Auto)
         }
         async fn get_manual_season(&self) -> Result<crate::domain::types::Season, Box<dyn Error>> {
@@ -776,7 +757,11 @@ mod tests {
             Ok(4)
         }
         async fn get_standard_finishing_machines(&self) -> Result<Vec<String>, Box<dyn Error>> {
-            Ok(vec!["H032".to_string(), "H033".to_string(), "H034".to_string()])
+            Ok(vec![
+                "H032".to_string(),
+                "H033".to_string(),
+                "H034".to_string(),
+            ])
         }
         async fn get_machine_offset_days(&self) -> Result<i32, Box<dyn Error>> {
             Ok(4)
@@ -787,7 +772,10 @@ mod tests {
         async fn get_batch_retention_days(&self) -> Result<i32, Box<dyn Error>> {
             Ok(90)
         }
-        async fn get_current_min_temp_days(&self, _today: chrono::NaiveDate) -> Result<i32, Box<dyn Error>> {
+        async fn get_current_min_temp_days(
+            &self,
+            _today: chrono::NaiveDate,
+        ) -> Result<i32, Box<dyn Error>> {
             Ok(3)
         }
         async fn get_n1_threshold_days(&self) -> Result<i32, Box<dyn Error>> {

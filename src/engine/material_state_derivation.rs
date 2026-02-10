@@ -87,7 +87,8 @@ impl MaterialStateDerivationService {
         } else {
             Season::Winter // 默认值,在 Auto 模式下会被覆盖
         };
-        let season = EligibilityCore::determine_season(today, season_mode, manual_season, &winter_months);
+        let season =
+            EligibilityCore::determine_season(today, season_mode, manual_season, &winter_months);
 
         // === 步骤 4: 获取适温阈值 ===
         let min_temp_days = match season {
@@ -96,14 +97,10 @@ impl MaterialStateDerivationService {
         };
 
         // === 步骤 5: 计算适温状态 ===
-        let ready_in_days = EligibilityCore::calculate_ready_in_days(
-            actual_output_age_days,
-            min_temp_days,
-        );
-        let earliest_sched_date = EligibilityCore::calculate_earliest_sched_date(
-            today,
-            ready_in_days,
-        );
+        let ready_in_days =
+            EligibilityCore::calculate_ready_in_days(actual_output_age_days, min_temp_days);
+        let earliest_sched_date =
+            EligibilityCore::calculate_earliest_sched_date(today, ready_in_days);
 
         // 在导入阶段,lock_flag 和 force_release_flag 都是 false
         let (sched_state, _reasons) = EligibilityCore::determine_sched_state(
@@ -134,8 +131,8 @@ impl MaterialStateDerivationService {
             n2_days,
             rush_level,
             Some(earliest_sched_date), // 包装为 Option
-            false, // manual_urgent_flag (导入阶段为 false)
-            false, // in_frozen_zone (导入阶段为 false)
+            false,                     // manual_urgent_flag (导入阶段为 false)
+            false,                     // in_frozen_zone (导入阶段为 false)
         );
 
         // === 步骤 9: 构建 MaterialState ===
@@ -284,7 +281,7 @@ mod tests {
             due_date: None,
             stock_age_days: Some(10),
             output_age_days_raw: Some(5),
-            rolling_output_date: None,  // v0.7
+            rolling_output_date: None, // v0.7
             status_updated_at: None,
             contract_no: None,
             contract_nature: None,
@@ -307,7 +304,7 @@ mod tests {
 
         assert_eq!(state.material_id, "MAT001");
         assert_eq!(state.rolling_output_age_days, 5); // H032 不加偏移
-        assert_eq!(state.ready_in_days, 0);           // 5 >= 3（已适温）
+        assert_eq!(state.ready_in_days, 0); // 5 >= 3（已适温）
         assert_eq!(state.sched_state, SchedState::Ready);
         assert_eq!(state.rush_level, RushLevel::L0);
     }
@@ -345,7 +342,7 @@ mod tests {
         let state = service.derive(&material, &config, today).await.unwrap();
 
         assert_eq!(state.rolling_output_age_days, 9); // 5 + 4
-        assert_eq!(state.ready_in_days, 0);           // 9 >= 3
+        assert_eq!(state.ready_in_days, 0); // 9 >= 3
     }
 
     #[tokio::test]

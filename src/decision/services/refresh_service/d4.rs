@@ -1,7 +1,6 @@
 use super::*;
 
 impl DecisionRefreshService {
-
     /// 刷新 D4: 哪个机组最堵
     pub(super) fn refresh_d4(
         &self,
@@ -20,8 +19,10 @@ impl DecisionRefreshService {
                     let placeholders: Vec<String> = (0..machines.len())
                         .map(|i| format!("?{}", params.len() + i + 1))
                         .collect();
-                    delete_conditions.push(format!("machine_code IN ({})", placeholders.join(", ")));
-                    insert_conditions.push(format!("cp.machine_code IN ({})", placeholders.join(", ")));
+                    delete_conditions
+                        .push(format!("machine_code IN ({})", placeholders.join(", ")));
+                    insert_conditions
+                        .push(format!("cp.machine_code IN ({})", placeholders.join(", ")));
                     params.extend(machines.clone());
                 }
             }
@@ -29,8 +30,12 @@ impl DecisionRefreshService {
             if let Some((start_date, end_date)) = &scope.affected_date_range {
                 let start_idx = params.len() + 1;
                 let end_idx = params.len() + 2;
-                delete_conditions.push(format!("plan_date BETWEEN ?{} AND ?{}", start_idx, end_idx));
-                insert_conditions.push(format!("cp.plan_date BETWEEN ?{} AND ?{}", start_idx, end_idx));
+                delete_conditions
+                    .push(format!("plan_date BETWEEN ?{} AND ?{}", start_idx, end_idx));
+                insert_conditions.push(format!(
+                    "cp.plan_date BETWEEN ?{} AND ?{}",
+                    start_idx, end_idx
+                ));
                 params.push(start_date.clone());
                 params.push(end_date.clone());
             }
@@ -60,7 +65,10 @@ impl DecisionRefreshService {
         let capacity_where_clause = if capacity_where_conditions.is_empty() {
             String::new()
         } else {
-            format!("\n            WHERE {}", capacity_where_conditions.join(" AND "))
+            format!(
+                "\n            WHERE {}",
+                capacity_where_conditions.join(" AND ")
+            )
         };
 
         // 节奏（品种大类）偏差：需要 plan_rhythm_target 表；若不存在则走旧逻辑（仅产能）
@@ -468,9 +476,9 @@ impl DecisionRefreshService {
         };
 
         let params_refs: Vec<&str> = params.iter().map(|s| s.as_str()).collect();
-        let rows_affected = tx.execute(&insert_sql, rusqlite::params_from_iter(params_refs.iter()))?;
+        let rows_affected =
+            tx.execute(&insert_sql, rusqlite::params_from_iter(params_refs.iter()))?;
 
         Ok(rows_affected)
     }
-
 }

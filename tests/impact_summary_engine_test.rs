@@ -10,7 +10,7 @@ use hot_rolling_aps::domain::capacity::CapacityPool;
 use hot_rolling_aps::domain::material::MaterialState;
 use hot_rolling_aps::domain::plan::PlanItem;
 use hot_rolling_aps::domain::risk::RiskSnapshot;
-use hot_rolling_aps::domain::types::{RiskLevel, SchedState, UrgentLevel, RushLevel};
+use hot_rolling_aps::domain::types::{RiskLevel, RushLevel, SchedState, UrgentLevel};
 use hot_rolling_aps::engine::ImpactSummaryEngine;
 use std::collections::HashMap;
 
@@ -163,10 +163,7 @@ fn test_impact_summary_material_moved() {
         create_test_material_state("M001", UrgentLevel::L1, false, SchedState::Ready),
         create_test_material_state("M002", UrgentLevel::L1, false, SchedState::Ready),
     ];
-    let material_weights = HashMap::from([
-        ("M001".to_string(), 50.0),
-        ("M002".to_string(), 50.0),
-    ]);
+    let material_weights = HashMap::from([("M001".to_string(), 50.0), ("M002".to_string(), 50.0)]);
 
     let impact = engine.generate_impact(
         &before_items,
@@ -267,9 +264,7 @@ fn test_impact_summary_material_added() {
     let date1 = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
 
     // M003在before中不存在,在after中新增
-    let before_items = vec![
-        create_test_plan_item("M001", date1, "H032", 1, 50.0),
-    ];
+    let before_items = vec![create_test_plan_item("M001", date1, "H032", 1, 50.0)];
 
     let after_items = vec![
         create_test_plan_item("M001", date1, "H032", 1, 50.0),
@@ -284,10 +279,7 @@ fn test_impact_summary_material_added() {
         create_test_material_state("M001", UrgentLevel::L1, false, SchedState::Ready),
         create_test_material_state("M003", UrgentLevel::L1, false, SchedState::Ready),
     ];
-    let material_weights = HashMap::from([
-        ("M001".to_string(), 50.0),
-        ("M003".to_string(), 30.0),
-    ]);
+    let material_weights = HashMap::from([("M001".to_string(), 50.0), ("M003".to_string(), 30.0)]);
 
     let impact = engine.generate_impact(
         &before_items,
@@ -328,7 +320,9 @@ fn test_impact_summary_capacity_delta() {
     // 产能从80吨增加到100吨
     let before_pools = vec![create_test_capacity_pool("H032", date1, 100.0, 120.0, 80.0)];
 
-    let after_pools = vec![create_test_capacity_pool("H032", date1, 100.0, 120.0, 100.0)];
+    let after_pools = vec![create_test_capacity_pool(
+        "H032", date1, 100.0, 120.0, 100.0,
+    )];
 
     let before_items = vec![];
     let after_items = vec![];
@@ -376,9 +370,13 @@ fn test_impact_summary_overflow_delta() {
 
     // before: used=100, limit=100, overflow=0
     // after: used=120, limit=100, overflow=20
-    let before_pools = vec![create_test_capacity_pool("H032", date1, 100.0, 100.0, 100.0)];
+    let before_pools = vec![create_test_capacity_pool(
+        "H032", date1, 100.0, 100.0, 100.0,
+    )];
 
-    let after_pools = vec![create_test_capacity_pool("H032", date1, 100.0, 100.0, 120.0)];
+    let after_pools = vec![create_test_capacity_pool(
+        "H032", date1, 100.0, 100.0, 120.0,
+    )];
 
     let before_items = vec![];
     let after_items = vec![];
@@ -593,10 +591,7 @@ fn test_impact_summary_locked_conflicts() {
         create_test_material_state("M001", UrgentLevel::L2, true, SchedState::Ready), // locked
         create_test_material_state("M002", UrgentLevel::L1, false, SchedState::Ready),
     ];
-    let material_weights = HashMap::from([
-        ("M001".to_string(), 50.0),
-        ("M002".to_string(), 50.0),
-    ]);
+    let material_weights = HashMap::from([("M001".to_string(), 50.0), ("M002".to_string(), 50.0)]);
 
     let impact = engine.generate_impact(
         &before_items,
@@ -643,10 +638,7 @@ fn test_impact_summary_frozen_conflicts() {
         create_test_material_state("M001", UrgentLevel::L2, false, SchedState::Locked), // frozen
         create_test_material_state("M002", UrgentLevel::L1, false, SchedState::Ready),
     ];
-    let material_weights = HashMap::from([
-        ("M001".to_string(), 50.0),
-        ("M002".to_string(), 50.0),
-    ]);
+    let material_weights = HashMap::from([("M001".to_string(), 50.0), ("M002".to_string(), 50.0)]);
 
     let impact = engine.generate_impact(
         &before_items,
@@ -689,12 +681,14 @@ fn test_impact_summary_comprehensive() {
     let after_items = vec![
         create_test_plan_item("M001", date2, "H032", 1, 50.0), // 移动到21日
         create_test_plan_item("M003", date1, "H032", 2, 50.0), // 新增
-        // M002被挤出
+                                                               // M002被挤出
     ];
 
     let before_pools = vec![create_test_capacity_pool("H032", date1, 100.0, 100.0, 80.0)];
 
-    let after_pools = vec![create_test_capacity_pool("H032", date1, 100.0, 100.0, 105.0)];
+    let after_pools = vec![create_test_capacity_pool(
+        "H032", date1, 100.0, 100.0, 105.0,
+    )];
 
     let before_risks = vec![create_test_risk_snapshot("H032", date1, RiskLevel::Green)];
 
@@ -781,8 +775,12 @@ fn test_impact_summary_no_changes() {
         create_test_plan_item("M002", date1, "H032", 2, 50.0),
     ];
 
-    let before_pools = vec![create_test_capacity_pool("H032", date1, 100.0, 120.0, 100.0)];
-    let after_pools = vec![create_test_capacity_pool("H032", date1, 100.0, 120.0, 100.0)];
+    let before_pools = vec![create_test_capacity_pool(
+        "H032", date1, 100.0, 120.0, 100.0,
+    )];
+    let after_pools = vec![create_test_capacity_pool(
+        "H032", date1, 100.0, 120.0, 100.0,
+    )];
 
     let before_risks = vec![create_test_risk_snapshot("H032", date1, RiskLevel::Green)];
     let after_risks = vec![create_test_risk_snapshot("H032", date1, RiskLevel::Green)];
@@ -791,10 +789,7 @@ fn test_impact_summary_no_changes() {
         create_test_material_state("M001", UrgentLevel::L1, false, SchedState::Ready),
         create_test_material_state("M002", UrgentLevel::L1, false, SchedState::Ready),
     ];
-    let material_weights = HashMap::from([
-        ("M001".to_string(), 50.0),
-        ("M002".to_string(), 50.0),
-    ]);
+    let material_weights = HashMap::from([("M001".to_string(), 50.0), ("M002".to_string(), 50.0)]);
 
     let impact = engine.generate_impact(
         &before_items,

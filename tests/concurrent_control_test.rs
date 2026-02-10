@@ -22,8 +22,8 @@ mod concurrent_control_test {
         material_repo::{MaterialMasterRepository, MaterialStateRepository},
         path_override_pending_repo::PathOverridePendingRepository,
         plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository},
-        roller_repo::RollerCampaignRepository,
         risk_repo::RiskSnapshotRepository,
+        roller_repo::RollerCampaignRepository,
         strategy_draft_repo::StrategyDraftRepository,
     };
     use rusqlite::Connection;
@@ -48,7 +48,9 @@ mod concurrent_control_test {
     ) {
         let (temp_file, db_path) = create_test_db().unwrap();
 
-        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).unwrap()));
+        let conn = Arc::new(Mutex::new(
+            test_helpers::open_test_connection(&db_path).unwrap(),
+        ));
         let material_master_repo = Arc::new(MaterialMasterRepository::new(&db_path).unwrap());
         let material_state_repo = Arc::new(MaterialStateRepository::new(&db_path).unwrap());
         let plan_repo = Arc::new(PlanRepository::new(conn.clone()));
@@ -57,7 +59,8 @@ mod concurrent_control_test {
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
         let strategy_draft_repo = Arc::new(StrategyDraftRepository::new(conn.clone()));
         let risk_snapshot_repo = Arc::new(RiskSnapshotRepository::new(&db_path).unwrap());
-        let capacity_pool_repo = Arc::new(CapacityPoolRepository::new(db_path.to_string()).unwrap());
+        let capacity_pool_repo =
+            Arc::new(CapacityPoolRepository::new(db_path.to_string()).unwrap());
         let roller_campaign_repo = Arc::new(RollerCampaignRepository::new(&db_path).unwrap());
         let path_override_pending_repo = Arc::new(PathOverridePendingRepository::new(conn.clone()));
 
@@ -149,8 +152,11 @@ mod concurrent_control_test {
         // 验证错误类型
         let err = result2.unwrap_err();
         let err_msg = err.to_string();
-        assert!(err_msg.contains("乐观锁冲突") || err_msg.contains("OptimisticLock"),
-                "错误应该是乐观锁冲突: {}", err_msg);
+        assert!(
+            err_msg.contains("乐观锁冲突") || err_msg.contains("OptimisticLock"),
+            "错误应该是乐观锁冲突: {}",
+            err_msg
+        );
 
         println!("✅ 乐观锁冲突测试通过");
     }
@@ -188,7 +194,8 @@ mod concurrent_control_test {
 
             let handle = thread::spawn(move || -> Result<(), String> {
                 // 读取版本
-                let version = plan_version_repo_clone.find_by_id(&version_id_clone)
+                let version = plan_version_repo_clone
+                    .find_by_id(&version_id_clone)
                     .map_err(|e| e.to_string())?
                     .ok_or_else(|| "版本不存在".to_string())?;
 
@@ -203,7 +210,8 @@ mod concurrent_control_test {
                     PlanVersionStatus::Archived
                 };
 
-                plan_version_repo_clone.update(&updated_version)
+                plan_version_repo_clone
+                    .update(&updated_version)
                     .map_err(|e| e.to_string())
             });
 
@@ -224,10 +232,16 @@ mod concurrent_control_test {
         // 4. 验证结果
         // 应该只有1个线程成功,其他线程因乐观锁冲突失败
         assert_eq!(success_count, 1, "应该只有1个线程成功更新");
-        assert_eq!(failure_count, thread_count - 1, "其他线程应该因乐观锁冲突失败");
+        assert_eq!(
+            failure_count,
+            thread_count - 1,
+            "其他线程应该因乐观锁冲突失败"
+        );
 
-        println!("✅ 多线程并发更新测试通过: {}个线程中1个成功,{}个失败",
-                 thread_count, failure_count);
+        println!(
+            "✅ 多线程并发更新测试通过: {}个线程中1个成功,{}个失败",
+            thread_count, failure_count
+        );
     }
 
     // ==========================================
@@ -276,16 +290,26 @@ mod concurrent_control_test {
         // 4. 验证结果
         // 并发创建可能因为数据库锁或其他原因部分失败,这是正常的
         // 只要有一定比例成功即可
-        assert!(success_count >= thread_count / 3,
-                "至少应该有1/3的创建操作成功,实际成功: {}/{}",
-                success_count, thread_count);
+        assert!(
+            success_count >= thread_count / 3,
+            "至少应该有1/3的创建操作成功,实际成功: {}/{}",
+            success_count,
+            thread_count
+        );
 
         // 5. 验证版本数量
         let versions = plan_api.list_versions(&plan_id).unwrap();
-        assert_eq!(versions.len(), success_count,
-                   "版本数量应该等于成功的创建数: {}", success_count);
+        assert_eq!(
+            versions.len(),
+            success_count,
+            "版本数量应该等于成功的创建数: {}",
+            success_count
+        );
 
-        println!("✅ 多线程并发创建测试通过: {}个线程中{}个成功", thread_count, success_count);
+        println!(
+            "✅ 多线程并发创建测试通过: {}个线程中{}个成功",
+            thread_count, success_count
+        );
     }
 
     // ==========================================

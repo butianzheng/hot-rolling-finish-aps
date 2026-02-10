@@ -1,7 +1,6 @@
 use super::*;
 
 impl DecisionRefreshService {
-
     /// 记录刷新开始
     pub(super) fn log_refresh_start(
         &self,
@@ -61,9 +60,14 @@ impl DecisionRefreshService {
                 status = 'SUCCESS'
             WHERE refresh_id = ?1
             "#,
-            rusqlite::params![refresh_id, tables_json, rows_affected as i64, completed_at, duration_ms],
+            rusqlite::params![
+                refresh_id,
+                tables_json,
+                rows_affected as i64,
+                completed_at,
+                duration_ms
+            ],
         )?;
         Ok(())
     }
-
 }

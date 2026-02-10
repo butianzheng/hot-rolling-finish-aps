@@ -5,18 +5,20 @@
 // 依据: Tauri_API_Contract_v0.3_Integrated.md
 // ==========================================
 
+use crate::api::error::ApiError;
+use crate::config::ConfigManager;
+use crate::domain::material::{
+    DqSummary, DqViolation, ImportConflict, MaterialMaster, RawMaterialRecord,
+};
+use crate::engine::MaterialStateDerivationService;
+use crate::importer::conflict_handler::ConflictHandler;
+use crate::importer::{
+    CsvParser, DataCleanerImpl, DerivationServiceImpl, DqValidatorImpl, FieldMapperImpl,
+    MaterialImporter, MaterialImporterImpl,
+};
+use crate::repository::{MaterialImportRepository, MaterialImportRepositoryImpl};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use crate::api::error::ApiError;
-use crate::importer::{
-    MaterialImporter, MaterialImporterImpl, CsvParser, FieldMapperImpl, DataCleanerImpl,
-    DerivationServiceImpl, DqValidatorImpl,
-};
-use crate::importer::conflict_handler::ConflictHandler;
-use crate::repository::{MaterialImportRepository, MaterialImportRepositoryImpl};
-use crate::config::ConfigManager;
-use crate::engine::MaterialStateDerivationService;
-use crate::domain::material::{DqSummary, DqViolation, ImportConflict, MaterialMaster, RawMaterialRecord};
 
 /// 导入API响应
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -110,14 +112,17 @@ impl ImportApi {
         _mapping_profile_id: Option<&str>,
     ) -> Result<ImportApiResponse, ApiError> {
         // 创建导入器
-        let importer = self.create_importer()
+        let importer = self
+            .create_importer()
             .map_err(|e| ApiError::ImportError(format!("创建导入器失败: {}", e)))?;
 
         // 执行导入（仅支持CSV）
         let result = if file_path.ends_with(".csv") {
             importer.import_from_csv(file_path).await
         } else {
-            return Err(ApiError::ImportError("当前仅支持 .csv 格式文件导入".to_string()));
+            return Err(ApiError::ImportError(
+                "当前仅支持 .csv 格式文件导入".to_string(),
+            ));
         };
 
         // 处理导入结果
@@ -134,9 +139,7 @@ impl ImportApi {
                     elapsed_ms: import_result.elapsed_time.as_millis() as i64,
                 })
             }
-            Err(e) => {
-                Err(ApiError::ImportError(format!("导入失败: {}", e)))
-            }
+            Err(e) => Err(ApiError::ImportError(format!("导入失败: {}", e))),
         }
     }
 
@@ -164,7 +167,7 @@ impl ImportApi {
             .map_err(|e| ApiError::DatabaseError(format!("创建仓储失败: {}", e)))?;
 
         // 参数验证
-        let limit = limit.max(1).min(100);  // 限制在 1-100 之间
+        let limit = limit.max(1).min(100); // 限制在 1-100 之间
         let offset = offset.max(0);
 
         // 验证状态参数
@@ -188,7 +191,7 @@ impl ImportApi {
                 Some("OPEN") => all.into_iter().filter(|c| !c.resolved).collect(),
                 Some("RESOLVED") => all.into_iter().filter(|c| c.resolved).collect(),
                 Some("IGNORED") => Vec::new(), // 当前实现未区分 IGNORED，保留语义占位
-                Some(_) => all, // 已验证合法性
+                Some(_) => all,                // 已验证合法性
                 None => all,
             };
 
@@ -255,7 +258,9 @@ impl ImportApi {
         }
 
         // 2. 获取冲突详情
-        let conflict = repo.get_conflict_by_id(conflict_id).await
+        let conflict = repo
+            .get_conflict_by_id(conflict_id)
+            .await
             .map_err(|e| ApiError::DatabaseError(format!("查询冲突失败: {}", e)))?
             .ok_or_else(|| ApiError::NotFound(format!("冲突不存在: {}", conflict_id)))?;
 
@@ -273,24 +278,20 @@ impl ImportApi {
                 // 用导入数据覆盖现有材料
                 // 1. 解析 raw_data JSON 为 RawMaterialRecord
                 let raw_record: RawMaterialRecord = serde_json::from_str(&conflict.raw_data)
-                    .map_err(|e| ApiError::ImportError(format!(
-                        "解析冲突原始数据失败: {}", e
-                    )))?;
+                    .map_err(|e| ApiError::ImportError(format!("解析冲突原始数据失败: {}", e)))?;
 
                 // 2. 验证材料号存在
-                let material_id = raw_record.material_id.clone()
-                    .ok_or_else(|| ApiError::InvalidInput(
-                        "原始数据中缺少材料号，无法执行覆盖".to_string()
-                    ))?;
+                let material_id = raw_record.material_id.clone().ok_or_else(|| {
+                    ApiError::InvalidInput("原始数据中缺少材料号，无法执行覆盖".to_string())
+                })?;
 
                 // 3. 转换为 MaterialMaster
                 let material_master = self.convert_raw_to_master(raw_record);
 
                 // 4. 使用 batch_insert 更新（INSERT OR REPLACE 策略）
-                repo.batch_insert_material_master(vec![material_master]).await
-                    .map_err(|e| ApiError::DatabaseError(format!(
-                        "覆盖材料数据失败: {}", e
-                    )))?;
+                repo.batch_insert_material_master(vec![material_master])
+                    .await
+                    .map_err(|e| ApiError::DatabaseError(format!("覆盖材料数据失败: {}", e)))?;
 
                 tracing::info!(
                     conflict_id = conflict_id,
@@ -314,7 +315,8 @@ impl ImportApi {
         }
 
         // 4. 标记冲突已解决
-        repo.resolve_conflict(conflict_id, action, note).await
+        repo.resolve_conflict(conflict_id, action, note)
+            .await
             .map_err(|e| ApiError::DatabaseError(format!("更新冲突状态失败: {}", e)))?;
 
         Ok(conflict)
@@ -362,7 +364,10 @@ impl ImportApi {
         let mut batch_id_sample: Option<String> = None;
 
         for conflict_id in conflict_ids {
-            match self.resolve_import_conflict(conflict_id, action, note).await {
+            match self
+                .resolve_import_conflict(conflict_id, action, note)
+                .await
+            {
                 Ok(conflict) => {
                     success_count += 1;
                     // 记录批次ID供后续使用
@@ -454,17 +459,17 @@ impl ImportApi {
         Ok(CancelImportBatchResponse {
             deleted_materials,
             deleted_conflicts,
-            message: format!(
-                "成功取消导入批次：删除 {} 条冲突记录",
-                deleted_conflicts
-            ),
+            message: format!("成功取消导入批次：删除 {} 条冲突记录", deleted_conflicts),
         })
     }
 
     /// 创建MaterialImporter实例
     fn create_importer(
         &self,
-    ) -> Result<MaterialImporterImpl<MaterialImportRepositoryImpl, ConfigManager>, Box<dyn std::error::Error>> {
+    ) -> Result<
+        MaterialImporterImpl<MaterialImportRepositoryImpl, ConfigManager>,
+        Box<dyn std::error::Error>,
+    > {
         let import_repo = MaterialImportRepositoryImpl::new(&self.db_path)?;
         let config = ConfigManager::new(&self.db_path)?;
 
@@ -506,15 +511,15 @@ impl ImportApi {
     /// 此方法复用导入流程的转换逻辑，用于 OVERWRITE 策略
     fn convert_raw_to_master(&self, record: RawMaterialRecord) -> MaterialMaster {
         // 派生 current_machine_code: COALESCE(rework_machine_code, next_machine_code)
-        let current_machine_code = record.rework_machine_code.clone()
+        let current_machine_code = record
+            .rework_machine_code
+            .clone()
             .or_else(|| record.next_machine_code.clone());
 
         // 派生 rolling_output_date (v0.7)
         let import_date = chrono::Local::now().date_naive();
         let rolling_output_date = match record.output_age_days_raw {
-            Some(days) if days >= 0 => {
-                Some(import_date - chrono::Duration::days(days as i64))
-            }
+            Some(days) if days >= 0 => Some(import_date - chrono::Duration::days(days as i64)),
             _ => None,
         };
 
@@ -535,7 +540,7 @@ impl ImportApi {
             due_date: record.due_date,
             stock_age_days: record.stock_age_days,
             output_age_days_raw: record.output_age_days_raw,
-            rolling_output_date,  // v0.7 新增字段
+            rolling_output_date, // v0.7 新增字段
             status_updated_at: record.status_updated_at,
             contract_no: record.contract_no,
             contract_nature: record.contract_nature,

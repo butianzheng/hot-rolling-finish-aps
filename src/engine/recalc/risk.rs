@@ -96,7 +96,9 @@ impl RecalcEngine {
                 // 筛选当日当机组的排产明细
                 let scheduled_items: Vec<PlanItem> = all_plan_items
                     .iter()
-                    .filter(|item| item.machine_code == *machine_code && item.plan_date == current_date)
+                    .filter(|item| {
+                        item.machine_code == *machine_code && item.plan_date == current_date
+                    })
                     .cloned()
                     .collect();
 
@@ -127,4 +129,3 @@ impl RecalcEngine {
         Ok(count)
     }
 }
-

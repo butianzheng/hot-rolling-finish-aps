@@ -18,28 +18,28 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RollerCampaign {
     // ===== 主键 (对齐schema) =====
-    pub version_id: String,        // 关联排产版本
-    pub machine_code: String,      // 机组代码
-    pub campaign_no: i32,          // 换辊批次号
+    pub version_id: String,   // 关联排产版本
+    pub machine_code: String, // 机组代码
+    pub campaign_no: i32,     // 换辊批次号
 
     // ===== 时间范围 =====
-    pub start_date: NaiveDate,     // 开始日期
+    pub start_date: NaiveDate,       // 开始日期
     pub end_date: Option<NaiveDate>, // 结束日期 (null表示进行中)
 
     // ===== 吨位统计 (对齐schema字段名) =====
-    pub cum_weight_t: f64,         // 累计吨位 (cumulative weight)
-    pub suggest_threshold_t: f64,  // 建议换辊阈值
-    pub hard_limit_t: f64,         // 强制换辊阈值
+    pub cum_weight_t: f64,        // 累计吨位 (cumulative weight)
+    pub suggest_threshold_t: f64, // 建议换辊阈值
+    pub hard_limit_t: f64,        // 强制换辊阈值
 
     // ===== 状态 =====
-    pub status: RollStatus,        // 换辊状态 (存储为字符串)
+    pub status: RollStatus, // 换辊状态 (存储为字符串)
 
     // ===== 路径锚点 [v0.4+] =====
     // 依据: Engine_Specs 14.2 RollCycleState
-    pub path_anchor_material_id: Option<String>,  // 路径锚点材料ID
-    pub path_anchor_width_mm: Option<f64>,        // 锚点宽度 (mm)
-    pub path_anchor_thickness_mm: Option<f64>,    // 锚点厚度 (mm)
-    pub anchor_source: Option<AnchorSource>,      // 锚点来源类型
+    pub path_anchor_material_id: Option<String>, // 路径锚点材料ID
+    pub path_anchor_width_mm: Option<f64>,       // 锚点宽度 (mm)
+    pub path_anchor_thickness_mm: Option<f64>,   // 锚点厚度 (mm)
+    pub anchor_source: Option<AnchorSource>,     // 锚点来源类型
 }
 
 // ==========================================
@@ -177,7 +177,10 @@ impl RollerCampaign {
     /// # 返回
     /// 格式: "{version_id}_{machine_code}_{campaign_no}"
     pub fn get_id(&self) -> String {
-        format!("{}_{}_C{}", self.version_id, self.machine_code, self.campaign_no)
+        format!(
+            "{}_{}_C{}",
+            self.version_id, self.machine_code, self.campaign_no
+        )
     }
 
     // ==========================================

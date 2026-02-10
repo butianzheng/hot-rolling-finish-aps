@@ -276,8 +276,7 @@ mod tests {
 
     #[test]
     fn simulate_to_as_of_does_not_hang_when_soft_reach_rounds_to_zero() {
-        let t0 = NaiveDateTime::parse_from_str("2026-02-01 00:00:00", "%Y-%m-%d %H:%M:%S")
-            .unwrap();
+        let t0 = NaiveDateTime::parse_from_str("2026-02-01 00:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
         let as_of = t0 + chrono::Duration::seconds(20);
 
         let items = vec![PlanItemLite {

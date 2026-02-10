@@ -8,13 +8,14 @@ mod test_helpers;
 #[cfg(test)]
 mod decision_refresh_status_test {
     use hot_rolling_aps::api::dashboard_api::DashboardApi;
+    use hot_rolling_aps::decision::api::decision_api::DecisionApi;
     use hot_rolling_aps::decision::api::dto::{
         CapacityOpportunityResponse, ColdStockProfileResponse, DecisionDaySummaryResponse,
         GetCapacityOpportunityRequest, GetColdStockProfileRequest, GetDecisionDaySummaryRequest,
-        GetMachineBottleneckProfileRequest, ListOrderFailureSetRequest, ListRollCampaignAlertsRequest,
-        MachineBottleneckProfileResponse, OrderFailureSetResponse, RollCampaignAlertsResponse,
+        GetMachineBottleneckProfileRequest, ListOrderFailureSetRequest,
+        ListRollCampaignAlertsRequest, MachineBottleneckProfileResponse, OrderFailureSetResponse,
+        RollCampaignAlertsResponse,
     };
-    use hot_rolling_aps::decision::api::decision_api::DecisionApi;
     use hot_rolling_aps::repository::action_log_repo::ActionLogRepository;
     use hot_rolling_aps::repository::decision_refresh_repo::DecisionRefreshRepository;
     use rusqlite::Connection;
@@ -73,7 +74,9 @@ mod decision_refresh_status_test {
     #[test]
     fn test_get_refresh_status_inflight_failed_and_completed() {
         let (_temp_file, db_path) = create_test_db().unwrap();
-        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).unwrap()));
+        let conn = Arc::new(Mutex::new(
+            test_helpers::open_test_connection(&db_path).unwrap(),
+        ));
 
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
         let decision_refresh_repo = Arc::new(DecisionRefreshRepository::new(conn.clone()));
@@ -114,7 +117,9 @@ mod decision_refresh_status_test {
             .unwrap();
         }
 
-        let status = dashboard_api.get_refresh_status(version_id_pending).unwrap();
+        let status = dashboard_api
+            .get_refresh_status(version_id_pending)
+            .unwrap();
         assert!(status.is_refreshing);
         assert_eq!(status.status, "REFRESHING");
         assert!(status.queue_counts.pending >= 1);
@@ -183,10 +188,15 @@ mod decision_refresh_status_test {
             .unwrap();
         }
 
-        let status = dashboard_api.get_refresh_status(version_id_completed).unwrap();
+        let status = dashboard_api
+            .get_refresh_status(version_id_completed)
+            .unwrap();
         assert!(!status.is_refreshing);
         assert_eq!(status.status, "IDLE");
-        assert_eq!(status.latest_task.as_ref().unwrap().task_id, completed_task_id);
+        assert_eq!(
+            status.latest_task.as_ref().unwrap().task_id,
+            completed_task_id
+        );
         assert_eq!(status.latest_log.as_ref().unwrap().refresh_id, refresh_id);
     }
 }

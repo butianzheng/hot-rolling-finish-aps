@@ -16,29 +16,31 @@ mod full_business_flow_e2e_test {
     use hot_rolling_aps::api::{DashboardApi, MaterialApi, PlanApi};
     use hot_rolling_aps::config::config_manager::ConfigManager;
     use hot_rolling_aps::decision::api::{DecisionApi, DecisionApiImpl};
-    use hot_rolling_aps::decision::repository::{DaySummaryRepository, BottleneckRepository};
+    use hot_rolling_aps::decision::repository::{BottleneckRepository, DaySummaryRepository};
     use hot_rolling_aps::decision::services::DecisionRefreshService;
-    use hot_rolling_aps::decision::use_cases::impls::{MostRiskyDayUseCaseImpl, MachineBottleneckUseCaseImpl};
+    use hot_rolling_aps::decision::use_cases::impls::{
+        MachineBottleneckUseCaseImpl, MostRiskyDayUseCaseImpl,
+    };
     use hot_rolling_aps::domain::capacity::CapacityPool;
     use hot_rolling_aps::engine::{
-        CapacityFiller, EligibilityEngine, MaterialStateDerivationService, PrioritySorter, RecalcEngine, RiskEngine,
-        UrgencyEngine,
+        CapacityFiller, EligibilityEngine, MaterialStateDerivationService, PrioritySorter,
+        RecalcEngine, RiskEngine, UrgencyEngine,
     };
     use hot_rolling_aps::importer::{
-        MaterialImporter, MaterialImporterImpl, CsvParser, FieldMapperImpl, DataCleanerImpl,
-        DerivationServiceImpl, DqValidatorImpl, ConflictHandlerImpl,
+        ConflictHandlerImpl, CsvParser, DataCleanerImpl, DerivationServiceImpl, DqValidatorImpl,
+        FieldMapperImpl, MaterialImporter, MaterialImporterImpl,
     };
     use hot_rolling_aps::repository::MaterialImportRepositoryImpl;
     use hot_rolling_aps::repository::{
         action_log_repo::ActionLogRepository,
         capacity_repo::CapacityPoolRepository,
+        decision_refresh_repo::DecisionRefreshRepository,
         material_repo::{MaterialMasterRepository, MaterialStateRepository},
         path_override_pending_repo::PathOverridePendingRepository,
         plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository},
-        roller_repo::RollerCampaignRepository,
         risk_repo::RiskSnapshotRepository,
+        roller_repo::RollerCampaignRepository,
         strategy_draft_repo::StrategyDraftRepository,
-        decision_refresh_repo::DecisionRefreshRepository,
     };
     use rusqlite::Connection;
     use std::sync::{Arc, Mutex};
@@ -66,24 +68,21 @@ mod full_business_flow_e2e_test {
     ) {
         // 创建临时数据库
         let (temp_file, db_path) = create_test_db().unwrap();
-        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).unwrap()));
+        let conn = Arc::new(Mutex::new(
+            test_helpers::open_test_connection(&db_path).unwrap(),
+        ));
 
         // === Repository 层 ===
-        let material_master_repo =
-            Arc::new(MaterialMasterRepository::new(&db_path).unwrap());
-        let material_state_repo =
-            Arc::new(MaterialStateRepository::new(&db_path).unwrap());
+        let material_master_repo = Arc::new(MaterialMasterRepository::new(&db_path).unwrap());
+        let material_state_repo = Arc::new(MaterialStateRepository::new(&db_path).unwrap());
         let plan_repo = Arc::new(PlanRepository::new(conn.clone()));
         let plan_version_repo = Arc::new(PlanVersionRepository::new(conn.clone()));
         let plan_item_repo = Arc::new(PlanItemRepository::new(conn.clone()));
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
         let strategy_draft_repo = Arc::new(StrategyDraftRepository::new(conn.clone()));
-        let risk_snapshot_repo =
-            Arc::new(RiskSnapshotRepository::new(&db_path).unwrap());
-        let capacity_pool_repo =
-            Arc::new(CapacityPoolRepository::new(db_path.clone()).unwrap());
-        let roller_campaign_repo =
-            Arc::new(RollerCampaignRepository::new(&db_path).unwrap());
+        let risk_snapshot_repo = Arc::new(RiskSnapshotRepository::new(&db_path).unwrap());
+        let capacity_pool_repo = Arc::new(CapacityPoolRepository::new(db_path.clone()).unwrap());
+        let roller_campaign_repo = Arc::new(RollerCampaignRepository::new(&db_path).unwrap());
         let path_override_pending_repo = Arc::new(PathOverridePendingRepository::new(conn.clone()));
 
         // === Engine 层 ===
@@ -176,10 +175,8 @@ mod full_business_flow_e2e_test {
         let d1_use_case = Arc::new(MostRiskyDayUseCaseImpl::new(day_summary_repo));
         let d4_use_case = Arc::new(MachineBottleneckUseCaseImpl::new(bottleneck_repo));
 
-        let decision_api: Arc<dyn DecisionApi> = Arc::new(DecisionApiImpl::new(
-            d1_use_case,
-            d4_use_case,
-        ));
+        let decision_api: Arc<dyn DecisionApi> =
+            Arc::new(DecisionApiImpl::new(d1_use_case, d4_use_case));
 
         let decision_refresh_repo = Arc::new(DecisionRefreshRepository::new(conn.clone()));
         let dashboard_api = Arc::new(DashboardApi::new(
@@ -189,8 +186,7 @@ mod full_business_flow_e2e_test {
         ));
 
         // === Decision Refresh Service ===
-        let refresh_service =
-            Arc::new(DecisionRefreshService::new(conn.clone()));
+        let refresh_service = Arc::new(DecisionRefreshService::new(conn.clone()));
 
         (
             temp_file,
@@ -265,14 +261,8 @@ mod full_business_flow_e2e_test {
             .import_from_csv("tests/fixtures/datasets/01_normal_data.csv")
             .await
             .expect("材料导入失败");
-        assert!(
-            import_result.summary.success > 0,
-            "应该有成功导入的材料"
-        );
-        assert_eq!(
-            import_result.summary.blocked, 0,
-            "不应该有阻塞记录"
-        );
+        assert!(import_result.summary.success > 0, "应该有成功导入的材料");
+        assert_eq!(import_result.summary.blocked, 0, "不应该有阻塞记录");
         println!(
             "✓ 步骤 2: 材料导入完成（成功: {}, 总计: {}）",
             import_result.summary.success, import_result.summary.total_rows
@@ -302,7 +292,7 @@ mod full_business_flow_e2e_test {
         let version_id = plan_api
             .create_version(
                 plan_id.clone(),
-                7,  // 窗口天数
+                7, // 窗口天数
                 None,
                 Some("测试版本".to_string()),
                 "test_operator".to_string(),
@@ -327,12 +317,7 @@ mod full_business_flow_e2e_test {
 
         // 6. 执行一键重算
         let recalc_result = plan_api
-            .recalc_full(
-                &version_id,
-                base_date,
-                None,
-                "test_operator",
-            )
+            .recalc_full(&version_id, base_date, None, "test_operator")
             .expect("一键重算失败");
         assert!(recalc_result.success, "重算应该成功");
         println!(
@@ -347,14 +332,8 @@ mod full_business_flow_e2e_test {
         let plan_items = plan_item_repo
             .find_by_version(&version_id)
             .expect("查询排产明细失败");
-        assert!(
-            !plan_items.is_empty(),
-            "应该有排产明细"
-        );
-        println!(
-            "✓ 步骤 7: 排产明细已生成（总数: {}）",
-            plan_items.len()
-        );
+        assert!(!plan_items.is_empty(), "应该有排产明细");
+        println!("✓ 步骤 7: 排产明细已生成（总数: {}）", plan_items.len());
 
         // 8. 刷新决策视图
         let refresh_scope = hot_rolling_aps::decision::services::RefreshScope {
@@ -388,10 +367,7 @@ mod full_business_flow_e2e_test {
         );
 
         // 10. 验证完整流程
-        assert!(
-            import_result.summary.success > 0,
-            "材料导入应该成功"
-        );
+        assert!(import_result.summary.success > 0, "材料导入应该成功");
         assert!(recalc_result.success, "重算应该成功");
         assert!(!plan_items.is_empty(), "应该生成排产明细");
 
@@ -435,24 +411,21 @@ mod full_business_flow_e2e_test {
 
         // 3. 创建方案并准备产能池
         let plan_id = plan_api
-            .create_plan(
-                "冻结区测试方案".to_string(),
-                "test_operator".to_string(),
-            )
+            .create_plan("冻结区测试方案".to_string(), "test_operator".to_string())
             .expect("创建方案失败");
         let version_id = plan_api
-            .create_version(
-                plan_id,
-                7,
-                None,
-                None,
-                "test_operator".to_string(),
-            )
+            .create_version(plan_id, 7, None, None, "test_operator".to_string())
             .expect("创建版本失败");
 
         let base_date = chrono::Local::now().date_naive();
-        prepare_capacity_pools(&capacity_repo, &version_id, vec!["H032", "H033"], base_date, 7)
-            .expect("准备产能池失败");
+        prepare_capacity_pools(
+            &capacity_repo,
+            &version_id,
+            vec!["H032", "H033"],
+            base_date,
+            7,
+        )
+        .expect("准备产能池失败");
         println!("✓ 步骤 3: 方案和产能池已准备");
 
         // 4. 第一次重算
@@ -521,11 +494,7 @@ mod full_business_flow_e2e_test {
                 .iter()
                 .filter(|item| item.locked_in_plan)
                 .collect();
-            assert_eq!(
-                locked_items.len(),
-                3,
-                "应该有3条冻结材料"
-            );
+            assert_eq!(locked_items.len(), 3, "应该有3条冻结材料");
             println!(
                 "✓ 步骤 8: 冻结区保护验证通过（{}条材料保持冻结）",
                 locked_items.len()

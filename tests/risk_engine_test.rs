@@ -18,11 +18,7 @@ use std::collections::HashMap;
 // ==========================================
 
 /// 创建测试用的产能池
-fn create_test_capacity_pool(
-    machine_code: &str,
-    target: f64,
-    limit: f64,
-) -> CapacityPool {
+fn create_test_capacity_pool(machine_code: &str, target: f64, limit: f64) -> CapacityPool {
     CapacityPool {
         version_id: "V001".to_string(),
         machine_code: machine_code.to_string(),
@@ -38,10 +34,7 @@ fn create_test_capacity_pool(
 }
 
 /// 创建测试用的PlanItem
-fn create_test_plan_item(
-    material_id: &str,
-    weight: f64,
-) -> PlanItem {
+fn create_test_plan_item(material_id: &str, weight: f64) -> PlanItem {
     PlanItem {
         version_id: "V001".to_string(),
         material_id: material_id.to_string(),
@@ -144,7 +137,10 @@ fn test_risk_engine_green_level() {
     println!("✓ 快照生成完成");
     println!("  - 风险等级: {:?}", snapshot.risk_level);
     println!("  - 已用产能: {} 吨", snapshot.used_capacity_t);
-    println!("  - 利用率: {:.1}%", snapshot.used_capacity_t / pool.target_capacity_t * 100.0);
+    println!(
+        "  - 利用率: {:.1}%",
+        snapshot.used_capacity_t / pool.target_capacity_t * 100.0
+    );
 
     // 验证
     assert_eq!(snapshot.risk_level, RiskLevel::Green, "风险等级应该是GREEN");
@@ -193,11 +189,18 @@ fn test_risk_engine_yellow_level_high_utilization() {
 
     println!("✓ 快照生成完成");
     println!("  - 风险等级: {:?}", snapshot.risk_level);
-    println!("  - 利用率: {:.1}%", snapshot.used_capacity_t / pool.target_capacity_t * 100.0);
+    println!(
+        "  - 利用率: {:.1}%",
+        snapshot.used_capacity_t / pool.target_capacity_t * 100.0
+    );
     println!("  - 风险原因: {}", snapshot.risk_reason);
 
     // 验证
-    assert_eq!(snapshot.risk_level, RiskLevel::Yellow, "风险等级应该是YELLOW");
+    assert_eq!(
+        snapshot.risk_level,
+        RiskLevel::Yellow,
+        "风险等级应该是YELLOW"
+    );
     assert_eq!(snapshot.used_capacity_t, 95.0, "已用产能应该是95吨");
     assert!(
         snapshot.risk_reason.contains("接近目标产能"),
@@ -252,7 +255,11 @@ fn test_risk_engine_yellow_level_l2_materials() {
     println!("  - 风险原因: {}", snapshot.risk_reason);
 
     // 验证
-    assert_eq!(snapshot.risk_level, RiskLevel::Yellow, "风险等级应该是YELLOW");
+    assert_eq!(
+        snapshot.risk_level,
+        RiskLevel::Yellow,
+        "风险等级应该是YELLOW"
+    );
     assert_eq!(snapshot.l2_count, 6, "L2材料数量应该是6");
     assert!(
         snapshot.risk_reason.contains("L2紧急材料较多"),
@@ -301,7 +308,11 @@ fn test_risk_engine_orange_level_overflow() {
     println!("  - 风险原因: {}", snapshot.risk_reason);
 
     // 验证
-    assert_eq!(snapshot.risk_level, RiskLevel::Orange, "风险等级应该是ORANGE");
+    assert_eq!(
+        snapshot.risk_level,
+        RiskLevel::Orange,
+        "风险等级应该是ORANGE"
+    );
     assert_eq!(snapshot.used_capacity_t, 125.0, "已用产能应该是125吨");
     assert_eq!(snapshot.overflow_t, 5.0, "超限吨位应该是5吨");
     assert!(
@@ -357,7 +368,11 @@ fn test_risk_engine_orange_level_many_l2_materials() {
     println!("  - 风险原因: {}", snapshot.risk_reason);
 
     // 验证
-    assert_eq!(snapshot.risk_level, RiskLevel::Orange, "风险等级应该是ORANGE");
+    assert_eq!(
+        snapshot.risk_level,
+        RiskLevel::Orange,
+        "风险等级应该是ORANGE"
+    );
     assert_eq!(snapshot.l2_count, 12, "L2材料数量应该是12");
     assert!(
         snapshot.risk_reason.contains("L2紧急材料过多"),
@@ -403,7 +418,10 @@ fn test_risk_engine_red_level_severe_overflow() {
     println!("✓ 快照生成完成");
     println!("  - 风险等级: {:?}", snapshot.risk_level);
     println!("  - 超限吨位: {} 吨", snapshot.overflow_t);
-    println!("  - 超限比例: {:.1}%", snapshot.overflow_t / pool.limit_capacity_t * 100.0);
+    println!(
+        "  - 超限比例: {:.1}%",
+        snapshot.overflow_t / pool.limit_capacity_t * 100.0
+    );
     println!("  - 风险原因: {}", snapshot.risk_reason);
 
     // 验证
@@ -533,9 +551,12 @@ fn test_risk_engine_snapshot_fields_completeness() {
     let pool = create_test_capacity_pool("H032", 100.0, 120.0);
 
     let scheduled_items = vec![create_test_plan_item("MAT001", 50.0)];
-    let all_materials = vec![
-        create_test_material_state("MAT001", UrgentLevel::L2, SchedState::Scheduled, "H032"),
-    ];
+    let all_materials = vec![create_test_material_state(
+        "MAT001",
+        UrgentLevel::L2,
+        SchedState::Scheduled,
+        "H032",
+    )];
 
     let mut material_weights = HashMap::new();
     material_weights.insert("MAT001".to_string(), 50.0);
@@ -559,7 +580,10 @@ fn test_risk_engine_snapshot_fields_completeness() {
     assert!(!snapshot.snapshot_id.is_empty(), "snapshot_id不应该为空");
     assert_eq!(snapshot.version_id, "V001");
     assert_eq!(snapshot.machine_code, "H032");
-    assert_eq!(snapshot.snapshot_date, NaiveDate::from_ymd_opt(2026, 1, 20).unwrap());
+    assert_eq!(
+        snapshot.snapshot_date,
+        NaiveDate::from_ymd_opt(2026, 1, 20).unwrap()
+    );
     assert_eq!(snapshot.target_capacity_t, 100.0);
     assert_eq!(snapshot.limit_capacity_t, 120.0);
     assert!(snapshot.used_capacity_t >= 0.0);

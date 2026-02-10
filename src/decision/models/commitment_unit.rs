@@ -72,11 +72,7 @@ pub struct CommitmentUnit {
 
 impl CommitmentUnit {
     /// 创建新的承诺单元
-    pub fn new(
-        contract_no: String,
-        version_id: String,
-        due_date: String,
-    ) -> Self {
+    pub fn new(contract_no: String, version_id: String, due_date: String) -> Self {
         Self {
             contract_no,
             version_id,
@@ -142,7 +138,8 @@ impl CommitmentUnit {
         // 超期风险
         if self.is_overdue {
             self.risk_level = "CRITICAL".to_string();
-            self.risk_reasons.push(format!("已超期 {} 天", -self.days_to_due));
+            self.risk_reasons
+                .push(format!("已超期 {} 天", -self.days_to_due));
             return;
         }
 
@@ -171,7 +168,8 @@ impl CommitmentUnit {
         // 正常情况
         if self.completion_rate < 0.3 {
             self.risk_level = "MEDIUM".to_string();
-            self.risk_reasons.push(format!("完成率较低 ({:.1}%)", self.completion_rate * 100.0));
+            self.risk_reasons
+                .push(format!("完成率较低 ({:.1}%)", self.completion_rate * 100.0));
         } else {
             self.risk_level = "LOW".to_string();
         }

@@ -36,7 +36,7 @@ fn create_test_material(
         due_date,
         stock_age_days: Some(stock_age_days),
         output_age_days_raw: None,
-        rolling_output_date: None,  // v0.7
+        rolling_output_date: None, // v0.7
         status_updated_at: None,
         contract_no: None,
         contract_nature: None,
@@ -84,10 +84,33 @@ fn test_scenario_01_force_release_priority() {
     // 场景1: FORCE_RELEASE 优先
     let sorter = PrioritySorter::new();
 
-    let material_a = create_test_material("A", Some("H032"), SchedState::Ready, UrgentLevel::L0, 10, 5, None);
-    let material_b =
-        create_test_material("B", Some("H032"), SchedState::ForceRelease, UrgentLevel::L0, 5, 5, None);
-    let material_c = create_test_material("C", Some("H032"), SchedState::Locked, UrgentLevel::L0, 8, 5, None);
+    let material_a = create_test_material(
+        "A",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        10,
+        5,
+        None,
+    );
+    let material_b = create_test_material(
+        "B",
+        Some("H032"),
+        SchedState::ForceRelease,
+        UrgentLevel::L0,
+        5,
+        5,
+        None,
+    );
+    let material_c = create_test_material(
+        "C",
+        Some("H032"),
+        SchedState::Locked,
+        UrgentLevel::L0,
+        8,
+        5,
+        None,
+    );
 
     let materials = vec![material_a, material_b.clone(), material_c.clone()];
     let sorted = sorter.sort(materials);
@@ -104,10 +127,33 @@ fn test_scenario_02_locked_priority() {
     // 场景2: LOCKED 优先（次于 FORCE_RELEASE）
     let sorter = PrioritySorter::new();
 
-    let material_a = create_test_material("A", Some("H032"), SchedState::Ready, UrgentLevel::L0, 15, 5, None);
-    let material_b = create_test_material("B", Some("H032"), SchedState::Locked, UrgentLevel::L0, 5, 5, None);
-    let material_c =
-        create_test_material("C", Some("H032"), SchedState::PendingMature, UrgentLevel::L0, 10, 5, None);
+    let material_a = create_test_material(
+        "A",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        15,
+        5,
+        None,
+    );
+    let material_b = create_test_material(
+        "B",
+        Some("H032"),
+        SchedState::Locked,
+        UrgentLevel::L0,
+        5,
+        5,
+        None,
+    );
+    let material_c = create_test_material(
+        "C",
+        Some("H032"),
+        SchedState::PendingMature,
+        UrgentLevel::L0,
+        10,
+        5,
+        None,
+    );
 
     let materials = vec![material_a.clone(), material_b.clone(), material_c];
     let sorted = sorter.sort(materials);
@@ -124,9 +170,33 @@ fn test_scenario_03_stock_age_days_descending() {
     // 场景3: stock_age_days 降序（冷料优先）
     let sorter = PrioritySorter::new();
 
-    let material_a = create_test_material("A", Some("H032"), SchedState::Ready, UrgentLevel::L0, 5, 5, None);
-    let material_b = create_test_material("B", Some("H032"), SchedState::Ready, UrgentLevel::L0, 15, 5, None);
-    let material_c = create_test_material("C", Some("H032"), SchedState::Ready, UrgentLevel::L0, 10, 5, None);
+    let material_a = create_test_material(
+        "A",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        5,
+        5,
+        None,
+    );
+    let material_b = create_test_material(
+        "B",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        15,
+        5,
+        None,
+    );
+    let material_c = create_test_material(
+        "C",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        10,
+        5,
+        None,
+    );
 
     let materials = vec![material_a, material_b.clone(), material_c.clone()];
     let sorted = sorter.sort(materials);
@@ -143,9 +213,33 @@ fn test_scenario_04_rolling_output_age_days_descending() {
     // 场景4: rolling_output_age_days 降序
     let sorter = PrioritySorter::new();
 
-    let material_a = create_test_material("A", Some("H032"), SchedState::Ready, UrgentLevel::L0, 10, 3, None);
-    let material_b = create_test_material("B", Some("H032"), SchedState::Ready, UrgentLevel::L0, 10, 8, None);
-    let material_c = create_test_material("C", Some("H032"), SchedState::Ready, UrgentLevel::L0, 10, 5, None);
+    let material_a = create_test_material(
+        "A",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        10,
+        3,
+        None,
+    );
+    let material_b = create_test_material(
+        "B",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        10,
+        8,
+        None,
+    );
+    let material_c = create_test_material(
+        "C",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        10,
+        5,
+        None,
+    );
 
     let materials = vec![material_a, material_b.clone(), material_c.clone()];
     let sorted = sorter.sort(materials);
@@ -210,9 +304,33 @@ fn test_scenario_06_missing_stock_age_days() {
     // 这个测试验证 stock_age_days = 0 的情况
     let sorter = PrioritySorter::new();
 
-    let material_a = create_test_material("A", Some("H032"), SchedState::Ready, UrgentLevel::L0, 0, 5, None);
-    let material_b = create_test_material("B", Some("H032"), SchedState::Ready, UrgentLevel::L0, 10, 5, None);
-    let material_c = create_test_material("C", Some("H032"), SchedState::Ready, UrgentLevel::L0, 5, 5, None);
+    let material_a = create_test_material(
+        "A",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        0,
+        5,
+        None,
+    );
+    let material_b = create_test_material(
+        "B",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        10,
+        5,
+        None,
+    );
+    let material_c = create_test_material(
+        "C",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        5,
+        5,
+        None,
+    );
 
     let materials = vec![material_a, material_b.clone(), material_c.clone()];
     let sorted = sorter.sort(materials);
@@ -229,7 +347,15 @@ fn test_scenario_07_missing_due_date() {
     // 场景7: 缺失 due_date
     let sorter = PrioritySorter::new();
 
-    let material_a = create_test_material("A", Some("H032"), SchedState::Ready, UrgentLevel::L0, 10, 5, None);
+    let material_a = create_test_material(
+        "A",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        10,
+        5,
+        None,
+    );
     let material_b = create_test_material(
         "B",
         Some("H032"),
@@ -275,7 +401,15 @@ fn test_scenario_09_single_material() {
     // 场景9: 单个材料
     let sorter = PrioritySorter::new();
 
-    let material_a = create_test_material("A", Some("H032"), SchedState::Ready, UrgentLevel::L0, 10, 5, None);
+    let material_a = create_test_material(
+        "A",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        10,
+        5,
+        None,
+    );
 
     let materials = vec![material_a.clone()];
     let sorted = sorter.sort(materials);
@@ -292,9 +426,33 @@ fn test_scenario_10_all_keys_equal() {
 
     let due_date = Some(NaiveDate::from_ymd_opt(2026, 1, 20).unwrap());
 
-    let material_a = create_test_material("A", Some("H032"), SchedState::Ready, UrgentLevel::L0, 10, 5, due_date);
-    let material_b = create_test_material("B", Some("H032"), SchedState::Ready, UrgentLevel::L0, 10, 5, due_date);
-    let material_c = create_test_material("C", Some("H032"), SchedState::Ready, UrgentLevel::L0, 10, 5, due_date);
+    let material_a = create_test_material(
+        "A",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        10,
+        5,
+        due_date,
+    );
+    let material_b = create_test_material(
+        "B",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        10,
+        5,
+        due_date,
+    );
+    let material_c = create_test_material(
+        "C",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        10,
+        5,
+        due_date,
+    );
 
     let materials = vec![material_a, material_b, material_c];
     let sorted = sorter.sort(materials);
@@ -315,15 +473,59 @@ fn test_scenario_11_force_release_and_locked_combination() {
     // 场景11: FORCE_RELEASE + LOCKED 组合
     let sorter = PrioritySorter::new();
 
-    let material_a = create_test_material("A", Some("H032"), SchedState::Locked, UrgentLevel::L0, 20, 5, None);
-    let material_b =
-        create_test_material("B", Some("H032"), SchedState::ForceRelease, UrgentLevel::L0, 5, 5, None);
-    let material_c = create_test_material("C", Some("H032"), SchedState::Ready, UrgentLevel::L0, 15, 5, None);
-    let material_d =
-        create_test_material("D", Some("H032"), SchedState::ForceRelease, UrgentLevel::L0, 10, 5, None);
-    let material_e = create_test_material("E", Some("H032"), SchedState::Locked, UrgentLevel::L0, 8, 5, None);
+    let material_a = create_test_material(
+        "A",
+        Some("H032"),
+        SchedState::Locked,
+        UrgentLevel::L0,
+        20,
+        5,
+        None,
+    );
+    let material_b = create_test_material(
+        "B",
+        Some("H032"),
+        SchedState::ForceRelease,
+        UrgentLevel::L0,
+        5,
+        5,
+        None,
+    );
+    let material_c = create_test_material(
+        "C",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        15,
+        5,
+        None,
+    );
+    let material_d = create_test_material(
+        "D",
+        Some("H032"),
+        SchedState::ForceRelease,
+        UrgentLevel::L0,
+        10,
+        5,
+        None,
+    );
+    let material_e = create_test_material(
+        "E",
+        Some("H032"),
+        SchedState::Locked,
+        UrgentLevel::L0,
+        8,
+        5,
+        None,
+    );
 
-    let materials = vec![material_a, material_b, material_c, material_d.clone(), material_e];
+    let materials = vec![
+        material_a,
+        material_b,
+        material_c,
+        material_d.clone(),
+        material_e,
+    ];
     let sorted = sorter.sort(materials);
 
     // 断言
@@ -334,13 +536,13 @@ fn test_scenario_11_force_release_and_locked_combination() {
     // FORCE_RELEASE 组内按 stock_age_days 降序
     assert_eq!(sorted[0].0.material_id, "D"); // stock_age_days = 10
     assert_eq!(sorted[1].0.material_id, "B"); // stock_age_days = 5
-    // 第3-4个都是 LOCKED
+                                              // 第3-4个都是 LOCKED
     assert_eq!(sorted[2].1.sched_state, SchedState::Locked);
     assert_eq!(sorted[3].1.sched_state, SchedState::Locked);
     // LOCKED 组内按 stock_age_days 降序
     assert_eq!(sorted[2].0.material_id, "A"); // stock_age_days = 20
     assert_eq!(sorted[3].0.material_id, "E"); // stock_age_days = 8
-    // 第5个是 READY
+                                              // 第5个是 READY
     assert_eq!(sorted[4].0.material_id, "C");
 }
 
@@ -531,10 +733,42 @@ fn test_scenario_16_sort_by_machine() {
     // 场景16: 按机组分组排序
     let sorter = PrioritySorter::new();
 
-    let material_a = create_test_material("A", Some("H032"), SchedState::Ready, UrgentLevel::L0, 10, 5, None);
-    let material_b = create_test_material("B", Some("H033"), SchedState::Ready, UrgentLevel::L0, 15, 5, None);
-    let material_c = create_test_material("C", Some("H032"), SchedState::Ready, UrgentLevel::L0, 20, 5, None);
-    let material_d = create_test_material("D", Some("H033"), SchedState::Ready, UrgentLevel::L0, 5, 5, None);
+    let material_a = create_test_material(
+        "A",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        10,
+        5,
+        None,
+    );
+    let material_b = create_test_material(
+        "B",
+        Some("H033"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        15,
+        5,
+        None,
+    );
+    let material_c = create_test_material(
+        "C",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        20,
+        5,
+        None,
+    );
+    let material_d = create_test_material(
+        "D",
+        Some("H033"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        5,
+        5,
+        None,
+    );
 
     let materials = vec![material_a, material_b, material_c, material_d];
     let grouped = sorter.sort_by_machine(materials);
@@ -562,12 +796,49 @@ fn test_scenario_17_sort_by_machine_and_urgent_level() {
     // 场景17: 按机组+紧急等级分组排序
     let sorter = PrioritySorter::new();
 
-    let material_a = create_test_material("A", Some("H032"), SchedState::Ready, UrgentLevel::L2, 10, 5, None);
-    let material_b = create_test_material("B", Some("H032"), SchedState::Ready, UrgentLevel::L1, 15, 5, None);
-    let material_c = create_test_material("C", Some("H032"), SchedState::Ready, UrgentLevel::L2, 20, 5, None);
-    let material_d = create_test_material("D", Some("H033"), SchedState::Ready, UrgentLevel::L2, 5, 5, None);
+    let material_a = create_test_material(
+        "A",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L2,
+        10,
+        5,
+        None,
+    );
+    let material_b = create_test_material(
+        "B",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L1,
+        15,
+        5,
+        None,
+    );
+    let material_c = create_test_material(
+        "C",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L2,
+        20,
+        5,
+        None,
+    );
+    let material_d = create_test_material(
+        "D",
+        Some("H033"),
+        SchedState::Ready,
+        UrgentLevel::L2,
+        5,
+        5,
+        None,
+    );
 
-    let materials = vec![material_a, material_b.clone(), material_c, material_d.clone()];
+    let materials = vec![
+        material_a,
+        material_b.clone(),
+        material_c,
+        material_d.clone(),
+    ];
     let grouped = sorter.sort_by_machine_and_urgent_level(materials);
 
     // 断言
@@ -598,9 +869,33 @@ fn test_scenario_18_cross_group_sorting_independence() {
     // 场景18: 跨组排序独立性验证
     let sorter = PrioritySorter::new();
 
-    let material_a = create_test_material("A", Some("H032"), SchedState::Ready, UrgentLevel::L2, 5, 5, None);
-    let material_b = create_test_material("B", Some("H033"), SchedState::Ready, UrgentLevel::L2, 20, 5, None);
-    let material_c = create_test_material("C", Some("H032"), SchedState::Ready, UrgentLevel::L1, 30, 5, None);
+    let material_a = create_test_material(
+        "A",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L2,
+        5,
+        5,
+        None,
+    );
+    let material_b = create_test_material(
+        "B",
+        Some("H033"),
+        SchedState::Ready,
+        UrgentLevel::L2,
+        20,
+        5,
+        None,
+    );
+    let material_c = create_test_material(
+        "C",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L1,
+        30,
+        5,
+        None,
+    );
 
     let materials = vec![material_a.clone(), material_b.clone(), material_c.clone()];
     let grouped = sorter.sort_by_machine_and_urgent_level(materials);
@@ -632,12 +927,26 @@ fn test_sort_with_parameters_capacity_weight_changes_order() {
     let sorter = PrioritySorter::new();
     let today = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
 
-    let (mut master_light, state_light) =
-        create_test_material("LIGHT", Some("H032"), SchedState::Ready, UrgentLevel::L0, 0, 0, None);
+    let (mut master_light, state_light) = create_test_material(
+        "LIGHT",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        0,
+        0,
+        None,
+    );
     master_light.weight_t = Some(1.0);
 
-    let (mut master_heavy, state_heavy) =
-        create_test_material("HEAVY", Some("H032"), SchedState::Ready, UrgentLevel::L0, 0, 0, None);
+    let (mut master_heavy, state_heavy) = create_test_material(
+        "HEAVY",
+        Some("H032"),
+        SchedState::Ready,
+        UrgentLevel::L0,
+        0,
+        0,
+        None,
+    );
     master_heavy.weight_t = Some(10.0);
 
     let params = CustomStrategyParameters {
@@ -655,4 +964,3 @@ fn test_sort_with_parameters_capacity_weight_changes_order() {
     assert_eq!(sorted[0].0.material_id, "HEAVY");
     assert_eq!(sorted[1].0.material_id, "LIGHT");
 }
-

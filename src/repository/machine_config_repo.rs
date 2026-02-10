@@ -14,16 +14,16 @@ use uuid::Uuid;
 /// 机组产能配置实体
 #[derive(Debug, Clone)]
 pub struct MachineConfigEntity {
-    pub config_id: String,                // 配置ID (UUID)
-    pub version_id: String,               // 版本ID
-    pub machine_code: String,             // 机组代码
-    pub default_daily_target_t: f64,      // 机组级默认目标产能(吨/天)
-    pub default_daily_limit_pct: f64,     // 机组级默认极限产能百分比 (如 1.05 表示 105%)
-    pub effective_date: Option<String>,   // 生效日期(可选, ISO DATE格式 YYYY-MM-DD)
-    pub created_at: String,               // 创建时间
-    pub updated_at: String,               // 更新时间
-    pub created_by: String,               // 创建人
-    pub reason: Option<String>,           // 配置原因/备注
+    pub config_id: String,              // 配置ID (UUID)
+    pub version_id: String,             // 版本ID
+    pub machine_code: String,           // 机组代码
+    pub default_daily_target_t: f64,    // 机组级默认目标产能(吨/天)
+    pub default_daily_limit_pct: f64,   // 机组级默认极限产能百分比 (如 1.05 表示 105%)
+    pub effective_date: Option<String>, // 生效日期(可选, ISO DATE格式 YYYY-MM-DD)
+    pub created_at: String,             // 创建时间
+    pub updated_at: String,             // 更新时间
+    pub created_by: String,             // 创建人
+    pub reason: Option<String>,         // 配置原因/备注
 }
 
 impl MachineConfigEntity {
@@ -37,9 +37,7 @@ impl MachineConfigEntity {
         reason: Option<String>,
         effective_date: Option<String>,
     ) -> Self {
-        let now = chrono::Local::now()
-            .format("%Y-%m-%d %H:%M:%S")
-            .to_string();
+        let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
         Self {
             config_id: Uuid::new_v4().to_string(),
@@ -205,7 +203,10 @@ impl MachineConfigRepository {
     }
 
     /// 列出某版本下所有配置（按机组代码排序）
-    pub fn list_by_version_id(&self, version_id: &str) -> RepositoryResult<Vec<MachineConfigEntity>> {
+    pub fn list_by_version_id(
+        &self,
+        version_id: &str,
+    ) -> RepositoryResult<Vec<MachineConfigEntity>> {
         let conn = self.get_conn()?;
         let mut stmt = conn.prepare(
             r#"
@@ -343,7 +344,8 @@ mod tests {
     use super::*;
 
     fn setup_test_repo() -> MachineConfigRepository {
-        let repo = MachineConfigRepository::new(":memory:").expect("Failed to create test repository");
+        let repo =
+            MachineConfigRepository::new(":memory:").expect("Failed to create test repository");
 
         // 创建必需的 plan_version 表（外键依赖）
         let conn = repo.conn.lock().expect("Failed to lock connection");
@@ -368,7 +370,8 @@ mod tests {
             INSERT INTO plan_version (version_id, plan_id, version_number, status, created_by)
             VALUES ('v3', 'plan1', 3, 'ACTIVE', 'test_user');
             "#,
-        ).expect("Failed to create plan_version table");
+        )
+        .expect("Failed to create plan_version table");
         drop(conn);
 
         repo

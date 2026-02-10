@@ -140,10 +140,7 @@ impl RiskEngine {
         scheduled_items: &[PlanItem],
     ) -> (f64, f64) {
         // 计算已用产能
-        let used_capacity_t: f64 = scheduled_items
-            .iter()
-            .map(|item| item.weight_t)
-            .sum();
+        let used_capacity_t: f64 = scheduled_items.iter().map(|item| item.weight_t).sum();
 
         // 计算超限吨位
         let overflow_t = if used_capacity_t > pool.limit_capacity_t {
@@ -287,7 +284,8 @@ impl RiskEngine {
         overflow_red_threshold_pct: f64,
     ) -> (RiskLevel, String) {
         let mut reasons: Vec<String> = Vec::new();
-        let threshold_pct = if overflow_red_threshold_pct > 0.0 && overflow_red_threshold_pct <= 1.0 {
+        let threshold_pct = if overflow_red_threshold_pct > 0.0 && overflow_red_threshold_pct <= 1.0
+        {
             overflow_red_threshold_pct
         } else if overflow_red_threshold_pct > 1.0 && overflow_red_threshold_pct <= 100.0 {
             // 兼容用户误填百分比（如 5 表示 5%）
@@ -629,11 +627,8 @@ mod tests {
         let materials = create_test_materials();
         let weights = create_test_material_weights();
 
-        let (urgent_total, l3_count, l2_count) = engine.calculate_urgent_metrics(
-            &materials,
-            "H032",
-            &weights,
-        );
+        let (urgent_total, l3_count, l2_count) =
+            engine.calculate_urgent_metrics(&materials, "H032", &weights);
 
         assert_eq!(l3_count, 1); // M002
         assert_eq!(l2_count, 1); // M001
@@ -646,11 +641,8 @@ mod tests {
         let materials = create_test_materials();
         let weights = create_test_material_weights();
 
-        let (mature_backlog, immature_backlog) = engine.calculate_backlog_metrics(
-            &materials,
-            "H032",
-            &weights,
-        );
+        let (mature_backlog, immature_backlog) =
+            engine.calculate_backlog_metrics(&materials, "H032", &weights);
 
         assert_eq!(mature_backlog, 450.0); // M002 (Ready)
         assert_eq!(immature_backlog, 200.0); // M003 (PendingMature)
@@ -662,16 +654,15 @@ mod tests {
         let pool = create_test_pool();
 
         let (risk_level, _reason) = engine.assess_risk_level(
-            &pool,
-            500.0,  // used_capacity_t
-            0.0,    // overflow_t
-            0.0,    // urgent_total_t
-            0,      // l3_count
-            0,      // l2_count
-            100.0,  // mature_backlog_t
-            50.0,   // immature_backlog_t
-            None,   // roll_status
-            0.1,    // overflow_red_threshold_pct
+            &pool, 500.0, // used_capacity_t
+            0.0,   // overflow_t
+            0.0,   // urgent_total_t
+            0,     // l3_count
+            0,     // l2_count
+            100.0, // mature_backlog_t
+            50.0,  // immature_backlog_t
+            None,  // roll_status
+            0.1,   // overflow_red_threshold_pct
         );
 
         assert_eq!(risk_level, RiskLevel::Green);
@@ -683,16 +674,15 @@ mod tests {
         let pool = create_test_pool();
 
         let (risk_level, _reason) = engine.assess_risk_level(
-            &pool,
-            950.0,  // used_capacity_t (95% utilization)
-            0.0,    // overflow_t
-            0.0,    // urgent_total_t
-            0,      // l3_count
-            0,      // l2_count
-            100.0,  // mature_backlog_t
-            50.0,   // immature_backlog_t
-            None,   // roll_status
-            0.1,    // overflow_red_threshold_pct
+            &pool, 950.0, // used_capacity_t (95% utilization)
+            0.0,   // overflow_t
+            0.0,   // urgent_total_t
+            0,     // l3_count
+            0,     // l2_count
+            100.0, // mature_backlog_t
+            50.0,  // immature_backlog_t
+            None,  // roll_status
+            0.1,   // overflow_red_threshold_pct
         );
 
         assert_eq!(risk_level, RiskLevel::Yellow);
@@ -704,8 +694,7 @@ mod tests {
         let pool = create_test_pool();
 
         let (risk_level, _reason) = engine.assess_risk_level(
-            &pool,
-            1250.0, // used_capacity_t
+            &pool, 1250.0, // used_capacity_t
             50.0,   // overflow_t (轻微超限)
             0.0,    // urgent_total_t
             0,      // l3_count
@@ -725,8 +714,7 @@ mod tests {
         let pool = create_test_pool();
 
         let (risk_level, _reason) = engine.assess_risk_level(
-            &pool,
-            1400.0, // used_capacity_t
+            &pool, 1400.0, // used_capacity_t
             200.0,  // overflow_t (>10% 严重超限)
             0.0,    // urgent_total_t
             0,      // l3_count
@@ -746,16 +734,15 @@ mod tests {
         let pool = create_test_pool();
 
         let (risk_level, _reason) = engine.assess_risk_level(
-            &pool,
-            500.0,  // used_capacity_t
-            0.0,    // overflow_t
-            0.0,    // urgent_total_t
-            5,      // l3_count (>=5)
-            0,      // l2_count
-            100.0,  // mature_backlog_t
-            50.0,   // immature_backlog_t
-            None,   // roll_status
-            0.1,    // overflow_red_threshold_pct
+            &pool, 500.0, // used_capacity_t
+            0.0,   // overflow_t
+            0.0,   // urgent_total_t
+            5,     // l3_count (>=5)
+            0,     // l2_count
+            100.0, // mature_backlog_t
+            50.0,  // immature_backlog_t
+            None,  // roll_status
+            0.1,   // overflow_red_threshold_pct
         );
 
         assert_eq!(risk_level, RiskLevel::Red);
@@ -768,15 +755,15 @@ mod tests {
 
         let (risk_level, _reason) = engine.assess_risk_level(
             &pool,
-            500.0,  // used_capacity_t
-            0.0,    // overflow_t
-            0.0,    // urgent_total_t
-            0,      // l3_count
-            0,      // l2_count
-            100.0,  // mature_backlog_t
-            50.0,   // immature_backlog_t
+            500.0,             // used_capacity_t
+            0.0,               // overflow_t
+            0.0,               // urgent_total_t
+            0,                 // l3_count
+            0,                 // l2_count
+            100.0,             // mature_backlog_t
+            50.0,              // immature_backlog_t
             Some("HARD_STOP"), // roll_status
-            0.1,    // overflow_red_threshold_pct
+            0.1,               // overflow_red_threshold_pct
         );
 
         assert_eq!(risk_level, RiskLevel::Red);

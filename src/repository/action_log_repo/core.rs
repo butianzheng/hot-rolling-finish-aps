@@ -56,7 +56,8 @@ impl ActionLogRepository {
                 log.payload_json.as_ref().map(|v| v.to_string()),
                 log.impact_summary_json.as_ref().map(|v| v.to_string()),
                 log.machine_code,
-                log.date_range_start.map(|d| d.format("%Y-%m-%d").to_string()),
+                log.date_range_start
+                    .map(|d| d.format("%Y-%m-%d").to_string()),
                 log.date_range_end.map(|d| d.format("%Y-%m-%d").to_string()),
                 log.detail,
             ],
@@ -105,7 +106,8 @@ impl ActionLogRepository {
                     log.payload_json.as_ref().map(|v| v.to_string()),
                     log.impact_summary_json.as_ref().map(|v| v.to_string()),
                     log.machine_code,
-                    log.date_range_start.map(|d| d.format("%Y-%m-%d").to_string()),
+                    log.date_range_start
+                        .map(|d| d.format("%Y-%m-%d").to_string()),
                     log.date_range_end.map(|d| d.format("%Y-%m-%d").to_string()),
                     log.detail,
                 ],
@@ -116,5 +118,4 @@ impl ActionLogRepository {
         tx.commit()?;
         Ok(count)
     }
-
 }

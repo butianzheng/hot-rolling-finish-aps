@@ -76,7 +76,11 @@ pub struct ScheduleEvent {
 
 impl ScheduleEvent {
     /// 创建全量事件
-    pub fn full_scope(version_id: String, event_type: ScheduleEventType, source: Option<String>) -> Self {
+    pub fn full_scope(
+        version_id: String,
+        event_type: ScheduleEventType,
+        source: Option<String>,
+    ) -> Self {
         Self {
             version_id,
             event_type,
@@ -234,11 +238,8 @@ mod tests {
     #[test]
     fn test_noop_publisher() {
         let publisher = NoOpEventPublisher;
-        let event = ScheduleEvent::full_scope(
-            "V001".to_string(),
-            ScheduleEventType::ManualTrigger,
-            None,
-        );
+        let event =
+            ScheduleEvent::full_scope("V001".to_string(), ScheduleEventType::ManualTrigger, None);
 
         let result = publisher.publish(event);
         assert!(result.is_ok());
@@ -250,11 +251,8 @@ mod tests {
         let publisher = OptionalEventPublisher::none();
         assert!(!publisher.is_configured());
 
-        let event = ScheduleEvent::full_scope(
-            "V001".to_string(),
-            ScheduleEventType::ManualTrigger,
-            None,
-        );
+        let event =
+            ScheduleEvent::full_scope("V001".to_string(), ScheduleEventType::ManualTrigger, None);
 
         let result = publisher.publish(event);
         assert!(result.is_ok());
@@ -266,11 +264,8 @@ mod tests {
         let publisher = OptionalEventPublisher::with_publisher(noop);
         assert!(publisher.is_configured());
 
-        let event = ScheduleEvent::full_scope(
-            "V001".to_string(),
-            ScheduleEventType::VersionCreated,
-            None,
-        );
+        let event =
+            ScheduleEvent::full_scope("V001".to_string(), ScheduleEventType::VersionCreated, None);
 
         let result = publisher.publish(event);
         assert!(result.is_ok());

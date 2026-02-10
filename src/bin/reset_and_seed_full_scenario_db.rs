@@ -30,9 +30,7 @@ struct ScheduledItem {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let db_path = std::env::args()
-        .nth(1)
-        .unwrap_or_else(get_default_db_path);
+    let db_path = std::env::args().nth(1).unwrap_or_else(get_default_db_path);
 
     let material_count = std::env::args()
         .nth(2)
@@ -272,7 +270,15 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
                 created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7)
             "#,
-            params![code, name, hourly, daily_target, limit_pct, now_sql_dt, now_sql_dt],
+            params![
+                code,
+                name,
+                hourly,
+                daily_target,
+                limit_pct,
+                now_sql_dt,
+                now_sql_dt
+            ],
         )?;
     }
 
@@ -284,7 +290,12 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
             created_by, created_at, updated_at
         ) VALUES (?1, ?2, 'BASELINE', NULL, 'seed', ?3, ?4)
         "#,
-        params![ACTIVE_PLAN_ID, "Full Scenario Seed Plan", now_sql_dt, now_sql_dt],
+        params![
+            ACTIVE_PLAN_ID,
+            "Full Scenario Seed Plan",
+            now_sql_dt,
+            now_sql_dt
+        ],
     )?;
 
     tx.execute(
@@ -408,11 +419,20 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
         };
 
         let (contract_no, due_date) = if (1..=10).contains(&i) {
-            ("C_OVERDUE".to_string(), (base_date - Duration::days(2)).to_string())
+            (
+                "C_OVERDUE".to_string(),
+                (base_date - Duration::days(2)).to_string(),
+            )
         } else if (11..=30).contains(&i) {
-            ("C_NEAR_DUE".to_string(), (base_date + Duration::days(2)).to_string())
+            (
+                "C_NEAR_DUE".to_string(),
+                (base_date + Duration::days(2)).to_string(),
+            )
         } else if (31..=60).contains(&i) {
-            ("C_CAP_SHORT".to_string(), (base_date + Duration::days(14)).to_string())
+            (
+                "C_CAP_SHORT".to_string(),
+                (base_date + Duration::days(14)).to_string(),
+            )
         } else {
             (
                 format!("C_NORMAL_{:02}", (i % 8) + 1),
@@ -525,23 +545,32 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
 
         // Manual urgent overrides for a handful of normal contracts
         let manual_urgent_flag = if matches!(i, 77 | 88 | 99) { 1 } else { 0 };
-        let urgent_level = if manual_urgent_flag == 1 { "L3" } else { urgent_level };
+        let urgent_level = if manual_urgent_flag == 1 {
+            "L3"
+        } else {
+            urgent_level
+        };
 
-        let in_frozen_zone = if matches!(i, 5 | 6 | 7 | 8 | 32 | 36) { 1 } else { 0 };
+        let in_frozen_zone = if matches!(i, 5 | 6 | 7 | 8 | 32 | 36) {
+            1
+        } else {
+            0
+        };
         let lock_flag = if in_frozen_zone == 1 { 1 } else { 0 };
         let force_release_flag = if matches!(i, 15 | 16) { 1 } else { 0 };
 
         let scheduled = schedule_map.get(&material_id).cloned();
-        let (sched_state, scheduled_date, scheduled_machine_code, seq_no) = if let Some(s) = &scheduled {
-            (
-                "SCHEDULED",
-                Some(s.plan_date.clone()),
-                Some(s.machine_code.clone()),
-                Some(s.seq_no),
-            )
-        } else {
-            (sched_state, None, None, None)
-        };
+        let (sched_state, scheduled_date, scheduled_machine_code, seq_no) =
+            if let Some(s) = &scheduled {
+                (
+                    "SCHEDULED",
+                    Some(s.plan_date.clone()),
+                    Some(s.machine_code.clone()),
+                    Some(s.seq_no),
+                )
+            } else {
+                (sched_state, None, None, None)
+            };
 
         tx.execute(
             r#"
@@ -579,7 +608,10 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
                 lock_flag,
                 force_release_flag,
                 urgent_level,
-                Some(format!("seeded urgent={} frozen={} force_release={}", urgent_level, in_frozen_zone, force_release_flag)),
+                Some(format!(
+                    "seeded urgent={} frozen={} force_release={}",
+                    urgent_level, in_frozen_zone, force_release_flag
+                )),
                 if i % 9 == 0 { "L2" } else { "L0" }, // rush_level (simplified)
                 (i % 20) as i32,
                 ready_in_days,
@@ -796,8 +828,9 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
                 };
 
                 // Backlog metrics are version-aware (based on whether the material is scheduled in this version).
-                let (urgent_total_t, mature_backlog_t, immature_backlog_t): (f64, f64, f64) = tx.query_row(
-                    r#"
+                let (urgent_total_t, mature_backlog_t, immature_backlog_t): (f64, f64, f64) = tx
+                    .query_row(
+                        r#"
                     SELECT
                         COALESCE(SUM(CASE
                             WHEN ms.urgent_level IN ('L2','L3')
@@ -823,9 +856,9 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
                     FROM material_state ms
                     WHERE ms.machine_code = ?2
                     "#,
-                    params![version_id, machine_code],
-                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-                )?;
+                        params![version_id, machine_code],
+                        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                    )?;
 
                 let campaign_status = if *machine_code == "H034" && day >= 4 && day <= 6 {
                     Some("NEAR_HARD_STOP".to_string())
@@ -923,7 +956,11 @@ fn seed_full_scenario(conn: &Connection, material_count: i32) -> Result<(), Box<
                 format!("MAT{:04}", idx + 1),
                 (idx + 2) as i32,
                 ct_json,
-                format!(r#"{{"row":{},"material_id":"MAT{:04}","reason":"seed conflict"}}"#, idx + 2, idx + 1),
+                format!(
+                    r#"{{"row":{},"material_id":"MAT{:04}","reason":"seed conflict"}}"#,
+                    idx + 2,
+                    idx + 1
+                ),
                 Option::<String>::None,
                 now_rfc3339,
             ],
@@ -977,7 +1014,10 @@ fn build_schedule_map(
             2 => "H033",
             _ => "H034",
         };
-        ids_by_machine.get_mut(machine_code).unwrap().push(material_id);
+        ids_by_machine
+            .get_mut(machine_code)
+            .unwrap()
+            .push(material_id);
     }
 
     let mut seq_per_machine_day: HashMap<(String, String), i32> = HashMap::new();
@@ -1011,11 +1051,12 @@ fn build_schedule_map(
             };
 
             // Inject a couple of STRUCT_CONFLICT samples for D2 blocking-factor demo.
-            let violation_flags = if matches!(material_id.as_str(), "MAT0031" | "MAT0032" | "MAT0033") {
-                Some(r#"["STRUCT_CONFLICT"]"#.to_string())
-            } else {
-                None
-            };
+            let violation_flags =
+                if matches!(material_id.as_str(), "MAT0031" | "MAT0032" | "MAT0033") {
+                    Some(r#"["STRUCT_CONFLICT"]"#.to_string())
+                } else {
+                    None
+                };
 
             out.insert(
                 material_id.clone(),
@@ -1073,7 +1114,10 @@ fn build_draft_schedule_map(
     out
 }
 
-fn apply_capacity_spikes(base_date: chrono::NaiveDate, schedule_map: &mut HashMap<String, ScheduledItem>) {
+fn apply_capacity_spikes(
+    base_date: chrono::NaiveDate,
+    schedule_map: &mut HashMap<String, ScheduledItem>,
+) {
     // Goal: create a few high-util / overflow days deterministically, while keeping
     // capacity_pool.used_capacity_t == SUM(plan_item.weight_t) (data-consistent).
     //
@@ -1090,7 +1134,13 @@ fn apply_capacity_spikes(base_date: chrono::NaiveDate, schedule_map: &mut HashMa
 
         let mut ids: Vec<String> = schedule_map
             .iter()
-            .filter_map(|(mid, s)| if s.machine_code == machine { Some(mid.clone()) } else { None })
+            .filter_map(|(mid, s)| {
+                if s.machine_code == machine {
+                    Some(mid.clone())
+                } else {
+                    None
+                }
+            })
             .collect();
         ids.sort();
 
@@ -1162,7 +1212,10 @@ fn is_schedule_candidate(idx: i32) -> bool {
 
 fn is_immature_seed(idx: i32) -> bool {
     // Hand-picked clusters + a periodic spread for larger data sets.
-    (91..=120).contains(&idx) || (7..=10).contains(&idx) || (55..=60).contains(&idx) || (idx > 60 && idx % 17 == 0)
+    (91..=120).contains(&idx)
+        || (7..=10).contains(&idx)
+        || (55..=60).contains(&idx)
+        || (idx > 60 && idx % 17 == 0)
 }
 
 fn material_weight_t(idx: i32) -> f64 {

@@ -22,12 +22,12 @@ pub use types::{RecalcConfig, RecalcResult, RescheduleResult, ResolvedStrategyPr
 
 use crate::config::ConfigManager;
 use crate::engine::events::OptionalEventPublisher;
-use crate::engine::{CapacityFiller, EligibilityEngine, PrioritySorter, UrgencyEngine};
 use crate::engine::RiskEngine;
+use crate::engine::{CapacityFiller, EligibilityEngine, PrioritySorter, UrgencyEngine};
 use crate::repository::{
-    ActionLogRepository, CapacityPoolRepository, MaterialMasterRepository,
-    MaterialStateRepository, PathOverridePendingRepository, PlanItemRepository,
-    PlanVersionRepository, RiskSnapshotRepository, RollerCampaignRepository,
+    ActionLogRepository, CapacityPoolRepository, MaterialMasterRepository, MaterialStateRepository,
+    PathOverridePendingRepository, PlanItemRepository, PlanVersionRepository,
+    RiskSnapshotRepository, RollerCampaignRepository,
 };
 use std::sync::Arc;
 
@@ -60,4 +60,3 @@ pub struct RecalcEngine {
     config: RecalcConfig,
     config_manager: Arc<ConfigManager>,
 }
-

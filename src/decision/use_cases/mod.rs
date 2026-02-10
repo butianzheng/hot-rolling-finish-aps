@@ -17,11 +17,17 @@ pub mod impls;
 
 // 重导出用例接口
 pub use d1_most_risky_day::{DaySummary, MostRiskyDayUseCase, ReasonItem};
-pub use d2_order_failure::{BlockingFactor, FailureStats, FailureType, OrderFailure, OrderFailureUseCase};
+pub use d2_order_failure::{
+    BlockingFactor, FailureStats, FailureType, OrderFailure, OrderFailureUseCase,
+};
 pub use d3_cold_stock::{ColdStockProfile, ColdStockSummary, ColdStockUseCase};
-pub use d4_machine_bottleneck::{BottleneckHeatmap, MachineBottleneckProfile, MachineBottleneckUseCase};
+pub use d4_machine_bottleneck::{
+    BottleneckHeatmap, MachineBottleneckProfile, MachineBottleneckUseCase,
+};
 pub use d5_roll_campaign_alert::{RollAlert, RollAlertSummary, RollCampaignAlertUseCase};
-pub use d6_capacity_opportunity::{CapacityOpportunity, CapacityOpportunityUseCase, OptimizationSummary};
+pub use d6_capacity_opportunity::{
+    CapacityOpportunity, CapacityOpportunityUseCase, OptimizationSummary,
+};
 
 // ==========================================
 // 通用类型定义

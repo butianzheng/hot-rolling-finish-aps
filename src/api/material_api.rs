@@ -6,20 +6,20 @@
 // 依据: 实施计划 Phase 2
 // ==========================================
 
-use std::sync::Arc;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use tracing::{debug, warn};
 
 use crate::api::error::{ApiError, ApiResult};
-use crate::api::validator::{ValidationMode, ManualOperationValidator};
-use crate::domain::material::{MaterialMaster, MaterialState};
+use crate::api::validator::{ManualOperationValidator, ValidationMode};
+use crate::config::config_manager::ConfigManager;
 use crate::domain::action_log::ActionLog;
+use crate::domain::material::{MaterialMaster, MaterialState};
 use crate::domain::types::{SchedState, UrgentLevel};
-use crate::repository::material_repo::{MaterialMasterRepository, MaterialStateRepository};
-use crate::repository::action_log_repo::ActionLogRepository;
 use crate::engine::eligibility::EligibilityEngine;
 use crate::engine::urgency::UrgencyEngine;
-use crate::config::config_manager::ConfigManager;
+use crate::repository::action_log_repo::ActionLogRepository;
+use crate::repository::material_repo::{MaterialMasterRepository, MaterialStateRepository};
 
 // ==========================================
 // MaterialWithState - 材料主数据 + 状态组合
@@ -375,7 +375,8 @@ impl MaterialApi {
         }
 
         // 使用validator进行校验（红线1）
-        self.validator.validate_lock_materials(&material_ids, mode)?;
+        self.validator
+            .validate_lock_materials(&material_ids, mode)?;
 
         // 执行状态更新
         let mut success_count = 0;
@@ -442,7 +443,11 @@ impl MaterialApi {
         Ok(ImpactSummary {
             success_count,
             fail_count,
-            message: format!("成功{}{}个材料", if lock_flag { "锁定" } else { "解锁" }, success_count),
+            message: format!(
+                "成功{}{}个材料",
+                if lock_flag { "锁定" } else { "解锁" },
+                success_count
+            ),
             details: None,
         })
     }
@@ -730,7 +735,9 @@ impl MaterialApi {
         // 如果指定了机组代码，进行过滤
         if let Some(code) = machine_code {
             materials.retain(|m| {
-                m.scheduled_machine_code.as_ref().map_or(false, |mc| mc == &code)
+                m.scheduled_machine_code
+                    .as_ref()
+                    .map_or(false, |mc| mc == &code)
             });
         }
 

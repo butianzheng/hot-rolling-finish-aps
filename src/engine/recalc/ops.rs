@@ -1,6 +1,6 @@
 use super::{RecalcEngine, RecalcResult, ResolvedStrategyProfile};
 use crate::domain::plan::{PlanItem, PlanVersion};
-use crate::domain::types::{PlanVersionStatus};
+use crate::domain::types::PlanVersionStatus;
 use crate::engine::events::ScheduleEventType;
 use crate::engine::strategy::ScheduleStrategy;
 use chrono::NaiveDate;
@@ -19,7 +19,14 @@ impl RecalcEngine {
         strategy_key: &str,
     ) -> Result<RecalcResult, Box<dyn Error>> {
         let profile = self.resolve_strategy_profile(strategy_key)?;
-        self.recalc_full_with_profile(plan_id, base_date, window_days, operator, is_dry_run, profile)
+        self.recalc_full_with_profile(
+            plan_id,
+            base_date,
+            window_days,
+            operator,
+            is_dry_run,
+            profile,
+        )
     }
 
     #[instrument(skip(self), fields(plan_id = %plan_id, window_days = %window_days, is_dry_run = %is_dry_run))]
@@ -38,7 +45,14 @@ impl RecalcEngine {
             title_cn: strategy.title_cn().to_string(),
             parameters: None,
         };
-        self.recalc_full_with_profile(plan_id, base_date, window_days, operator, is_dry_run, profile)
+        self.recalc_full_with_profile(
+            plan_id,
+            base_date,
+            window_days,
+            operator,
+            is_dry_run,
+            profile,
+        )
     }
 
     #[instrument(skip(self, profile), fields(plan_id = %plan_id, window_days = %window_days, is_dry_run = %is_dry_run, strategy = %profile.strategy_key))]
@@ -61,7 +75,7 @@ impl RecalcEngine {
             PlanVersion {
                 version_id: Uuid::new_v4().to_string(),
                 plan_id: plan_id.to_string(),
-                version_no: 0, // 试算版本号为0
+                version_no: 0,                    // 试算版本号为0
                 status: PlanVersionStatus::Draft, // 试算也用 Draft 状态
                 frozen_from_date: None,
                 recalc_window_days: Some(window_days),
@@ -102,7 +116,11 @@ impl RecalcEngine {
         // 4. 如果有基准版本，复制冻结区（仅生产模式）
         let frozen_count = if !is_dry_run {
             if let Some(base_ver) = &base_version {
-                self.copy_frozen_zone(&base_ver.version_id, &new_version.version_id, frozen_from_date)?
+                self.copy_frozen_zone(
+                    &base_ver.version_id,
+                    &new_version.version_id,
+                    frozen_from_date,
+                )?
             } else {
                 0
             }
@@ -187,7 +205,8 @@ impl RecalcEngine {
 
         // 11. 激活新版本（仅生产模式且auto_activate=true）
         if !is_dry_run && self.config.auto_activate {
-            self.version_repo.activate_version(&new_version.version_id)?;
+            self.version_repo
+                .activate_version(&new_version.version_id)?;
         }
 
         // 12. 触发决策视图刷新（仅生产模式）
@@ -269,9 +288,9 @@ impl RecalcEngine {
                 .filter(|i| i.plan_date >= start_date && i.plan_date <= end_date)
                 .collect();
 
-            let _deleted_count =
-                self.item_repo
-                    .delete_by_date_range(version_id, start_date, end_date)?;
+            let _deleted_count = self
+                .item_repo
+                .delete_by_date_range(version_id, start_date, end_date)?;
 
             // 4. 重新插入冻结区明细
             if !frozen_to_keep.is_empty() {
@@ -364,7 +383,8 @@ impl RecalcEngine {
         let end_date = trigger_date + chrono::Duration::days(cascade_days as i64);
 
         // 调用局部重排
-        self.recalc_partial(version_id, start_date, end_date, operator, is_dry_run, strategy)
+        self.recalc_partial(
+            version_id, start_date, end_date, operator, is_dry_run, strategy,
+        )
     }
 }
-

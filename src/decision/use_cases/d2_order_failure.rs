@@ -169,12 +169,7 @@ impl OrderFailure {
     }
 
     /// 设置材料信息
-    pub fn set_material_info(
-        &mut self,
-        total: i32,
-        unscheduled: i32,
-        unscheduled_weight: f64,
-    ) {
+    pub fn set_material_info(&mut self, total: i32, unscheduled: i32, unscheduled_weight: f64) {
         self.total_materials = total;
         self.unscheduled_count = unscheduled;
         self.unscheduled_weight_t = unscheduled_weight;
@@ -242,7 +237,10 @@ impl OrderFailure {
 
     /// 获取不可解除的阻塞数量
     pub fn unremovable_block_count(&self) -> usize {
-        self.blocking_factors.iter().filter(|f| !f.is_removable).count()
+        self.blocking_factors
+            .iter()
+            .filter(|f| !f.is_removable)
+            .count()
     }
 }
 
@@ -360,20 +358,8 @@ mod tests {
             "L2".to_string(),
         );
 
-        failure.add_blocking_factor(
-            "CAP".to_string(),
-            "产能不足".to_string(),
-            2,
-            100.0,
-            false,
-        );
-        failure.add_blocking_factor(
-            "STRUCT".to_string(),
-            "结构冲突".to_string(),
-            1,
-            50.0,
-            true,
-        );
+        failure.add_blocking_factor("CAP".to_string(), "产能不足".to_string(), 2, 100.0, false);
+        failure.add_blocking_factor("STRUCT".to_string(), "结构冲突".to_string(), 1, 50.0, true);
 
         assert_eq!(failure.blocking_factors.len(), 2);
         assert!(failure.has_removable_blocks());

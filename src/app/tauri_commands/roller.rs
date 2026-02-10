@@ -92,7 +92,6 @@ pub async fn get_active_roll_campaign(
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
 
-
 /// 查询需要换辊的机组列表
 #[tauri::command(rename_all = "snake_case")]
 pub async fn list_needs_roll_change(
@@ -141,7 +140,10 @@ pub async fn create_roll_campaign(
         let event = ScheduleEvent::incremental(
             version_id.clone(),
             ScheduleEventType::RollCampaignChanged,
-            Some(format!("create_roll_campaign: {}#{}", machine_code, campaign_no)),
+            Some(format!(
+                "create_roll_campaign: {}#{}",
+                machine_code, campaign_no
+            )),
             Some(vec![machine_code.clone()]),
             None,
         );
@@ -183,7 +185,10 @@ pub async fn close_roll_campaign(
         let event = ScheduleEvent::incremental(
             version_id.clone(),
             ScheduleEventType::RollCampaignChanged,
-            Some(format!("close_roll_campaign: {}#{}", machine_code, campaign_no)),
+            Some(format!(
+                "close_roll_campaign: {}#{}",
+                machine_code, campaign_no
+            )),
             Some(vec![machine_code.clone()]),
             None,
         );
@@ -194,4 +199,3 @@ pub async fn close_roll_campaign(
 
     Ok("{}".to_string())
 }
-

@@ -17,8 +17,8 @@ use rusqlite::{params, Connection};
 use serde_json::json;
 use std::collections::HashMap;
 use std::error::Error;
-use std::sync::{Arc, Mutex};
 use std::sync::RwLock;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Default)]
 struct ParsedConfigCache {
@@ -150,7 +150,9 @@ impl ConfigManager {
     /// - key: 配置键
     /// - default: 默认值
     fn get_config_or_default(&self, key: &str, default: &str) -> Result<String, Box<dyn Error>> {
-        Ok(self.get_config_value(key)?.unwrap_or_else(|| default.to_string()))
+        Ok(self
+            .get_config_value(key)?
+            .unwrap_or_else(|| default.to_string()))
     }
 
     /// 获取所有配置的快照（JSON格式）
@@ -166,16 +168,12 @@ impl ConfigManager {
         let conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
 
         // 查询所有global scope的配置
-        let mut stmt = conn.prepare(
-            "SELECT key, value FROM config_kv WHERE scope_id = 'global' ORDER BY key"
-        )?;
+        let mut stmt = conn
+            .prepare("SELECT key, value FROM config_kv WHERE scope_id = 'global' ORDER BY key")?;
 
         let mut config_map: HashMap<String, String> = HashMap::new();
         let rows = stmt.query_map([], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-            ))
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })?;
 
         for row in rows {
@@ -200,7 +198,10 @@ impl ConfigManager {
     /// # 注意
     /// - 此方法会覆盖现有的global配置
     /// - 仅用于版本回滚场景
-    pub fn restore_config_from_snapshot(&self, snapshot_json: &str) -> Result<usize, Box<dyn Error>> {
+    pub fn restore_config_from_snapshot(
+        &self,
+        snapshot_json: &str,
+    ) -> Result<usize, Box<dyn Error>> {
         // 解析JSON
         let config_map: HashMap<String, String> = serde_json::from_str(snapshot_json)?;
 
@@ -245,15 +246,14 @@ impl ConfigManager {
     /// 如果配置不存在或格式错误，返回空 HashMap（不启用结构校正）
     pub async fn get_target_ratio(&self) -> Result<HashMap<String, f64>, Box<dyn Error>> {
         let value = self.get_config_or_default(config_keys::TARGET_RATIO, "{}")?;
-        let ratio: HashMap<String, f64> = serde_json::from_str(&value)
-            .unwrap_or_else(|_| {
-                tracing::warn!(
-                    config_key = config_keys::TARGET_RATIO,
-                    raw_value = %value,
-                    "目标配比配置格式错误，使用空配置"
-                );
-                HashMap::new()
-            });
+        let ratio: HashMap<String, f64> = serde_json::from_str(&value).unwrap_or_else(|_| {
+            tracing::warn!(
+                config_key = config_keys::TARGET_RATIO,
+                raw_value = %value,
+                "目标配比配置格式错误，使用空配置"
+            );
+            HashMap::new()
+        });
         Ok(ratio)
     }
 
@@ -509,11 +509,18 @@ impl ImportConfigReader for ConfigManager {
 // ==========================================
 #[derive(Debug, Clone)]
 pub enum ConfigScope {
-    Global,                                  // 全局
-    Machine { machine_code: String },        // 机组
-    SteelGrade { steel_grade: String },      // 钢种
-    Date { date: NaiveDate },                // 日期
-    MachineSteelGrade {                      // 机组+钢种
+    Global, // 全局
+    Machine {
+        machine_code: String,
+    }, // 机组
+    SteelGrade {
+        steel_grade: String,
+    }, // 钢种
+    Date {
+        date: NaiveDate,
+    }, // 日期
+    MachineSteelGrade {
+        // 机组+钢种
         machine_code: String,
         steel_grade: String,
     },
@@ -552,7 +559,7 @@ pub mod config_keys {
     pub const CASCADE_WINDOW_DAYS: &str = "cascade_window_days";
 
     // 结构校正
-    pub const TARGET_RATIO: &str = "target_ratio";           // 目标钢种配比 (JSON)
+    pub const TARGET_RATIO: &str = "target_ratio"; // 目标钢种配比 (JSON)
     pub const DEVIATION_THRESHOLD: &str = "deviation_threshold"; // 偏差阈值
 
     // 每日生产节奏（品种大类等）

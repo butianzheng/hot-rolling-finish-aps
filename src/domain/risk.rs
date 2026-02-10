@@ -15,29 +15,29 @@ use serde::{Deserialize, Serialize};
 // 用途: 驾驶舱指标,只读数据源
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RiskSnapshot {
-    pub snapshot_id: String,       // 快照ID
-    pub version_id: String,        // 关联排产版本
-    pub machine_code: String,      // 机组代码
-    pub snapshot_date: NaiveDate,  // 快照日期
+    pub snapshot_id: String,      // 快照ID
+    pub version_id: String,       // 关联排产版本
+    pub machine_code: String,     // 机组代码
+    pub snapshot_date: NaiveDate, // 快照日期
 
     // ===== 产能指标 =====
-    pub used_capacity_t: f64,      // 已用产能
-    pub target_capacity_t: f64,    // 目标产能
-    pub limit_capacity_t: f64,     // 上限产能
-    pub overflow_t: f64,           // 超限吨位
+    pub used_capacity_t: f64,   // 已用产能
+    pub target_capacity_t: f64, // 目标产能
+    pub limit_capacity_t: f64,  // 上限产能
+    pub overflow_t: f64,        // 超限吨位
 
     // ===== 紧急材料统计 =====
-    pub urgent_total_t: f64,       // 紧急材料总吨位 (L2+L3)
-    pub l3_count: i32,             // L3 红线材料数量
-    pub l2_count: i32,             // L2 紧急材料数量
+    pub urgent_total_t: f64, // 紧急材料总吨位 (L2+L3)
+    pub l3_count: i32,       // L3 红线材料数量
+    pub l2_count: i32,       // L2 紧急材料数量
 
     // ===== 冷料压力 =====
-    pub mature_backlog_t: f64,     // 适温待排积压吨位
-    pub immature_backlog_t: f64,   // 未成熟材料吨位
+    pub mature_backlog_t: f64,   // 适温待排积压吨位
+    pub immature_backlog_t: f64, // 未成熟材料吨位
 
     // ===== 风险等级 =====
-    pub risk_level: RiskLevel,     // 风险等级
-    pub risk_reason: String,       // 风险原因 (可解释性)
+    pub risk_level: RiskLevel, // 风险等级
+    pub risk_reason: String,   // 风险原因 (可解释性)
 
     // ===== 换辊风险 =====
     pub roll_status: Option<String>, // 换辊状态

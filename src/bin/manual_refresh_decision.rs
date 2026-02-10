@@ -5,8 +5,8 @@
 //
 // This is intentionally lightweight and does not start the Tauri UI.
 
-use hot_rolling_aps::decision::services::{DecisionRefreshService, RefreshScope, RefreshTrigger};
 use hot_rolling_aps::db::open_sqlite_connection;
+use hot_rolling_aps::decision::services::{DecisionRefreshService, RefreshScope, RefreshTrigger};
 use rusqlite::OptionalExtension;
 use std::sync::{Arc, Mutex};
 
@@ -18,7 +18,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let conn = Arc::new(Mutex::new(open_sqlite_connection(&db_path)?));
 
-    let version_id = match args.next().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()) {
+    let version_id = match args
+        .next()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+    {
         Some(v) => v,
         None => {
             let active_version_id: Option<String> = {

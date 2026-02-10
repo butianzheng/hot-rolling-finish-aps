@@ -1,8 +1,8 @@
 use crate::db::open_sqlite_connection;
 use crate::domain::material::MaterialMaster;
 use crate::repository::error::{RepositoryError, RepositoryResult};
-use rusqlite::{params, params_from_iter, Connection, Result as SqliteResult};
 use rusqlite::types::Value;
+use rusqlite::{params, params_from_iter, Connection, Result as SqliteResult};
 use std::sync::{Arc, Mutex};
 
 // ==========================================
@@ -301,16 +301,17 @@ impl MaterialMasterRepository {
     /// # 返回
     /// - Ok(Vec<String>): 已存在的材料号列表
     /// - Err: 数据库错误
-    pub fn batch_check_exists(
-        &self,
-        material_ids: Vec<String>,
-    ) -> RepositoryResult<Vec<String>> {
+    pub fn batch_check_exists(&self, material_ids: Vec<String>) -> RepositoryResult<Vec<String>> {
         if material_ids.is_empty() {
             return Ok(vec![]);
         }
 
         let conn = self.get_conn()?;
-        let placeholders = material_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let placeholders = material_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
         let query = format!(
             "SELECT material_id FROM material_master WHERE material_id IN ({})",
             placeholders
@@ -337,10 +338,7 @@ impl MaterialMasterRepository {
     /// # 返回
     /// - Ok(Vec<MaterialMaster>): 材料列表
     /// - Err: 数据库错误
-    pub fn find_by_machine(
-        &self,
-        machine_code: &str,
-    ) -> RepositoryResult<Vec<MaterialMaster>> {
+    pub fn find_by_machine(&self, machine_code: &str) -> RepositoryResult<Vec<MaterialMaster>> {
         let conn = self.get_conn()?;
         let mut stmt = conn.prepare(
             r#"
@@ -414,11 +412,7 @@ impl MaterialMasterRepository {
     /// # 返回
     /// - Ok(Vec<MaterialMaster>): 材料列表
     /// - Err: 数据库错误
-    pub fn list_all(
-        &self,
-        limit: i32,
-        offset: i32,
-    ) -> RepositoryResult<Vec<MaterialMaster>> {
+    pub fn list_all(&self, limit: i32, offset: i32) -> RepositoryResult<Vec<MaterialMaster>> {
         let conn = self.get_conn()?;
 
         // 根据 limit 决定是否使用分页
@@ -452,7 +446,8 @@ impl MaterialMasterRepository {
                 created_at, updated_at
             FROM material_master
             ORDER BY material_id
-            "#.to_string()
+            "#
+            .to_string()
         };
 
         let mut stmt = conn.prepare(&sql)?;
@@ -520,10 +515,14 @@ impl MaterialMasterRepository {
         offset: i64,
     ) -> RepositoryResult<Vec<MaterialWithStateRow>> {
         if limit <= 0 {
-            return Err(RepositoryError::ValidationError("limit 必须为正数".to_string()));
+            return Err(RepositoryError::ValidationError(
+                "limit 必须为正数".to_string(),
+            ));
         }
         if offset < 0 {
-            return Err(RepositoryError::ValidationError("offset 不能为负数".to_string()));
+            return Err(RepositoryError::ValidationError(
+                "offset 不能为负数".to_string(),
+            ));
         }
 
         let conn = self.get_conn()?;
@@ -699,9 +698,7 @@ impl MaterialMasterRepository {
     }
 
     /// 汇总：机组 × 排产状态 的材料数量（用于物料池树）
-    pub fn summarize_by_machine_and_state(
-        &self,
-    ) -> RepositoryResult<Vec<(String, String, i64)>> {
+    pub fn summarize_by_machine_and_state(&self) -> RepositoryResult<Vec<(String, String, i64)>> {
         let conn = self.get_conn()?;
 
         let mut stmt = conn.prepare(

@@ -80,7 +80,13 @@ impl MachineDay {
         limit_capacity_t: f64,
     ) -> Result<Self, chrono::ParseError> {
         let plan_date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")?;
-        Ok(Self::new(machine_code, plan_date, version_id, target_capacity_t, limit_capacity_t))
+        Ok(Self::new(
+            machine_code,
+            plan_date,
+            version_id,
+            target_capacity_t,
+            limit_capacity_t,
+        ))
     }
 
     /// 获取日期字符串
@@ -166,13 +172,7 @@ mod tests {
     #[test]
     fn test_machine_day_creation() {
         let date = NaiveDate::from_ymd_opt(2026, 1, 22).unwrap();
-        let md = MachineDay::new(
-            "H032".to_string(),
-            date,
-            "V001".to_string(),
-            1000.0,
-            1200.0,
-        );
+        let md = MachineDay::new("H032".to_string(), date, "V001".to_string(), 1000.0, 1200.0);
 
         assert_eq!(md.machine_code, "H032");
         assert_eq!(md.target_capacity_t, 1000.0);
@@ -185,13 +185,7 @@ mod tests {
     #[test]
     fn test_update_used_capacity() {
         let date = NaiveDate::from_ymd_opt(2026, 1, 22).unwrap();
-        let mut md = MachineDay::new(
-            "H032".to_string(),
-            date,
-            "V001".to_string(),
-            1000.0,
-            1200.0,
-        );
+        let mut md = MachineDay::new("H032".to_string(), date, "V001".to_string(), 1000.0, 1200.0);
 
         md.update_used_capacity(800.0);
         assert_eq!(md.used_capacity_t, 800.0);
@@ -202,13 +196,7 @@ mod tests {
     #[test]
     fn test_capacity_checks() {
         let date = NaiveDate::from_ymd_opt(2026, 1, 22).unwrap();
-        let mut md = MachineDay::new(
-            "H032".to_string(),
-            date,
-            "V001".to_string(),
-            1000.0,
-            1200.0,
-        );
+        let mut md = MachineDay::new("H032".to_string(), date, "V001".to_string(), 1000.0, 1200.0);
 
         // 未超过目标
         md.update_used_capacity(800.0);
@@ -235,13 +223,7 @@ mod tests {
     #[test]
     fn test_capacity_slack_and_overload() {
         let date = NaiveDate::from_ymd_opt(2026, 1, 22).unwrap();
-        let mut md = MachineDay::new(
-            "H032".to_string(),
-            date,
-            "V001".to_string(),
-            1000.0,
-            1200.0,
-        );
+        let mut md = MachineDay::new("H032".to_string(), date, "V001".to_string(), 1000.0, 1200.0);
 
         // 有松弛度
         md.update_used_capacity(800.0);
@@ -262,7 +244,8 @@ mod tests {
             "V001".to_string(),
             1000.0,
             1200.0,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(md.key(), "H032_2026-01-22");
     }

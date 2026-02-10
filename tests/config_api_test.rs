@@ -21,9 +21,7 @@ fn test_list_configs_初始状态() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 查询所有配置
-    let result = env.config_api
-        .list_configs()
-        .expect("查询失败");
+    let result = env.config_api.list_configs().expect("查询失败");
 
     // 初始状态应该有一些默认配置
     assert!(result.len() >= 0, "应该返回配置列表");
@@ -39,7 +37,8 @@ fn test_get_config_存在() {
         .expect("插入失败");
 
     // 测试: 查询配置
-    let result = env.config_api
+    let result = env
+        .config_api
         .get_config("global", "test_key")
         .expect("查询失败");
 
@@ -54,7 +53,8 @@ fn test_get_config_不存在() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 查询不存在的配置
-    let result = env.config_api
+    let result = env
+        .config_api
         .get_config("global", "non_existent_key")
         .expect("查询失败");
 
@@ -70,13 +70,15 @@ fn test_update_config_成功() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 更新配置
-    let result = env.config_api
-        .update_config("global", "test_key", "test_value", "admin", "测试更新");
+    let result =
+        env.config_api
+            .update_config("global", "test_key", "test_value", "admin", "测试更新");
 
     assert!(result.is_ok(), "更新配置应该成功");
 
     // 验证: 查询配置
-    let config = env.config_api
+    let config = env
+        .config_api
         .get_config("global", "test_key")
         .expect("查询失败")
         .expect("应该找到配置");
@@ -99,7 +101,8 @@ fn test_update_config_覆盖() {
         .expect("更新失败");
 
     // 验证: 查询配置
-    let config = env.config_api
+    let config = env
+        .config_api
         .get_config("global", "test_key")
         .expect("查询失败")
         .expect("应该找到配置");
@@ -132,7 +135,8 @@ fn test_batch_update_configs_成功() {
     ];
 
     // 测试: 批量更新配置
-    let count = env.config_api
+    let count = env
+        .config_api
         .batch_update_configs(configs, "admin", "批量更新")
         .expect("批量更新失败");
 
@@ -153,9 +157,7 @@ fn test_get_config_snapshot() {
         .expect("插入失败");
 
     // 测试: 获取配置快照
-    let snapshot = env.config_api
-        .get_config_snapshot()
-        .expect("获取快照失败");
+    let snapshot = env.config_api.get_config_snapshot().expect("获取快照失败");
 
     assert!(!snapshot.is_empty(), "快照不应该为空");
     assert!(snapshot.contains("key1"), "快照应该包含key1");
@@ -169,14 +171,16 @@ fn test_restore_from_snapshot() {
     let snapshot_json = r#"{"test_key":"test_value"}"#;
 
     // 测试: 从快照恢复配置
-    let count = env.config_api
+    let count = env
+        .config_api
         .restore_from_snapshot(snapshot_json, "admin", "恢复配置")
         .expect("恢复失败");
 
     assert_eq!(count, 1, "应该恢复1个配置");
 
     // 验证: 查询配置
-    let config = env.config_api
+    let config = env
+        .config_api
         .get_config("global", "test_key")
         .expect("查询失败")
         .expect("应该找到配置");
@@ -193,7 +197,8 @@ fn test_update_config_空scope() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 空scope_id
-    let result = env.config_api
+    let result = env
+        .config_api
         .update_config("", "key", "value", "admin", "测试");
 
     assert!(result.is_err(), "空scope_id应该返回错误");
@@ -204,7 +209,8 @@ fn test_update_config_空key() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 空key
-    let result = env.config_api
+    let result = env
+        .config_api
         .update_config("global", "", "value", "admin", "测试");
 
     assert!(result.is_err(), "空key应该返回错误");
@@ -215,7 +221,8 @@ fn test_update_config_空原因() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 空原因
-    let result = env.config_api
+    let result = env
+        .config_api
         .update_config("global", "key", "value", "admin", "");
 
     assert!(result.is_err(), "空原因应该返回错误");
@@ -226,8 +233,7 @@ fn test_batch_update_configs_空列表() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 空配置列表
-    let result = env.config_api
-        .batch_update_configs(vec![], "admin", "测试");
+    let result = env.config_api.batch_update_configs(vec![], "admin", "测试");
 
     assert!(result.is_err(), "空配置列表应该返回错误");
 }
@@ -238,7 +244,9 @@ fn test_batch_update_configs_空列表() {
 
 #[test]
 fn test_save_custom_strategy_成功_并写入_action_log() {
-    use hot_rolling_aps::config::strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
+    use hot_rolling_aps::config::strategy_profile::{
+        CustomStrategyParameters, CustomStrategyProfile,
+    };
 
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
@@ -267,10 +275,7 @@ fn test_save_custom_strategy_成功_并写入_action_log() {
     assert!(!resp.existed);
 
     // 验证：可被查询到
-    let list = env
-        .config_api
-        .list_custom_strategies()
-        .expect("查询失败");
+    let list = env.config_api.list_custom_strategies().expect("查询失败");
     assert_eq!(list.len(), 1);
     assert_eq!(list[0].strategy_id, "my_strategy_1");
     assert_eq!(list[0].base_strategy, "balanced");
@@ -286,7 +291,9 @@ fn test_save_custom_strategy_成功_并写入_action_log() {
 
 #[test]
 fn test_save_custom_strategy_非法_id() {
-    use hot_rolling_aps::config::strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
+    use hot_rolling_aps::config::strategy_profile::{
+        CustomStrategyParameters, CustomStrategyProfile,
+    };
 
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
@@ -307,7 +314,9 @@ fn test_save_custom_strategy_非法_id() {
 
 #[test]
 fn test_save_custom_strategy_非法_base_strategy() {
-    use hot_rolling_aps::config::strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
+    use hot_rolling_aps::config::strategy_profile::{
+        CustomStrategyParameters, CustomStrategyProfile,
+    };
 
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
@@ -328,7 +337,9 @@ fn test_save_custom_strategy_非法_base_strategy() {
 
 #[test]
 fn test_save_custom_strategy_非法_weight() {
-    use hot_rolling_aps::config::strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
+    use hot_rolling_aps::config::strategy_profile::{
+        CustomStrategyParameters, CustomStrategyProfile,
+    };
 
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 

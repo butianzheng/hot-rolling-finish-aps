@@ -9,7 +9,7 @@
 // 禁止控制台窗口 (Windows)
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use hot_rolling_aps::app::{AppState, get_default_db_path};
+use hot_rolling_aps::app::{get_default_db_path, AppState};
 
 #[cfg(feature = "tauri-app")]
 fn main() {
@@ -29,8 +29,7 @@ fn main() {
 
     // 创建AppState
     tracing::info!("正在初始化AppState...");
-    let app_state = AppState::new(db_path)
-        .expect("无法初始化AppState");
+    let app_state = AppState::new(db_path).expect("无法初始化AppState");
 
     tracing::info!("AppState初始化成功");
     tracing::info!("启动Tauri应用...");
@@ -47,7 +46,6 @@ fn main() {
             resolve_import_conflict,
             batch_resolve_import_conflicts,
             cancel_import_batch,
-
             // ==========================================
             // 材料相关命令 (8个)
             // ==========================================
@@ -60,7 +58,6 @@ fn main() {
             batch_clear_force_release,
             batch_set_urgent,
             list_materials_by_urgent_level,
-
             // ==========================================
             // 排产方案相关命令 (19个)
             // ==========================================
@@ -89,7 +86,6 @@ fn main() {
             compare_versions,
             compare_versions_kpi,
             move_items,
-
             // ==========================================
             // 驾驶舱相关命令 (9个)
             // ==========================================
@@ -105,7 +101,6 @@ fn main() {
             list_action_logs_by_material,
             list_action_logs_by_version,
             get_recent_actions,
-
             // ==========================================
             // 配置管理相关命令 (8个)
             // ==========================================
@@ -117,7 +112,6 @@ fn main() {
             restore_config_from_snapshot,
             save_custom_strategy,
             list_custom_strategies,
-
             // ==========================================
             // 宽厚路径规则相关命令 (v0.6)
             // ==========================================
@@ -133,7 +127,6 @@ fn main() {
             batch_reject_path_override_by_range,
             get_roll_cycle_anchor,
             reset_roll_cycle,
-
             // ==========================================
             // 换辊管理相关命令 (7个)
             // ==========================================
@@ -144,7 +137,6 @@ fn main() {
             create_roll_campaign,
             close_roll_campaign,
             upsert_roll_campaign_plan,
-
             // ==========================================
             // 每日生产节奏管理相关命令 (7个)
             // ==========================================
@@ -155,17 +147,15 @@ fn main() {
             upsert_rhythm_target,
             apply_rhythm_preset,
             get_daily_rhythm_profile,
-
             // ==========================================
             // 决策支持相关命令 (6个)
             // ==========================================
-            get_decision_day_summary,           // D1: 哪天最危险
-            list_order_failure_set,             // D2: 哪些紧急单无法完成
-            get_cold_stock_profile,             // D3: 哪些冷料压库
-            get_machine_bottleneck_profile,     // D4: 哪个机组最堵
-            get_roll_campaign_alert,            // D5: 换辊是否异常
-            get_capacity_opportunity,           // D6: 是否存在产能优化空间
-
+            get_decision_day_summary,       // D1: 哪天最危险
+            list_order_failure_set,         // D2: 哪些紧急单无法完成
+            get_cold_stock_profile,         // D3: 哪些冷料压库
+            get_machine_bottleneck_profile, // D4: 哪个机组最堵
+            get_roll_campaign_alert,        // D5: 换辊是否异常
+            get_capacity_opportunity,       // D6: 是否存在产能优化空间
             // ==========================================
             // 产能池管理相关命令 (8个)
             // ==========================================
@@ -176,7 +166,6 @@ fn main() {
             create_or_update_machine_config,
             apply_machine_config_to_dates,
             get_machine_config_history,
-
             // ==========================================
             // 前端遥测/错误上报 (1个)
             // ==========================================

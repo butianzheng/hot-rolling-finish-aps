@@ -6,7 +6,9 @@
 // ==========================================
 
 use crate::decision::repository::order_failure_repo::OrderFailureRepository;
-use crate::decision::use_cases::d2_order_failure::{FailureStats, OrderFailure, OrderFailureUseCase};
+use crate::decision::use_cases::d2_order_failure::{
+    FailureStats, OrderFailure, OrderFailureUseCase,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -152,9 +154,15 @@ mod tests {
 
         // 注意：D2 读模型使用 UTC “今天”计算 days_to_due；测试数据需避免固定日期导致随时间漂移。
         let today = chrono::Utc::now().date_naive();
-        let overdue_due_date = (today - chrono::Duration::days(4)).format("%Y-%m-%d").to_string();
-        let near_due_date = (today + chrono::Duration::days(2)).format("%Y-%m-%d").to_string();
-        let future_due_date = (today + chrono::Duration::days(10)).format("%Y-%m-%d").to_string();
+        let overdue_due_date = (today - chrono::Duration::days(4))
+            .format("%Y-%m-%d")
+            .to_string();
+        let near_due_date = (today + chrono::Duration::days(2))
+            .format("%Y-%m-%d")
+            .to_string();
+        let future_due_date = (today + chrono::Duration::days(10))
+            .format("%Y-%m-%d")
+            .to_string();
 
         // 插入 3 个合同的紧急单材料
         // C001: L3, 5个材料, 2个已排产 (超期)

@@ -375,21 +375,26 @@ impl ActionLogRepository {
 
         // 解析时间戳
         let action_ts = NaiveDateTime::parse_from_str(&action_ts_str, "%Y-%m-%d %H:%M:%S")
-            .map_err(|e| rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, Box::new(e)))?;
+            .map_err(|e| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    3,
+                    rusqlite::types::Type::Text,
+                    Box::new(e),
+                )
+            })?;
 
         // 解析 JSON 字段
-        let payload_json = payload_json_str
-            .and_then(|s| serde_json::from_str(&s).ok());
+        let payload_json = payload_json_str.and_then(|s| serde_json::from_str(&s).ok());
 
-        let impact_summary_json = impact_summary_json_str
-            .and_then(|s| serde_json::from_str(&s).ok());
+        let impact_summary_json =
+            impact_summary_json_str.and_then(|s| serde_json::from_str(&s).ok());
 
         // 解析日期
-        let date_range_start = date_range_start_str
-            .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok());
+        let date_range_start =
+            date_range_start_str.and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok());
 
-        let date_range_end = date_range_end_str
-            .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok());
+        let date_range_end =
+            date_range_end_str.and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok());
 
         Ok(ActionLog {
             action_id,

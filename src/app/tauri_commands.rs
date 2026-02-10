@@ -7,18 +7,18 @@
 
 #![cfg(feature = "tauri-app")]
 
+mod capacity;
 mod common;
-mod telemetry;
-mod material;
-mod plan;
-mod dashboard;
 mod config;
-mod path_rule;
-mod roller;
-mod rhythm;
+mod dashboard;
 mod decision;
 mod import;
-mod capacity;
+mod material;
+mod path_rule;
+mod plan;
+mod rhythm;
+mod roller;
+mod telemetry;
 
 pub use capacity::*;
 pub use config::*;
@@ -31,4 +31,3 @@ pub use plan::*;
 pub use rhythm::*;
 pub use roller::*;
 pub use telemetry::*;
-

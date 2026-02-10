@@ -224,29 +224,27 @@ impl MaterialStateRepository {
             )?;
 
             for state in states {
-                stmt.execute(
-                    params![
-                        state.material_id,
-                        Self::sched_state_to_str(&state.sched_state),
-                        state.lock_flag as i32,
-                        state.force_release_flag as i32,
-                        Self::urgent_level_to_str(&state.urgent_level),
-                        state.urgent_reason,
-                        Self::rush_level_to_str(&state.rush_level),
-                        state.rolling_output_age_days,
-                        state.ready_in_days,
-                        state.earliest_sched_date.map(|d| d.to_string()),
-                        state.stock_age_days,
-                        state.scheduled_date.map(|d| d.to_string()),
-                        state.scheduled_machine_code,
-                        state.seq_no,
-                        state.manual_urgent_flag as i32,
-                        state.in_frozen_zone as i32,
-                        state.last_calc_version_id,
-                        state.updated_at.to_rfc3339(),
-                        state.updated_by,
-                    ],
-                )?;
+                stmt.execute(params![
+                    state.material_id,
+                    Self::sched_state_to_str(&state.sched_state),
+                    state.lock_flag as i32,
+                    state.force_release_flag as i32,
+                    Self::urgent_level_to_str(&state.urgent_level),
+                    state.urgent_reason,
+                    Self::rush_level_to_str(&state.rush_level),
+                    state.rolling_output_age_days,
+                    state.ready_in_days,
+                    state.earliest_sched_date.map(|d| d.to_string()),
+                    state.stock_age_days,
+                    state.scheduled_date.map(|d| d.to_string()),
+                    state.scheduled_machine_code,
+                    state.seq_no,
+                    state.manual_urgent_flag as i32,
+                    state.in_frozen_zone as i32,
+                    state.last_calc_version_id,
+                    state.updated_at.to_rfc3339(),
+                    state.updated_by,
+                ])?;
                 count += 1;
             }
         }
@@ -339,7 +337,9 @@ impl MaterialStateRepository {
     pub fn list_by_machine_code(&self, machine_code: &str) -> RepositoryResult<Vec<MaterialState>> {
         let code = machine_code.trim();
         if code.is_empty() {
-            return Err(RepositoryError::ValidationError("machine_code 不能为空".to_string()));
+            return Err(RepositoryError::ValidationError(
+                "machine_code 不能为空".to_string(),
+            ));
         }
 
         let conn = self.get_conn()?;
@@ -583,7 +583,11 @@ impl MaterialStateRepository {
         }
 
         let conn = self.get_conn()?;
-        let placeholders = urgent_levels.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let placeholders = urgent_levels
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
         let query = format!(
             r#"
             SELECT
@@ -686,15 +690,21 @@ impl MaterialStateRepository {
     ) -> RepositoryResult<()> {
         let id = material_id.trim();
         if id.is_empty() {
-            return Err(RepositoryError::ValidationError("material_id 不能为空".to_string()));
+            return Err(RepositoryError::ValidationError(
+                "material_id 不能为空".to_string(),
+            ));
         }
         let by = confirmed_by.trim();
         if by.is_empty() {
-            return Err(RepositoryError::ValidationError("confirmed_by 不能为空".to_string()));
+            return Err(RepositoryError::ValidationError(
+                "confirmed_by 不能为空".to_string(),
+            ));
         }
         let r = reason.trim();
         if r.is_empty() {
-            return Err(RepositoryError::ValidationError("reason 不能为空".to_string()));
+            return Err(RepositoryError::ValidationError(
+                "reason 不能为空".to_string(),
+            ));
         }
 
         let conn = self.get_conn()?;
@@ -751,7 +761,9 @@ impl MaterialStateRepository {
     ) -> RepositoryResult<Vec<UserConfirmedMaterialSummary>> {
         let code = machine_code.trim();
         if code.is_empty() {
-            return Err(RepositoryError::ValidationError("machine_code 不能为空".to_string()));
+            return Err(RepositoryError::ValidationError(
+                "machine_code 不能为空".to_string(),
+            ));
         }
 
         let conn = self.get_conn()?;
@@ -795,15 +807,21 @@ impl MaterialStateRepository {
     ) -> RepositoryResult<()> {
         let id = material_id.trim();
         if id.is_empty() {
-            return Err(RepositoryError::ValidationError("material_id 不能为空".to_string()));
+            return Err(RepositoryError::ValidationError(
+                "material_id 不能为空".to_string(),
+            ));
         }
         let by = rejected_by.trim();
         if by.is_empty() {
-            return Err(RepositoryError::ValidationError("rejected_by 不能为空".to_string()));
+            return Err(RepositoryError::ValidationError(
+                "rejected_by 不能为空".to_string(),
+            ));
         }
         let r = reason.trim();
         if r.is_empty() {
-            return Err(RepositoryError::ValidationError("reason 不能为空".to_string()));
+            return Err(RepositoryError::ValidationError(
+                "reason 不能为空".to_string(),
+            ));
         }
 
         let conn = self.get_conn()?;
@@ -855,11 +873,15 @@ impl MaterialStateRepository {
     ) -> RepositoryResult<()> {
         let id = material_id.trim();
         if id.is_empty() {
-            return Err(RepositoryError::ValidationError("material_id 不能为空".to_string()));
+            return Err(RepositoryError::ValidationError(
+                "material_id 不能为空".to_string(),
+            ));
         }
         let by = cleared_by.trim();
         if by.is_empty() {
-            return Err(RepositoryError::ValidationError("cleared_by 不能为空".to_string()));
+            return Err(RepositoryError::ValidationError(
+                "cleared_by 不能为空".to_string(),
+            ));
         }
 
         let conn = self.get_conn()?;
@@ -896,7 +918,9 @@ impl MaterialStateRepository {
     ) -> RepositoryResult<Vec<PathOverrideRejectionSummary>> {
         let code = machine_code.trim();
         if code.is_empty() {
-            return Err(RepositoryError::ValidationError("machine_code 不能为空".to_string()));
+            return Err(RepositoryError::ValidationError(
+                "machine_code 不能为空".to_string(),
+            ));
         }
 
         let conn = self.get_conn()?;

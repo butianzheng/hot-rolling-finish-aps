@@ -5,19 +5,18 @@
 // 用途: 协调五大核心引擎的执行顺序
 // ==========================================
 
+use crate::config::strategy_profile::CustomStrategyParameters;
 use crate::config::ImportConfigReader;
 use crate::domain::capacity::CapacityPool;
 use crate::domain::material::{MaterialMaster, MaterialState};
 use crate::domain::plan::PlanItem;
 use crate::domain::types::{SchedState, UrgentLevel};
+use crate::engine::capacity_filler::PathOverridePendingItem;
+use crate::engine::strategy::ScheduleStrategy;
 use crate::engine::{
-    Anchor, PathRuleEngine,
-    CapacityFiller, EligibilityEngine, PrioritySorter, StructureCorrector,
+    Anchor, CapacityFiller, EligibilityEngine, PathRuleEngine, PrioritySorter, StructureCorrector,
     StructureViolationReport, UrgencyEngine,
 };
-use crate::engine::capacity_filler::PathOverridePendingItem;
-use crate::config::strategy_profile::CustomStrategyParameters;
-use crate::engine::strategy::ScheduleStrategy;
 use chrono::NaiveDate;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -232,14 +231,9 @@ where
             );
 
             // 判定紧急等级
-            let (level, reason) = self.urgency.determine_urgent_level(
-                state,
-                material,
-                rush_level,
-                today,
-                n1_days,
-                n2_days,
-            );
+            let (level, reason) = self
+                .urgency
+                .determine_urgent_level(state, material, rush_level, today, n1_days, n2_days);
 
             // 更新状态
             state.urgent_level = level;
@@ -299,10 +293,7 @@ where
                 .sort_with_strategy(eligible_materials.clone(), self.strategy),
         };
 
-        info!(
-            sorted_count = sorted_materials.len(),
-            "等级内排序完成"
-        );
+        info!(sorted_count = sorted_materials.len(), "等级内排序完成");
 
         // ==========================================
         // 步骤4: Capacity Filler - 产能池填充

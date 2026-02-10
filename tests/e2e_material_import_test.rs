@@ -79,32 +79,14 @@ async fn test_e2e_csv_import_to_state_derivation() {
     assert!(result.is_ok(), "导入应该成功");
     let import_result = result.unwrap();
     println!("✓ 步骤 2: 导入完成（耗时: {:?}）", elapsed);
-    println!(
-        "  - 总行数: {}",
-        import_result.summary.total_rows
-    );
-    println!(
-        "  - 成功: {}",
-        import_result.summary.success
-    );
-    println!(
-        "  - 失败: {}",
-        import_result.summary.blocked
-    );
-    println!(
-        "  - 告警: {}",
-        import_result.summary.warning
-    );
+    println!("  - 总行数: {}", import_result.summary.total_rows);
+    println!("  - 成功: {}", import_result.summary.success);
+    println!("  - 失败: {}", import_result.summary.blocked);
+    println!("  - 告警: {}", import_result.summary.warning);
 
     // 验证导入结果
-    assert!(
-        import_result.summary.success > 0,
-        "应该有成功导入的记录"
-    );
-    assert_eq!(
-        import_result.summary.blocked, 0,
-        "不应该有阻塞记录"
-    );
+    assert!(import_result.summary.success > 0, "应该有成功导入的记录");
+    assert_eq!(import_result.summary.blocked, 0, "不应该有阻塞记录");
 
     // 步骤 3: 验证 MaterialMaster 数据正确性
     let master_repo =
@@ -116,10 +98,7 @@ async fn test_e2e_csv_import_to_state_derivation() {
         .find_by_id("MAT000001")
         .expect("Failed to query material");
 
-    assert!(
-        first_material.is_some(),
-        "应该能查询到 MAT000001"
-    );
+    assert!(first_material.is_some(), "应该能查询到 MAT000001");
     let material = first_material.unwrap();
     println!("  - 材料号: {}", material.material_id);
     println!("    机组: {:?}", material.current_machine_code);
@@ -131,24 +110,23 @@ async fn test_e2e_csv_import_to_state_derivation() {
 
     // 验证字段映射正确性（使用fixture实际数据进行验证）
     assert_eq!(material.material_id, "MAT000001");
-    assert!(material.current_machine_code.is_some(), "机组代码应该已映射");
+    assert!(
+        material.current_machine_code.is_some(),
+        "机组代码应该已映射"
+    );
     assert!(material.weight_t.is_some(), "重量应该已映射");
     assert!(material.width_mm.is_some(), "宽度应该已映射");
     assert!(material.thickness_mm.is_some(), "厚度应该已映射");
 
     // 步骤 4: 验证 MaterialState 状态派生正确性
-    let state_repo =
-        MaterialStateRepository::new(&db_path).expect("Failed to create state repo");
+    let state_repo = MaterialStateRepository::new(&db_path).expect("Failed to create state repo");
     println!("✓ 步骤 4: MaterialStateRepository 已创建");
 
     let material_state = state_repo
         .find_by_id("MAT000001")
         .expect("Failed to query state");
 
-    assert!(
-        material_state.is_some(),
-        "应该能查询到 MAT000001 的状态"
-    );
+    assert!(material_state.is_some(), "应该能查询到 MAT000001 的状态");
     let state = material_state.unwrap();
     println!("  - 材料号: {}", state.material_id);
     println!("    排产状态: {:?}", state.sched_state);
@@ -169,7 +147,10 @@ async fn test_e2e_csv_import_to_state_derivation() {
     // 验证催料等级派生（字段已设置即可，具体值由业务逻辑决定）
     use hot_rolling_aps::domain::types::RushLevel;
     assert!(
-        matches!(state.rush_level, RushLevel::L0 | RushLevel::L1 | RushLevel::L2),
+        matches!(
+            state.rush_level,
+            RushLevel::L0 | RushLevel::L1 | RushLevel::L2
+        ),
         "催料等级应该是L0/L1/L2之一"
     );
     println!("  - 催料等级: {:?}", state.rush_level);
@@ -181,33 +162,23 @@ async fn test_e2e_csv_import_to_state_derivation() {
     let materials_h032 = master_repo
         .find_by_machine("H032")
         .expect("Failed to query by machine");
-    println!(
-        "  - 机组 H032 材料数量: {}",
-        materials_h032.len()
-    );
+    println!("  - 机组 H032 材料数量: {}", materials_h032.len());
     assert!(materials_h032.len() > 0, "H032 应该有材料");
 
     // 验证导入结果与保存的数据一致
     assert_eq!(
-        import_result.summary.success,
-        100,
+        import_result.summary.success, 100,
         "应该成功导入100条记录（fixture数据有100行）"
     );
 
     // 步骤 6: 验证批次管理
     println!("✓ 步骤 6: 验证批次管理");
-    assert!(
-        !import_result.batch.batch_id.is_empty(),
-        "批次ID不应该为空"
-    );
+    assert!(!import_result.batch.batch_id.is_empty(), "批次ID不应该为空");
     println!("  - 批次ID: {}", import_result.batch.batch_id);
 
     // 步骤 7: 验证冲突队列为空 (正常数据无冲突)
     println!("✓ 步骤 7: 验证冲突队列");
-    assert_eq!(
-        import_result.summary.conflict, 0,
-        "正常数据不应该有冲突"
-    );
+    assert_eq!(import_result.summary.conflict, 0, "正常数据不应该有冲突");
 
     println!("\n=== 测试通过：CSV导入到状态派生完整流程验证成功 ===\n");
 }
@@ -238,8 +209,7 @@ async fn test_e2e_urgent_material_state_derivation() {
     println!("✓ 步骤 2: 数据已导入");
 
     // 步骤 3: 验证不同材料的催料等级已派生
-    let state_repo =
-        MaterialStateRepository::new(&db_path).expect("Failed to create state repo");
+    let state_repo = MaterialStateRepository::new(&db_path).expect("Failed to create state repo");
     println!("✓ 步骤 3: 验证材料催料等级已派生");
 
     use hot_rolling_aps::domain::types::RushLevel;
@@ -254,7 +224,10 @@ async fn test_e2e_urgent_material_state_derivation() {
 
         // 验证RushLevel字段已设置（L0-L2之间的任意值都是有效的）
         assert!(
-            matches!(state.rush_level, RushLevel::L0 | RushLevel::L1 | RushLevel::L2),
+            matches!(
+                state.rush_level,
+                RushLevel::L0 | RushLevel::L1 | RushLevel::L2
+            ),
             "{} 的催料等级应该是L0/L1/L2之一",
             mat_id
         );
@@ -289,8 +262,7 @@ async fn test_e2e_maturity_date_calculation() {
     println!("✓ 步骤 2: 数据已导入");
 
     // 步骤 3: 验证适温日期计算
-    let state_repo =
-        MaterialStateRepository::new(&db_path).expect("Failed to create state repo");
+    let state_repo = MaterialStateRepository::new(&db_path).expect("Failed to create state repo");
     let master_repo =
         MaterialMasterRepository::new(&db_path).expect("Failed to create master repo");
     println!("✓ 步骤 3: 验证适温日期计算");
@@ -311,7 +283,8 @@ async fn test_e2e_maturity_date_calculation() {
             .expect(&format!("Failed to query {}", mat_id))
             .expect(&format!("{} should exist", mat_id));
 
-        println!("  - {}: 出钢天数={:?}, 轧制出钢天数={:?}, 适温天数={}, 排产状态={:?}",
+        println!(
+            "  - {}: 出钢天数={:?}, 轧制出钢天数={:?}, 适温天数={}, 排产状态={:?}",
             mat_id,
             master.output_age_days_raw,
             state.rolling_output_age_days,
@@ -370,25 +343,18 @@ async fn test_e2e_bulk_import_performance() {
     );
 
     // 性能断言: 20行数据应该在1秒内完成
-    assert!(
-        elapsed.as_secs() < 1,
-        "20行数据导入应该在1秒内完成"
-    );
+    assert!(elapsed.as_secs() < 1, "20行数据导入应该在1秒内完成");
 
     // 步骤 3: 验证数据完整性
     let _master_repo =
         MaterialMasterRepository::new(&db_path).expect("Failed to create master repo");
-    let _state_repo =
-        MaterialStateRepository::new(&db_path).expect("Failed to create state repo");
+    let _state_repo = MaterialStateRepository::new(&db_path).expect("Failed to create state repo");
 
     println!("✓ 步骤 3: 验证数据完整性");
     println!("  - 成功导入记录数: {}", result.summary.success);
 
     // 验证导入成功数符合预期 (20行fixture数据)
-    assert_eq!(
-        result.summary.success, 100,
-        "应该成功导入100条记录"
-    );
+    assert_eq!(result.summary.success, 100, "应该成功导入100条记录");
 
     println!("\n=== 测试通过：批量导入性能验证成功 ===\n");
 }
@@ -417,9 +383,9 @@ async fn test_e2e_duplicate_import_conflict_detection() {
         .import_from_csv("tests/fixtures/datasets/01_normal_data.csv")
         .await
         .expect("First import should succeed");
-    println!("✓ 步骤 2: 第一次导入完成 (成功: {}, 冲突: {})",
-        result1.summary.success,
-        result1.summary.conflict
+    println!(
+        "✓ 步骤 2: 第一次导入完成 (成功: {}, 冲突: {})",
+        result1.summary.success, result1.summary.conflict
     );
 
     // 第一次导入应该无冲突
@@ -430,13 +396,16 @@ async fn test_e2e_duplicate_import_conflict_detection() {
         .import_from_csv("tests/fixtures/datasets/01_normal_data.csv")
         .await
         .expect("Second import should succeed");
-    println!("✓ 步骤 3: 第二次导入完成 (成功: {}, 冲突: {})",
-        result2.summary.success,
-        result2.summary.conflict
+    println!(
+        "✓ 步骤 3: 第二次导入完成 (成功: {}, 冲突: {})",
+        result2.summary.success, result2.summary.conflict
     );
 
     // 第二次导入应该检测到重复material_id（作为冲突）
-    println!("  - 冲突检测机制: {} 条重复记录被识别", result2.summary.conflict);
+    println!(
+        "  - 冲突检测机制: {} 条重复记录被识别",
+        result2.summary.conflict
+    );
     assert!(
         result2.summary.conflict >= 90,
         "第二次导入应该检测到大量重复材料号（作为冲突）"

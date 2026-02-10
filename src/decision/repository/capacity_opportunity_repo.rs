@@ -36,7 +36,10 @@ impl CapacityOpportunityRepository {
         start_date: &str,
         end_date: &str,
     ) -> SqlResult<Vec<CapacityOpportunity>> {
-        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         let base_sql = r#"
             SELECT
@@ -55,11 +58,8 @@ impl CapacityOpportunityRepository {
         "#;
 
         let additional_filter = machine_code.map(|_| "machine_code = ?");
-        let sql = build_optional_filter_sql(
-            base_sql,
-            additional_filter,
-            "slack_t DESC, plan_date ASC",
-        );
+        let sql =
+            build_optional_filter_sql(base_sql, additional_filter, "slack_t DESC, plan_date ASC");
 
         let map_row = |row: &rusqlite::Row| -> SqlResult<CapacityOpportunity> {
             let binding_constraints_json: Option<String> = row.get(6)?;
@@ -106,7 +106,10 @@ impl CapacityOpportunityRepository {
         end_date: &str,
         top_n: usize,
     ) -> SqlResult<Vec<CapacityOpportunity>> {
-        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         let sql = format!(
             r#"
@@ -168,7 +171,10 @@ impl CapacityOpportunityRepository {
         start_date: &str,
         end_date: &str,
     ) -> SqlResult<OptimizationSummary> {
-        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         // 查询总体统计
         let mut stmt = conn.prepare(
@@ -183,15 +189,19 @@ impl CapacityOpportunityRepository {
         "#,
         )?;
 
-        let (total_slack_t, total_soft_adjust_space_t, avg_utilization_rate, high_opportunity_count) =
-            stmt.query_row(params![version_id, start_date, end_date], |row| {
-                Ok((
-                    row.get::<_, Option<f64>>(0)?.unwrap_or(0.0),
-                    row.get::<_, Option<f64>>(1)?.unwrap_or(0.0),
-                    row.get::<_, Option<f64>>(2)?.unwrap_or(0.0),
-                    row.get::<_, Option<i32>>(3)?.unwrap_or(0),
-                ))
-            })?;
+        let (
+            total_slack_t,
+            total_soft_adjust_space_t,
+            avg_utilization_rate,
+            high_opportunity_count,
+        ) = stmt.query_row(params![version_id, start_date, end_date], |row| {
+            Ok((
+                row.get::<_, Option<f64>>(0)?.unwrap_or(0.0),
+                row.get::<_, Option<f64>>(1)?.unwrap_or(0.0),
+                row.get::<_, Option<f64>>(2)?.unwrap_or(0.0),
+                row.get::<_, Option<i32>>(3)?.unwrap_or(0),
+            ))
+        })?;
 
         // 按机组分组统计
         let mut stmt = conn.prepare(
@@ -220,7 +230,8 @@ impl CapacityOpportunityRepository {
             .collect::<SqlResult<Vec<_>>>()?;
 
         // 计算总潜在增益
-        let total_potential_gain_t = self.calculate_total_potential_gain(&conn, version_id, start_date, end_date)?;
+        let total_potential_gain_t =
+            self.calculate_total_potential_gain(&conn, version_id, start_date, end_date)?;
 
         Ok(OptimizationSummary {
             version_id: version_id.to_string(),
@@ -236,7 +247,10 @@ impl CapacityOpportunityRepository {
 
     /// 全量刷新 D6 读模型
     pub fn refresh_full(&self, version_id: &str) -> SqlResult<usize> {
-        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         // 1. 删除旧数据
         conn.execute(
@@ -266,7 +280,10 @@ impl CapacityOpportunityRepository {
             return Ok(0);
         }
 
-        let conn = self.conn.lock().map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| rusqlite::Error::InvalidParameterName(format!("锁获取失败: {}", e)))?;
 
         // 1. 删除受影响的记录
         let in_clause = build_in_clause("machine_code", machine_codes);
@@ -305,7 +322,8 @@ impl CapacityOpportunityRepository {
             .filter(|opp| {
                 machine_codes.contains(&opp.machine_code)
                     && affected_dates.iter().any(|(start, end)| {
-                        opp.plan_date.as_str() >= start.as_str() && opp.plan_date.as_str() <= end.as_str()
+                        opp.plan_date.as_str() >= start.as_str()
+                            && opp.plan_date.as_str() <= end.as_str()
                     })
             })
             .collect();
@@ -434,9 +452,8 @@ impl CapacityOpportunityRepository {
         "#,
         )?;
 
-        let total_gain: f64 = stmt.query_row(params![version_id, start_date, end_date], |row| {
-            row.get(0)
-        })?;
+        let total_gain: f64 =
+            stmt.query_row(params![version_id, start_date, end_date], |row| row.get(0))?;
 
         Ok(total_gain)
     }
@@ -450,21 +467,20 @@ fn generate_optimizations(opp: &mut CapacityOpportunity) {
                 "高优化潜力: 松弛产能 {:.1}t,建议优先优化",
                 opp.slack_t
             ));
-            opp.suggested_optimizations.push("评估是否可调整目标产能或放松约束".to_string());
-            opp.suggested_optimizations.push("考虑从其他机组转移负荷".to_string());
+            opp.suggested_optimizations
+                .push("评估是否可调整目标产能或放松约束".to_string());
+            opp.suggested_optimizations
+                .push("考虑从其他机组转移负荷".to_string());
         }
         "MEDIUM" => {
-            opp.suggested_optimizations.push(format!(
-                "中等优化潜力: 松弛产能 {:.1}t",
-                opp.slack_t
-            ));
-            opp.suggested_optimizations.push("评估优化价值,确定是否调整".to_string());
+            opp.suggested_optimizations
+                .push(format!("中等优化潜力: 松弛产能 {:.1}t", opp.slack_t));
+            opp.suggested_optimizations
+                .push("评估优化价值,确定是否调整".to_string());
         }
         "LOW" => {
-            opp.suggested_optimizations.push(format!(
-                "低优化潜力: 松弛产能 {:.1}t",
-                opp.slack_t
-            ));
+            opp.suggested_optimizations
+                .push(format!("低优化潜力: 松弛产能 {:.1}t", opp.slack_t));
         }
         _ => {
             opp.suggested_optimizations
@@ -574,11 +590,8 @@ mod tests {
             .unwrap();
 
             // 插入排产数据
-            c.execute(
-                "INSERT INTO material_state VALUES ('M001', 500.0)",
-                [],
-            )
-            .unwrap();
+            c.execute("INSERT INTO material_state VALUES ('M001', 500.0)", [])
+                .unwrap();
 
             c.execute(
                 "INSERT INTO plan_item VALUES ('V001', 'H032', '2026-01-24', 'M001')",
@@ -666,7 +679,13 @@ mod tests {
             // 插入 5 条测试数据
             for i in 1..=5 {
                 let slack_t = (1000 - i * 100) as f64;
-                let level = if i <= 2 { "HIGH" } else if i <= 4 { "MEDIUM" } else { "LOW" };
+                let level = if i <= 2 {
+                    "HIGH"
+                } else if i <= 4 {
+                    "MEDIUM"
+                } else {
+                    "LOW"
+                };
                 c.execute(
                     &format!(
                         r#"
@@ -677,7 +696,10 @@ mod tests {
                         ) VALUES ('V001', 'H03{}', '2026-01-24', {}, 0.{},
                             '{}', '[]')
                     "#,
-                        i, slack_t, i * 15, level
+                        i,
+                        slack_t,
+                        i * 15,
+                        level
                     ),
                     [],
                 )
@@ -755,13 +777,20 @@ mod tests {
             .unwrap();
 
         assert_eq!(summary.version_id, "V001");
-        assert_eq!(summary.date_range, ("2026-01-24".to_string(), "2026-01-25".to_string()));
+        assert_eq!(
+            summary.date_range,
+            ("2026-01-24".to_string(), "2026-01-25".to_string())
+        );
         assert_eq!(summary.total_slack_t, 1600.0); // 800 + 500 + 300
         assert_eq!(summary.high_opportunity_count, 2); // HIGH + MEDIUM
         assert_eq!(summary.by_machine.len(), 2); // H032 和 H033
 
         // 验证按机组统计
-        let h032_stat = summary.by_machine.iter().find(|s| s.machine_code == "H032").unwrap();
+        let h032_stat = summary
+            .by_machine
+            .iter()
+            .find(|s| s.machine_code == "H032")
+            .unwrap();
         assert_eq!(h032_stat.slack_t, 1300.0); // 800 + 500
         assert_eq!(h032_stat.opportunity_count, 2);
     }
@@ -785,11 +814,8 @@ mod tests {
             .unwrap();
 
             // 先做全量刷新
-            c.execute(
-                "INSERT INTO material_state VALUES ('M001', 500.0)",
-                [],
-            )
-            .unwrap();
+            c.execute("INSERT INTO material_state VALUES ('M001', 500.0)", [])
+                .unwrap();
             c.execute(
                 "INSERT INTO plan_item VALUES ('V001', 'H032', '2026-01-24', 'M001')",
                 [],

@@ -1,7 +1,6 @@
 use super::*;
 
 impl DecisionRefreshService {
-
     /// 刷新 D2: 哪些紧急单无法完成
     pub(super) fn refresh_d2(
         &self,
@@ -16,7 +15,8 @@ impl DecisionRefreshService {
 
         // 2. 检查 material_state 表是否有必要的列
         // 如果表结构不完整(如测试环境),返回 0
-        let check_sql = "SELECT COUNT(*) FROM pragma_table_info('material_state') WHERE name = 'contract_no'";
+        let check_sql =
+            "SELECT COUNT(*) FROM pragma_table_info('material_state') WHERE name = 'contract_no'";
         let has_contract_no: i32 = tx.query_row(check_sql, [], |row| row.get(0))?;
 
         if has_contract_no == 0 {
@@ -81,5 +81,4 @@ impl DecisionRefreshService {
 
         Ok(rows_affected)
     }
-
 }

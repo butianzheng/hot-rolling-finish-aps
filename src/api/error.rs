@@ -6,8 +6,8 @@
 // 工业红线合规: 红线5（可解释性）
 // ==========================================
 
-use thiserror::Error;
 use crate::repository::error::RepositoryError;
+use thiserror::Error;
 
 /// API层错误类型
 /// 所有错误信息必须包含显式原因（红线5：可解释性）
@@ -16,7 +16,6 @@ pub enum ApiError {
     // ==========================================
     // 工业红线违反错误
     // ==========================================
-
     /// 红线1: 冻结区保护
     #[error("冻结区保护: {0}")]
     FrozenZoneProtection(String),
@@ -43,7 +42,6 @@ pub enum ApiError {
     // ==========================================
     // 业务规则错误
     // ==========================================
-
     #[error("无效输入: {0}")]
     InvalidInput(String),
 
@@ -59,7 +57,6 @@ pub enum ApiError {
     // ==========================================
     // 并发控制错误
     // ==========================================
-
     #[error("乐观锁冲突: {0}")]
     OptimisticLockFailure(String),
 
@@ -76,7 +73,6 @@ pub enum ApiError {
     // ==========================================
     // 数据访问错误
     // ==========================================
-
     #[error("数据库错误: {0}")]
     DatabaseError(String),
 
@@ -89,7 +85,6 @@ pub enum ApiError {
     // ==========================================
     // 导入错误
     // ==========================================
-
     #[error("文件导入失败: {0}")]
     ImportError(String),
 
@@ -106,7 +101,6 @@ pub enum ApiError {
     // ==========================================
     // 通用错误
     // ==========================================
-
     #[error("内部错误: {0}")]
     InternalError(String),
 
@@ -122,32 +116,28 @@ impl From<RepositoryError> for ApiError {
     fn from(err: RepositoryError) -> Self {
         match err {
             // 并发控制错误
-            RepositoryError::OptimisticLockFailure { version_id, expected, actual } => {
-                ApiError::OptimisticLockFailure(
-                    format!("版本{}已被其他用户修改（期望revision={}，实际revision={}）",
-                        version_id, expected, actual)
-                )
-            }
-            RepositoryError::VersionConflict { message } => {
-                ApiError::VersionConflict(message)
-            }
+            RepositoryError::OptimisticLockFailure {
+                version_id,
+                expected,
+                actual,
+            } => ApiError::OptimisticLockFailure(format!(
+                "版本{}已被其他用户修改（期望revision={}，实际revision={}）",
+                version_id, expected, actual
+            )),
+            RepositoryError::VersionConflict { message } => ApiError::VersionConflict(message),
 
             // 数据库错误
             RepositoryError::NotFound { entity, id } => {
                 ApiError::NotFound(format!("{}(id={})不存在", entity, id))
             }
-            RepositoryError::DatabaseConnectionError(msg) => {
-                ApiError::DatabaseConnectionError(msg)
-            }
+            RepositoryError::DatabaseConnectionError(msg) => ApiError::DatabaseConnectionError(msg),
             RepositoryError::DatabaseTransactionError(msg) => {
                 ApiError::DatabaseTransactionError(msg)
             }
             RepositoryError::LockError(msg) => {
                 ApiError::DatabaseConnectionError(format!("数据库锁获取失败: {}", msg))
             }
-            RepositoryError::DatabaseQueryError(msg) => {
-                ApiError::DatabaseError(msg)
-            }
+            RepositoryError::DatabaseQueryError(msg) => ApiError::DatabaseError(msg),
             RepositoryError::UniqueConstraintViolation(msg) => {
                 ApiError::BusinessRuleViolation(format!("唯一约束违反: {}", msg))
             }
@@ -173,20 +163,14 @@ impl From<RepositoryError> for ApiError {
             }
 
             // 数据质量错误
-            RepositoryError::ValidationError(msg) => {
-                ApiError::ValidationError(msg)
-            }
+            RepositoryError::ValidationError(msg) => ApiError::ValidationError(msg),
             RepositoryError::FieldValueError { field, message } => {
                 ApiError::InvalidInput(format!("字段{}错误: {}", field, message))
             }
 
             // 通用错误
-            RepositoryError::InternalError(msg) => {
-                ApiError::InternalError(msg)
-            }
-            RepositoryError::Other(err) => {
-                ApiError::Other(err)
-            }
+            RepositoryError::InternalError(msg) => ApiError::InternalError(msg),
+            RepositoryError::Other(err) => ApiError::Other(err),
         }
     }
 }
@@ -242,10 +226,7 @@ pub fn validate_frozen_zone(
 /// 返回:
 /// - Ok(()) 如果已适温
 /// - Err(ApiError::MaturityConstraintViolation) 如果未适温
-pub fn validate_maturity_constraint(
-    material_id: &str,
-    ready_in_days: i32,
-) -> ApiResult<()> {
+pub fn validate_maturity_constraint(material_id: &str, ready_in_days: i32) -> ApiResult<()> {
     if ready_in_days > 0 {
         Err(ApiError::MaturityConstraintViolation {
             material_id: material_id.to_string(),
@@ -297,7 +278,10 @@ mod tests {
         let result = validate_maturity_constraint("M001", 5);
         assert!(result.is_err());
         match result {
-            Err(ApiError::MaturityConstraintViolation { material_id, ready_in_days }) => {
+            Err(ApiError::MaturityConstraintViolation {
+                material_id,
+                ready_in_days,
+            }) => {
                 assert_eq!(material_id, "M001");
                 assert_eq!(ready_in_days, 5);
             }
@@ -323,7 +307,9 @@ mod tests {
         let result = validate_capacity_constraint("M1", date, 500.0, 900.0, 1200.0);
         assert!(result.is_err());
         match result {
-            Err(ApiError::CapacityConstraintViolation { machine, excess_t, .. }) => {
+            Err(ApiError::CapacityConstraintViolation {
+                machine, excess_t, ..
+            }) => {
                 assert_eq!(machine, "M1");
                 assert_eq!(excess_t, 200.0); // 1400 - 1200
             }

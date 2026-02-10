@@ -288,7 +288,12 @@ impl PlanRhythmRepository {
             SET is_active = ?2, updated_at = ?3, updated_by = ?4
             WHERE preset_id = ?1
             "#,
-            params![preset_id, if is_active { 1 } else { 0 }, updated_at, updated_by],
+            params![
+                preset_id,
+                if is_active { 1 } else { 0 },
+                updated_at,
+                updated_by
+            ],
         )?;
         Ok(affected)
     }
@@ -322,7 +327,10 @@ impl PlanRhythmRepository {
         if let Some((start, end)) = date_range {
             let start_idx = params_vec.len() + 1;
             let end_idx = params_vec.len() + 2;
-            sql.push_str(&format!(" AND plan_date BETWEEN ?{} AND ?{}", start_idx, end_idx));
+            sql.push_str(&format!(
+                " AND plan_date BETWEEN ?{} AND ?{}",
+                start_idx, end_idx
+            ));
             params_vec.push(start.to_string());
             params_vec.push(end.to_string());
         }
@@ -332,7 +340,10 @@ impl PlanRhythmRepository {
                 let placeholders: Vec<String> = (0..codes.len())
                     .map(|i| format!("?{}", params_vec.len() + i + 1))
                     .collect();
-                sql.push_str(&format!(" AND machine_code IN ({})", placeholders.join(", ")));
+                sql.push_str(&format!(
+                    " AND machine_code IN ({})",
+                    placeholders.join(", ")
+                ));
                 params_vec.extend(codes.iter().cloned());
             }
         }
@@ -383,18 +394,21 @@ impl PlanRhythmRepository {
             "#,
         )?;
 
-        let result = stmt.query_row(params![version_id, machine_code, plan_date, dimension], |row| {
-            Ok(PlanRhythmTargetEntity {
-                version_id: row.get(0)?,
-                machine_code: row.get(1)?,
-                plan_date: row.get(2)?,
-                dimension: row.get(3)?,
-                target_json: row.get(4)?,
-                preset_id: row.get(5)?,
-                updated_at: row.get(6)?,
-                updated_by: row.get(7)?,
-            })
-        });
+        let result = stmt.query_row(
+            params![version_id, machine_code, plan_date, dimension],
+            |row| {
+                Ok(PlanRhythmTargetEntity {
+                    version_id: row.get(0)?,
+                    machine_code: row.get(1)?,
+                    plan_date: row.get(2)?,
+                    dimension: row.get(3)?,
+                    target_json: row.get(4)?,
+                    preset_id: row.get(5)?,
+                    updated_at: row.get(6)?,
+                    updated_by: row.get(7)?,
+                })
+            },
+        );
 
         match result {
             Ok(v) => Ok(Some(v)),
@@ -437,7 +451,10 @@ impl PlanRhythmRepository {
         Ok(())
     }
 
-    pub fn batch_upsert_targets(&self, entities: &[PlanRhythmTargetEntity]) -> RepositoryResult<usize> {
+    pub fn batch_upsert_targets(
+        &self,
+        entities: &[PlanRhythmTargetEntity],
+    ) -> RepositoryResult<usize> {
         if entities.is_empty() {
             return Ok(0);
         }

@@ -15,4 +15,3 @@ mod scoring;
 mod tests;
 
 pub use core::PrioritySorter;
-

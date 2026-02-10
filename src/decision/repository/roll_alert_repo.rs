@@ -6,8 +6,7 @@
 // ==========================================
 
 use crate::decision::common::{
-    build_in_clause, build_optional_filter_sql, deserialize_json_array_optional,
-    serialize_json_vec,
+    build_in_clause, build_optional_filter_sql, deserialize_json_array_optional, serialize_json_vec,
 };
 use crate::decision::use_cases::d5_roll_campaign_alert::{
     MachineRollStat, RollAlert, RollAlertSummary,
@@ -315,7 +314,8 @@ impl RollAlertRepository {
         // 3. 对每个批次计算累计重量和预警
         let mut alerts = Vec::new();
         for campaign in campaigns {
-            let cum_weight = self.calculate_cum_weight(&conn, version_id, &campaign.machine_code)?;
+            let cum_weight =
+                self.calculate_cum_weight(&conn, version_id, &campaign.machine_code)?;
 
             let mut alert = RollAlert::new(
                 version_id.to_string(),
@@ -376,7 +376,8 @@ impl RollAlertRepository {
         // 3. 计算预警
         let mut alerts = Vec::new();
         for campaign in campaigns {
-            let cum_weight = self.calculate_cum_weight(&conn, version_id, &campaign.machine_code)?;
+            let cum_weight =
+                self.calculate_cum_weight(&conn, version_id, &campaign.machine_code)?;
 
             let mut alert = RollAlert::new(
                 version_id.to_string(),
@@ -438,7 +439,11 @@ impl RollAlertRepository {
     }
 
     /// 查询所有活跃的换辊批次
-    fn query_active_campaigns(&self, conn: &Connection, version_id: &str) -> SqlResult<Vec<RollCampaign>> {
+    fn query_active_campaigns(
+        &self,
+        conn: &Connection,
+        version_id: &str,
+    ) -> SqlResult<Vec<RollCampaign>> {
         let mut stmt = conn.prepare(
             r#"
             SELECT
@@ -525,7 +530,8 @@ impl RollAlertRepository {
         "#,
         )?;
 
-        let cum_weight: f64 = stmt.query_row(params![version_id, machine_code], |row| row.get(0))?;
+        let cum_weight: f64 =
+            stmt.query_row(params![version_id, machine_code], |row| row.get(0))?;
 
         Ok(cum_weight)
     }
@@ -544,14 +550,24 @@ struct RollCampaign {
 fn generate_suggestions(alert: &mut RollAlert) {
     match alert.alert_level.as_str() {
         "EMERGENCY" => {
-            alert.suggested_actions.push("紧急: 立即安排换辊,暂停排产".to_string());
-            alert.suggested_actions.push("通知维护团队准备换辊作业".to_string());
-            alert.suggested_actions.push("检查换辊物料和工具是否就位".to_string());
+            alert
+                .suggested_actions
+                .push("紧急: 立即安排换辊,暂停排产".to_string());
+            alert
+                .suggested_actions
+                .push("通知维护团队准备换辊作业".to_string());
+            alert
+                .suggested_actions
+                .push("检查换辊物料和工具是否就位".to_string());
         }
         "CRITICAL" => {
             if alert.needs_immediate_change {
-                alert.suggested_actions.push("尽快安排换辊,避免超过硬限制".to_string());
-                alert.suggested_actions.push("评估换辊窗口期,制定换辊计划".to_string());
+                alert
+                    .suggested_actions
+                    .push("尽快安排换辊,避免超过硬限制".to_string());
+                alert
+                    .suggested_actions
+                    .push("评估换辊窗口期,制定换辊计划".to_string());
                 // 如果同时超过建议阈值,也添加相关建议
                 if alert.cum_weight_t >= alert.suggest_threshold_t {
                     alert.suggested_actions.push(format!(
@@ -564,7 +580,9 @@ fn generate_suggestions(alert: &mut RollAlert) {
                     "已超过建议阈值 {:.1} 吨,建议尽快换辊",
                     alert.suggest_threshold_t
                 ));
-                alert.suggested_actions.push("评估辊套磨损情况,确定换辊时间".to_string());
+                alert
+                    .suggested_actions
+                    .push("评估辊套磨损情况,确定换辊时间".to_string());
             }
         }
         "WARNING" => {
@@ -572,7 +590,9 @@ fn generate_suggestions(alert: &mut RollAlert) {
                 "接近建议阈值,剩余容量 {:.1} 吨",
                 alert.remaining_capacity()
             ));
-            alert.suggested_actions.push("关注累计吨数,提前准备换辊物料".to_string());
+            alert
+                .suggested_actions
+                .push("关注累计吨数,提前准备换辊物料".to_string());
         }
         "NONE" => {
             alert.suggested_actions.push(format!(
@@ -784,6 +804,9 @@ mod tests {
         generate_suggestions(&mut alert);
 
         assert!(!alert.suggested_actions.is_empty());
-        assert!(alert.suggested_actions.iter().any(|s| s.contains("超过建议阈值")));
+        assert!(alert
+            .suggested_actions
+            .iter()
+            .any(|s| s.contains("超过建议阈值")));
     }
 }

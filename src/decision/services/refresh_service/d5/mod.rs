@@ -79,19 +79,31 @@ impl DecisionRefreshService {
                 [],
             );
         }
-        if !table_has_column(tx, "decision_roll_campaign_alert", "planned_downtime_minutes") {
+        if !table_has_column(
+            tx,
+            "decision_roll_campaign_alert",
+            "planned_downtime_minutes",
+        ) {
             let _ = tx.execute(
                 "ALTER TABLE decision_roll_campaign_alert ADD COLUMN planned_downtime_minutes INTEGER",
                 [],
             );
         }
-        if !table_has_column(tx, "decision_roll_campaign_alert", "estimated_soft_reach_at") {
+        if !table_has_column(
+            tx,
+            "decision_roll_campaign_alert",
+            "estimated_soft_reach_at",
+        ) {
             let _ = tx.execute(
                 "ALTER TABLE decision_roll_campaign_alert ADD COLUMN estimated_soft_reach_at TEXT",
                 [],
             );
         }
-        if !table_has_column(tx, "decision_roll_campaign_alert", "estimated_hard_reach_at") {
+        if !table_has_column(
+            tx,
+            "decision_roll_campaign_alert",
+            "estimated_hard_reach_at",
+        ) {
             let _ = tx.execute(
                 "ALTER TABLE decision_roll_campaign_alert ADD COLUMN estimated_hard_reach_at TEXT",
                 [],
@@ -113,10 +125,8 @@ impl DecisionRefreshService {
 
         if let Some(machines) = &scope.affected_machines {
             let mut params: Vec<&dyn rusqlite::ToSql> = vec![&scope.version_id];
-            let machine_refs: Vec<&dyn rusqlite::ToSql> = machines
-                .iter()
-                .map(|m| m as &dyn rusqlite::ToSql)
-                .collect();
+            let machine_refs: Vec<&dyn rusqlite::ToSql> =
+                machines.iter().map(|m| m as &dyn rusqlite::ToSql).collect();
             params.extend(machine_refs);
             tx.execute(&delete_sql, rusqlite::params_from_iter(params))?;
         } else {
@@ -243,9 +253,8 @@ impl DecisionRefreshService {
                 order_clause
             );
             let mut pi_stmt = tx.prepare(&pi_sql)?;
-            let pi_iter = pi_stmt.query_map(
-                rusqlite::params![&scope.version_id, &machine_code],
-                |row| {
+            let pi_iter =
+                pi_stmt.query_map(rusqlite::params![&scope.version_id, &machine_code], |row| {
                     let plan_date: String = row.get(0)?;
                     let weight_t: f64 = row.get(1)?;
                     let start_at = ymd_to_start_at(&plan_date).unwrap_or_else(|| as_of);
@@ -253,8 +262,7 @@ impl DecisionRefreshService {
                         earliest_start_at: start_at,
                         weight_t,
                     })
-                },
-            )?;
+                })?;
 
             let mut items: Vec<PlanItemLite> = pi_iter.collect::<Result<Vec<_>, _>>()?;
             items.retain(|i| i.weight_t > 0.0);
@@ -372,7 +380,8 @@ impl DecisionRefreshService {
                 planned_change_at,
             );
 
-            let estimated_change_date = hard_reach.map(|dt| dt.date().format("%Y-%m-%d").to_string());
+            let estimated_change_date =
+                hard_reach.map(|dt| dt.date().format("%Y-%m-%d").to_string());
 
             // 6.8 插入告警记录
             tx.execute(

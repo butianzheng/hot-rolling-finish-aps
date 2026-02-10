@@ -171,12 +171,7 @@ pub trait DataCleaner: Send + Sync {
     /// # 返回
     /// - Ok(f64): 校验通过
     /// - Err: 范围违规
-    fn validate_decimal(
-        &self,
-        value: f64,
-        min: f64,
-        max: f64,
-    ) -> Result<f64, Box<dyn Error>>;
+    fn validate_decimal(&self, value: f64, min: f64, max: f64) -> Result<f64, Box<dyn Error>>;
 }
 
 // ==========================================
@@ -216,11 +211,7 @@ pub trait DerivationService: Send + Sync {
     ///
     /// # 返回
     /// - i32: 派生后的等效轧制产出天数
-    fn derive_rolling_output_age_days(
-        &self,
-        output_age_raw: i32,
-        machine_code: &str,
-    ) -> i32;
+    fn derive_rolling_output_age_days(&self, output_age_raw: i32, machine_code: &str) -> i32;
 
     /// 派生 rolling_output_date（阶段 3.5 - v0.7 新增）
     ///

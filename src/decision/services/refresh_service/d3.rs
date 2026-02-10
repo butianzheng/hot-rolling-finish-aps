@@ -1,7 +1,6 @@
 use super::*;
 
 impl DecisionRefreshService {
-
     /// 刷新 D3: 哪些冷料压库
     pub(super) fn refresh_d3(
         &self,
@@ -20,9 +19,8 @@ impl DecisionRefreshService {
 
         if let Some(machines) = &scope.affected_machines {
             let mut params: Vec<&dyn rusqlite::ToSql> = vec![&scope.version_id];
-            let machine_refs: Vec<&dyn rusqlite::ToSql> = machines.iter()
-                .map(|m| m as &dyn rusqlite::ToSql)
-                .collect();
+            let machine_refs: Vec<&dyn rusqlite::ToSql> =
+                machines.iter().map(|m| m as &dyn rusqlite::ToSql).collect();
             params.extend(machine_refs);
             tx.execute(&delete_sql, rusqlite::params_from_iter(params))?;
         } else {
@@ -186,5 +184,4 @@ impl DecisionRefreshService {
 
         Ok(rows_affected)
     }
-
 }

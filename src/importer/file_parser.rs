@@ -99,10 +99,7 @@ impl FileParser for ExcelParser {
         }
 
         // 检查扩展名
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         if ext != "xlsx" && ext != "xls" {
             return Err(Box::new(ImportError::UnsupportedFormat(ext.to_string())));
         }
@@ -126,9 +123,9 @@ impl FileParser for ExcelParser {
 
         // 提取表头（第一行）
         let mut rows = range.rows();
-        let header_row = rows.next().ok_or_else(|| {
-            ImportError::ExcelParseError("Excel 文件无数据行".to_string())
-        })?;
+        let header_row = rows
+            .next()
+            .ok_or_else(|| ImportError::ExcelParseError("Excel 文件无数据行".to_string()))?;
 
         let headers: Vec<String> = header_row
             .iter()

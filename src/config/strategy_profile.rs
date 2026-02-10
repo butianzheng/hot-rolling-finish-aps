@@ -54,4 +54,3 @@ pub struct CustomStrategyParameters {
     #[serde(default)]
     pub overflow_tolerance_pct: Option<f64>,
 }
-

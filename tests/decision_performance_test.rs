@@ -152,7 +152,7 @@ fn setup_large_dataset(
                     } else {
                         0.0
                     },
-                    used_capacity * 0.1,                          // frozen_capacity_t
+                    used_capacity * 0.1, // frozen_capacity_t
                     used_capacity * (date_offset as f64 + 1.0), // accumulated_tonnage_t
                     format!("RC{:03}", machine_idx),
                 ],
@@ -183,18 +183,11 @@ fn setup_large_dataset(
                         material_id, weight_t, created_at, updated_at
                     ) VALUES (?1, ?2, datetime('now'), datetime('now'))
                     "#,
-                    rusqlite::params![
-                        &material_id,
-                        100.0 + ((seq % 10) as f64) * 10.0,
-                    ],
+                    rusqlite::params![&material_id, 100.0 + ((seq % 10) as f64) * 10.0,],
                 )?;
 
                 // 部分材料有结构违规
-                let violation_flags = if seq % 5 == 0 {
-                    "STRUCT_CONFLICT"
-                } else {
-                    ""
-                };
+                let violation_flags = if seq % 5 == 0 { "STRUCT_CONFLICT" } else { "" };
 
                 conn.execute(
                     r#"
@@ -348,7 +341,11 @@ fn test_d1_top_n_query_performance() {
         .unwrap();
     let duration = start.elapsed();
 
-    println!("✅ Top-10 查询结果: {} 天, 耗时: {:?}", summaries.len(), duration);
+    println!(
+        "✅ Top-10 查询结果: {} 天, 耗时: {:?}",
+        summaries.len(),
+        duration
+    );
     assert!(
         duration.as_millis() < 100,
         "D1 Top-N 查询应该 < 100ms, 实际: {:?}",
@@ -1040,10 +1037,7 @@ fn test_performance_comparison_summary() {
                         "H033".to_string(),
                         "H034".to_string(),
                     ]),
-                    affected_date_range: Some((
-                        "2026-01-25".to_string(),
-                        "2026-01-31".to_string(),
-                    )),
+                    affected_date_range: Some(("2026-01-25".to_string(), "2026-01-31".to_string())),
                 },
                 RefreshTrigger::PlanItemChanged,
                 Some("增量刷新".to_string()),

@@ -500,8 +500,8 @@ fn test_filter_by_machine_code() {
 
     assert_eq!(profiles.len(), 1);
     assert_eq!(profiles[0].machine_code, "H032");
-    assert_eq!(profiles[0].pending_materials, 3);  // H032 有 3 个未排材料
-    assert_eq!(profiles[0].scheduled_materials, 10);  // H032 有 10 个已排材料
+    assert_eq!(profiles[0].pending_materials, 3); // H032 有 3 个未排材料
+    assert_eq!(profiles[0].scheduled_materials, 10); // H032 有 10 个已排材料
 }
 
 #[test]
@@ -658,10 +658,12 @@ fn test_data_inconsistency_warning() {
     let h034 = &profiles[0];
 
     // 应该包含数据不一致警告原因
-    let warning_reason = h034.reasons.iter()
+    let warning_reason = h034
+        .reasons
+        .iter()
         .find(|r| r.code == "DATA_INCONSISTENCY_WARNING");
     assert!(warning_reason.is_some(), "应该包含数据不一致警告");
-    assert_eq!(h034.scheduled_materials, 0);  // 没有已排材料
+    assert_eq!(h034.scheduled_materials, 0); // 没有已排材料
 }
 
 #[test]

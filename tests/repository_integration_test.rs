@@ -80,24 +80,12 @@ async fn test_complete_import_flow() {
     assert!(result.is_ok(), "导入应该成功");
     let import_result = result.unwrap();
     println!("✓ 步骤 4: 导入完成（耗时: {:?}）", elapsed);
-    println!(
-        "  - 总行数: {}",
-        import_result.summary.total_rows
-    );
-    println!(
-        "  - 成功: {}",
-        import_result.summary.success
-    );
-    println!(
-        "  - 冲突: {}",
-        import_result.summary.conflict
-    );
+    println!("  - 总行数: {}", import_result.summary.total_rows);
+    println!("  - 成功: {}", import_result.summary.success);
+    println!("  - 冲突: {}", import_result.summary.conflict);
 
     // 验证导入结果
-    assert!(
-        import_result.summary.success > 0,
-        "应该有成功导入的记录"
-    );
+    assert!(import_result.summary.success > 0, "应该有成功导入的记录");
 
     // 步骤 5: 使用 MaterialMasterRepository 验证数据
     let master_repo =
@@ -109,18 +97,14 @@ async fn test_complete_import_flow() {
         .find_by_id("MAT000001")
         .expect("Failed to query material");
 
-    assert!(
-        first_material.is_some(),
-        "应该能查询到 MAT000001"
-    );
+    assert!(first_material.is_some(), "应该能查询到 MAT000001");
     let material = first_material.unwrap();
     println!("  - 查询到材料: {}", material.material_id);
     println!("    机组: {:?}", material.current_machine_code);
     println!("    重量: {:?} 吨", material.weight_t);
 
     // 步骤 6: 使用 MaterialStateRepository 验证状态
-    let state_repo =
-        MaterialStateRepository::new(&db_path).expect("Failed to create state repo");
+    let state_repo = MaterialStateRepository::new(&db_path).expect("Failed to create state repo");
     println!("✓ 步骤 6: MaterialStateRepository 已创建");
 
     // 查询材料状态
@@ -128,10 +112,7 @@ async fn test_complete_import_flow() {
         .find_by_id("MAT000001")
         .expect("Failed to query state");
 
-    assert!(
-        material_state.is_some(),
-        "应该能查询到 MAT000001 的状态"
-    );
+    assert!(material_state.is_some(), "应该能查询到 MAT000001 的状态");
     let state = material_state.unwrap();
     println!("  - 查询到状态: {}", state.material_id);
     println!("    排产状态: {:?}", state.sched_state);
@@ -177,19 +158,19 @@ async fn test_repository_queries() {
     );
 
     // 测试批量检查存在性
-    let test_ids = vec!["MAT000001".to_string(), "MAT000002".to_string(), "NONEXIST".to_string()];
+    let test_ids = vec![
+        "MAT000001".to_string(),
+        "MAT000002".to_string(),
+        "NONEXIST".to_string(),
+    ];
     let existing_ids = master_repo
         .batch_check_exists(test_ids)
         .expect("Failed to check exists");
-    println!(
-        "  - 批量检查存在性: {} 条存在",
-        existing_ids.len()
-    );
+    println!("  - 批量检查存在性: {} 条存在", existing_ids.len());
     assert_eq!(existing_ids.len(), 2, "应该有2条记录存在");
 
     // 步骤 3: 测试 MaterialStateRepository 查询
-    let state_repo =
-        MaterialStateRepository::new(&db_path).expect("Failed to create state repo");
+    let state_repo = MaterialStateRepository::new(&db_path).expect("Failed to create state repo");
     println!("✓ 步骤 3: MaterialStateRepository 已创建");
 
     // 测试查询适温待排材料

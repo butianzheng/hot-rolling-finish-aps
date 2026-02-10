@@ -5,14 +5,11 @@
 // 红线: Repository 不含业务逻辑
 // ==========================================
 
-
 mod master;
 mod state;
 
 pub use master::MaterialMasterRepository;
 pub use state::{
-    MaterialStateRepository,
-    MaterialStateSnapshotLite,
-    PathOverrideRejectionSummary,
+    MaterialStateRepository, MaterialStateSnapshotLite, PathOverrideRejectionSummary,
     UserConfirmedMaterialSummary,
 };

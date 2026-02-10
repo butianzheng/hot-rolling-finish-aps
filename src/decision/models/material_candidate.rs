@@ -261,7 +261,10 @@ mod tests {
         candidate.set_locked(true);
 
         assert_eq!(candidate.ineligible_reasons.len(), 2);
-        assert_eq!(candidate.primary_ineligible_reason(), Some("未适温，还需 3 天".to_string()));
+        assert_eq!(
+            candidate.primary_ineligible_reason(),
+            Some("未适温，还需 3 天".to_string())
+        );
     }
 
     #[test]

@@ -210,8 +210,7 @@ impl OrderFailureRepository {
         let blocking_factors = deserialize_json_array(&blocking_factors_json);
 
         let suggested_actions_json: Option<String> = row.get(12)?;
-        let suggested_actions =
-            deserialize_json_array_optional(suggested_actions_json.as_deref());
+        let suggested_actions = deserialize_json_array_optional(suggested_actions_json.as_deref());
 
         Ok(OrderFailure {
             contract_no: row.get(1)?,
@@ -359,8 +358,14 @@ impl OrderFailureRepository {
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
 
         for row_result in rows {
-            let (contract_no, due_date, urgency_level, total_materials, unscheduled_count, unscheduled_weight_t) =
-                row_result?;
+            let (
+                contract_no,
+                due_date,
+                urgency_level,
+                total_materials,
+                unscheduled_count,
+                unscheduled_weight_t,
+            ) = row_result?;
 
             // 计算完成率
             let completion_rate = if total_materials > 0 {
@@ -506,9 +511,10 @@ impl OrderFailureRepository {
               )
         "#;
 
-        let cold_count: i32 = conn.query_row(cold_count_sql, params![contract_no, version_id], |row| {
-            row.get(0)
-        })?;
+        let cold_count: i32 =
+            conn.query_row(cold_count_sql, params![contract_no, version_id], |row| {
+                row.get(0)
+            })?;
 
         if cold_count > 0 {
             factors.push(BlockingFactor {
@@ -593,10 +599,7 @@ impl OrderFailureRepository {
             match factor.code.as_str() {
                 "COLD_STOCK" => {
                     if factor.affected_count <= 3 {
-                        actions.push(format!(
-                            "考虑强制释放 {} 个冷料材料",
-                            factor.affected_count
-                        ));
+                        actions.push(format!("考虑强制释放 {} 个冷料材料", factor.affected_count));
                     }
                 }
                 "STRUCTURE_CONFLICT" => {

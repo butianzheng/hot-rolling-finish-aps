@@ -114,11 +114,7 @@ impl DaySummary {
         }
 
         // 计算加权风险分数
-        let weighted_sum: f64 = self
-            .top_reasons
-            .iter()
-            .map(|r| r.severity * r.weight)
-            .sum();
+        let weighted_sum: f64 = self.top_reasons.iter().map(|r| r.severity * r.weight).sum();
 
         let total_weight: f64 = self.top_reasons.iter().map(|r| r.weight).sum();
 
@@ -221,18 +217,8 @@ mod tests {
     #[test]
     fn test_add_reason() {
         let mut summary = DaySummary::new("2026-01-23".to_string());
-        summary.add_reason(
-            "CAP_HIGH".to_string(),
-            "产能利用率高".to_string(),
-            0.5,
-            0.9,
-        );
-        summary.add_reason(
-            "BOTTLENECK".to_string(),
-            "存在堵塞".to_string(),
-            0.3,
-            0.8,
-        );
+        summary.add_reason("CAP_HIGH".to_string(), "产能利用率高".to_string(), 0.5, 0.9);
+        summary.add_reason("BOTTLENECK".to_string(), "存在堵塞".to_string(), 0.3, 0.8);
 
         assert_eq!(summary.top_reasons.len(), 2);
         assert!(summary.risk_score > 0.0);

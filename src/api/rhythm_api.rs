@@ -153,12 +153,12 @@ impl RhythmApi {
             return Err(ApiError::InvalidInput("目标配比 JSON 不能为空".to_string()));
         }
 
-        let parsed: serde_json::Value =
-            serde_json::from_str(raw).map_err(|e| ApiError::InvalidInput(format!("目标配比 JSON 解析失败: {}", e)))?;
+        let parsed: serde_json::Value = serde_json::from_str(raw)
+            .map_err(|e| ApiError::InvalidInput(format!("目标配比 JSON 解析失败: {}", e)))?;
 
-        let obj = parsed
-            .as_object()
-            .ok_or_else(|| ApiError::InvalidInput("目标配比应为 JSON 对象，如 {\"普板\":0.3}".to_string()))?;
+        let obj = parsed.as_object().ok_or_else(|| {
+            ApiError::InvalidInput("目标配比应为 JSON 对象，如 {\"普板\":0.3}".to_string())
+        })?;
 
         if obj.is_empty() {
             // 允许空对象：表示不启用/清空目标
@@ -171,14 +171,17 @@ impl RhythmApi {
             if key.is_empty() {
                 continue;
             }
-            let ratio = v
-                .as_f64()
-                .ok_or_else(|| ApiError::InvalidInput(format!("目标配比 {} 的值必须为数字", key)))?;
+            let ratio = v.as_f64().ok_or_else(|| {
+                ApiError::InvalidInput(format!("目标配比 {} 的值必须为数字", key))
+            })?;
             if !ratio.is_finite() {
                 return Err(ApiError::InvalidInput(format!("目标配比 {} 的值非法", key)));
             }
             if ratio < 0.0 {
-                return Err(ApiError::InvalidInput(format!("目标配比 {} 不能为负数", key)));
+                return Err(ApiError::InvalidInput(format!(
+                    "目标配比 {} 不能为负数",
+                    key
+                )));
             }
             ratios.insert(key.to_string(), ratio);
         }
@@ -193,10 +196,8 @@ impl RhythmApi {
         }
 
         // 自动归一化（提升手工输入容错）
-        let normalized: BTreeMap<String, f64> = ratios
-            .into_iter()
-            .map(|(k, v)| (k, v / sum))
-            .collect();
+        let normalized: BTreeMap<String, f64> =
+            ratios.into_iter().map(|(k, v)| (k, v / sum)).collect();
 
         serde_json::to_string(&normalized)
             .map_err(|e| ApiError::InvalidInput(format!("目标配比序列化失败: {}", e)))
@@ -221,7 +222,10 @@ impl RhythmApi {
             .list_presets(dim.as_deref(), active_only)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
-        Ok(presets.into_iter().map(PlanRhythmPresetInfo::from).collect())
+        Ok(presets
+            .into_iter()
+            .map(PlanRhythmPresetInfo::from)
+            .collect())
     }
 
     pub fn upsert_preset(
@@ -347,7 +351,11 @@ impl RhythmApi {
             machine_code: None,
             date_range_start: None,
             date_range_end: None,
-            detail: Some(format!("{}节奏模板: {}", if is_active { "启用" } else { "停用" }, id)),
+            detail: Some(format!(
+                "{}节奏模板: {}",
+                if is_active { "启用" } else { "停用" },
+                id
+            )),
         };
 
         self.action_log_repo
@@ -393,7 +401,10 @@ impl RhythmApi {
             .list_targets(version_id, &dim, machine_codes, range_refs)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
-        Ok(targets.into_iter().map(PlanRhythmTargetInfo::from).collect())
+        Ok(targets
+            .into_iter()
+            .map(PlanRhythmTargetInfo::from)
+            .collect())
     }
 
     pub fn upsert_target(
@@ -514,7 +525,9 @@ impl RhythmApi {
         let end = NaiveDate::parse_from_str(&Self::normalize_date_str(date_to)?, "%Y-%m-%d")
             .map_err(|_| ApiError::InvalidInput("结束日期格式错误".to_string()))?;
         if end < start {
-            return Err(ApiError::InvalidInput("结束日期不能早于开始日期".to_string()));
+            return Err(ApiError::InvalidInput(
+                "结束日期不能早于开始日期".to_string(),
+            ));
         }
 
         let preset = self
@@ -625,15 +638,20 @@ impl RhythmApi {
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         let mut target_map: HashMap<String, f64> = HashMap::new();
-        let (target_preset_id, target_updated_at, target_updated_by) = if let Some(t) = &target_entity {
-            let json_str = t.target_json.as_str();
-            if let Ok(map) = serde_json::from_str::<HashMap<String, f64>>(json_str) {
-                target_map = map;
-            }
-            (t.preset_id.clone(), Some(t.updated_at.clone()), t.updated_by.clone())
-        } else {
-            (None, None, None)
-        };
+        let (target_preset_id, target_updated_at, target_updated_by) =
+            if let Some(t) = &target_entity {
+                let json_str = t.target_json.as_str();
+                if let Ok(map) = serde_json::from_str::<HashMap<String, f64>>(json_str) {
+                    target_map = map;
+                }
+                (
+                    t.preset_id.clone(),
+                    Some(t.updated_at.clone()),
+                    t.updated_by.clone(),
+                )
+            } else {
+                (None, None, None)
+            };
 
         // actual weights by category (scheduled plan items)
         let weights = self

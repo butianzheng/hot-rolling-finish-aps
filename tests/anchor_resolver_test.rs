@@ -25,7 +25,10 @@ fn ms(
 fn test_frozen_has_highest_priority() {
     let resolver = AnchorResolver::new(SeedS2Config::default());
 
-    let frozen = vec![ms("F1", 1200.0, 10.0, 1, None), ms("F2", 1100.0, 9.0, 3, None)];
+    let frozen = vec![
+        ms("F1", 1200.0, 10.0, 1, None),
+        ms("F2", 1100.0, 9.0, 3, None),
+    ];
     let locked = vec![ms("L1", 1300.0, 11.0, 10, None)];
     let confirmed = vec![ms("C1", 1400.0, 12.0, 0, Some("2026-01-02T00:00:00Z"))];
     let candidates = vec![ms("X1", 1000.0, 8.0, 0, None)];
@@ -43,7 +46,10 @@ fn test_locked_is_second_priority() {
     let resolver = AnchorResolver::new(SeedS2Config::default());
 
     let frozen: Vec<MaterialSummary> = vec![];
-    let locked = vec![ms("L1", 1300.0, 11.0, 1, None), ms("L2", 1250.0, 10.5, 2, None)];
+    let locked = vec![
+        ms("L1", 1300.0, 11.0, 1, None),
+        ms("L2", 1250.0, 10.5, 2, None),
+    ];
     let confirmed: Vec<MaterialSummary> = vec![];
     let candidates: Vec<MaterialSummary> = vec![];
 
@@ -135,4 +141,3 @@ fn test_no_anchor_returns_none() {
     assert_eq!(r.source, AnchorSource::None);
     assert!(r.anchor.is_none());
 }
-

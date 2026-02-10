@@ -10,9 +10,9 @@ mod test_helpers;
 
 #[cfg(test)]
 mod dashboard_api_e2e_test {
-    use std::sync::{Arc, Mutex};
-    use rusqlite::Connection;
     use chrono::{NaiveDate, NaiveDateTime};
+    use rusqlite::Connection;
+    use std::sync::{Arc, Mutex};
 
     // 导入 DashboardAPI
     use hot_rolling_aps::api::dashboard_api::DashboardApi;
@@ -22,7 +22,9 @@ mod dashboard_api_e2e_test {
     // 导入 DecisionAPI 相关（使用重导出路径）
     use hot_rolling_aps::decision::api::{DecisionApi, DecisionApiImpl};
     use hot_rolling_aps::decision::repository::*;
-    use hot_rolling_aps::decision::services::{DecisionRefreshService, RefreshScope, RefreshTrigger};
+    use hot_rolling_aps::decision::services::{
+        DecisionRefreshService, RefreshScope, RefreshTrigger,
+    };
     use hot_rolling_aps::decision::use_cases::impls::*;
 
     use crate::test_helpers;
@@ -41,7 +43,9 @@ mod dashboard_api_e2e_test {
         Arc<DecisionRefreshService>,
     ) {
         let (temp_file, db_path) = create_test_db().unwrap();
-        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).unwrap()));
+        let conn = Arc::new(Mutex::new(
+            test_helpers::open_test_connection(&db_path).unwrap(),
+        ));
 
         // 决策层 Repositories
         let day_summary_repo = Arc::new(DaySummaryRepository::new(conn.clone()));
@@ -52,10 +56,8 @@ mod dashboard_api_e2e_test {
         let d4_use_case = Arc::new(MachineBottleneckUseCaseImpl::new(bottleneck_repo));
 
         // Decision API（只支持 D1 和 D4）
-        let decision_api: Arc<dyn DecisionApi> = Arc::new(DecisionApiImpl::new(
-            d1_use_case,
-            d4_use_case,
-        ));
+        let decision_api: Arc<dyn DecisionApi> =
+            Arc::new(DecisionApiImpl::new(d1_use_case, d4_use_case));
 
         // ActionLog Repository
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
@@ -83,7 +85,10 @@ mod dashboard_api_e2e_test {
         let (_temp, _db_path, dashboard_api, _refresh_service) = setup_dashboard_test_env();
 
         // 验证 DashboardAPI 可以正常创建
-        assert!(Arc::strong_count(&dashboard_api) > 0, "DashboardAPI 应该被正确创建");
+        assert!(
+            Arc::strong_count(&dashboard_api) > 0,
+            "DashboardAPI 应该被正确创建"
+        );
     }
 
     // ==========================================
@@ -138,7 +143,11 @@ mod dashboard_api_e2e_test {
             affected_date_range: None,
         };
         refresh_service
-            .refresh_all(scope, RefreshTrigger::ManualRefresh, Some("e2e_test".to_string()))
+            .refresh_all(
+                scope,
+                RefreshTrigger::ManualRefresh,
+                Some("e2e_test".to_string()),
+            )
             .unwrap();
 
         // 4. 调用 DashboardAPI 简化版本（向后兼容 Tauri 命令）
@@ -152,9 +161,16 @@ mod dashboard_api_e2e_test {
 
         // 验证第一条记录是最高风险
         let first_item = &response.items[0];
-        assert_eq!(first_item.plan_date, date1.to_string(), "第一条应该是风险最高的日期");
+        assert_eq!(
+            first_item.plan_date,
+            date1.to_string(),
+            "第一条应该是风险最高的日期"
+        );
         // D1 读模型目前按 risk_level 映射计算风险分数：HIGH≈70, MEDIUM≈40, CRITICAL≈90
-        assert!((first_item.risk_score - 70.0).abs() < 6.0, "风险分数应该接近 70.0");
+        assert!(
+            (first_item.risk_score - 70.0).abs() < 6.0,
+            "风险分数应该接近 70.0"
+        );
     }
 
     // ==========================================
@@ -208,7 +224,11 @@ mod dashboard_api_e2e_test {
             affected_date_range: None,
         };
         refresh_service
-            .refresh_all(scope, RefreshTrigger::ManualRefresh, Some("e2e_test".to_string()))
+            .refresh_all(
+                scope,
+                RefreshTrigger::ManualRefresh,
+                Some("e2e_test".to_string()),
+            )
             .unwrap();
 
         // 4. 调用 DashboardAPI 完整参数版本（指定日期范围和风险等级过滤）
@@ -280,7 +300,11 @@ mod dashboard_api_e2e_test {
             affected_date_range: None,
         };
         refresh_service
-            .refresh_all(scope, RefreshTrigger::ManualRefresh, Some("e2e_test".to_string()))
+            .refresh_all(
+                scope,
+                RefreshTrigger::ManualRefresh,
+                Some("e2e_test".to_string()),
+            )
             .unwrap();
 
         // 4. 调用向后兼容方法（Tauri 命令使用的接口）
@@ -301,8 +325,10 @@ mod dashboard_api_e2e_test {
         let conn = test_helpers::open_test_connection(&db_path).unwrap();
 
         // 1. 创建测试日志
-        let log_time1 = NaiveDateTime::parse_from_str("2026-01-24 10:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
-        let log_time2 = NaiveDateTime::parse_from_str("2026-01-24 11:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let log_time1 =
+            NaiveDateTime::parse_from_str("2026-01-24 10:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let log_time2 =
+            NaiveDateTime::parse_from_str("2026-01-24 11:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
 
         conn.execute(
             "INSERT INTO action_log (action_id, version_id, action_type, detail, actor, action_ts)
@@ -333,15 +359,25 @@ mod dashboard_api_e2e_test {
         .unwrap();
 
         // 2. 查询时间范围内的日志
-        let start_time = NaiveDateTime::parse_from_str("2026-01-24 09:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
-        let end_time = NaiveDateTime::parse_from_str("2026-01-24 12:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let start_time =
+            NaiveDateTime::parse_from_str("2026-01-24 09:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let end_time =
+            NaiveDateTime::parse_from_str("2026-01-24 12:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
 
-        let logs = dashboard_api.list_action_logs(start_time, end_time).unwrap();
+        let logs = dashboard_api
+            .list_action_logs(start_time, end_time)
+            .unwrap();
 
         // 3. 验证结果
         assert_eq!(logs.len(), 2, "应该返回 2 条日志");
-        assert_eq!(logs[0].action_id, "LOG_002", "第一条日志应该是 LOG_002 (降序)");
-        assert_eq!(logs[1].action_id, "LOG_001", "第二条日志应该是 LOG_001 (降序)");
+        assert_eq!(
+            logs[0].action_id, "LOG_002",
+            "第一条日志应该是 LOG_002 (降序)"
+        );
+        assert_eq!(
+            logs[1].action_id, "LOG_001",
+            "第二条日志应该是 LOG_001 (降序)"
+        );
     }
 
     // ==========================================
@@ -355,7 +391,8 @@ mod dashboard_api_e2e_test {
         let conn = test_helpers::open_test_connection(&db_path).unwrap();
 
         // 1. 创建测试日志（不同版本）
-        let log_time = NaiveDateTime::parse_from_str("2026-01-24 10:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let log_time =
+            NaiveDateTime::parse_from_str("2026-01-24 10:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
 
         conn.execute(
             "INSERT INTO action_log (action_id, version_id, action_type, detail, actor, action_ts)
@@ -386,12 +423,18 @@ mod dashboard_api_e2e_test {
         .unwrap();
 
         // 2. 查询指定版本的日志
-        let logs = dashboard_api.list_action_logs_by_version("VERSION_001").unwrap();
+        let logs = dashboard_api
+            .list_action_logs_by_version("VERSION_001")
+            .unwrap();
 
         // 3. 验证结果
         assert_eq!(logs.len(), 1, "应该只返回 VERSION_001 的日志");
         assert_eq!(logs[0].action_id, "LOG_V1", "日志应该是 LOG_V1");
-        assert_eq!(logs[0].version_id.as_deref(), Some("VERSION_001"), "版本ID 应该是 VERSION_001");
+        assert_eq!(
+            logs[0].version_id.as_deref(),
+            Some("VERSION_001"),
+            "版本ID 应该是 VERSION_001"
+        );
     }
 
     // ==========================================
@@ -488,18 +531,33 @@ mod dashboard_api_e2e_test {
         )
         .unwrap();
 
-        let start_time = NaiveDateTime::parse_from_str("2026-01-24 09:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
-        let end_time = NaiveDateTime::parse_from_str("2026-01-24 15:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let start_time =
+            NaiveDateTime::parse_from_str("2026-01-24 09:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let end_time =
+            NaiveDateTime::parse_from_str("2026-01-24 15:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
 
         // 1) 默认 limit 足够大，返回全部命中项（应按 action_ts DESC 排序）
         let logs = dashboard_api
             .list_action_logs_by_material("MAT001", start_time, end_time, 10)
             .unwrap();
 
-        assert_eq!(logs.len(), 3, "应该返回 3 条命中日志（detail/payload/impact）");
-        assert_eq!(logs[0].action_id, "LOG_MAT_IMPACT", "应按时间降序排列：最新在前");
-        assert_eq!(logs[1].action_id, "LOG_MAT_PAYLOAD", "应按时间降序排列：其次");
-        assert_eq!(logs[2].action_id, "LOG_MAT_DETAIL", "应按时间降序排列：最早");
+        assert_eq!(
+            logs.len(),
+            3,
+            "应该返回 3 条命中日志（detail/payload/impact）"
+        );
+        assert_eq!(
+            logs[0].action_id, "LOG_MAT_IMPACT",
+            "应按时间降序排列：最新在前"
+        );
+        assert_eq!(
+            logs[1].action_id, "LOG_MAT_PAYLOAD",
+            "应按时间降序排列：其次"
+        );
+        assert_eq!(
+            logs[2].action_id, "LOG_MAT_DETAIL",
+            "应按时间降序排列：最早"
+        );
 
         // 2) limit 生效
         let logs_limited = dashboard_api
@@ -591,8 +649,10 @@ mod dashboard_api_e2e_test {
         let (_temp, _db_path, dashboard_api, _refresh_service) = setup_dashboard_test_env();
 
         // 1. 创建无效的时间范围（开始时间晚于结束时间）
-        let start_time = NaiveDateTime::parse_from_str("2026-01-24 12:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
-        let end_time = NaiveDateTime::parse_from_str("2026-01-24 10:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let start_time =
+            NaiveDateTime::parse_from_str("2026-01-24 12:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let end_time =
+            NaiveDateTime::parse_from_str("2026-01-24 10:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
 
         // 2. 调用查询方法
         let result = dashboard_api.list_action_logs(start_time, end_time);

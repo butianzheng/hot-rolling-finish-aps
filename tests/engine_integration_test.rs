@@ -133,12 +133,8 @@ fn test_integration_normal_fill_green_risk() {
     let frozen_items = vec![];
 
     // Step 1: CapacityFiller填充产能
-    let (plan_items, _rejected) = capacity_filler.fill_single_day(
-        &mut pool,
-        candidates.clone(),
-        frozen_items,
-        "test_v1",
-    );
+    let (plan_items, _rejected) =
+        capacity_filler.fill_single_day(&mut pool, candidates.clone(), frozen_items, "test_v1");
 
     // 验证CapacityFiller输出
     assert_eq!(plan_items.len(), 2, "应该排入2个材料");
@@ -146,13 +142,11 @@ fn test_integration_normal_fill_green_risk() {
         (pool.used_capacity_t - 80.0).abs() < 0.01,
         "已用产能应该是80吨"
     );
-    assert!(
-        (pool.overflow_t - 0.0).abs() < 0.01,
-        "超限应该是0吨"
-    );
+    assert!((pool.overflow_t - 0.0).abs() < 0.01, "超限应该是0吨");
 
     // Step 2: 准备RiskEngine输入
-    let all_materials: Vec<MaterialState> = candidates.iter().map(|(_, state)| state.clone()).collect();
+    let all_materials: Vec<MaterialState> =
+        candidates.iter().map(|(_, state)| state.clone()).collect();
     let material_weights: HashMap<String, f64> = candidates
         .iter()
         .map(|(master, _)| (master.material_id.clone(), master.weight_t.unwrap()))
@@ -172,7 +166,11 @@ fn test_integration_normal_fill_green_risk() {
     );
 
     // 验证RiskEngine输出
-    assert_eq!(risk_snapshot.risk_level, RiskLevel::Green, "风险等级应该是GREEN");
+    assert_eq!(
+        risk_snapshot.risk_level,
+        RiskLevel::Green,
+        "风险等级应该是GREEN"
+    );
     assert_eq!(risk_snapshot.machine_code, "H032");
     assert_eq!(risk_snapshot.snapshot_date, date);
     assert!((risk_snapshot.used_capacity_t - 80.0).abs() < 0.01);
@@ -180,7 +178,11 @@ fn test_integration_normal_fill_green_risk() {
 
     // 验证产能利用率 (80/100 = 80%)
     let utilization = risk_snapshot.used_capacity_t / risk_snapshot.target_capacity_t;
-    assert!(utilization < 0.95, "利用率应该低于95%,实际: {:.2}%", utilization * 100.0);
+    assert!(
+        utilization < 0.95,
+        "利用率应该低于95%,实际: {:.2}%",
+        utilization * 100.0
+    );
 }
 
 // ==========================================
@@ -209,18 +211,15 @@ fn test_integration_high_utilization_yellow_risk() {
     let frozen_items = vec![];
 
     // Step 1: CapacityFiller填充
-    let (plan_items, _rejected) = capacity_filler.fill_single_day(
-        &mut pool,
-        candidates.clone(),
-        frozen_items,
-        "test_v1",
-    );
+    let (plan_items, _rejected) =
+        capacity_filler.fill_single_day(&mut pool, candidates.clone(), frozen_items, "test_v1");
 
     assert_eq!(plan_items.len(), 2);
     assert!((pool.used_capacity_t - 95.0).abs() < 0.01);
 
     // Step 2: RiskEngine评估
-    let all_materials: Vec<MaterialState> = candidates.iter().map(|(_, state)| state.clone()).collect();
+    let all_materials: Vec<MaterialState> =
+        candidates.iter().map(|(_, state)| state.clone()).collect();
     let material_weights: HashMap<String, f64> = candidates
         .iter()
         .map(|(master, _)| (master.material_id.clone(), master.weight_t.unwrap()))
@@ -279,12 +278,8 @@ fn test_integration_overflow_orange_risk() {
     let frozen_items = vec![];
 
     // Step 1: CapacityFiller填充
-    let (plan_items, rejected) = capacity_filler.fill_single_day(
-        &mut pool,
-        candidates.clone(),
-        frozen_items,
-        "test_v1",
-    );
+    let (plan_items, rejected) =
+        capacity_filler.fill_single_day(&mut pool, candidates.clone(), frozen_items, "test_v1");
 
     // 验证填充结果: 前两个材料填充,第三个被拒绝或跳过
     // 注意: locked材料的处理逻辑取决于CapacityFiller实现
@@ -311,12 +306,8 @@ fn test_integration_overflow_orange_risk() {
     ];
 
     let mut pool2 = create_test_capacity_pool("H032", date, 100.0, 120.0);
-    let (plan_items_with_locked, _) = capacity_filler.fill_single_day(
-        &mut pool2,
-        locked_candidates.clone(),
-        vec![],
-        "test_v1",
-    );
+    let (plan_items_with_locked, _) =
+        capacity_filler.fill_single_day(&mut pool2, locked_candidates.clone(), vec![], "test_v1");
 
     // locked材料应该被强制加入,导致超限
     assert_eq!(plan_items_with_locked.len(), 3, "locked材料应该被强制加入");
@@ -324,7 +315,10 @@ fn test_integration_overflow_orange_risk() {
     assert!((pool2.overflow_t - 5.0).abs() < 0.01, "超限应该是5吨");
 
     // Step 3: RiskEngine评估超限风险
-    let all_materials: Vec<MaterialState> = locked_candidates.iter().map(|(_, state)| state.clone()).collect();
+    let all_materials: Vec<MaterialState> = locked_candidates
+        .iter()
+        .map(|(_, state)| state.clone())
+        .collect();
     let material_weights: HashMap<String, f64> = locked_candidates
         .iter()
         .map(|(master, _)| (master.material_id.clone(), master.weight_t.unwrap()))
@@ -349,7 +343,10 @@ fn test_integration_overflow_orange_risk() {
         risk_snapshot.risk_level
     );
     assert!((risk_snapshot.overflow_t - 5.0).abs() < 0.01);
-    assert!(risk_snapshot.risk_reason.contains("超限") || risk_snapshot.risk_reason.contains("overflow"));
+    assert!(
+        risk_snapshot.risk_reason.contains("超限")
+            || risk_snapshot.risk_reason.contains("overflow")
+    );
 }
 
 // ==========================================
@@ -377,19 +374,19 @@ fn test_integration_many_l2_materials_yellow_risk() {
     let frozen_items = vec![];
 
     // Step 1: CapacityFiller填充
-    let (plan_items, _rejected) = capacity_filler.fill_single_day(
-        &mut pool,
-        candidates.clone(),
-        frozen_items,
-        "test_v1",
-    );
+    let (plan_items, _rejected) =
+        capacity_filler.fill_single_day(&mut pool, candidates.clone(), frozen_items, "test_v1");
 
     // 验证填充结果
     assert_eq!(plan_items.len(), 6, "应该排入6个L2材料");
-    assert!((pool.used_capacity_t - 90.0).abs() < 0.01, "已用产能应该是90吨");
+    assert!(
+        (pool.used_capacity_t - 90.0).abs() < 0.01,
+        "已用产能应该是90吨"
+    );
 
     // Step 2: RiskEngine评估
-    let all_materials: Vec<MaterialState> = candidates.iter().map(|(_, state)| state.clone()).collect();
+    let all_materials: Vec<MaterialState> =
+        candidates.iter().map(|(_, state)| state.clone()).collect();
     let material_weights: HashMap<String, f64> = candidates
         .iter()
         .map(|(master, _)| (master.material_id.clone(), master.weight_t.unwrap()))
@@ -441,19 +438,19 @@ fn test_integration_l3_critical_materials_red_risk() {
     let frozen_items = vec![];
 
     // Step 1: CapacityFiller填充
-    let (plan_items, _rejected) = capacity_filler.fill_single_day(
-        &mut pool,
-        candidates.clone(),
-        frozen_items,
-        "test_v1",
-    );
+    let (plan_items, _rejected) =
+        capacity_filler.fill_single_day(&mut pool, candidates.clone(), frozen_items, "test_v1");
 
     // 验证填充结果
     assert_eq!(plan_items.len(), 5, "应该排入5个L3材料");
-    assert!((pool.used_capacity_t - 90.0).abs() < 0.01, "已用产能应该是90吨");
+    assert!(
+        (pool.used_capacity_t - 90.0).abs() < 0.01,
+        "已用产能应该是90吨"
+    );
 
     // Step 2: RiskEngine评估
-    let all_materials: Vec<MaterialState> = candidates.iter().map(|(_, state)| state.clone()).collect();
+    let all_materials: Vec<MaterialState> =
+        candidates.iter().map(|(_, state)| state.clone()).collect();
     let material_weights: HashMap<String, f64> = candidates
         .iter()
         .map(|(master, _)| (master.material_id.clone(), master.weight_t.unwrap()))
@@ -496,30 +493,28 @@ fn test_integration_frozen_zone_priority_with_risk() {
     let mut pool = create_test_capacity_pool("H032", date, 100.0, 120.0);
 
     // 准备冻结材料
-    let frozen_items = vec![
-        PlanItem {
-            version_id: "test_v1".to_string(),
-            material_id: "F001".to_string(),
-            machine_code: "H032".to_string(),
-            plan_date: date,
-            seq_no: 1,
-            weight_t: 30.0,
-            source_type: "FROZEN".to_string(),
-            locked_in_plan: true,
-            force_release_in_plan: false,
-            violation_flags: None,
-            urgent_level: Some("L2".to_string()),
-            sched_state: Some("LOCKED".to_string()),
-            assign_reason: Some("FROZEN_ZONE".to_string()),
-            steel_grade: None,
-            width_mm: None,
-            thickness_mm: None,
-            contract_no: None,
-            due_date: None,
-            scheduled_date: None,
-            scheduled_machine_code: None,
-        },
-    ];
+    let frozen_items = vec![PlanItem {
+        version_id: "test_v1".to_string(),
+        material_id: "F001".to_string(),
+        machine_code: "H032".to_string(),
+        plan_date: date,
+        seq_no: 1,
+        weight_t: 30.0,
+        source_type: "FROZEN".to_string(),
+        locked_in_plan: true,
+        force_release_in_plan: false,
+        violation_flags: None,
+        urgent_level: Some("L2".to_string()),
+        sched_state: Some("LOCKED".to_string()),
+        assign_reason: Some("FROZEN_ZONE".to_string()),
+        steel_grade: None,
+        width_mm: None,
+        thickness_mm: None,
+        contract_no: None,
+        due_date: None,
+        scheduled_date: None,
+        scheduled_machine_code: None,
+    }];
 
     // 准备候选材料
     let candidates = vec![
@@ -544,16 +539,25 @@ fn test_integration_frozen_zone_priority_with_risk() {
     // 验证冻结材料在最前
     assert!(plan_items.len() >= 3, "应该包含冻结材料+候选材料");
     assert_eq!(plan_items[0].material_id, "F001", "冻结材料应该排在第一位");
-    assert_eq!(plan_items[0].assign_reason.as_ref().map(|s| s.as_str()), Some("FROZEN_ZONE"));
+    assert_eq!(
+        plan_items[0].assign_reason.as_ref().map(|s| s.as_str()),
+        Some("FROZEN_ZONE")
+    );
 
     // 验证产能计算包含冻结区
     // 注意: frozen_capacity_t字段在当前CapacityFiller实现中未更新,所以只验证used_capacity_t
     assert!(pool.used_capacity_t >= 30.0, "已用产能应该包含冻结区");
 
     // Step 2: RiskEngine评估 (需要包含所有材料状态)
-    let mut all_materials: Vec<MaterialState> = candidates.iter().map(|(_, state)| state.clone()).collect();
+    let mut all_materials: Vec<MaterialState> =
+        candidates.iter().map(|(_, state)| state.clone()).collect();
     // 添加冻结材料的状态
-    all_materials.push(create_test_material_state("F001", UrgentLevel::L2, true, SchedState::Locked));
+    all_materials.push(create_test_material_state(
+        "F001",
+        UrgentLevel::L2,
+        true,
+        SchedState::Locked,
+    ));
 
     let mut material_weights: HashMap<String, f64> = candidates
         .iter()
@@ -574,7 +578,10 @@ fn test_integration_frozen_zone_priority_with_risk() {
     );
 
     // 验证风险评估正确反映冻结区影响
-    assert!(risk_snapshot.used_capacity_t >= 30.0, "已用产能应该包含冻结区");
+    assert!(
+        risk_snapshot.used_capacity_t >= 30.0,
+        "已用产能应该包含冻结区"
+    );
     assert!(risk_snapshot.l2_count >= 1, "应该统计到冻结区的L2材料");
 
     // 注意: frozen_capacity_t由Capacity Filler设置,不是测试的核心关注点
@@ -618,19 +625,16 @@ fn test_integration_comprehensive_scenario() {
     let frozen_items = vec![];
 
     // Step 1: CapacityFiller填充
-    let (plan_items, _rejected) = capacity_filler.fill_single_day(
-        &mut pool,
-        candidates.clone(),
-        frozen_items,
-        "test_v1",
-    );
+    let (plan_items, _rejected) =
+        capacity_filler.fill_single_day(&mut pool, candidates.clone(), frozen_items, "test_v1");
 
     assert_eq!(plan_items.len(), 4);
     assert!((pool.used_capacity_t - 118.0).abs() < 0.01);
     assert!(pool.used_capacity_t <= pool.limit_capacity_t, "不应该超限");
 
     // Step 2: RiskEngine评估
-    let all_materials: Vec<MaterialState> = candidates.iter().map(|(_, state)| state.clone()).collect();
+    let all_materials: Vec<MaterialState> =
+        candidates.iter().map(|(_, state)| state.clone()).collect();
     let material_weights: HashMap<String, f64> = candidates
         .iter()
         .map(|(master, _)| (master.material_id.clone(), master.weight_t.unwrap()))
@@ -686,15 +690,12 @@ fn test_integration_data_flow_integrity() {
     let frozen_items = vec![];
 
     // Step 1: CapacityFiller
-    let (plan_items, _) = capacity_filler.fill_single_day(
-        &mut pool,
-        candidates.clone(),
-        frozen_items,
-        "test_v1",
-    );
+    let (plan_items, _) =
+        capacity_filler.fill_single_day(&mut pool, candidates.clone(), frozen_items, "test_v1");
 
     // Step 2: RiskEngine
-    let all_materials: Vec<MaterialState> = candidates.iter().map(|(_, state)| state.clone()).collect();
+    let all_materials: Vec<MaterialState> =
+        candidates.iter().map(|(_, state)| state.clone()).collect();
     let material_weights: HashMap<String, f64> = candidates
         .iter()
         .map(|(master, _)| (master.material_id.clone(), master.weight_t.unwrap()))

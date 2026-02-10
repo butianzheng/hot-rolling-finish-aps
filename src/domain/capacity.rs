@@ -16,27 +16,27 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapacityPool {
     // ===== 主键 (版本化后) =====
-    pub version_id: String,        // 所属版本ID (P1-1: 版本化改造)
-    pub machine_code: String,      // 机组代码
-    pub plan_date: NaiveDate,      // 排产日期
+    pub version_id: String,   // 所属版本ID (P1-1: 版本化改造)
+    pub machine_code: String, // 机组代码
+    pub plan_date: NaiveDate, // 排产日期
 
     // ===== 产能参数 =====
-    pub target_capacity_t: f64,    // 目标产能 (吨)
-    pub limit_capacity_t: f64,     // 上限产能 (吨)
+    pub target_capacity_t: f64, // 目标产能 (吨)
+    pub limit_capacity_t: f64,  // 上限产能 (吨)
 
     // ===== 实际使用 =====
-    pub used_capacity_t: f64,      // 已使用产能 (吨)
-    pub overflow_t: f64,           // 超限吨位 (> limit)
+    pub used_capacity_t: f64, // 已使用产能 (吨)
+    pub overflow_t: f64,      // 超限吨位 (> limit)
 
     // ===== 冻结区 =====
-    pub frozen_capacity_t: f64,    // 冻结区吨位
+    pub frozen_capacity_t: f64, // 冻结区吨位
 
     // ===== 换辊相关 =====
     pub accumulated_tonnage_t: f64, // 累计吨位 (用于换辊判断)
     pub roll_campaign_id: Option<String>, // 关联换辊窗口
 
-    // TODO: 添加结构目标字段 (品种配比)
-    // TODO: 添加锁定标志
+                                    // TODO: 添加结构目标字段 (品种配比)
+                                    // TODO: 添加锁定标志
 }
 
 // ==========================================

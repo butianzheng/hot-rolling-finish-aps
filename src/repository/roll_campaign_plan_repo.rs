@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 pub struct RollCampaignPlanEntity {
     pub version_id: String,
     pub machine_code: String,
-    pub initial_start_at: String, // YYYY-MM-DD HH:MM:SS
+    pub initial_start_at: String,       // YYYY-MM-DD HH:MM:SS
     pub next_change_at: Option<String>, // YYYY-MM-DD HH:MM:SS
     pub downtime_minutes: Option<i32>,
     pub updated_at: String,
@@ -142,7 +142,10 @@ impl RollCampaignPlanRepository {
         }
     }
 
-    pub fn list_by_version_id(&self, version_id: &str) -> RepositoryResult<Vec<RollCampaignPlanEntity>> {
+    pub fn list_by_version_id(
+        &self,
+        version_id: &str,
+    ) -> RepositoryResult<Vec<RollCampaignPlanEntity>> {
         let conn = self.get_conn()?;
         let mut stmt = conn.prepare(
             r#"

@@ -77,7 +77,9 @@ impl MaterialImportRepositoryImpl {
                 material.due_date,
                 material.stock_age_days,
                 material.output_age_days_raw,
-                material.rolling_output_date.map(|d| d.format("%Y-%m-%d").to_string()),
+                material
+                    .rolling_output_date
+                    .map(|d| d.format("%Y-%m-%d").to_string()),
                 material.status_updated_at,
                 material.contract_no,
                 material.contract_nature,

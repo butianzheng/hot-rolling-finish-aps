@@ -196,7 +196,10 @@ mod tests {
         assert_eq!(summaries.len(), 2);
 
         // 最危险的应该是有产能超载的那天（2026-01-25）
-        assert!(summaries[0].top_reasons.iter().any(|r| r.code == "CAPACITY_OVERFLOW"));
+        assert!(summaries[0]
+            .top_reasons
+            .iter()
+            .any(|r| r.code == "CAPACITY_OVERFLOW"));
     }
 
     #[test]

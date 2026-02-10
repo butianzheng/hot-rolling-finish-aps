@@ -94,7 +94,10 @@ impl BottleneckScoringConfig {
         if self.capacity_full_threshold <= self.capacity_hard_threshold {
             return 1.0;
         }
-        clamp01((utilization - self.capacity_hard_threshold) / (self.capacity_full_threshold - self.capacity_hard_threshold))
+        clamp01(
+            (utilization - self.capacity_hard_threshold)
+                / (self.capacity_full_threshold - self.capacity_hard_threshold),
+        )
     }
 
     fn structure_deviation_severity(&self, weighted_dev: f64) -> f64 {
@@ -114,7 +117,10 @@ impl BottleneckScoringConfig {
         if full_threshold <= self.structure_dev_threshold {
             return 1.0;
         }
-        clamp01((weighted_dev - self.structure_dev_threshold) / (full_threshold - self.structure_dev_threshold))
+        clamp01(
+            (weighted_dev - self.structure_dev_threshold)
+                / (full_threshold - self.structure_dev_threshold),
+        )
     }
 
     fn structure_violation_severity(&self, violation_count: i32) -> f64 {
@@ -158,9 +164,22 @@ impl BottleneckRepository {
 
         // 根据是否指定 machine_code 选择不同的查询路径
         if let Some(mc) = machine_code {
-            self.query_capacity_for_machine(&conn, version_id, mc, start_date, end_date, &mut bottleneck_map)?;
+            self.query_capacity_for_machine(
+                &conn,
+                version_id,
+                mc,
+                start_date,
+                end_date,
+                &mut bottleneck_map,
+            )?;
         } else {
-            self.query_capacity_for_all(&conn, version_id, start_date, end_date, &mut bottleneck_map)?;
+            self.query_capacity_for_all(
+                &conn,
+                version_id,
+                start_date,
+                end_date,
+                &mut bottleneck_map,
+            )?;
         }
 
         // 查询 plan_item 表以获取已排材料数据
@@ -177,7 +196,13 @@ impl BottleneckRepository {
         )?;
 
         // 查询 material_state 表以获取真实的待排材料数据
-        self.enrich_with_pending_materials(&conn, version_id, start_date, end_date, &mut bottleneck_map)?;
+        self.enrich_with_pending_materials(
+            &conn,
+            version_id,
+            start_date,
+            end_date,
+            &mut bottleneck_map,
+        )?;
 
         // 转换为 MachineBottleneckProfile 并排序
         let mut profiles: Vec<MachineBottleneckProfile> = bottleneck_map
@@ -225,19 +250,22 @@ impl BottleneckRepository {
             "#,
         )?;
 
-        let rows = stmt.query_map(params![version_id, machine_code, start_date, end_date], |row| {
-            Ok((
-                row.get::<_, String>(0)?, // machine_code
-                row.get::<_, String>(1)?, // plan_date
-                row.get::<_, f64>(2)?,    // target_capacity_t
-                row.get::<_, f64>(3)?,    // limit_capacity_t
-                row.get::<_, f64>(4)?,    // used_capacity_t
-                row.get::<_, f64>(5)?,    // overflow_t
-                row.get::<_, f64>(6)?,    // frozen_capacity_t
-                row.get::<_, f64>(7)?,    // accumulated_tonnage_t
-                row.get::<_, Option<String>>(8)?, // roll_campaign_id
-            ))
-        })?;
+        let rows = stmt.query_map(
+            params![version_id, machine_code, start_date, end_date],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,         // machine_code
+                    row.get::<_, String>(1)?,         // plan_date
+                    row.get::<_, f64>(2)?,            // target_capacity_t
+                    row.get::<_, f64>(3)?,            // limit_capacity_t
+                    row.get::<_, f64>(4)?,            // used_capacity_t
+                    row.get::<_, f64>(5)?,            // overflow_t
+                    row.get::<_, f64>(6)?,            // frozen_capacity_t
+                    row.get::<_, f64>(7)?,            // accumulated_tonnage_t
+                    row.get::<_, Option<String>>(8)?, // roll_campaign_id
+                ))
+            },
+        )?;
 
         self.process_capacity_rows(rows, bottleneck_map)?;
         Ok(())
@@ -273,14 +301,14 @@ impl BottleneckRepository {
 
         let rows = stmt.query_map(params![version_id, start_date, end_date], |row| {
             Ok((
-                row.get::<_, String>(0)?, // machine_code
-                row.get::<_, String>(1)?, // plan_date
-                row.get::<_, f64>(2)?,    // target_capacity_t
-                row.get::<_, f64>(3)?,    // limit_capacity_t
-                row.get::<_, f64>(4)?,    // used_capacity_t
-                row.get::<_, f64>(5)?,    // overflow_t
-                row.get::<_, f64>(6)?,    // frozen_capacity_t
-                row.get::<_, f64>(7)?,    // accumulated_tonnage_t
+                row.get::<_, String>(0)?,         // machine_code
+                row.get::<_, String>(1)?,         // plan_date
+                row.get::<_, f64>(2)?,            // target_capacity_t
+                row.get::<_, f64>(3)?,            // limit_capacity_t
+                row.get::<_, f64>(4)?,            // used_capacity_t
+                row.get::<_, f64>(5)?,            // overflow_t
+                row.get::<_, f64>(6)?,            // frozen_capacity_t
+                row.get::<_, f64>(7)?,            // accumulated_tonnage_t
                 row.get::<_, Option<String>>(8)?, // roll_campaign_id
             ))
         })?;
@@ -292,7 +320,21 @@ impl BottleneckRepository {
     /// 处理产能查询结果行
     fn process_capacity_rows(
         &self,
-        rows: rusqlite::MappedRows<impl FnMut(&rusqlite::Row) -> rusqlite::Result<(String, String, f64, f64, f64, f64, f64, f64, Option<String>)>>,
+        rows: rusqlite::MappedRows<
+            impl FnMut(
+                &rusqlite::Row,
+            ) -> rusqlite::Result<(
+                String,
+                String,
+                f64,
+                f64,
+                f64,
+                f64,
+                f64,
+                f64,
+                Option<String>,
+            )>,
+        >,
         bottleneck_map: &mut HashMap<(String, String), MachineBottleneckAggregateData>,
     ) -> Result<(), Box<dyn Error>> {
         for row_result in rows {
@@ -352,11 +394,11 @@ impl BottleneckRepository {
 
         let rows = stmt.query_map(params![version_id, start_date, end_date], |row| {
             Ok((
-                row.get::<_, String>(0)?,  // machine_code
-                row.get::<_, String>(1)?,  // plan_date
-                row.get::<_, i32>(2)?,     // material_count (已排材料数)
-                row.get::<_, f64>(3)?,     // total_weight_t (已排材料重量)
-                row.get::<_, i32>(4)?,     // violation_count
+                row.get::<_, String>(0)?, // machine_code
+                row.get::<_, String>(1)?, // plan_date
+                row.get::<_, i32>(2)?,    // material_count (已排材料数)
+                row.get::<_, f64>(3)?,    // total_weight_t (已排材料重量)
+                row.get::<_, i32>(4)?,    // violation_count
             ))
         })?;
 
@@ -369,11 +411,11 @@ impl BottleneckRepository {
                 // plan_item 数据代表已排材料，直接赋值给 scheduled 字段
                 // pending 字段将从 material_state 表查询，不在此处赋值
                 entry.set_plan_item_data(
-                    0,                   // pending_materials（暂不赋值，由 enrich_with_pending_materials 填充）
-                    0.0,                 // pending_weight_t（暂不赋值）
+                    0,   // pending_materials（暂不赋值，由 enrich_with_pending_materials 填充）
+                    0.0, // pending_weight_t（暂不赋值）
                     violation_count,
-                    scheduled_count,     // scheduled_materials（已排材料数）
-                    scheduled_weight,    // scheduled_weight_t（已排材料重量）
+                    scheduled_count,  // scheduled_materials（已排材料数）
+                    scheduled_weight, // scheduled_weight_t（已排材料重量）
                 );
             }
         }
@@ -597,14 +639,16 @@ impl BottleneckRepository {
         }
 
         // pending increments: READY/FORCE_RELEASE/LOCKED 且未排入 plan_item
-        let pending_incr_map =
-            Self::query_unscheduled_ready_increments(conn, version_id, &machine_codes, start_date, end_date)?;
-
-        let pending_map = Self::compute_pending_map(
+        let pending_incr_map = Self::query_unscheduled_ready_increments(
+            conn,
+            version_id,
             &machine_codes,
-            &profile_dates,
-            &pending_incr_map,
-        );
+            start_date,
+            end_date,
+        )?;
+
+        let pending_map =
+            Self::compute_pending_map(&machine_codes, &profile_dates, &pending_incr_map);
 
         for ((machine_code, plan_date), entry) in bottleneck_map.iter_mut() {
             if let Some((pending_cnt, pending_weight)) =
@@ -705,7 +749,11 @@ impl MachineBottleneckAggregateData {
         self.structure_deviation = deviation;
     }
 
-    fn into_profile(self, version_id: String, cfg: &BottleneckScoringConfig) -> MachineBottleneckProfile {
+    fn into_profile(
+        self,
+        version_id: String,
+        cfg: &BottleneckScoringConfig,
+    ) -> MachineBottleneckProfile {
         let mut profile =
             MachineBottleneckProfile::new(version_id, self.machine_code, self.plan_date);
 
@@ -792,7 +840,10 @@ impl MachineBottleneckAggregateData {
         if self.pending_materials > 20 {
             profile.add_reason(
                 "HIGH_PENDING_COUNT".to_string(),
-                format!("未排材料数量较多 {} 个（到当日仍未排入≤当日）", self.pending_materials),
+                format!(
+                    "未排材料数量较多 {} 个（到当日仍未排入≤当日）",
+                    self.pending_materials
+                ),
                 0.0,
                 self.pending_materials,
             );
@@ -827,7 +878,8 @@ impl MachineBottleneckAggregateData {
                 profile.add_suggested_action("优先处理结构冲突/节奏偏差材料".to_string());
             }
             if self.pending_materials > 20 {
-                profile.add_suggested_action("将部分材料转移至其他机组或延后至后续日期".to_string());
+                profile
+                    .add_suggested_action("将部分材料转移至其他机组或延后至后续日期".to_string());
             }
         }
 

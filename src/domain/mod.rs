@@ -17,7 +17,9 @@ pub mod roller;
 pub mod types;
 
 // 重导出核心类型
-pub use action_log::{ActionLog, ActionType, CapacityChange, ImpactSummary, MaterialChange, RiskChange};
+pub use action_log::{
+    ActionLog, ActionType, CapacityChange, ImpactSummary, MaterialChange, RiskChange,
+};
 pub use capacity::{CapacityConstraint, CapacityPool};
 pub use material::{
     ConflictType, DqLevel, DqReport, DqSummary, DqViolation, ImportBatch, ImportConflict,
@@ -27,9 +29,7 @@ pub use material::{
 pub use plan::{Plan, PlanItem, PlanVersion, PlanVersionManagement};
 pub use risk::{RiskAssessment, RiskSnapshot};
 pub use roller::{RollerCampaign, RollerCampaignMonitor};
-pub use types::{
-    RiskLevel, RollStatus, RushLevel, SchedState, Season, SeasonMode, UrgentLevel,
-};
+pub use types::{RiskLevel, RollStatus, RushLevel, SchedState, Season, SeasonMode, UrgentLevel};
 
 // TODO: 添加领域服务模块 (domain services)
 // TODO: 添加值对象模块 (value objects)

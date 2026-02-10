@@ -13,7 +13,10 @@ thread_local! {
 }
 
 fn is_true(v: &str) -> bool {
-    matches!(v.trim().to_lowercase().as_str(), "1" | "true" | "yes" | "y" | "on")
+    matches!(
+        v.trim().to_lowercase().as_str(),
+        "1" | "true" | "yes" | "y" | "on"
+    )
 }
 
 fn truncate_sql(sql: &str, max_len: usize) -> String {
@@ -136,4 +139,3 @@ impl Drop for PerfGuard {
         PERF_DEPTH.with(|d| d.set(d.get().saturating_sub(1)));
     }
 }
-

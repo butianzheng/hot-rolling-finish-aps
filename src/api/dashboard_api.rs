@@ -7,9 +7,9 @@
 // 架构: API 层 → Decision 层 (DecisionApi) → Use Case 层
 // ==========================================
 
-use std::sync::Arc;
 use chrono::{NaiveDate, NaiveDateTime};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use crate::api::error::{ApiError, ApiResult};
 use crate::domain::action_log::ActionLog;
@@ -19,10 +19,9 @@ use crate::repository::{DecisionRefreshRepository, DecisionRefreshTaskEntity};
 // 导入 DecisionApi（P2 阶段完成的决策层）
 use crate::decision::api::decision_api::DecisionApi;
 use crate::decision::api::dto::{
-    GetDecisionDaySummaryRequest, DecisionDaySummaryResponse,
-    GetMachineBottleneckProfileRequest, MachineBottleneckProfileResponse,
-    ListOrderFailureSetRequest, OrderFailureSetResponse,
-    GetColdStockProfileRequest, ColdStockProfileResponse,
+    ColdStockProfileResponse, DecisionDaySummaryResponse, GetColdStockProfileRequest,
+    GetDecisionDaySummaryRequest, GetMachineBottleneckProfileRequest, ListOrderFailureSetRequest,
+    MachineBottleneckProfileResponse, OrderFailureSetResponse,
 };
 
 // ==========================================
@@ -106,15 +105,22 @@ impl DashboardApi {
 
         let status = if is_refreshing {
             "REFRESHING"
-        } else if matches!(latest_task.as_ref().map(|t| t.status.as_str()), Some("FAILED")) {
+        } else if matches!(
+            latest_task.as_ref().map(|t| t.status.as_str()),
+            Some("FAILED")
+        ) {
             "FAILED"
         } else {
             "IDLE"
         };
 
-        let last_error = latest_task
-            .as_ref()
-            .and_then(|t| if t.status == "FAILED" { t.error_message.clone() } else { None });
+        let last_error = latest_task.as_ref().and_then(|t| {
+            if t.status == "FAILED" {
+                t.error_message.clone()
+            } else {
+                None
+            }
+        });
 
         Ok(DecisionRefreshStatusResponse {
             version_id: version_id.to_string(),
@@ -255,7 +261,7 @@ impl DashboardApi {
             date_from: date_from.unwrap_or(&default_date_from).to_string(),
             date_to: date_to.unwrap_or(&default_date_to).to_string(),
             risk_level_filter,
-            limit: limit.or(Some(10)),  // 默认limit为10
+            limit: limit.or(Some(10)),               // 默认limit为10
             sort_by: Some("risk_score".to_string()), // 按风险分数降序
         };
 
@@ -297,7 +303,7 @@ impl DashboardApi {
             due_date_to: None,
             completion_rate_threshold: None,
             offset: None,
-            limit: limit.or(Some(100)),  // 默认limit为100
+            limit: limit.or(Some(100)), // 默认limit为100
         };
 
         self.decision_api
@@ -334,7 +340,7 @@ impl DashboardApi {
             machine_codes,
             pressure_level_filter,
             age_bin_filter: None,
-            limit: limit.or(Some(100)),  // 默认limit为100
+            limit: limit.or(Some(100)), // 默认limit为100
         };
 
         self.decision_api
@@ -382,7 +388,7 @@ impl DashboardApi {
             machine_codes,
             bottleneck_level_filter,
             bottleneck_type_filter: None,
-            limit: limit.or(Some(10)),  // 默认limit为10
+            limit: limit.or(Some(10)), // 默认limit为10
         };
 
         self.decision_api
@@ -437,9 +443,7 @@ impl DashboardApi {
             ));
         }
         if limit <= 0 || limit > 1000 {
-            return Err(ApiError::InvalidInput(
-                "limit必须在1-1000之间".to_string(),
-            ));
+            return Err(ApiError::InvalidInput("limit必须在1-1000之间".to_string()));
         }
 
         self.action_log_repo
@@ -490,9 +494,7 @@ impl DashboardApi {
         end_time: Option<NaiveDateTime>,
     ) -> ApiResult<Vec<ActionLog>> {
         if limit <= 0 || limit > 1000 {
-            return Err(ApiError::InvalidInput(
-                "limit必须在1-1000之间".to_string(),
-            ));
+            return Err(ApiError::InvalidInput("limit必须在1-1000之间".to_string()));
         }
         if offset < 0 {
             return Err(ApiError::InvalidInput("offset不能为负数".to_string()));

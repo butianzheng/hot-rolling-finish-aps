@@ -353,13 +353,18 @@ impl RecalcEngine {
             HashMap::new();
         let mut user_confirmed_summaries_by_machine: HashMap<String, Vec<MaterialSummary>> =
             HashMap::new();
-        let mut rejection_map_by_machine: HashMap<String, HashMap<String, (Option<i32>, Option<String>)>> =
-            HashMap::new();
+        let mut rejection_map_by_machine: HashMap<
+            String,
+            HashMap<String, (Option<i32>, Option<String>)>,
+        > = HashMap::new();
 
         for machine_code in machine_codes {
             let materials = self.material_master_repo.find_by_machine(machine_code)?;
-            let states = self.material_state_repo.list_by_machine_code(machine_code)?;
-            let mut state_map: HashMap<String, MaterialState> = HashMap::with_capacity(states.len());
+            let states = self
+                .material_state_repo
+                .list_by_machine_code(machine_code)?;
+            let mut state_map: HashMap<String, MaterialState> =
+                HashMap::with_capacity(states.len());
             for s in states {
                 state_map.insert(s.material_id.clone(), s);
             }
@@ -422,14 +427,12 @@ impl RecalcEngine {
                     .get(machine_code)
                     .map(Vec::as_slice)
                     .unwrap_or(&[]);
-                let state_map = state_map_by_machine
-                    .get(machine_code)
-                    .ok_or_else(|| {
-                        std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            format!("状态缓存缺失: machine_code={}", machine_code),
-                        )
-                    })?;
+                let state_map = state_map_by_machine.get(machine_code).ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("状态缓存缺失: machine_code={}", machine_code),
+                    )
+                })?;
 
                 // ----- 4.3 过滤候选材料 -----
                 // - 排除已排产材料，避免重复排产；
@@ -465,7 +468,9 @@ impl RecalcEngine {
                             continue;
                         };
                         let allow = match state.sched_state {
-                            SchedState::Ready | SchedState::Locked | SchedState::ForceRelease => true,
+                            SchedState::Ready | SchedState::Locked | SchedState::ForceRelease => {
+                                true
+                            }
                             SchedState::PendingMature => state.ready_in_days <= delta_days_i32,
                             _ => false,
                         };
@@ -611,8 +616,9 @@ impl RecalcEngine {
                     let mut anchor_material_id = None;
 
                     if let Some(last_frozen) = frozen_for_today.iter().max_by_key(|i| i.seq_no) {
-                        if let Some(master) =
-                            self.material_master_repo.find_by_id(&last_frozen.material_id)?
+                        if let Some(master) = self
+                            .material_master_repo
+                            .find_by_id(&last_frozen.material_id)?
                         {
                             let w = master.width_mm.unwrap_or(0.0);
                             let t = master.thickness_mm.unwrap_or(0.0);
@@ -648,7 +654,8 @@ impl RecalcEngine {
                             .max_by_key(|i| (i.plan_date, i.seq_no));
                         let frozen_summaries: Vec<MaterialSummary> = match frozen_last {
                             Some(item) => {
-                                if let Some(m) = self.material_master_repo.find_by_id(&item.material_id)?
+                                if let Some(m) =
+                                    self.material_master_repo.find_by_id(&item.material_id)?
                                 {
                                     let w = m.width_mm.unwrap_or(0.0);
                                     let t = m.thickness_mm.unwrap_or(0.0);
@@ -893,7 +900,10 @@ impl RecalcEngine {
         // ===== Step 4.11: 持久化路径规则待确认（仅生产模式） =====
         if !is_dry_run {
             if let Err(e) = self.path_override_pending_repo.ensure_schema() {
-                tracing::warn!("path_override_pending 表初始化失败(将继续返回重算结果): {}", e);
+                tracing::warn!(
+                    "path_override_pending 表初始化失败(将继续返回重算结果): {}",
+                    e
+                );
             } else if !path_override_pending_records.is_empty() {
                 match self
                     .path_override_pending_repo

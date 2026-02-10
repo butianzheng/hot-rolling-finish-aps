@@ -179,8 +179,10 @@ impl CapacityFiller {
                             continue;
                         }
                         PathRuleStatus::OverrideRequired => {
-                            let (anchor_width_mm, anchor_thickness_mm) =
-                                current_anchor.as_ref().map(|a| (a.width_mm, a.thickness_mm)).unwrap_or((0.0, 0.0));
+                            let (anchor_width_mm, anchor_thickness_mm) = current_anchor
+                                .as_ref()
+                                .map(|a| (a.width_mm, a.thickness_mm))
+                                .unwrap_or((0.0, 0.0));
                             path_override_pending.push(PathOverridePendingItem {
                                 material_id: master.material_id.clone(),
                                 urgent_level: state.urgent_level.to_string(),
@@ -302,7 +304,8 @@ impl CapacityFiller {
 
         // 3. 更新产能池的 overflow_t
         if capacity_pool.used_capacity_t > capacity_pool.limit_capacity_t {
-            capacity_pool.overflow_t = capacity_pool.used_capacity_t - capacity_pool.limit_capacity_t;
+            capacity_pool.overflow_t =
+                capacity_pool.used_capacity_t - capacity_pool.limit_capacity_t;
         } else {
             capacity_pool.overflow_t = 0.0;
         }
@@ -342,7 +345,11 @@ impl CapacityFiller {
             plan_date,
             seq_no: sequence_no,
             weight_t: master.weight_t.unwrap_or(0.0),
-            source_type: if is_frozen { "FROZEN".to_string() } else { "CALC".to_string() },
+            source_type: if is_frozen {
+                "FROZEN".to_string()
+            } else {
+                "CALC".to_string()
+            },
             locked_in_plan: is_frozen,
             force_release_in_plan: state.force_release_flag,
             violation_flags: None,
@@ -402,8 +409,8 @@ impl Default for CapacityFiller {
 mod tests {
     use super::*;
     use crate::domain::types::{RushLevel, UrgentLevel};
-    use chrono::Utc;
     use crate::engine::path_rule::{PathRuleConfig, PathRuleEngine};
+    use chrono::Utc;
 
     // ==========================================
     // 测试辅助函数
@@ -455,7 +462,7 @@ mod tests {
             due_date: None,
             stock_age_days: Some(10),
             output_age_days_raw: None,
-            rolling_output_date: None,  // v0.7
+            rolling_output_date: None, // v0.7
             status_updated_at: None,
             contract_no: None,
             contract_nature: None,
@@ -535,12 +542,8 @@ mod tests {
             create_test_material("M003", "H032", SchedState::Ready, 200.0),
         ];
 
-        let (plan_items, skipped) = filler.fill_single_day(
-            &mut pool,
-            materials,
-            vec![],
-            "version-001",
-        );
+        let (plan_items, skipped) =
+            filler.fill_single_day(&mut pool, materials, vec![], "version-001");
 
         // 断言
         assert_eq!(plan_items.len(), 3); // 全部添加
@@ -566,19 +569,21 @@ mod tests {
             create_test_material("M002", "H032", SchedState::Ready, 150.0), // 填充到 limit
         ];
 
-        let (plan_items, skipped) = filler.fill_single_day(
-            &mut pool,
-            materials,
-            vec![],
-            "version-001",
-        );
+        let (plan_items, skipped) =
+            filler.fill_single_day(&mut pool, materials, vec![], "version-001");
 
         // 断言
         assert_eq!(plan_items.len(), 2);
         assert_eq!(skipped.len(), 0);
         assert_eq!(pool.used_capacity_t, 1200.0); // 950 + 100 + 150
-        assert_eq!(plan_items[0].assign_reason, Some("FILL_TO_TARGET".to_string()));
-        assert_eq!(plan_items[1].assign_reason, Some("FILL_TO_LIMIT".to_string()));
+        assert_eq!(
+            plan_items[0].assign_reason,
+            Some("FILL_TO_TARGET".to_string())
+        );
+        assert_eq!(
+            plan_items[1].assign_reason,
+            Some("FILL_TO_LIMIT".to_string())
+        );
     }
 
     #[test]
@@ -594,16 +599,12 @@ mod tests {
         );
 
         let materials = vec![
-            create_test_material("M001", "H032", SchedState::Ready, 30.0),  // 可添加
+            create_test_material("M001", "H032", SchedState::Ready, 30.0), // 可添加
             create_test_material("M002", "H032", SchedState::Ready, 100.0), // 会超限，跳过
         ];
 
-        let (plan_items, skipped) = filler.fill_single_day(
-            &mut pool,
-            materials,
-            vec![],
-            "version-001",
-        );
+        let (plan_items, skipped) =
+            filler.fill_single_day(&mut pool, materials, vec![], "version-001");
 
         // 断言
         assert_eq!(plan_items.len(), 1); // 只添加 M001
@@ -630,19 +631,18 @@ mod tests {
             create_test_material("M002", "H032", SchedState::Ready, 100.0), // 普通材料，会超限
         ];
 
-        let (plan_items, skipped) = filler.fill_single_day(
-            &mut pool,
-            materials,
-            vec![],
-            "version-001",
-        );
+        let (plan_items, skipped) =
+            filler.fill_single_day(&mut pool, materials, vec![], "version-001");
 
         // 断言
         assert_eq!(plan_items.len(), 1); // 只添加锁定材料
         assert_eq!(skipped.len(), 1); // 普通材料被跳过
         assert_eq!(pool.used_capacity_t, 1150.0); // 1100 + 50
         assert_eq!(plan_items[0].material_id, "M001");
-        assert_eq!(plan_items[0].assign_reason, Some("LOCKED_MATERIAL".to_string()));
+        assert_eq!(
+            plan_items[0].assign_reason,
+            Some("LOCKED_MATERIAL".to_string())
+        );
     }
 
     #[test]
@@ -658,41 +658,38 @@ mod tests {
         );
 
         // 创建冻结区材料
-        let frozen_items = vec![
-            PlanItem {
-                version_id: "version-001".to_string(),
-                material_id: "F001".to_string(),
-                machine_code: "H032".to_string(),
-                plan_date: NaiveDate::from_ymd_opt(2026, 1, 20).unwrap(),
-                seq_no: 1,
-                weight_t: 500.0,
-                source_type: "FROZEN".to_string(),
-                locked_in_plan: true,
-                force_release_in_plan: false,
-                violation_flags: None,
-                urgent_level: Some("L0".to_string()),
-                sched_state: Some("Ready".to_string()),
-                assign_reason: Some("FROZEN".to_string()),
-                steel_grade: None,
-                width_mm: None,
-                thickness_mm: None,
-                contract_no: None,
-                due_date: None,
-                scheduled_date: None,
-                scheduled_machine_code: None,
-            },
-        ];
+        let frozen_items = vec![PlanItem {
+            version_id: "version-001".to_string(),
+            material_id: "F001".to_string(),
+            machine_code: "H032".to_string(),
+            plan_date: NaiveDate::from_ymd_opt(2026, 1, 20).unwrap(),
+            seq_no: 1,
+            weight_t: 500.0,
+            source_type: "FROZEN".to_string(),
+            locked_in_plan: true,
+            force_release_in_plan: false,
+            violation_flags: None,
+            urgent_level: Some("L0".to_string()),
+            sched_state: Some("Ready".to_string()),
+            assign_reason: Some("FROZEN".to_string()),
+            steel_grade: None,
+            width_mm: None,
+            thickness_mm: None,
+            contract_no: None,
+            due_date: None,
+            scheduled_date: None,
+            scheduled_machine_code: None,
+        }];
 
-        let materials = vec![
-            create_test_material("M001", "H032", SchedState::Ready, 300.0),
-        ];
+        let materials = vec![create_test_material(
+            "M001",
+            "H032",
+            SchedState::Ready,
+            300.0,
+        )];
 
-        let (plan_items, _skipped) = filler.fill_single_day(
-            &mut pool,
-            materials,
-            frozen_items,
-            "version-001",
-        );
+        let (plan_items, _skipped) =
+            filler.fill_single_day(&mut pool, materials, frozen_items, "version-001");
 
         // 断言
         assert_eq!(plan_items.len(), 2); // 1个冻结 + 1个新增
@@ -709,9 +706,7 @@ mod tests {
         let filler = CapacityFiller::new();
         let plan_date = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
         let mut pool = create_test_capacity_pool(
-            "H032",
-            plan_date,
-            1000.0, // target
+            "H032", plan_date, 1000.0, // target
             1200.0, // limit
             0.0,    // used
         );
@@ -763,7 +758,12 @@ mod tests {
             },
         ];
 
-        let materials = vec![create_test_material("M001", "H032", SchedState::Ready, 50.0)];
+        let materials = vec![create_test_material(
+            "M001",
+            "H032",
+            SchedState::Ready,
+            50.0,
+        )];
 
         let (plan_items, _skipped) =
             filler.fill_single_day(&mut pool, materials, frozen_items, "version-001");
@@ -795,12 +795,8 @@ mod tests {
             create_test_material("M001", "H032", SchedState::Locked, 150.0), // 锁定材料，会超限
         ];
 
-        let (plan_items, _skipped) = filler.fill_single_day(
-            &mut pool,
-            materials,
-            vec![],
-            "version-001",
-        );
+        let (plan_items, _skipped) =
+            filler.fill_single_day(&mut pool, materials, vec![], "version-001");
 
         // 断言
         assert_eq!(plan_items.len(), 1);
@@ -917,7 +913,9 @@ mod tests {
 
         assert_eq!(result.plan_items.len(), 0);
         assert_eq!(result.skipped_materials.len(), 1);
-        assert!(result.skipped_materials[0].2.contains("PATH_HARD_VIOLATION"));
+        assert!(result.skipped_materials[0]
+            .2
+            .contains("PATH_HARD_VIOLATION"));
     }
 
     #[test]
@@ -964,7 +962,9 @@ mod tests {
 
         assert_eq!(result.plan_items.len(), 0);
         assert_eq!(result.skipped_materials.len(), 1);
-        assert!(result.skipped_materials[0].2.contains("PATH_OVERRIDE_REQUIRED"));
+        assert!(result.skipped_materials[0]
+            .2
+            .contains("PATH_OVERRIDE_REQUIRED"));
     }
 
     #[test]

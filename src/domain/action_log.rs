@@ -18,11 +18,11 @@ use serde_json::Value as JsonValue;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionLog {
     // ===== 主键 (对齐schema) =====
-    pub action_id: String,         // 日志ID (对齐schema字段名)
+    pub action_id: String,          // 日志ID (对齐schema字段名)
     pub version_id: Option<String>, // 关联版本 (可选，配置更新等系统操作可为None)
-    pub action_type: String,       // 操作类型 (存储为字符串)
-    pub action_ts: NaiveDateTime,  // 操作时间戳 (对齐schema)
-    pub actor: String,             // 操作人 (对齐schema字段名)
+    pub action_type: String,        // 操作类型 (存储为字符串)
+    pub action_ts: NaiveDateTime,   // 操作时间戳 (对齐schema)
+    pub actor: String,              // 操作人 (对齐schema字段名)
 
     // ===== 操作负载 =====
     pub payload_json: Option<JsonValue>, // 操作参数 (JSON)
@@ -31,10 +31,10 @@ pub struct ActionLog {
     pub impact_summary_json: Option<JsonValue>, // 影响摘要 (JSON)
 
     // ===== 扩展字段 (业务用) =====
-    pub machine_code: Option<String>, // 机组代码
+    pub machine_code: Option<String>,                // 机组代码
     pub date_range_start: Option<chrono::NaiveDate>, // 影响开始日期
     pub date_range_end: Option<chrono::NaiveDate>,   // 影响结束日期
-    pub detail: Option<String>,    // 详细描述
+    pub detail: Option<String>,                      // 详细描述
 }
 
 // ==========================================
@@ -42,14 +42,14 @@ pub struct ActionLog {
 // ==========================================
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActionType {
-    Import,            // 导入材料
-    Recalc,            // 一键重算
-    LocalAdjust,       // 局部调整
-    Lock,              // 锁定材料
-    ForceRelease,      // 强制放行
-    CreateVersion,     // 创建版本
-    ActivateVersion,   // 激活版本
-    RollChange,        // 换辊
+    Import,          // 导入材料
+    Recalc,          // 一键重算
+    LocalAdjust,     // 局部调整
+    Lock,            // 锁定材料
+    ForceRelease,    // 强制放行
+    CreateVersion,   // 创建版本
+    ActivateVersion, // 激活版本
+    RollChange,      // 换辊
     // ===== v0.4+ 路径规则相关 =====
     PathOverrideConfirm, // 路径突破人工确认
     PathOverrideReject,  // 路径突破人工拒绝
@@ -63,23 +63,23 @@ pub enum ActionType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImpactSummary {
     // ===== 材料影响 (汇总) =====
-    pub moved_count: i32,          // 移动材料数量
-    pub squeezed_out_count: i32,   // 挤出材料数量
-    pub added_count: i32,          // 新增材料数量
+    pub moved_count: i32,                      // 移动材料数量
+    pub squeezed_out_count: i32,               // 挤出材料数量
+    pub added_count: i32,                      // 新增材料数量
     pub material_changes: Vec<MaterialChange>, // 详细材料变更列表
 
     // ===== 产能影响 =====
-    pub capacity_delta_t: f64,     // 产能变化 (吨)
-    pub overflow_delta_t: f64,     // 超限变化 (吨)
+    pub capacity_delta_t: f64,                 // 产能变化 (吨)
+    pub overflow_delta_t: f64,                 // 超限变化 (吨)
     pub capacity_changes: Vec<CapacityChange>, // 按日期/机组的产能变化
 
     // ===== 风险影响 =====
-    pub risk_level_before: String, // 操作前风险等级
-    pub risk_level_after: String,  // 操作后风险等级
+    pub risk_level_before: String,     // 操作前风险等级
+    pub risk_level_after: String,      // 操作后风险等级
     pub risk_changes: Vec<RiskChange>, // 按日期的风险变化
 
     // ===== 换辊影响 =====
-    pub roll_campaign_affected: bool, // 是否影响换辊窗口
+    pub roll_campaign_affected: bool,      // 是否影响换辊窗口
     pub roll_tonnage_delta_t: Option<f64>, // 换辊累计吨位变化
 
     // ===== 紧急单影响 =====
@@ -87,8 +87,8 @@ pub struct ImpactSummary {
     pub l3_critical_count: i32,        // 受影响的L3红线材料数量
 
     // ===== 冲突提示 =====
-    pub locked_conflicts: Vec<String>, // 锁定冲突材料列表
-    pub frozen_conflicts: Vec<String>, // 冻结冲突材料列表
+    pub locked_conflicts: Vec<String>,      // 锁定冲突材料列表
+    pub frozen_conflicts: Vec<String>,      // 冻结冲突材料列表
     pub structure_suggestions: Vec<String>, // 结构补偿建议
 }
 
@@ -97,11 +97,11 @@ pub struct ImpactSummary {
 // ==========================================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MaterialChange {
-    pub material_no: String,       // 材料编号
-    pub change_type: String,       // 变更类型: "added", "moved", "squeezed_out", "removed"
+    pub material_no: String,                  // 材料编号
+    pub change_type: String, // 变更类型: "added", "moved", "squeezed_out", "removed"
     pub from_date: Option<chrono::NaiveDate>, // 原计划日期
-    pub to_date: Option<chrono::NaiveDate>,   // 新计划日期
-    pub reason: String,            // 变更原因
+    pub to_date: Option<chrono::NaiveDate>, // 新计划日期
+    pub reason: String,      // 变更原因
 }
 
 // ==========================================
@@ -109,11 +109,11 @@ pub struct MaterialChange {
 // ==========================================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapacityChange {
-    pub date: chrono::NaiveDate,   // 日期
-    pub machine_code: String,      // 机组
+    pub date: chrono::NaiveDate,     // 日期
+    pub machine_code: String,        // 机组
     pub used_capacity_before_t: f64, // 操作前已用产能
     pub used_capacity_after_t: f64,  // 操作后已用产能
-    pub delta_t: f64,              // 变化量
+    pub delta_t: f64,                // 变化量
 }
 
 // ==========================================
@@ -121,11 +121,11 @@ pub struct CapacityChange {
 // ==========================================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RiskChange {
-    pub date: chrono::NaiveDate,   // 日期
-    pub machine_code: String,      // 机组
-    pub risk_before: String,       // 操作前风险等级
-    pub risk_after: String,        // 操作后风险等级
-    pub reason: String,            // 风险变化原因
+    pub date: chrono::NaiveDate, // 日期
+    pub machine_code: String,    // 机组
+    pub risk_before: String,     // 操作前风险等级
+    pub risk_after: String,      // 操作后风险等级
+    pub reason: String,          // 风险变化原因
 }
 
 // ==========================================
@@ -218,11 +218,7 @@ impl ActionLog {
     }
 
     /// 设置日期范围
-    pub fn with_date_range(
-        mut self,
-        start: chrono::NaiveDate,
-        end: chrono::NaiveDate,
-    ) -> Self {
+    pub fn with_date_range(mut self, start: chrono::NaiveDate, end: chrono::NaiveDate) -> Self {
         self.date_range_start = Some(start);
         self.date_range_end = Some(end);
         self

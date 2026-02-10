@@ -73,7 +73,6 @@ impl DecisionRefreshService {
         Self { conn }
     }
 
-
     // 其余刷新逻辑已拆分到子模块（按域/职责），入口仅保留构造方法。
 }
 
@@ -335,7 +334,11 @@ mod tests {
         };
 
         let refresh_id = service
-            .refresh_all(scope, RefreshTrigger::ManualRefresh, Some("test".to_string()))
+            .refresh_all(
+                scope,
+                RefreshTrigger::ManualRefresh,
+                Some("test".to_string()),
+            )
             .unwrap();
 
         assert!(!refresh_id.is_empty());
@@ -460,7 +463,11 @@ mod tests {
             affected_date_range: None,
         };
         service
-            .refresh_all(scope, RefreshTrigger::ManualRefresh, Some("test".to_string()))
+            .refresh_all(
+                scope,
+                RefreshTrigger::ManualRefresh,
+                Some("test".to_string()),
+            )
             .unwrap();
 
         // 验证有 2 个日期的数据
@@ -483,7 +490,11 @@ mod tests {
             affected_date_range: Some(("2026-01-25".to_string(), "2026-01-25".to_string())),
         };
         service
-            .refresh_all(scope, RefreshTrigger::RiskSnapshotUpdated, Some("test".to_string()))
+            .refresh_all(
+                scope,
+                RefreshTrigger::RiskSnapshotUpdated,
+                Some("test".to_string()),
+            )
             .unwrap();
 
         // 验证仍然有 2 个日期的数据
@@ -538,7 +549,11 @@ mod tests {
             affected_date_range: None,
         };
         service
-            .refresh_all(scope, RefreshTrigger::ManualRefresh, Some("test".to_string()))
+            .refresh_all(
+                scope,
+                RefreshTrigger::ManualRefresh,
+                Some("test".to_string()),
+            )
             .unwrap();
 
         // 验证有 3 条记录（H032-01-24, H033-01-24, H032-01-25）
@@ -561,7 +576,11 @@ mod tests {
             affected_date_range: Some(("2026-01-25".to_string(), "2026-01-25".to_string())),
         };
         service
-            .refresh_all(scope, RefreshTrigger::CapacityPoolChanged, Some("test".to_string()))
+            .refresh_all(
+                scope,
+                RefreshTrigger::CapacityPoolChanged,
+                Some("test".to_string()),
+            )
             .unwrap();
 
         // 验证仍然有 3 条记录

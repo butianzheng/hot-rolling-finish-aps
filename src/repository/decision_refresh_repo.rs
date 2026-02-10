@@ -221,7 +221,10 @@ impl DecisionRefreshRepository {
         .map_err(|e| e.into())
     }
 
-    pub fn find_log_by_id(&self, refresh_id: &str) -> RepositoryResult<Option<DecisionRefreshLogEntity>> {
+    pub fn find_log_by_id(
+        &self,
+        refresh_id: &str,
+    ) -> RepositoryResult<Option<DecisionRefreshLogEntity>> {
         let conn = self.get_conn()?;
         conn.query_row(
             r#"

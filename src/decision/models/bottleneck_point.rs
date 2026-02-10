@@ -74,11 +74,7 @@ pub struct BottleneckReason {
 
 impl BottleneckPoint {
     /// 创建新的瓶颈点
-    pub fn new(
-        version_id: String,
-        machine_code: String,
-        plan_date: String,
-    ) -> Self {
+    pub fn new(version_id: String, machine_code: String, plan_date: String) -> Self {
         Self {
             version_id,
             machine_code,
@@ -129,11 +125,7 @@ impl BottleneckPoint {
     pub fn set_roll_change_info(&mut self, needs_change: bool) {
         self.needs_roll_change = needs_change;
         if needs_change {
-            self.add_reason(
-                "ROLL_CHANGE".to_string(),
-                "需要换辊".to_string(),
-                0.8,
-            );
+            self.add_reason("ROLL_CHANGE".to_string(), "需要换辊".to_string(), 0.8);
         }
     }
 
@@ -207,7 +199,9 @@ impl BottleneckPoint {
     /// 获取主要瓶颈原因
     pub fn primary_reason(&self) -> Option<&BottleneckReason> {
         self.reasons.iter().max_by(|a, b| {
-            a.severity.partial_cmp(&b.severity).unwrap_or(std::cmp::Ordering::Equal)
+            a.severity
+                .partial_cmp(&b.severity)
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
     }
 }

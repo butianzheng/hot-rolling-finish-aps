@@ -37,7 +37,9 @@ impl PlanApi {
 
         let range_days = (to - from).num_days();
         if range_days > 60 {
-            return Err(ApiError::InvalidInput("时间跨度过大，最多支持60天".to_string()));
+            return Err(ApiError::InvalidInput(
+                "时间跨度过大，最多支持60天".to_string(),
+            ));
         }
 
         // 校验基准版本存在
@@ -52,7 +54,9 @@ impl PlanApi {
             .plan_version_repo
             .find_active_version(&base_version.plan_id)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?
-            .ok_or_else(|| ApiError::InvalidInput("当前方案没有激活版本，无法生成草案".to_string()))?;
+            .ok_or_else(|| {
+                ApiError::InvalidInput("当前方案没有激活版本，无法生成草案".to_string())
+            })?;
 
         if active_version.version_id != base_version_id {
             return Err(ApiError::VersionConflict(format!(
@@ -96,7 +100,9 @@ impl PlanApi {
             let profile = self
                 .recalc_engine
                 .resolve_strategy_profile(&raw_strategy_key)
-                .map_err(|e| ApiError::InvalidInput(format!("策略解析失败（{}）: {}", raw_strategy_key, e)))?;
+                .map_err(|e| {
+                    ApiError::InvalidInput(format!("策略解析失败（{}）: {}", raw_strategy_key, e))
+                })?;
 
             let draft_id = uuid::Uuid::new_v4().to_string();
 
@@ -118,9 +124,8 @@ impl PlanApi {
             let overflow_days = reschedule.overflow_days;
             let reschedule_items = reschedule.plan_items;
 
-            let mut draft_items_in_range: Vec<PlanItem> = Vec::with_capacity(
-                frozen_items_in_range.len() + reschedule_items.len(),
-            );
+            let mut draft_items_in_range: Vec<PlanItem> =
+                Vec::with_capacity(frozen_items_in_range.len() + reschedule_items.len());
 
             for mut item in frozen_items_in_range.clone() {
                 item.version_id = draft_id.clone();
@@ -287,7 +292,9 @@ impl PlanApi {
             .plan_version_repo
             .find_active_version(&base_version.plan_id)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?
-            .ok_or_else(|| ApiError::InvalidInput("当前方案没有激活版本，无法发布草案".to_string()))?;
+            .ok_or_else(|| {
+                ApiError::InvalidInput("当前方案没有激活版本，无法发布草案".to_string())
+            })?;
 
         if active_version.version_id != record.base_version_id {
             return Err(ApiError::VersionConflict(format!(
@@ -301,7 +308,9 @@ impl PlanApi {
             return Err(ApiError::InvalidInput("草案日期范围非法".to_string()));
         }
         if window_days_i64 > 60 {
-            return Err(ApiError::InvalidInput("草案时间跨度过大，最多支持60天".to_string()));
+            return Err(ApiError::InvalidInput(
+                "草案时间跨度过大，最多支持60天".to_string(),
+            ));
         }
         let window_days = window_days_i64 as i32;
 
@@ -311,11 +320,10 @@ impl PlanApi {
             .parse::<ScheduleStrategy>()
             .map_err(|e| ApiError::InvalidInput(format!("草案策略解析失败: {}", e)))?;
         let parameters = match record.strategy_params_json.as_deref() {
-            Some(raw) if !raw.trim().is_empty() && raw.trim() != "null" => {
-                Some(serde_json::from_str(raw).map_err(|e| {
-                    ApiError::InvalidInput(format!("草案参数解析失败: {}", e))
-                })?)
-            }
+            Some(raw) if !raw.trim().is_empty() && raw.trim() != "null" => Some(
+                serde_json::from_str(raw)
+                    .map_err(|e| ApiError::InvalidInput(format!("草案参数解析失败: {}", e)))?,
+            ),
             _ => None,
         };
         let profile = ResolvedStrategyProfile {
@@ -336,9 +344,7 @@ impl PlanApi {
             Ok(v) => v,
             Err(e) => {
                 // best-effort: 释放锁，避免草案长期处于 locked 状态
-                if let Err(unlock_err) =
-                    self.strategy_draft_repo.unlock(draft_id, operator)
-                {
+                if let Err(unlock_err) = self.strategy_draft_repo.unlock(draft_id, operator) {
                     tracing::warn!("unlock draft failed: {}", unlock_err);
                 }
                 return Err(ApiError::InternalError(format!("发布草案失败: {}", e)));
@@ -384,7 +390,11 @@ impl PlanApi {
             machine_code: None,
             date_range_start: Some(record.plan_date_from),
             date_range_end: Some(record.plan_date_to),
-            detail: Some(format!("发布策略草案: {} ({})", record.strategy_title_cn.as_str(), draft_id)),
+            detail: Some(format!(
+                "发布策略草案: {} ({})",
+                record.strategy_title_cn.as_str(),
+                draft_id
+            )),
         };
 
         self.action_log_repo
@@ -418,8 +428,9 @@ impl PlanApi {
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?
             .ok_or_else(|| ApiError::NotFound(format!("草案{}不存在或已过期", draft_id)))?;
 
-        let mut diff_items: Vec<StrategyDraftDiffItem> = serde_json::from_str(&record.diff_items_json)
-            .map_err(|e| ApiError::InternalError(format!("解析草案变更明细失败: {}", e)))?;
+        let mut diff_items: Vec<StrategyDraftDiffItem> =
+            serde_json::from_str(&record.diff_items_json)
+                .map_err(|e| ApiError::InternalError(format!("解析草案变更明细失败: {}", e)))?;
 
         let mut message = if record.diff_items_truncated {
             format!(
@@ -494,7 +505,9 @@ impl PlanApi {
 
         let range_days = (to - from).num_days();
         if range_days > 60 {
-            return Err(ApiError::InvalidInput("时间跨度过大，最多支持60天".to_string()));
+            return Err(ApiError::InvalidInput(
+                "时间跨度过大，最多支持60天".to_string(),
+            ));
         }
 
         let status = status_filter
@@ -688,10 +701,7 @@ impl PlanApi {
         ])
     }
 
-    fn diff_plan_items(
-        items_a: &[PlanItem],
-        items_b: &[PlanItem],
-    ) -> (usize, usize, usize, usize) {
+    fn diff_plan_items(items_a: &[PlanItem], items_b: &[PlanItem]) -> (usize, usize, usize, usize) {
         let (moved_count, added_count, removed_count, squeezed_out_count, _, _, _) =
             Self::diff_plan_items_detail(items_a, items_b);
         (moved_count, added_count, removed_count, squeezed_out_count)
@@ -717,10 +727,14 @@ impl PlanApi {
         // - 在 50k+ 数据量下，diff_items_total 可能非常大；
         // - 若先收集全量 diff_items 再 sort/截断，会导致明显的 CPU 与内存放大；
         // - 这里采用“计数全量 + 仅保留前 MAX_DIFF_ITEMS 作为明细预览”的策略。
-        let map_a: HashMap<String, &PlanItem> =
-            items_a.iter().map(|item| (item.material_id.clone(), item)).collect();
-        let map_b: HashMap<String, &PlanItem> =
-            items_b.iter().map(|item| (item.material_id.clone(), item)).collect();
+        let map_a: HashMap<String, &PlanItem> = items_a
+            .iter()
+            .map(|item| (item.material_id.clone(), item))
+            .collect();
+        let map_b: HashMap<String, &PlanItem> = items_b
+            .iter()
+            .map(|item| (item.material_id.clone(), item))
+            .collect();
 
         let mut moved_count = 0usize;
         let mut added_count = 0usize;
@@ -732,7 +746,9 @@ impl PlanApi {
         for item_a in items_a.iter() {
             let material_id = item_a.material_id.as_str();
             if let Some(item_b) = map_b.get(material_id) {
-                if item_a.plan_date != item_b.plan_date || item_a.machine_code != item_b.machine_code {
+                if item_a.plan_date != item_b.plan_date
+                    || item_a.machine_code != item_b.machine_code
+                {
                     moved_count += 1;
                     if diff_items.len() < MAX_DIFF_ITEMS {
                         diff_items.push(StrategyDraftDiffItem {
@@ -850,5 +866,4 @@ impl PlanApi {
     }
 
     // ==========================================
-
 }

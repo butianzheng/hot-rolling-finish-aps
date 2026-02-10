@@ -6,8 +6,8 @@
 // 架构: 依赖倒置 - Decision 层实现 Engine 层定义的接口
 // ==========================================
 
+use super::{RefreshQueue, RefreshScope, RefreshTask, RefreshTrigger};
 use crate::engine::events::{ScheduleEvent, ScheduleEventPublisher, ScheduleEventType};
-use super::{RefreshQueue, RefreshTask, RefreshScope, RefreshTrigger};
 use std::error::Error;
 use std::sync::Arc;
 
@@ -42,9 +42,9 @@ impl RefreshQueueAdapter {
     /// 将 ScheduleEvent 转换为 RefreshTask
     fn convert_to_refresh_task(event: &ScheduleEvent) -> RefreshTask {
         // 转换日期范围
-        let affected_date_range = event.affected_date_range.map(|(start, end)| {
-            (start.to_string(), end.to_string())
-        });
+        let affected_date_range = event
+            .affected_date_range
+            .map(|(start, end)| (start.to_string(), end.to_string()));
 
         // 创建刷新范围
         let scope = RefreshScope {

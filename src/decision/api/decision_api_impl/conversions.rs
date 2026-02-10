@@ -13,8 +13,8 @@ pub(super) fn convert_day_summary_to_dto(
         risk_score: summary.risk_score,
         risk_level: summary.risk_level.clone(),
         capacity_util_pct: summary.capacity_util_pct * 100.0, // 转换为百分比
-        overload_weight_t: 0.0, // TODO: 从用例层获取
-        urgent_failure_count: 0, // TODO: 从用例层获取
+        overload_weight_t: 0.0,                               // TODO: 从用例层获取
+        urgent_failure_count: 0,                              // TODO: 从用例层获取
         top_reasons: summary
             .top_reasons
             .iter()
@@ -87,8 +87,8 @@ pub(super) fn convert_order_failure_to_dto(
     failure: &crate::decision::use_cases::d2_order_failure::OrderFailure,
     machine_code: &str,
 ) -> OrderFailureDto {
-    let scheduled_weight_t = (failure.total_materials - failure.unscheduled_count) as f64 *
-        (failure.unscheduled_weight_t / failure.unscheduled_count.max(1) as f64);
+    let scheduled_weight_t = (failure.total_materials - failure.unscheduled_count) as f64
+        * (failure.unscheduled_weight_t / failure.unscheduled_count.max(1) as f64);
     let total_weight_t = scheduled_weight_t + failure.unscheduled_weight_t;
 
     OrderFailureDto {
@@ -97,11 +97,21 @@ pub(super) fn convert_order_failure_to_dto(
         days_to_due: failure.days_to_due,
         urgency_level: failure.urgency_level.clone(),
         fail_type: match failure.fail_type {
-            crate::decision::use_cases::d2_order_failure::FailureType::Overdue => "Overdue".to_string(),
-            crate::decision::use_cases::d2_order_failure::FailureType::NearDueImpossible => "NearDueImpossible".to_string(),
-            crate::decision::use_cases::d2_order_failure::FailureType::CapacityShortage => "CapacityShortage".to_string(),
-            crate::decision::use_cases::d2_order_failure::FailureType::StructureConflict => "StructureConflict".to_string(),
-            crate::decision::use_cases::d2_order_failure::FailureType::ColdStockNotReady => "ColdStockNotReady".to_string(),
+            crate::decision::use_cases::d2_order_failure::FailureType::Overdue => {
+                "Overdue".to_string()
+            }
+            crate::decision::use_cases::d2_order_failure::FailureType::NearDueImpossible => {
+                "NearDueImpossible".to_string()
+            }
+            crate::decision::use_cases::d2_order_failure::FailureType::CapacityShortage => {
+                "CapacityShortage".to_string()
+            }
+            crate::decision::use_cases::d2_order_failure::FailureType::StructureConflict => {
+                "StructureConflict".to_string()
+            }
+            crate::decision::use_cases::d2_order_failure::FailureType::ColdStockNotReady => {
+                "ColdStockNotReady".to_string()
+            }
             crate::decision::use_cases::d2_order_failure::FailureType::Other => "Other".to_string(),
         },
         completion_rate: failure.completion_rate * 100.0, // 转换为百分比
@@ -109,12 +119,16 @@ pub(super) fn convert_order_failure_to_dto(
         scheduled_weight_t,
         unscheduled_weight_t: failure.unscheduled_weight_t,
         machine_code: machine_code.to_string(),
-        blocking_factors: failure.blocking_factors.iter().map(|bf| BlockingFactorDto {
-            factor_type: bf.code.clone(),
-            description: bf.description.clone(),
-            impact: bf.affected_weight_t / total_weight_t.max(1.0),
-            affected_material_count: bf.affected_count as u32,
-        }).collect(),
+        blocking_factors: failure
+            .blocking_factors
+            .iter()
+            .map(|bf| BlockingFactorDto {
+                factor_type: bf.code.clone(),
+                description: bf.description.clone(),
+                impact: bf.affected_weight_t / total_weight_t.max(1.0),
+                affected_material_count: bf.affected_count as u32,
+            })
+            .collect(),
         failure_reasons: failure.failure_reasons.clone(),
         recommended_actions: Some(failure.suggested_actions.clone()),
     }
@@ -133,13 +147,20 @@ pub(super) fn convert_cold_stock_to_dto(
         pressure_level: profile.pressure_level.clone(),
         avg_age_days: profile.avg_age(),
         max_age_days: profile.age_max_days.unwrap_or(999),
-        structure_gap: profile.structure_gap.clone().unwrap_or_else(|| "无".to_string()),
-        reasons: profile.reasons.iter().map(|r| ReasonItemDto {
-            code: "AGE_HIGH".to_string(),
-            msg: r.clone(),
-            weight: 0.8,
-            affected_count: Some(profile.count as u32),
-        }).collect(),
+        structure_gap: profile
+            .structure_gap
+            .clone()
+            .unwrap_or_else(|| "无".to_string()),
+        reasons: profile
+            .reasons
+            .iter()
+            .map(|r| ReasonItemDto {
+                code: "AGE_HIGH".to_string(),
+                msg: r.clone(),
+                weight: 0.8,
+                affected_count: Some(profile.count as u32),
+            })
+            .collect(),
         trend: None, // 领域对象中没有趋势信息
     }
 }
@@ -207,7 +228,10 @@ pub(super) fn convert_roll_alert_to_dto(
         planned_downtime_minutes: alert.planned_downtime_minutes,
         estimated_soft_reach_at: alert.estimated_soft_reach_at.clone(),
         estimated_hard_reach_at: alert.estimated_hard_reach_at.clone(),
-        alert_message: alert.reason.clone().unwrap_or_else(|| "无预警信息".to_string()),
+        alert_message: alert
+            .reason
+            .clone()
+            .unwrap_or_else(|| "无预警信息".to_string()),
         impact_description: format!(
             "已使用 {:.1}%, 剩余 {:.1} 吨",
             alert.utilization_rate * 100.0,
@@ -225,7 +249,8 @@ pub(super) fn convert_capacity_opportunity_to_dto(
     let used_capacity_t = 1000.0 * opportunity.utilization_rate; // 假设标准产能 1000吨
     let target_capacity_t = 1000.0;
     let opportunity_space_t = opportunity.slack_t;
-    let optimized_util_pct = ((used_capacity_t + opportunity_space_t * 0.5) / target_capacity_t * 100.0).min(100.0);
+    let optimized_util_pct =
+        ((used_capacity_t + opportunity_space_t * 0.5) / target_capacity_t * 100.0).min(100.0);
 
     let opportunity_type = match opportunity.opportunity_level.as_str() {
         "HIGH" => "CAPACITY_UNDERUTILIZATION",
@@ -234,25 +259,30 @@ pub(super) fn convert_capacity_opportunity_to_dto(
         _ => "NO_OPPORTUNITY",
     };
 
-    let sensitivity_dto = opportunity.sensitivity.as_ref().map(|s| SensitivityAnalysisDto {
-        scenarios: vec![
-            ScenarioDto {
-                name: "保守方案".to_string(),
-                adjustment: format!("增加 {:.1} 吨", s.soft_constraint_gain_t),
-                util_pct: (used_capacity_t + s.soft_constraint_gain_t) / target_capacity_t * 100.0,
-                risk_score: 20.0,
-                affected_material_count: 0,
-            },
-            ScenarioDto {
-                name: "激进方案".to_string(),
-                adjustment: format!("增加 {:.1} 吨", s.total_potential_gain_t),
-                util_pct: (used_capacity_t + s.total_potential_gain_t) / target_capacity_t * 100.0,
-                risk_score: 70.0,
-                affected_material_count: 0,
-            },
-        ],
-        best_scenario_index: 0,
-    });
+    let sensitivity_dto = opportunity
+        .sensitivity
+        .as_ref()
+        .map(|s| SensitivityAnalysisDto {
+            scenarios: vec![
+                ScenarioDto {
+                    name: "保守方案".to_string(),
+                    adjustment: format!("增加 {:.1} 吨", s.soft_constraint_gain_t),
+                    util_pct: (used_capacity_t + s.soft_constraint_gain_t) / target_capacity_t
+                        * 100.0,
+                    risk_score: 20.0,
+                    affected_material_count: 0,
+                },
+                ScenarioDto {
+                    name: "激进方案".to_string(),
+                    adjustment: format!("增加 {:.1} 吨", s.total_potential_gain_t),
+                    util_pct: (used_capacity_t + s.total_potential_gain_t) / target_capacity_t
+                        * 100.0,
+                    risk_score: 70.0,
+                    affected_material_count: 0,
+                },
+            ],
+            best_scenario_index: 0,
+        });
 
     CapacityOpportunityDto {
         machine_code: opportunity.machine_code.clone(),
@@ -325,4 +355,3 @@ pub(super) fn generate_heatmap_stats(bottleneck_points: &[BottleneckPointDto]) -
         by_machine,
     }
 }
-

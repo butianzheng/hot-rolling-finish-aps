@@ -176,8 +176,7 @@ async fn test_importer_parse_csv_success() {
 
     // 2. 成功导入 = 3 (MAT001, MAT002, MAT005 - MAT005虽然有WARNING但不阻断)
     assert_eq!(
-        result.summary.success,
-        3,
+        result.summary.success, 3,
         "成功导入应该为3 (MAT001, MAT002, MAT005)"
     );
 
@@ -420,10 +419,7 @@ async fn test_importer_batch_management() {
         .expect("导入失败");
 
     // === 验证批次记录 ===
-    let batches = repo
-        .get_recent_batches(10)
-        .await
-        .expect("查询批次失败");
+    let batches = repo.get_recent_batches(10).await.expect("查询批次失败");
     assert!(!batches.is_empty(), "应该有批次记录");
 
     let batch = &batches[0];
@@ -586,17 +582,14 @@ async fn test_importer_dq_negative_dimensions() {
     assert!(result.summary.warning >= 2, "应该有至少2个警告(宽度+厚度)");
 
     // 检查违规记录
-    let width_warning = result
-        .violations
-        .iter()
-        .find(|v| v.field == "width_mm");
+    let width_warning = result.violations.iter().find(|v| v.field == "width_mm");
     assert!(width_warning.is_some(), "应该有width_mm的WARNING违规");
 
-    let thickness_warning = result
-        .violations
-        .iter()
-        .find(|v| v.field == "thickness_mm");
-    assert!(thickness_warning.is_some(), "应该有thickness_mm的WARNING违规");
+    let thickness_warning = result.violations.iter().find(|v| v.field == "thickness_mm");
+    assert!(
+        thickness_warning.is_some(),
+        "应该有thickness_mm的WARNING违规"
+    );
 
     println!("✅ 负数尺寸DQ测试通过");
 }

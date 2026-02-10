@@ -255,8 +255,10 @@ fn test_find_by_material_id_in_time_range_matches_detail_and_json_token() {
     log_similar.detail = None;
     repo.insert(&log_similar).unwrap();
 
-    let start_time = NaiveDateTime::parse_from_str("2026-01-24 09:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
-    let end_time = NaiveDateTime::parse_from_str("2026-01-24 15:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+    let start_time =
+        NaiveDateTime::parse_from_str("2026-01-24 09:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+    let end_time =
+        NaiveDateTime::parse_from_str("2026-01-24 15:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
 
     let logs = repo
         .find_by_material_id_in_time_range("MAT001", start_time, end_time, 10)

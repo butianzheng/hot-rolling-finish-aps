@@ -57,7 +57,8 @@ impl PlanApi {
 
         self.validate_expected_plan_rev(version_id, expected_plan_rev)?;
 
-        let mut items = self.plan_item_repo
+        let mut items = self
+            .plan_item_repo
             .find_by_version(version_id)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
@@ -108,9 +109,7 @@ impl PlanApi {
 
         if let Some(limit) = limit {
             if limit <= 0 || limit > 20_000 {
-                return Err(ApiError::InvalidInput(
-                    "limit必须在1-20000之间".to_string(),
-                ));
+                return Err(ApiError::InvalidInput("limit必须在1-20000之间".to_string()));
             }
         }
         if let Some(offset) = offset {
@@ -213,7 +212,10 @@ impl PlanApi {
         let material_ids: Vec<String> = items.iter().map(|it| it.material_id.clone()).collect();
 
         // 1. 从 material_state 获取 urgent_level, sched_state
-        if let Ok(snapshots) = self.material_state_repo.find_snapshots_by_material_ids(&material_ids) {
+        if let Ok(snapshots) = self
+            .material_state_repo
+            .find_snapshots_by_material_ids(&material_ids)
+        {
             let state_map: HashMap<String, MaterialStateSnapshotLite> = snapshots
                 .into_iter()
                 .map(|s| (s.material_id.clone(), s))
@@ -269,5 +271,4 @@ impl PlanApi {
     }
 
     // ==========================================
-
 }

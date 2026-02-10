@@ -5,9 +5,9 @@
 // 红线: Repository 不含业务逻辑
 // ==========================================
 
+use crate::db::open_sqlite_connection;
 use crate::domain::risk::RiskSnapshot;
 use crate::domain::types::RiskLevel;
-use crate::db::open_sqlite_connection;
 use crate::repository::error::{RepositoryError, RepositoryResult};
 use chrono::NaiveDate;
 use rusqlite::{params, Connection, Result as SqliteResult};
@@ -162,8 +162,8 @@ impl RiskSnapshotRepository {
                     immature_backlog_t: row.get(11)?,
                     roll_status: row.get(12)?,
                     roll_risk: None, // TODO: 添加到schema
-                    l3_count: 0, // TODO: 添加到schema
-                    l2_count: 0, // TODO: 添加到schema
+                    l3_count: 0,     // TODO: 添加到schema
+                    l2_count: 0,     // TODO: 添加到schema
                     created_at: chrono::NaiveDateTime::parse_from_str(
                         &row.get::<_, String>(13)?,
                         "%Y-%m-%d %H:%M:%S",
@@ -397,10 +397,7 @@ impl RiskSnapshotRepository {
     /// # 规则
     /// - 优先级: RED > ORANGE > YELLOW > GREEN
     /// - 相同风险等级按 overflow_t 降序
-    pub fn find_most_risky_date(
-        &self,
-        version_id: &str,
-    ) -> RepositoryResult<Option<RiskSnapshot>> {
+    pub fn find_most_risky_date(&self, version_id: &str) -> RepositoryResult<Option<RiskSnapshot>> {
         let conn = self.get_conn()?;
         let mut stmt = conn.prepare(
             r#"

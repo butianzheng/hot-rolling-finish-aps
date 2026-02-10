@@ -11,15 +11,13 @@ mod test_helpers;
 #[cfg(test)]
 mod e2e_p0_p1_features_test {
     use chrono::{Duration, NaiveDate, Utc};
-    use hot_rolling_aps::api::{
-        ConfigApi, MaterialApi, PlanApi, ValidationMode,
-    };
+    use hot_rolling_aps::api::{ConfigApi, MaterialApi, PlanApi, ValidationMode};
     use hot_rolling_aps::config::config_manager::ConfigManager;
     use hot_rolling_aps::domain::material::{MaterialMaster, MaterialState};
     use hot_rolling_aps::domain::types::{RushLevel, SchedState, UrgentLevel};
     use hot_rolling_aps::engine::{
-        CapacityFiller, EligibilityEngine, PrioritySorter, RecalcEngine,
-        RiskEngine, UrgencyEngine, ScheduleStrategy,
+        CapacityFiller, EligibilityEngine, PrioritySorter, RecalcEngine, RiskEngine,
+        ScheduleStrategy, UrgencyEngine,
     };
     use hot_rolling_aps::repository::{
         action_log_repo::ActionLogRepository,
@@ -27,8 +25,8 @@ mod e2e_p0_p1_features_test {
         material_repo::{MaterialMasterRepository, MaterialStateRepository},
         path_override_pending_repo::PathOverridePendingRepository,
         plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository},
-        roller_repo::RollerCampaignRepository,
         risk_repo::RiskSnapshotRepository,
+        roller_repo::RollerCampaignRepository,
         strategy_draft_repo::StrategyDraftRepository,
     };
     use rusqlite::Connection;
@@ -45,7 +43,7 @@ mod e2e_p0_p1_features_test {
 
     /// 创建测试环境
     fn setup_test_env() -> (
-        NamedTempFile,  // 保持临时文件生命周期
+        NamedTempFile, // 保持临时文件生命周期
         String,
         Arc<PlanApi>,
         Arc<MaterialApi>,
@@ -56,7 +54,9 @@ mod e2e_p0_p1_features_test {
         let (temp_file, db_path) = create_test_db().unwrap();
 
         // 创建repositories
-        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).unwrap()));
+        let conn = Arc::new(Mutex::new(
+            test_helpers::open_test_connection(&db_path).unwrap(),
+        ));
         let material_master_repo = Arc::new(MaterialMasterRepository::new(&db_path).unwrap());
         let material_state_repo = Arc::new(MaterialStateRepository::new(&db_path).unwrap());
         let plan_repo = Arc::new(PlanRepository::new(conn.clone()));
@@ -65,7 +65,8 @@ mod e2e_p0_p1_features_test {
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
         let strategy_draft_repo = Arc::new(StrategyDraftRepository::new(conn.clone()));
         let risk_snapshot_repo = Arc::new(RiskSnapshotRepository::new(&db_path).unwrap());
-        let capacity_pool_repo = Arc::new(CapacityPoolRepository::new(db_path.to_string()).unwrap());
+        let capacity_pool_repo =
+            Arc::new(CapacityPoolRepository::new(db_path.to_string()).unwrap());
         let roller_campaign_repo = Arc::new(RollerCampaignRepository::new(&db_path).unwrap());
         let path_override_pending_repo = Arc::new(PathOverridePendingRepository::new(conn.clone()));
 
@@ -135,7 +136,14 @@ mod e2e_p0_p1_features_test {
             action_log_repo,
         ));
 
-        (temp_file, db_path.to_string(), plan_api, material_api, config_api, config_manager)
+        (
+            temp_file,
+            db_path.to_string(),
+            plan_api,
+            material_api,
+            config_api,
+            config_manager,
+        )
     }
 
     // ==========================================
@@ -144,7 +152,8 @@ mod e2e_p0_p1_features_test {
 
     #[test]
     fn test_e2e_dry_run_mode() {
-        let (_temp_file, db_path, plan_api, _material_api, _config_api, _config_manager) = setup_test_env();
+        let (_temp_file, db_path, plan_api, _material_api, _config_api, _config_manager) =
+            setup_test_env();
 
         // 1. 创建方案
         let plan_id = plan_api
@@ -235,13 +244,7 @@ mod e2e_p0_p1_features_test {
         let state_before = state_repo.find_by_id(material_id).unwrap().unwrap();
 
         // 3. 执行dry-run重算
-        let result = plan_api
-            .simulate_recalc(
-                &version_id,
-                base_date,
-                None,
-                "test_user",
-            );
+        let result = plan_api.simulate_recalc(&version_id, base_date, None, "test_user");
 
         // 4. 验证结果
         assert!(result.is_ok(), "Dry-run重算应该成功");
@@ -273,7 +276,8 @@ mod e2e_p0_p1_features_test {
 
     #[test]
     fn test_e2e_version_comparison() {
-        let (_temp_file, _db_path, plan_api, _material_api, _config_api, _config_manager) = setup_test_env();
+        let (_temp_file, _db_path, plan_api, _material_api, _config_api, _config_manager) =
+            setup_test_env();
 
         // 1. 创建方案
         let plan_id = plan_api
@@ -327,7 +331,8 @@ mod e2e_p0_p1_features_test {
 
     #[test]
     fn test_e2e_config_snapshot() {
-        let (_temp_file, _db_path, plan_api, _material_api, config_api, _config_manager) = setup_test_env();
+        let (_temp_file, _db_path, plan_api, _material_api, config_api, _config_manager) =
+            setup_test_env();
 
         // 1. 更新配置
         config_api
@@ -379,7 +384,8 @@ mod e2e_p0_p1_features_test {
 
     #[test]
     fn test_e2e_manual_operation_validation() {
-        let (_temp_file, _db_path, _plan_api, material_api, _config_api, _config_manager) = setup_test_env();
+        let (_temp_file, _db_path, _plan_api, material_api, _config_api, _config_manager) =
+            setup_test_env();
 
         // 1. 创建测试材料
         let material_ids = vec!["MAT001".to_string(), "MAT002".to_string()];
@@ -419,7 +425,8 @@ mod e2e_p0_p1_features_test {
 
     #[test]
     fn test_e2e_complete_scheduling_flow() {
-        let (_temp_file, _db_path, plan_api, material_api, config_api, _config_manager) = setup_test_env();
+        let (_temp_file, _db_path, plan_api, material_api, config_api, _config_manager) =
+            setup_test_env();
 
         // 1. 配置系统参数
         config_api
@@ -472,7 +479,8 @@ mod e2e_p0_p1_features_test {
 
     #[test]
     fn test_e2e_config_snapshot_version_binding() {
-        let (_temp_file, _db_path, plan_api, _material_api, config_api, _config_manager) = setup_test_env();
+        let (_temp_file, _db_path, plan_api, _material_api, config_api, _config_manager) =
+            setup_test_env();
 
         // 1. 设置初始配置
         config_api
@@ -545,9 +553,7 @@ mod e2e_p0_p1_features_test {
             )
             .unwrap();
 
-        plan_api
-            .activate_version(&version_id, "test_user")
-            .unwrap();
+        plan_api.activate_version(&version_id, "test_user").unwrap();
 
         // 2. 生成草案（dry-run，不落库）
         let from = base_date;
@@ -610,10 +616,7 @@ mod e2e_p0_p1_features_test {
             .expect("发布草案后应生成新的正式版本");
 
         // 4.1 新版本应写入“中文命名”到 config_snapshot_json（不改表结构）
-        let snapshot_json = new_version
-            .config_snapshot_json
-            .as_deref()
-            .unwrap_or("{}");
+        let snapshot_json = new_version.config_snapshot_json.as_deref().unwrap_or("{}");
         let snapshot_map: std::collections::HashMap<String, String> =
             serde_json::from_str(snapshot_json).unwrap_or_default();
         let expected_name = format!(

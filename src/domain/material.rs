@@ -25,37 +25,37 @@ pub struct MaterialMaster {
     // ===== 基础信息 =====
     pub manufacturing_order_id: Option<String>, // 制造命令号
     pub material_status_code_src: Option<String>, // 材料状态码（源字段）
-    pub steel_mark: Option<String>,            // 出钢记号（钢种影子字段）
-    pub slab_id: Option<String>,               // 板坯号
+    pub steel_mark: Option<String>,             // 出钢记号（钢种影子字段）
+    pub slab_id: Option<String>,                // 板坯号
 
     // ===== 机组信息 =====
-    pub next_machine_code: Option<String>,     // 下道机组代码（源字段）
-    pub rework_machine_code: Option<String>,   // 精整返修机组（源字段）
-    pub current_machine_code: Option<String>,  // 当前机组代码（派生：COALESCE(rework, next)）
+    pub next_machine_code: Option<String>, // 下道机组代码（源字段）
+    pub rework_machine_code: Option<String>, // 精整返修机组（源字段）
+    pub current_machine_code: Option<String>, // 当前机组代码（派生：COALESCE(rework, next)）
 
     // ===== 工艺维度 =====
-    pub width_mm: Option<f64>,                 // 材料实际宽度（mm）
-    pub thickness_mm: Option<f64>,             // 材料实际厚度（mm）
-    pub length_m: Option<f64>,                 // 材料实际长度（m）
-    pub weight_t: Option<f64>,                 // 材料实际重量（吨，3位小数）
-    pub available_width_mm: Option<f64>,       // 可利用宽度（mm）
+    pub width_mm: Option<f64>,           // 材料实际宽度（mm）
+    pub thickness_mm: Option<f64>,       // 材料实际厚度（mm）
+    pub length_m: Option<f64>,           // 材料实际长度（m）
+    pub weight_t: Option<f64>,           // 材料实际重量（吨，3位小数）
+    pub available_width_mm: Option<f64>, // 可利用宽度（mm）
 
     // ===== 时间信息 =====
-    pub due_date: Option<NaiveDate>,           // 合同交货期（ISO DATE）
-    pub stock_age_days: Option<i32>,           // 状态时间（天）- 库存压力主口径
-    pub output_age_days_raw: Option<i32>,      // 产出时间（天）- 适温反推基础（导入时刻静态快照）
+    pub due_date: Option<NaiveDate>,      // 合同交货期（ISO DATE）
+    pub stock_age_days: Option<i32>,      // 状态时间（天）- 库存压力主口径
+    pub output_age_days_raw: Option<i32>, // 产出时间（天）- 适温反推基础（导入时刻静态快照）
     pub rolling_output_date: Option<NaiveDate>, // 轧制产出日期（ISO DATE）- v0.7 新增，动态计算基准
     pub status_updated_at: Option<DateTime<Utc>>, // 物料状态修改时间
 
     // ===== 合同影子字段（用于催料计算）=====
-    pub contract_no: Option<String>,           // 合同号
-    pub contract_nature: Option<String>,       // 合同性质代码（催料规则字段①）
-    pub weekly_delivery_flag: Option<String>,  // 按周交货标志（催料规则字段②）
-    pub export_flag: Option<String>,           // 出口标记（催料规则字段③，统一为 '1'/'0'）
+    pub contract_no: Option<String>,          // 合同号
+    pub contract_nature: Option<String>,      // 合同性质代码（催料规则字段①）
+    pub weekly_delivery_flag: Option<String>, // 按周交货标志（催料规则字段②）
+    pub export_flag: Option<String>,          // 出口标记（催料规则字段③，统一为 '1'/'0'）
 
     // ===== 审计字段 =====
-    pub created_at: DateTime<Utc>,             // 记录创建时间
-    pub updated_at: DateTime<Utc>,             // 记录更新时间
+    pub created_at: DateTime<Utc>, // 记录创建时间
+    pub updated_at: DateTime<Utc>, // 记录更新时间
 }
 
 // ==========================================
@@ -81,34 +81,34 @@ pub struct MaterialState {
 
     // ===== 适温派生字段（导入层派生）=====
     pub rolling_output_age_days: i32, // 等效轧制产出天数（按机组偏移规则派生）
-    pub ready_in_days: i32,        // 距离适温还需天数（0=已适温）
+    pub ready_in_days: i32,           // 距离适温还需天数（0=已适温）
     pub earliest_sched_date: Option<NaiveDate>, // 最早可排日期（today + ready_in_days）
 
     // ===== 库存压力 =====
     pub stock_age_days: i32, // 库存天数（状态时间）
 
     // ===== 排产落位（由 Capacity Filler 写入）=====
-    pub scheduled_date: Option<NaiveDate>,    // 已排日期（NULL=未排）
+    pub scheduled_date: Option<NaiveDate>, // 已排日期（NULL=未排）
     pub scheduled_machine_code: Option<String>, // 已排机组
-    pub seq_no: Option<i32>,                  // 日内顺序号
+    pub seq_no: Option<i32>,               // 日内顺序号
 
     // ===== 人工干预标志 =====
     pub manual_urgent_flag: bool, // 人工红线标志
 
     // ===== 路径规则人工确认 [v0.6] =====
     // 依据: migrations/v0.6_path_rule_extension.sql
-    pub user_confirmed: bool, // 路径违规人工确认突破标志
+    pub user_confirmed: bool,                     // 路径违规人工确认突破标志
     pub user_confirmed_at: Option<DateTime<Utc>>, // 确认时间（RFC3339）
-    pub user_confirmed_by: Option<String>, // 确认人
-    pub user_confirmed_reason: Option<String>, // 确认原因（user_confirmed=1 时必填）
+    pub user_confirmed_by: Option<String>,        // 确认人
+    pub user_confirmed_reason: Option<String>,    // 确认原因（user_confirmed=1 时必填）
 
     // ===== 冻结区标志 =====
     pub in_frozen_zone: bool, // 是否在冻结区
 
     // ===== 审计字段 =====
     pub last_calc_version_id: Option<String>, // 最后计算版本ID（关联 plan_version）
-    pub updated_at: DateTime<Utc>,    // 最后更新时间
-    pub updated_by: Option<String>,   // 操作人/系统标识
+    pub updated_at: DateTime<Utc>,            // 最后更新时间
+    pub updated_by: Option<String>,           // 操作人/系统标识
 }
 
 // ==========================================
@@ -151,18 +151,18 @@ pub struct RawMaterialRecord {
 // 对齐: v0.2_importer_schema.sql import_batch 表
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportBatch {
-    pub batch_id: String,                      // 批次 ID（UUID）
-    pub file_name: Option<String>,             // 源文件名
-    pub file_path: Option<String>,             // 源文件路径
-    pub total_rows: i32,                       // 总行数
-    pub success_rows: i32,                     // 成功导入行数
-    pub blocked_rows: i32,                     // 阻断行数（DQ ERROR）
-    pub warning_rows: i32,                     // 警告行数（DQ WARNING）
-    pub conflict_rows: i32,                    // 冲突行数
-    pub imported_at: Option<DateTime<Utc>>,    // 导入时间
-    pub imported_by: Option<String>,           // 导入人
-    pub elapsed_ms: Option<i32>,               // 导入耗时（毫秒）
-    pub dq_report_json: Option<String>,        // DQ 报告 JSON
+    pub batch_id: String,                   // 批次 ID（UUID）
+    pub file_name: Option<String>,          // 源文件名
+    pub file_path: Option<String>,          // 源文件路径
+    pub total_rows: i32,                    // 总行数
+    pub success_rows: i32,                  // 成功导入行数
+    pub blocked_rows: i32,                  // 阻断行数（DQ ERROR）
+    pub warning_rows: i32,                  // 警告行数（DQ WARNING）
+    pub conflict_rows: i32,                 // 冲突行数
+    pub imported_at: Option<DateTime<Utc>>, // 导入时间
+    pub imported_by: Option<String>,        // 导入人
+    pub elapsed_ms: Option<i32>,            // 导入耗时（毫秒）
+    pub dq_report_json: Option<String>,     // DQ 报告 JSON
 }
 
 // ==========================================
@@ -172,15 +172,15 @@ pub struct ImportBatch {
 // 对齐: schema_v0.1.sql import_conflict 表
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportConflict {
-    pub conflict_id: String,           // 冲突记录 ID（UUID）
-    pub batch_id: String,              // 关联批次 ID
-    pub row_number: usize,             // 原始文件行号
-    pub material_id: Option<String>,   // 材料号（如果可解析）
-    pub conflict_type: ConflictType,   // 冲突类型
-    pub raw_data: String,              // 原始行数据（JSON）
-    pub reason: String,                // 冲突原因
-    pub resolved: bool,                // 是否已处理
-    pub created_at: DateTime<Utc>,     // 创建时间
+    pub conflict_id: String,         // 冲突记录 ID（UUID）
+    pub batch_id: String,            // 关联批次 ID
+    pub row_number: usize,           // 原始文件行号
+    pub material_id: Option<String>, // 材料号（如果可解析）
+    pub conflict_type: ConflictType, // 冲突类型
+    pub raw_data: String,            // 原始行数据（JSON）
+    pub reason: String,              // 冲突原因
+    pub resolved: bool,              // 是否已处理
+    pub created_at: DateTime<Utc>,   // 创建时间
 }
 
 // ==========================================
@@ -188,10 +188,10 @@ pub struct ImportConflict {
 // ==========================================
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConflictType {
-    PrimaryKeyMissing,  // 主键缺失
+    PrimaryKeyMissing,   // 主键缺失
     PrimaryKeyDuplicate, // 主键重复
     ForeignKeyViolation, // 外键违反（如机组代码不存在）
-    DataTypeError,      // 数据类型错误
+    DataTypeError,       // 数据类型错误
 }
 
 // ==========================================
@@ -199,11 +199,11 @@ pub enum ConflictType {
 // ==========================================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DqViolation {
-    pub row_number: usize,             // 原始文件行号
-    pub material_id: Option<String>,   // 材料号（如果可解析）
-    pub level: DqLevel,                // 违规级别
-    pub field: String,                 // 违规字段
-    pub message: String,               // 违规描述
+    pub row_number: usize,           // 原始文件行号
+    pub material_id: Option<String>, // 材料号（如果可解析）
+    pub level: DqLevel,              // 违规级别
+    pub field: String,               // 违规字段
+    pub message: String,             // 违规描述
 }
 
 // ==========================================
@@ -211,9 +211,9 @@ pub struct DqViolation {
 // ==========================================
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DqLevel {
-    Error,   // 错误（阻断导入）
-    Warning, // 警告（允许导入）
-    Info,    // 提示（仅记录）
+    Error,    // 错误（阻断导入）
+    Warning,  // 警告（允许导入）
+    Info,     // 提示（仅记录）
     Conflict, // 冲突（进入冲突队列）
 }
 
@@ -222,9 +222,9 @@ pub enum DqLevel {
 // ==========================================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DqReport {
-    pub batch_id: String,              // 批次 ID
-    pub summary: DqSummary,            // 汇总统计
-    pub violations: Vec<DqViolation>,  // 违规明细
+    pub batch_id: String,             // 批次 ID
+    pub summary: DqSummary,           // 汇总统计
+    pub violations: Vec<DqViolation>, // 违规明细
 }
 
 // ==========================================
@@ -232,11 +232,11 @@ pub struct DqReport {
 // ==========================================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DqSummary {
-    pub total_rows: usize,    // 总行数
-    pub success: usize,       // 成功导入
-    pub blocked: usize,       // 阻断（ERROR）
-    pub warning: usize,       // 警告（WARNING）
-    pub conflict: usize,      // 冲突（CONFLICT）
+    pub total_rows: usize, // 总行数
+    pub success: usize,    // 成功导入
+    pub blocked: usize,    // 阻断（ERROR）
+    pub warning: usize,    // 警告（WARNING）
+    pub conflict: usize,   // 冲突（CONFLICT）
 }
 
 // ==========================================
@@ -245,9 +245,9 @@ pub struct DqSummary {
 // 用途: 导入接口返回值
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportResult {
-    pub batch: ImportBatch,    // 批次信息
-    pub summary: DqSummary,    // 汇总统计
-    pub violations: Vec<DqViolation>, // 违规明细
+    pub batch: ImportBatch,                // 批次信息
+    pub summary: DqSummary,                // 汇总统计
+    pub violations: Vec<DqViolation>,      // 违规明细
     pub elapsed_time: std::time::Duration, // 导入耗时
 }
 

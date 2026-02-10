@@ -14,9 +14,7 @@ mod test_helpers;
 use chrono::{NaiveDate, Utc};
 use hot_rolling_aps::domain::plan::{Plan, PlanItem, PlanVersion};
 use hot_rolling_aps::domain::types::PlanVersionStatus;
-use hot_rolling_aps::repository::{
-    PlanItemRepository, PlanRepository, PlanVersionRepository,
-};
+use hot_rolling_aps::repository::{PlanItemRepository, PlanRepository, PlanVersionRepository};
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
 
@@ -540,12 +538,12 @@ fn test_plan_item_find_frozen() {
     let item3 = create_test_plan_item("v001", "MAT003", date3, false);
 
     // 批量插入
-    item_repo.batch_insert(&vec![item1, item2, item3]).expect("插入失败");
+    item_repo
+        .batch_insert(&vec![item1, item2, item3])
+        .expect("插入失败");
 
     // 查询冻结明细
-    let frozen_items = item_repo
-        .find_frozen_items("v001")
-        .expect("查询失败");
+    let frozen_items = item_repo.find_frozen_items("v001").expect("查询失败");
 
     // 应该只有MAT001（locked_in_plan=true）
     assert_eq!(frozen_items.len(), 1);
@@ -582,7 +580,9 @@ fn test_plan_version_update_not_found() {
     assert!(result.is_err(), "更新不存在的记录应该失败");
     let err_msg = result.unwrap_err().to_string();
     assert!(
-        err_msg.contains("NotFound") || err_msg.contains("不存在") || err_msg.contains("记录未找到"),
+        err_msg.contains("NotFound")
+            || err_msg.contains("不存在")
+            || err_msg.contains("记录未找到"),
         "错误消息应该包含NotFound信息，实际错误: {}",
         err_msg
     );
@@ -727,7 +727,9 @@ fn test_plan_version_revision_boundary() {
         assert_eq!(version.revision, i, "第{}次更新前revision应该是{}", i, i);
 
         version.config_snapshot_json = Some(format!("update_{}", i));
-        version_repo.update(&version).expect(&format!("第{}次更新失败", i));
+        version_repo
+            .update(&version)
+            .expect(&format!("第{}次更新失败", i));
     }
 
     // 最终检查
@@ -778,7 +780,10 @@ fn test_performance_batch_insert_plan_items() {
     println!("记录数: {}", material_count);
     println!("耗时: {:?}", elapsed);
     println!("平均每条: {:?}", elapsed / material_count as u32);
-    println!("吞吐量: {:.2} 条/秒", material_count as f64 / elapsed.as_secs_f64());
+    println!(
+        "吞吐量: {:.2} 条/秒",
+        material_count as f64 / elapsed.as_secs_f64()
+    );
     println!("==========================================\n");
 
     // 性能基准：1000条应该在1秒内完成
@@ -811,7 +816,8 @@ fn test_performance_batch_query() {
     let plan_date = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
     let items: Vec<PlanItem> = (0..material_count)
         .map(|i| {
-            let mut item = create_test_plan_item("v_query", &format!("QMAT_{:05}", i), plan_date, false);
+            let mut item =
+                create_test_plan_item("v_query", &format!("QMAT_{:05}", i), plan_date, false);
             item.seq_no = i as i32 + 1;
             item
         })
@@ -832,7 +838,10 @@ fn test_performance_batch_query() {
     println!("记录数: {}", material_count);
     println!("耗时: {:?}", elapsed);
     println!("平均每条: {:?}", elapsed / material_count as u32);
-    println!("吞吐量: {:.2} 条/秒", material_count as f64 / elapsed.as_secs_f64());
+    println!(
+        "吞吐量: {:.2} 条/秒",
+        material_count as f64 / elapsed.as_secs_f64()
+    );
     println!("==========================================\n");
 
     // 性能基准：查询5000条应该在500ms内完成
@@ -861,7 +870,10 @@ fn test_performance_revision_updates() {
     let start = Instant::now();
 
     for i in 0..update_count {
-        let mut version = version_repo.find_by_id("v_update").expect("查询失败").unwrap();
+        let mut version = version_repo
+            .find_by_id("v_update")
+            .expect("查询失败")
+            .unwrap();
         version.config_snapshot_json = Some(format!("update_{}", i));
         version_repo.update(&version).expect("更新失败");
     }
@@ -874,11 +886,17 @@ fn test_performance_revision_updates() {
     println!("更新次数: {}", update_count);
     println!("耗时: {:?}", elapsed);
     println!("平均每次: {:?}", elapsed / update_count);
-    println!("吞吐量: {:.2} 次/秒", update_count as f64 / elapsed.as_secs_f64());
+    println!(
+        "吞吐量: {:.2} 次/秒",
+        update_count as f64 / elapsed.as_secs_f64()
+    );
     println!("==========================================\n");
 
     // 验证最终revision
-    let final_version = version_repo.find_by_id("v_update").expect("查询失败").unwrap();
+    let final_version = version_repo
+        .find_by_id("v_update")
+        .expect("查询失败")
+        .unwrap();
     assert_eq!(final_version.revision, update_count as i32);
 
     // 性能基准：1000次更新应该在5秒内完成

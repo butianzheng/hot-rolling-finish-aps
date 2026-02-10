@@ -1,8 +1,8 @@
 use crate::domain::plan::PlanItem;
 use crate::repository::error::{RepositoryError, RepositoryResult};
 use chrono::NaiveDate;
-use rusqlite::{params, params_from_iter, Connection};
 use rusqlite::types::Value;
+use rusqlite::{params, params_from_iter, Connection};
 use std::sync::{Arc, Mutex};
 
 // ==========================================
@@ -76,20 +76,18 @@ impl PlanItemRepository {
             )?;
 
             for item in items {
-                stmt.execute(
-                    params![
-                        &item.version_id,
-                        &item.material_id,
-                        &item.machine_code,
-                        &item.plan_date.format("%Y-%m-%d").to_string(),
-                        &item.seq_no,
-                        &item.weight_t,
-                        &item.source_type,
-                        if item.locked_in_plan { 1 } else { 0 },
-                        if item.force_release_in_plan { 1 } else { 0 },
-                        &item.violation_flags,
-                    ],
-                )?;
+                stmt.execute(params![
+                    &item.version_id,
+                    &item.material_id,
+                    &item.machine_code,
+                    &item.plan_date.format("%Y-%m-%d").to_string(),
+                    &item.seq_no,
+                    &item.weight_t,
+                    &item.source_type,
+                    if item.locked_in_plan { 1 } else { 0 },
+                    if item.force_release_in_plan { 1 } else { 0 },
+                    &item.violation_flags,
+                ])?;
             }
         }
 
@@ -116,20 +114,18 @@ impl PlanItemRepository {
             )?;
 
             for item in items {
-                stmt.execute(
-                    params![
-                        &item.version_id,
-                        &item.material_id,
-                        &item.machine_code,
-                        &item.plan_date.format("%Y-%m-%d").to_string(),
-                        &item.seq_no,
-                        &item.weight_t,
-                        &item.source_type,
-                        if item.locked_in_plan { 1 } else { 0 },
-                        if item.force_release_in_plan { 1 } else { 0 },
-                        &item.violation_flags,
-                    ],
-                )?;
+                stmt.execute(params![
+                    &item.version_id,
+                    &item.material_id,
+                    &item.machine_code,
+                    &item.plan_date.format("%Y-%m-%d").to_string(),
+                    &item.seq_no,
+                    &item.weight_t,
+                    &item.source_type,
+                    if item.locked_in_plan { 1 } else { 0 },
+                    if item.force_release_in_plan { 1 } else { 0 },
+                    &item.violation_flags,
+                ])?;
             }
         }
 
@@ -242,29 +238,28 @@ impl PlanItemRepository {
     ) -> RepositoryResult<(Option<NaiveDate>, Option<NaiveDate>, i64)> {
         let conn = self.get_conn()?;
 
-        let (min_str, max_str, count): (Option<String>, Option<String>, i64) = if let Some(code) =
-            machine_code.map(str::trim).filter(|s| !s.is_empty())
-        {
-            conn.query_row(
-                r#"
+        let (min_str, max_str, count): (Option<String>, Option<String>, i64) =
+            if let Some(code) = machine_code.map(str::trim).filter(|s| !s.is_empty()) {
+                conn.query_row(
+                    r#"
                 SELECT MIN(plan_date), MAX(plan_date), COUNT(*)
                 FROM plan_item
                 WHERE version_id = ?1 AND machine_code = ?2
                 "#,
-                params![version_id, code],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-            )?
-        } else {
-            conn.query_row(
-                r#"
+                    params![version_id, code],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )?
+            } else {
+                conn.query_row(
+                    r#"
                 SELECT MIN(plan_date), MAX(plan_date), COUNT(*)
                 FROM plan_item
                 WHERE version_id = ?1
                 "#,
-                params![version_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-            )?
-        };
+                    params![version_id],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )?
+            };
 
         let parse_date = |s: Option<String>| -> Option<NaiveDate> {
             s.and_then(|v| NaiveDate::parse_from_str(v.trim(), "%Y-%m-%d").ok())
@@ -344,13 +339,14 @@ impl PlanItemRepository {
             .query_map(params![version_id], |row| {
                 let machine_code: String = row.get(0)?;
                 let plan_date_str: String = row.get(1)?;
-                let plan_date = NaiveDate::parse_from_str(&plan_date_str, "%Y-%m-%d").map_err(|e| {
-                    rusqlite::Error::FromSqlConversionFailure(
-                        1,
-                        rusqlite::types::Type::Text,
-                        Box::new(e),
-                    )
-                })?;
+                let plan_date =
+                    NaiveDate::parse_from_str(&plan_date_str, "%Y-%m-%d").map_err(|e| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            1,
+                            rusqlite::types::Type::Text,
+                            Box::new(e),
+                        )
+                    })?;
                 Ok((machine_code, plan_date))
             })?
             .collect::<Result<Vec<(String, NaiveDate)>, _>>()?;
@@ -393,13 +389,14 @@ impl PlanItemRepository {
                 let plan_date_str: String = row.get(1)?;
                 let used_capacity_t: f64 = row.get(2)?;
 
-                let plan_date = NaiveDate::parse_from_str(&plan_date_str, "%Y-%m-%d").map_err(|e| {
-                    rusqlite::Error::FromSqlConversionFailure(
-                        1,
-                        rusqlite::types::Type::Text,
-                        Box::new(e),
-                    )
-                })?;
+                let plan_date =
+                    NaiveDate::parse_from_str(&plan_date_str, "%Y-%m-%d").map_err(|e| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            1,
+                            rusqlite::types::Type::Text,
+                            Box::new(e),
+                        )
+                    })?;
 
                 Ok((machine_code, plan_date, used_capacity_t))
             })?
@@ -612,10 +609,7 @@ impl PlanItemRepository {
     }
 
     /// 查询材料的排产历史
-    pub fn find_material_history(
-        &self,
-        material_id: &str,
-    ) -> RepositoryResult<Vec<PlanItem>> {
+    pub fn find_material_history(&self, material_id: &str) -> RepositoryResult<Vec<PlanItem>> {
         let conn = self.get_conn()?;
 
         let mut stmt = conn.prepare(
@@ -678,14 +672,15 @@ impl PlanItemRepository {
             version_id: row.get(0)?,
             material_id: row.get(1)?,
             machine_code: row.get(2)?,
-            plan_date: NaiveDate::parse_from_str(&row.get::<_, String>(3)?, "%Y-%m-%d")
-                .map_err(|e| {
+            plan_date: NaiveDate::parse_from_str(&row.get::<_, String>(3)?, "%Y-%m-%d").map_err(
+                |e| {
                     rusqlite::Error::FromSqlConversionFailure(
                         3,
                         rusqlite::types::Type::Text,
                         Box::new(e),
                     )
-                })?,
+                },
+            )?,
             seq_no: row.get(4)?,
             weight_t: row.get(5)?,
             source_type: row.get(6)?,

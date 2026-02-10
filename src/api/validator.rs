@@ -6,14 +6,14 @@
 // 依据: 自查说明.md - 设计对齐缺口4
 // ==========================================
 
-use std::sync::Arc;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use crate::api::error::{ApiError, ApiResult, ValidationViolation};
+use crate::repository::capacity_repo::CapacityPoolRepository;
 use crate::repository::material_repo::MaterialStateRepository;
 use crate::repository::plan_repo::PlanItemRepository;
-use crate::repository::capacity_repo::CapacityPoolRepository;
 
 // ==========================================
 // ValidationMode - 校验模式
@@ -112,10 +112,7 @@ impl ManualOperationValidator {
                 }
                 ValidationMode::AutoFix => {
                     // AutoFix模式下，记录警告但允许操作
-                    tracing::warn!(
-                        "AutoFix模式: 忽略{}个冻结区违规",
-                        violations.len()
-                    );
+                    tracing::warn!("AutoFix模式: 忽略{}个冻结区违规", violations.len());
                 }
             }
         }
@@ -153,10 +150,7 @@ impl ManualOperationValidator {
                     violations.push(ValidationViolation {
                         violation_type: "MATURITY".to_string(),
                         material_id: material_id.clone(),
-                        reason: format!(
-                            "材料未适温，还需{}天",
-                            state.ready_in_days
-                        ),
+                        reason: format!("材料未适温，还需{}天", state.ready_in_days),
                         details: Some(serde_json::json!({
                             "ready_in_days": state.ready_in_days,
                         })),
@@ -176,10 +170,7 @@ impl ManualOperationValidator {
                 }
                 ValidationMode::AutoFix => {
                     // AutoFix模式下，记录警告但允许操作
-                    tracing::warn!(
-                        "AutoFix模式: 允许强制放行{}个未适温材料",
-                        violations.len()
-                    );
+                    tracing::warn!("AutoFix模式: 允许强制放行{}个未适温材料", violations.len());
                 }
             }
         }
@@ -225,10 +216,7 @@ impl ManualOperationValidator {
                 violations.push(ValidationViolation {
                     violation_type: "MATURITY".to_string(),
                     material_id: material_id.to_string(),
-                    reason: format!(
-                        "材料未适温，还需{}天",
-                        state.ready_in_days
-                    ),
+                    reason: format!("材料未适温，还需{}天", state.ready_in_days),
                     details: Some(serde_json::json!({
                         "ready_in_days": state.ready_in_days,
                     })),
@@ -272,10 +260,7 @@ impl ManualOperationValidator {
                 }
                 ValidationMode::AutoFix => {
                     // AutoFix模式下，记录警告但允许操作
-                    tracing::warn!(
-                        "AutoFix模式: 忽略{}个人工排产违规",
-                        violations.len()
-                    );
+                    tracing::warn!("AutoFix模式: 忽略{}个人工排产违规", violations.len());
                 }
             }
         }

@@ -33,11 +33,7 @@ async fn test_import_api_full_flow() {
     println!("  文件路径: {}", test_file.display());
 
     let result = import_api
-        .import_materials(
-            test_file.to_str().unwrap(),
-            &batch_id,
-            None,
-        )
+        .import_materials(test_file.to_str().unwrap(), &batch_id, None)
         .await;
 
     // 步骤 5: 验证结果
@@ -93,7 +89,10 @@ async fn test_import_api_duplicate_detection() {
         .await
         .expect("第一次导入失败");
 
-    println!("✓ 第一次导入: 成功 {} 条, 冲突 {} 条", result1.imported, result1.conflicts);
+    println!(
+        "✓ 第一次导入: 成功 {} 条, 冲突 {} 条",
+        result1.imported, result1.conflicts
+    );
     assert!(result1.imported > 0);
     assert_eq!(result1.conflicts, 0);
 
@@ -104,7 +103,10 @@ async fn test_import_api_duplicate_detection() {
         .await
         .expect("第二次导入失败");
 
-    println!("✓ 第二次导入: 成功 {} 条, 冲突 {} 条", result2.imported, result2.conflicts);
+    println!(
+        "✓ 第二次导入: 成功 {} 条, 冲突 {} 条",
+        result2.imported, result2.conflicts
+    );
 
     // 第二次导入应该全部是冲突
     assert_eq!(result2.imported, 0, "重复导入不应有新记录");
@@ -131,7 +133,11 @@ async fn test_import_api_invalid_file() {
 
     // 测试非 CSV 文件
     let result2 = import_api
-        .import_materials("tests/fixtures/datasets/01_normal_data.xlsx", "BATCH_TEST", None)
+        .import_materials(
+            "tests/fixtures/datasets/01_normal_data.xlsx",
+            "BATCH_TEST",
+            None,
+        )
         .await;
 
     // 应该返回错误（当前只支持 CSV）

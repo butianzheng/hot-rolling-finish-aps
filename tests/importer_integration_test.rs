@@ -7,13 +7,13 @@
 mod test_helpers;
 
 use hot_rolling_aps::config::ConfigManager;
+use hot_rolling_aps::engine::material_state_derivation::MaterialStateDerivationService;
 use hot_rolling_aps::importer::{
-    CsvParser, DataCleanerImpl, DerivationServiceImpl, DqValidatorImpl,
-    ConflictHandlerImpl, FieldMapperImpl, MaterialImporter, MaterialImporterImpl,
+    ConflictHandlerImpl, CsvParser, DataCleanerImpl, DerivationServiceImpl, DqValidatorImpl,
+    FieldMapperImpl, MaterialImporter, MaterialImporterImpl,
 };
 use hot_rolling_aps::logging;
 use hot_rolling_aps::repository::MaterialImportRepositoryImpl;
-use hot_rolling_aps::engine::material_state_derivation::MaterialStateDerivationService;
 use test_helpers::{create_test_db, insert_test_config};
 
 /// 创建测试用的 MaterialImporter 实例
@@ -25,8 +25,7 @@ fn create_test_importer(
         .expect("Failed to create MaterialImportRepository");
 
     // 创建 ConfigManager
-    let config = ConfigManager::new(db_path)
-        .expect("Failed to create ConfigManager");
+    let config = ConfigManager::new(db_path).expect("Failed to create ConfigManager");
 
     // 创建导入组件
     let file_parser = Box::new(CsvParser);
@@ -77,8 +76,14 @@ async fn test_import_csv_basic() {
     println!("Import result: {:?}", import_result.summary);
 
     // 验证导入统计
-    assert_eq!(import_result.summary.total_rows, 5, "Should have 5 total rows");
-    assert!(import_result.summary.success > 0, "Should have successful imports");
+    assert_eq!(
+        import_result.summary.total_rows, 5,
+        "Should have 5 total rows"
+    );
+    assert!(
+        import_result.summary.success > 0,
+        "Should have successful imports"
+    );
 }
 
 #[tokio::test]
@@ -100,7 +105,8 @@ async fn test_import_csv_data_verification() {
     assert!(result.is_ok(), "Import should succeed: {:?}", result.err());
 
     let import_result = result.unwrap();
-    println!("Import summary: total={}, success={}, conflict={}, blocked={}",
+    println!(
+        "Import summary: total={}, success={}, conflict={}, blocked={}",
         import_result.summary.total_rows,
         import_result.summary.success,
         import_result.summary.conflict,
@@ -115,7 +121,9 @@ async fn test_import_csv_data_verification() {
     println!("Materials in database: {}", count);
 
     // 列出所有导入的材料ID
-    let mut stmt = conn.prepare("SELECT material_id FROM material_master ORDER BY material_id").unwrap();
+    let mut stmt = conn
+        .prepare("SELECT material_id FROM material_master ORDER BY material_id")
+        .unwrap();
     let material_ids: Vec<String> = stmt
         .query_map([], |row| row.get(0))
         .unwrap()
@@ -130,5 +138,8 @@ async fn test_import_csv_data_verification() {
     println!("Conflicts: {}", conflict_count);
 
     assert!(count > 0, "Should have materials in database");
-    assert!(material_ids.contains(&"MAT001".to_string()), "Should have MAT001 in database");
+    assert!(
+        material_ids.contains(&"MAT001".to_string()),
+        "Should have MAT001 in database"
+    );
 }

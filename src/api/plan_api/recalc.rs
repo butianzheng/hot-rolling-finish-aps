@@ -122,8 +122,7 @@ impl PlanApi {
             success: true,
             message: format!(
                 "试算完成（{}），共排产{}个材料（冻结{}个，重算{}个）",
-                strategy_key,
-                result.total_items, result.frozen_items, result.recalc_items
+                strategy_key, result.total_items, result.frozen_items, result.recalc_items
             ),
         })
     }
@@ -270,9 +269,7 @@ impl PlanApi {
             })),
             machine_code: None,
             date_range_start: Some(base_date),
-            date_range_end: Some(
-                base_date + chrono::Duration::days(window_days as i64),
-            ),
+            date_range_end: Some(base_date + chrono::Duration::days(window_days as i64)),
             detail: Some("一键重算".to_string()),
         };
 
@@ -288,7 +285,10 @@ impl PlanApi {
             plan_items_count,
             frozen_items_count,
             success: true,
-            message: format!("重算完成（{}），共排产{}个材料", strategy_key, plan_items_count),
+            message: format!(
+                "重算完成（{}），共排产{}个材料",
+                strategy_key, plan_items_count
+            ),
         })
     }
 
@@ -316,7 +316,10 @@ impl PlanApi {
             };
 
             if profile.base_strategy.parse::<ScheduleStrategy>().is_err() {
-                tracing::warn!(strategy_key = normalized, "自定义策略基线异常，回退 balanced");
+                tracing::warn!(
+                    strategy_key = normalized,
+                    "自定义策略基线异常，回退 balanced"
+                );
                 return Ok(ScheduleStrategy::Balanced.as_str().to_string());
             }
 
@@ -333,5 +336,4 @@ impl PlanApi {
     }
 
     // ==========================================
-
 }

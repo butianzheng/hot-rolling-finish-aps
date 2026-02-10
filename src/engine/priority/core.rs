@@ -99,13 +99,18 @@ impl PrioritySorter {
             let (master_a, state_a) = a;
             let (master_b, state_b) = b;
 
-            if let Some(ord) = self.compare_sched_state(state_a.sched_state, state_b.sched_state)
-            {
+            if let Some(ord) = self.compare_sched_state(state_a.sched_state, state_b.sched_state) {
                 return ord;
             }
 
-            let sa = score_by_id.get(&master_a.material_id).copied().unwrap_or(0.0);
-            let sb = score_by_id.get(&master_b.material_id).copied().unwrap_or(0.0);
+            let sa = score_by_id
+                .get(&master_a.material_id)
+                .copied()
+                .unwrap_or(0.0);
+            let sb = score_by_id
+                .get(&master_b.material_id)
+                .copied()
+                .unwrap_or(0.0);
 
             // 分数高者优先
             match sb.total_cmp(&sa) {
@@ -279,7 +284,10 @@ impl PrioritySorter {
                 }
 
                 // 4) rolling_output_age_days 降序
-                match state_b.rolling_output_age_days.cmp(&state_a.rolling_output_age_days) {
+                match state_b
+                    .rolling_output_age_days
+                    .cmp(&state_a.rolling_output_age_days)
+                {
                     Ordering::Equal => {}
                     other => return other,
                 }
@@ -321,7 +329,10 @@ impl PrioritySorter {
                 }
 
                 // 2) rolling_output_age_days 降序（更“老”的优先）
-                match state_b.rolling_output_age_days.cmp(&state_a.rolling_output_age_days) {
+                match state_b
+                    .rolling_output_age_days
+                    .cmp(&state_a.rolling_output_age_days)
+                {
                     Ordering::Equal => {}
                     other => return other,
                 }
@@ -403,4 +414,3 @@ impl Default for PrioritySorter {
         Self::new()
     }
 }
-

@@ -6,9 +6,7 @@
 // 红线: Repository 不含业务规则，只做数据 CRUD
 // ==========================================
 
-use crate::domain::material::{
-    ImportBatch, ImportConflict, MaterialMaster, MaterialState,
-};
+use crate::domain::material::{ImportBatch, ImportConflict, MaterialMaster, MaterialState};
 use async_trait::async_trait;
 use std::error::Error;
 
@@ -53,10 +51,7 @@ pub trait MaterialImportRepository: Send + Sync {
     ///
     /// # 参数
     /// - conflict: 冲突记录
-    async fn insert_conflict(
-        &self,
-        conflict: ImportConflict,
-    ) -> Result<(), Box<dyn Error>>;
+    async fn insert_conflict(&self, conflict: ImportConflict) -> Result<(), Box<dyn Error>>;
 
     /// 批量插入冲突记录
     ///
@@ -89,10 +84,7 @@ pub trait MaterialImportRepository: Send + Sync {
     ///
     /// # 参数
     /// - conflict_id: 冲突记录 ID
-    async fn mark_conflict_resolved(
-        &self,
-        conflict_id: &str,
-    ) -> Result<(), Box<dyn Error>>;
+    async fn mark_conflict_resolved(&self, conflict_id: &str) -> Result<(), Box<dyn Error>>;
 
     /// 带过滤和分页的冲突列表查询
     ///
@@ -111,10 +103,7 @@ pub trait MaterialImportRepository: Send + Sync {
     ///
     /// # 参数
     /// - status: 冲突状态 (OPEN/RESOLVED/IGNORED/None表示全部)
-    async fn count_conflicts_by_status(
-        &self,
-        status: Option<&str>,
-    ) -> Result<i64, Box<dyn Error>>;
+    async fn count_conflicts_by_status(&self, status: Option<&str>) -> Result<i64, Box<dyn Error>>;
 
     /// 按批次统计冲突数量（支持状态过滤）
     ///
@@ -162,19 +151,13 @@ pub trait MaterialImportRepository: Send + Sync {
     ///
     /// # 参数
     /// - batch: 批次信息
-    async fn insert_batch(
-        &self,
-        batch: ImportBatch,
-    ) -> Result<(), Box<dyn Error>>;
+    async fn insert_batch(&self, batch: ImportBatch) -> Result<(), Box<dyn Error>>;
 
     /// 查询最近的导入批次
     ///
     /// # 参数
     /// - limit: 返回记录数限制
-    async fn get_recent_batches(
-        &self,
-        limit: usize,
-    ) -> Result<Vec<ImportBatch>, Box<dyn Error>>;
+    async fn get_recent_batches(&self, limit: usize) -> Result<Vec<ImportBatch>, Box<dyn Error>>;
 
     // ===== 查询与校验 =====
 
@@ -186,10 +169,7 @@ pub trait MaterialImportRepository: Send + Sync {
     /// # 返回
     /// - Ok(true): 材料已存在
     /// - Ok(false): 材料不存在
-    async fn exists_material(
-        &self,
-        material_id: &str,
-    ) -> Result<bool, Box<dyn Error>>;
+    async fn exists_material(&self, material_id: &str) -> Result<bool, Box<dyn Error>>;
 
     /// 批量检查材料号是否存在
     ///
@@ -218,10 +198,7 @@ pub trait MaterialImportRepository: Send + Sync {
     ///
     /// # 返回
     /// - Ok(usize): 删除的材料数量
-    async fn delete_materials_by_batch(
-        &self,
-        batch_id: &str,
-    ) -> Result<usize, Box<dyn Error>>;
+    async fn delete_materials_by_batch(&self, batch_id: &str) -> Result<usize, Box<dyn Error>>;
 
     /// 按批次ID删除所有关联的冲突记录
     ///
@@ -230,17 +207,11 @@ pub trait MaterialImportRepository: Send + Sync {
     ///
     /// # 返回
     /// - Ok(usize): 删除的冲突记录数
-    async fn delete_conflicts_by_batch(
-        &self,
-        batch_id: &str,
-    ) -> Result<usize, Box<dyn Error>>;
+    async fn delete_conflicts_by_batch(&self, batch_id: &str) -> Result<usize, Box<dyn Error>>;
 
     /// 删除导入批次记录
     ///
     /// # 参数
     /// - batch_id: 批次ID
-    async fn delete_batch(
-        &self,
-        batch_id: &str,
-    ) -> Result<(), Box<dyn Error>>;
+    async fn delete_batch(&self, batch_id: &str) -> Result<(), Box<dyn Error>>;
 }

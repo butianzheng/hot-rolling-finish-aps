@@ -5,8 +5,8 @@
 // 说明: 用于"产能池管理日历化"功能，支持版本化配置
 // ==========================================
 
-use std::sync::Arc;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use crate::api::error::{ApiError, ApiResult};
 use crate::domain::action_log::ActionLog;
@@ -75,8 +75,8 @@ pub struct CreateOrUpdateMachineConfigResponse {
 pub struct ApplyConfigToDateRangeRequest {
     pub version_id: String,
     pub machine_code: String,
-    pub date_from: String,  // YYYY-MM-DD
-    pub date_to: String,    // YYYY-MM-DD
+    pub date_from: String, // YYYY-MM-DD
+    pub date_to: String,   // YYYY-MM-DD
     pub reason: String,
     pub operator: String,
 }
@@ -135,7 +135,9 @@ impl MachineConfigApi {
         machine_codes: Option<Vec<String>>,
     ) -> ApiResult<Vec<MachineConfigDto>> {
         // 查询所有配置
-        let all_configs = self.machine_config_repo.list_by_version_id(version_id)
+        let all_configs = self
+            .machine_config_repo
+            .list_by_version_id(version_id)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         // 如果指定了 machine_codes，进行过滤
@@ -183,7 +185,8 @@ impl MachineConfigApi {
         let config_id = entity.config_id.clone();
 
         // 执行 upsert
-        self.machine_config_repo.upsert(&entity)
+        self.machine_config_repo
+            .upsert(&entity)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         // 记录 ActionLog
@@ -195,11 +198,7 @@ impl MachineConfigApi {
             request.reason
         );
 
-        self.log_action(
-            &request.operator,
-            "UPDATE_MACHINE_CONFIG",
-            &action_desc,
-        )?;
+        self.log_action(&request.operator, "UPDATE_MACHINE_CONFIG", &action_desc)?;
 
         Ok(CreateOrUpdateMachineConfigResponse {
             success: true,
@@ -228,7 +227,8 @@ impl MachineConfigApi {
         self.validate_apply_request(&request)?;
 
         // 查询机组配置
-        let config = self.machine_config_repo
+        let config = self
+            .machine_config_repo
             .find_by_key(&request.version_id, &request.machine_code)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?
             .ok_or_else(|| {
@@ -239,13 +239,19 @@ impl MachineConfigApi {
             })?;
 
         // 解析日期范围
-        let date_from = chrono::NaiveDate::parse_from_str(&request.date_from, "%Y-%m-%d")
-            .map_err(|_| ApiError::InvalidInput("起始日期格式错误（应为 YYYY-MM-DD）".to_string()))?;
-        let date_to = chrono::NaiveDate::parse_from_str(&request.date_to, "%Y-%m-%d")
-            .map_err(|_| ApiError::InvalidInput("结束日期格式错误（应为 YYYY-MM-DD）".to_string()))?;
+        let date_from =
+            chrono::NaiveDate::parse_from_str(&request.date_from, "%Y-%m-%d").map_err(|_| {
+                ApiError::InvalidInput("起始日期格式错误（应为 YYYY-MM-DD）".to_string())
+            })?;
+        let date_to =
+            chrono::NaiveDate::parse_from_str(&request.date_to, "%Y-%m-%d").map_err(|_| {
+                ApiError::InvalidInput("结束日期格式错误（应为 YYYY-MM-DD）".to_string())
+            })?;
 
         if date_from > date_to {
-            return Err(ApiError::InvalidInput("起始日期不能晚于结束日期".to_string()));
+            return Err(ApiError::InvalidInput(
+                "起始日期不能晚于结束日期".to_string(),
+            ));
         }
 
         // 计算产能值
@@ -259,7 +265,8 @@ impl MachineConfigApi {
 
         while current_date <= date_to {
             // 查询当前日期的产能池记录
-            let pool_opt = self.capacity_repo
+            let pool_opt = self
+                .capacity_repo
                 .find_by_machine_and_date(&request.version_id, &request.machine_code, current_date)
                 .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
@@ -273,7 +280,8 @@ impl MachineConfigApi {
                     pool.target_capacity_t = target_capacity_t;
                     pool.limit_capacity_t = limit_capacity_t;
 
-                    self.capacity_repo.upsert_single(&pool)
+                    self.capacity_repo
+                        .upsert_single(&pool)
                         .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
                     updated_count += 1;
@@ -332,7 +340,8 @@ impl MachineConfigApi {
         machine_code: &str,
         limit: Option<usize>,
     ) -> ApiResult<Vec<MachineConfigDto>> {
-        let history = self.machine_config_repo
+        let history = self
+            .machine_config_repo
             .list_history_by_machine(machine_code, limit)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
@@ -344,7 +353,10 @@ impl MachineConfigApi {
     // ==========================================
 
     /// 验证创建或更新请求
-    fn validate_create_or_update_request(&self, request: &CreateOrUpdateMachineConfigRequest) -> ApiResult<()> {
+    fn validate_create_or_update_request(
+        &self,
+        request: &CreateOrUpdateMachineConfigRequest,
+    ) -> ApiResult<()> {
         if request.version_id.trim().is_empty() {
             return Err(ApiError::InvalidInput("version_id 不能为空".to_string()));
         }
@@ -354,15 +366,21 @@ impl MachineConfigApi {
         }
 
         if request.default_daily_target_t <= 0.0 {
-            return Err(ApiError::InvalidInput("default_daily_target_t 必须大于 0".to_string()));
+            return Err(ApiError::InvalidInput(
+                "default_daily_target_t 必须大于 0".to_string(),
+            ));
         }
 
         if request.default_daily_limit_pct < 1.0 {
-            return Err(ApiError::InvalidInput("default_daily_limit_pct 必须 >= 1.0 (100%)".to_string()));
+            return Err(ApiError::InvalidInput(
+                "default_daily_limit_pct 必须 >= 1.0 (100%)".to_string(),
+            ));
         }
 
         if request.reason.trim().is_empty() {
-            return Err(ApiError::InvalidInput("reason 不能为空（必须填写配置原因）".to_string()));
+            return Err(ApiError::InvalidInput(
+                "reason 不能为空（必须填写配置原因）".to_string(),
+            ));
         }
 
         if request.operator.trim().is_empty() {
@@ -371,8 +389,9 @@ impl MachineConfigApi {
 
         // 验证生效日期格式（如果提供）
         if let Some(ref date_str) = request.effective_date {
-            chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
-                .map_err(|_| ApiError::InvalidInput("effective_date 格式错误（应为 YYYY-MM-DD）".to_string()))?;
+            chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d").map_err(|_| {
+                ApiError::InvalidInput("effective_date 格式错误（应为 YYYY-MM-DD）".to_string())
+            })?;
         }
 
         Ok(())
@@ -389,7 +408,9 @@ impl MachineConfigApi {
         }
 
         if request.date_from.trim().is_empty() || request.date_to.trim().is_empty() {
-            return Err(ApiError::InvalidInput("date_from 和 date_to 不能为空".to_string()));
+            return Err(ApiError::InvalidInput(
+                "date_from 和 date_to 不能为空".to_string(),
+            ));
         }
 
         if request.reason.trim().is_empty() {
@@ -419,7 +440,8 @@ impl MachineConfigApi {
             detail: Some(description.to_string()),
         };
 
-        self.action_log_repo.insert(&log)
+        self.action_log_repo
+            .insert(&log)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         Ok(())

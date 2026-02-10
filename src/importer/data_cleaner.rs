@@ -93,7 +93,12 @@ impl DataCleaner {
     }
 
     /// 校验重量范围（0 < weight <= threshold）
-    pub fn validate_weight(&self, weight: Option<f64>, threshold: f64, row: usize) -> ImportResult<()> {
+    pub fn validate_weight(
+        &self,
+        weight: Option<f64>,
+        threshold: f64,
+        row: usize,
+    ) -> ImportResult<()> {
         if let Some(w) = weight {
             if w <= 0.0 {
                 return Err(ImportError::ValueRangeError {
@@ -113,7 +118,12 @@ impl DataCleaner {
     }
 
     /// 校验宽度/厚度范围（> 0）
-    pub fn validate_dimension(&self, dimension: Option<f64>, field_name: &str, row: usize) -> ImportResult<()> {
+    pub fn validate_dimension(
+        &self,
+        dimension: Option<f64>,
+        field_name: &str,
+        row: usize,
+    ) -> ImportResult<()> {
         if let Some(d) = dimension {
             if d <= 0.0 {
                 return Err(ImportError::ValueRangeError {
@@ -145,19 +155,40 @@ mod tests {
         let cleaner = DataCleaner;
         assert_eq!(cleaner.normalize_null(Some("  ".to_string())), None);
         assert_eq!(cleaner.normalize_null(Some("".to_string())), None);
-        assert_eq!(cleaner.normalize_null(Some("  value  ".to_string())), Some("value".to_string()));
+        assert_eq!(
+            cleaner.normalize_null(Some("  value  ".to_string())),
+            Some("value".to_string())
+        );
         assert_eq!(cleaner.normalize_null(None), None);
     }
 
     #[test]
     fn test_clean_export_flag() {
         let cleaner = DataCleaner;
-        assert_eq!(cleaner.clean_export_flag(Some("1".to_string())), Some("1".to_string()));
-        assert_eq!(cleaner.clean_export_flag(Some("Y".to_string())), Some("1".to_string()));
-        assert_eq!(cleaner.clean_export_flag(Some("是".to_string())), Some("1".to_string()));
-        assert_eq!(cleaner.clean_export_flag(Some("0".to_string())), Some("0".to_string()));
-        assert_eq!(cleaner.clean_export_flag(Some("N".to_string())), Some("0".to_string()));
-        assert_eq!(cleaner.clean_export_flag(Some("invalid".to_string())), Some("0".to_string()));
+        assert_eq!(
+            cleaner.clean_export_flag(Some("1".to_string())),
+            Some("1".to_string())
+        );
+        assert_eq!(
+            cleaner.clean_export_flag(Some("Y".to_string())),
+            Some("1".to_string())
+        );
+        assert_eq!(
+            cleaner.clean_export_flag(Some("是".to_string())),
+            Some("1".to_string())
+        );
+        assert_eq!(
+            cleaner.clean_export_flag(Some("0".to_string())),
+            Some("0".to_string())
+        );
+        assert_eq!(
+            cleaner.clean_export_flag(Some("N".to_string())),
+            Some("0".to_string())
+        );
+        assert_eq!(
+            cleaner.clean_export_flag(Some("invalid".to_string())),
+            Some("0".to_string())
+        );
     }
 
     #[test]

@@ -1,7 +1,6 @@
 use super::*;
 
 impl DecisionRefreshService {
-
     /// 刷新所有决策视图（P1 版本：只刷新 D1 和 D4）
     ///
     /// # 参数
@@ -21,8 +20,7 @@ impl DecisionRefreshService {
         let refresh_id = Uuid::new_v4().to_string();
         let started_at = Utc::now().to_rfc3339();
 
-        let mut conn = self.conn.lock()
-            .map_err(|e| format!("锁获取失败: {}", e))?;
+        let mut conn = self.conn.lock().map_err(|e| format!("锁获取失败: {}", e))?;
         let tx = conn.transaction()?;
 
         // 记录刷新开始
@@ -90,8 +88,7 @@ impl DecisionRefreshService {
 
         // 记录刷新完成
         let completed_at = Utc::now().to_rfc3339();
-        let duration_ms = (chrono::DateTime::parse_from_rfc3339(&completed_at)?
-            .timestamp_millis()
+        let duration_ms = (chrono::DateTime::parse_from_rfc3339(&completed_at)?.timestamp_millis()
             - chrono::DateTime::parse_from_rfc3339(&started_at)?.timestamp_millis())
             as i64;
 
@@ -186,5 +183,4 @@ impl DecisionRefreshService {
                 | RefreshTrigger::ManualRefresh
         )
     }
-
 }

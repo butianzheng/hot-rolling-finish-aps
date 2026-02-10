@@ -20,8 +20,7 @@ use tracing_subscriber::{fmt, EnvFilter};
 /// ```
 pub fn init() {
     // 从环境变量读取日志级别，默认为 info
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     // 配置日志格式
     fmt()

@@ -78,7 +78,8 @@ pub async fn list_rhythm_targets(
     date_to: Option<String>,
 ) -> Result<String, String> {
     let machine_codes = if let Some(raw) = machine_codes {
-        let list: Vec<String> = serde_json::from_str(&raw).map_err(|e| format!("machine_codes 解析失败: {}", e))?;
+        let list: Vec<String> =
+            serde_json::from_str(&raw).map_err(|e| format!("machine_codes 解析失败: {}", e))?;
         Some(list)
     } else {
         None
@@ -158,8 +159,8 @@ pub async fn apply_rhythm_preset(
     operator: String,
     reason: String,
 ) -> Result<String, String> {
-    let machines: Vec<String> =
-        serde_json::from_str(&machine_codes).map_err(|e| format!("machine_codes 解析失败: {}", e))?;
+    let machines: Vec<String> = serde_json::from_str(&machine_codes)
+        .map_err(|e| format!("machine_codes 解析失败: {}", e))?;
 
     let applied = state
         .rhythm_api
@@ -213,4 +214,3 @@ pub async fn get_daily_rhythm_profile(
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
-

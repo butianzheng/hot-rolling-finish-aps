@@ -22,8 +22,8 @@ mod system_performance_test {
         material_repo::{MaterialMasterRepository, MaterialStateRepository},
         path_override_pending_repo::PathOverridePendingRepository,
         plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository},
-        roller_repo::RollerCampaignRepository,
         risk_repo::RiskSnapshotRepository,
+        roller_repo::RollerCampaignRepository,
         strategy_draft_repo::StrategyDraftRepository,
     };
     use rusqlite::Connection;
@@ -39,7 +39,10 @@ mod system_performance_test {
     // ==========================================
 
     /// 生成大量测试材料数据
-    fn generate_test_materials(count: usize, base_date: NaiveDate) -> Vec<(MaterialMaster, MaterialState)> {
+    fn generate_test_materials(
+        count: usize,
+        base_date: NaiveDate,
+    ) -> Vec<(MaterialMaster, MaterialState)> {
         let mut materials = Vec::with_capacity(count);
 
         let steel_grades = vec!["Q235", "Q345", "Q390", "Q420", "Q460"];
@@ -79,15 +82,23 @@ mod system_performance_test {
             };
 
             // 材料状态
-            use hot_rolling_aps::domain::types::{SchedState, UrgentLevel, RushLevel};
+            use hot_rolling_aps::domain::types::{RushLevel, SchedState, UrgentLevel};
             let state = MaterialState {
                 material_id: material_id.clone(),
                 sched_state: SchedState::Ready,
                 lock_flag: i % 20 == 0, // 5%冻结
                 force_release_flag: false,
-                urgent_level: if i % 50 == 0 { UrgentLevel::L0 } else { UrgentLevel::L3 },
+                urgent_level: if i % 50 == 0 {
+                    UrgentLevel::L0
+                } else {
+                    UrgentLevel::L3
+                },
                 urgent_reason: None,
-                rush_level: if i % 10 == 0 { RushLevel::L1 } else { RushLevel::L2 },
+                rush_level: if i % 10 == 0 {
+                    RushLevel::L1
+                } else {
+                    RushLevel::L2
+                },
                 rolling_output_age_days: (i % 30) as i32,
                 ready_in_days: 0,
                 earliest_sched_date: Some(base_date),
@@ -125,7 +136,9 @@ mod system_performance_test {
     }
 
     /// 创建性能测试环境
-    fn setup_performance_test_env(material_count: usize) -> (
+    fn setup_performance_test_env(
+        material_count: usize,
+    ) -> (
         NamedTempFile,
         String,
         Arc<PlanApi>,
@@ -134,7 +147,9 @@ mod system_performance_test {
     ) {
         let (temp_file, db_path) = create_test_db().unwrap();
 
-        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).unwrap()));
+        let conn = Arc::new(Mutex::new(
+            test_helpers::open_test_connection(&db_path).unwrap(),
+        ));
         let material_master_repo = Arc::new(MaterialMasterRepository::new(&db_path).unwrap());
         let material_state_repo = Arc::new(MaterialStateRepository::new(&db_path).unwrap());
         let plan_repo = Arc::new(PlanRepository::new(conn.clone()));
@@ -143,7 +158,8 @@ mod system_performance_test {
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
         let strategy_draft_repo = Arc::new(StrategyDraftRepository::new(conn.clone()));
         let risk_snapshot_repo = Arc::new(RiskSnapshotRepository::new(&db_path).unwrap());
-        let capacity_pool_repo = Arc::new(CapacityPoolRepository::new(db_path.to_string()).unwrap());
+        let capacity_pool_repo =
+            Arc::new(CapacityPoolRepository::new(db_path.to_string()).unwrap());
         let roller_campaign_repo = Arc::new(RollerCampaignRepository::new(&db_path).unwrap());
         let path_override_pending_repo = Arc::new(PathOverridePendingRepository::new(conn.clone()));
 
@@ -194,7 +210,13 @@ mod system_performance_test {
         let materials = generate_test_materials(material_count, base_date);
         bulk_insert_materials(&material_master_repo, &material_state_repo, materials).unwrap();
 
-        (temp_file, db_path, plan_api, material_master_repo, material_state_repo)
+        (
+            temp_file,
+            db_path,
+            plan_api,
+            material_master_repo,
+            material_state_repo,
+        )
     }
 
     // ==========================================
@@ -213,8 +235,16 @@ mod system_performance_test {
         let all_materials = master_repo.find_by_machine("").unwrap();
         let duration = start.elapsed();
 
-        println!("✅ 查询所有材料: {} 条, 耗时: {:?}", all_materials.len(), duration);
-        assert!(duration.as_secs_f64() < 1.0, "查询10000材料应该<1秒,实际: {:?}", duration);
+        println!(
+            "✅ 查询所有材料: {} 条, 耗时: {:?}",
+            all_materials.len(),
+            duration
+        );
+        assert!(
+            duration.as_secs_f64() < 1.0,
+            "查询10000材料应该<1秒,实际: {:?}",
+            duration
+        );
 
         // 测试2: 按material_id查询(主键)
         let start = Instant::now();
@@ -222,15 +252,27 @@ mod system_performance_test {
         let duration = start.elapsed();
 
         println!("✅ 按material_id查询(主键): 耗时: {:?}", duration);
-        assert!(duration.as_micros() < 10000, "主键查询应该<10ms,实际: {:?}", duration);
+        assert!(
+            duration.as_micros() < 10000,
+            "主键查询应该<10ms,实际: {:?}",
+            duration
+        );
 
         // 测试3: 查询适温材料
         let start = Instant::now();
         let ready_materials = state_repo.find_ready_materials(None).unwrap();
         let duration = start.elapsed();
 
-        println!("✅ 查询适温材料: {} 条, 耗时: {:?}", ready_materials.len(), duration);
-        assert!(duration.as_secs_f64() < 1.0, "查询适温材料应该<1秒,实际: {:?}", duration);
+        println!(
+            "✅ 查询适温材料: {} 条, 耗时: {:?}",
+            ready_materials.len(),
+            duration
+        );
+        assert!(
+            duration.as_secs_f64() < 1.0,
+            "查询适温材料应该<1秒,实际: {:?}",
+            duration
+        );
 
         println!("\n========== 查询性能测试通过 ==========\n");
     }
@@ -247,30 +289,44 @@ mod system_performance_test {
             setup_performance_test_env(1000);
 
         // 创建方案
-        let plan_id = plan_api.create_plan("性能测试方案".to_string(), "test_user".to_string()).unwrap();
+        let plan_id = plan_api
+            .create_plan("性能测试方案".to_string(), "test_user".to_string())
+            .unwrap();
 
         // 测试: 创建版本并排产
         let start = Instant::now();
-        let version_id = plan_api.create_version(
-            plan_id.clone(),
-            30,
-            Some(NaiveDate::from_ymd_opt(2026, 1, 20).unwrap()),
-            Some("性能测试版本".to_string()),
-            "test_user".to_string(),
-        ).unwrap();
+        let version_id = plan_api
+            .create_version(
+                plan_id.clone(),
+                30,
+                Some(NaiveDate::from_ymd_opt(2026, 1, 20).unwrap()),
+                Some("性能测试版本".to_string()),
+                "test_user".to_string(),
+            )
+            .unwrap();
         let duration = start.elapsed();
 
         println!("✅ 创建版本并排产(1000材料): 耗时: {:?}", duration);
-        assert!(duration.as_secs_f64() < 5.0, "排产1000材料应该<5秒,实际: {:?}", duration);
+        assert!(
+            duration.as_secs_f64() < 5.0,
+            "排产1000材料应该<5秒,实际: {:?}",
+            duration
+        );
 
         // 测试: 重算性能
         let start = Instant::now();
         let base_date = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
-        plan_api.recalc_full(&version_id, base_date, None, "test_user").unwrap();
+        plan_api
+            .recalc_full(&version_id, base_date, None, "test_user")
+            .unwrap();
         let duration = start.elapsed();
 
         println!("✅ 重算排产(1000材料): 耗时: {:?}", duration);
-        assert!(duration.as_secs_f64() < 5.0, "重算1000材料应该<5秒,实际: {:?}", duration);
+        assert!(
+            duration.as_secs_f64() < 5.0,
+            "重算1000材料应该<5秒,实际: {:?}",
+            duration
+        );
 
         println!("\n========== 排产性能测试通过 ==========\n");
     }
@@ -296,7 +352,11 @@ mod system_performance_test {
         let duration = start.elapsed();
 
         println!("✅ 批量查询100个材料状态: 耗时: {:?}", duration);
-        assert!(duration.as_secs_f64() < 1.0, "批量查询100材料应该<1秒,实际: {:?}", duration);
+        assert!(
+            duration.as_secs_f64() < 1.0,
+            "批量查询100材料应该<1秒,实际: {:?}",
+            duration
+        );
 
         println!("\n========== 批量操作性能测试通过 ==========\n");
     }
@@ -318,7 +378,11 @@ mod system_performance_test {
         let duration = start.elapsed();
 
         println!("✅ 按material_id查询(主键): 耗时: {:?}", duration);
-        assert!(duration.as_micros() < 10000, "主键查询应该<10ms,实际: {:?}", duration);
+        assert!(
+            duration.as_micros() < 10000,
+            "主键查询应该<10ms,实际: {:?}",
+            duration
+        );
 
         // 测试: 全表扫描性能
         let start = Instant::now();
@@ -326,7 +390,11 @@ mod system_performance_test {
         let duration = start.elapsed();
 
         println!("✅ 全表扫描(10000条): 耗时: {:?}", duration);
-        assert!(duration.as_secs_f64() < 1.0, "全表扫描应该<1秒,实际: {:?}", duration);
+        assert!(
+            duration.as_secs_f64() < 1.0,
+            "全表扫描应该<1秒,实际: {:?}",
+            duration
+        );
 
         println!("\n========== 数据库索引效果测试通过 ==========\n");
     }

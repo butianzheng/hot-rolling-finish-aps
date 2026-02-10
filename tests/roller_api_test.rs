@@ -21,11 +21,13 @@ fn test_list_campaigns_空结果() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 创建方案和版本
-    let plan_id = env.plan_api
+    let plan_id = env
+        .plan_api
         .create_plan("测试方案".to_string(), "admin".to_string())
         .expect("创建失败");
 
-    let version_id = env.plan_api
+    let version_id = env
+        .plan_api
         .create_version(
             plan_id,
             30,
@@ -36,7 +38,8 @@ fn test_list_campaigns_空结果() {
         .expect("创建失败");
 
     // 测试: 查询换辊窗口（没有创建，应该为空）
-    let campaigns = env.roller_api
+    let campaigns = env
+        .roller_api
         .list_campaigns(&version_id)
         .expect("查询失败");
 
@@ -48,11 +51,13 @@ fn test_get_active_campaign_不存在() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 创建方案和版本
-    let plan_id = env.plan_api
+    let plan_id = env
+        .plan_api
         .create_plan("测试方案".to_string(), "admin".to_string())
         .expect("创建失败");
 
-    let version_id = env.plan_api
+    let version_id = env
+        .plan_api
         .create_version(
             plan_id,
             30,
@@ -63,7 +68,8 @@ fn test_get_active_campaign_不存在() {
         .expect("创建失败");
 
     // 测试: 查询进行中的换辊窗口（不存在）
-    let campaign = env.roller_api
+    let campaign = env
+        .roller_api
         .get_active_campaign(&version_id, "H032")
         .expect("查询失败");
 
@@ -75,11 +81,13 @@ fn test_list_needs_roll_change_空结果() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 创建方案和版本
-    let plan_id = env.plan_api
+    let plan_id = env
+        .plan_api
         .create_plan("测试方案".to_string(), "admin".to_string())
         .expect("创建失败");
 
-    let version_id = env.plan_api
+    let version_id = env
+        .plan_api
         .create_version(
             plan_id,
             30,
@@ -90,7 +98,8 @@ fn test_list_needs_roll_change_空结果() {
         .expect("创建失败");
 
     // 测试: 查询需要换辊的机组（没有创建，应该为空）
-    let campaigns = env.roller_api
+    let campaigns = env
+        .roller_api
         .list_needs_roll_change(&version_id)
         .expect("查询失败");
 
@@ -106,11 +115,13 @@ fn test_create_campaign_成功() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 创建方案和版本
-    let plan_id = env.plan_api
+    let plan_id = env
+        .plan_api
         .create_plan("测试方案".to_string(), "admin".to_string())
         .expect("创建失败");
 
-    let version_id = env.plan_api
+    let version_id = env
+        .plan_api
         .create_version(
             plan_id,
             30,
@@ -121,22 +132,22 @@ fn test_create_campaign_成功() {
         .expect("创建失败");
 
     // 测试: 创建换辊窗口
-    let result = env.roller_api
-        .create_campaign(
-            &version_id,
-            "H032",
-            1,
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
-            Some(1500.0),
-            Some(2500.0),
-            "admin",
-            "创建换辊窗口",
-        );
+    let result = env.roller_api.create_campaign(
+        &version_id,
+        "H032",
+        1,
+        NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
+        Some(1500.0),
+        Some(2500.0),
+        "admin",
+        "创建换辊窗口",
+    );
 
     assert!(result.is_ok(), "创建换辊窗口应该成功");
 
     // 验证: 查询换辊窗口
-    let campaigns = env.roller_api
+    let campaigns = env
+        .roller_api
         .list_campaigns(&version_id)
         .expect("查询失败");
 
@@ -150,11 +161,13 @@ fn test_close_campaign_成功() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 创建方案和版本
-    let plan_id = env.plan_api
+    let plan_id = env
+        .plan_api
         .create_plan("测试方案".to_string(), "admin".to_string())
         .expect("创建失败");
 
-    let version_id = env.plan_api
+    let version_id = env
+        .plan_api
         .create_version(
             plan_id,
             30,
@@ -179,20 +192,20 @@ fn test_close_campaign_成功() {
         .expect("创建失败");
 
     // 测试: 结束换辊窗口
-    let result = env.roller_api
-        .close_campaign(
-            &version_id,
-            "H032",
-            1,
-            NaiveDate::from_ymd_opt(2024, 1, 10).unwrap(),
-            "admin",
-            "结束换辊窗口",
-        );
+    let result = env.roller_api.close_campaign(
+        &version_id,
+        "H032",
+        1,
+        NaiveDate::from_ymd_opt(2024, 1, 10).unwrap(),
+        "admin",
+        "结束换辊窗口",
+    );
 
     assert!(result.is_ok(), "结束换辊窗口应该成功");
 
     // 验证: 查询进行中的换辊窗口（应该为空）
-    let campaign = env.roller_api
+    let campaign = env
+        .roller_api
         .get_active_campaign(&version_id, "H032")
         .expect("查询失败");
 
@@ -208,17 +221,16 @@ fn test_create_campaign_空版本ID() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 空版本ID
-    let result = env.roller_api
-        .create_campaign(
-            "",
-            "H032",
-            1,
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
-            None,
-            None,
-            "admin",
-            "测试",
-        );
+    let result = env.roller_api.create_campaign(
+        "",
+        "H032",
+        1,
+        NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
+        None,
+        None,
+        "admin",
+        "测试",
+    );
 
     assert!(result.is_err(), "空版本ID应该返回错误");
 }
@@ -228,17 +240,16 @@ fn test_create_campaign_空机组代码() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 空机组代码
-    let result = env.roller_api
-        .create_campaign(
-            "version_id",
-            "",
-            1,
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
-            None,
-            None,
-            "admin",
-            "测试",
-        );
+    let result = env.roller_api.create_campaign(
+        "version_id",
+        "",
+        1,
+        NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
+        None,
+        None,
+        "admin",
+        "测试",
+    );
 
     assert!(result.is_err(), "空机组代码应该返回错误");
 }
@@ -248,17 +259,16 @@ fn test_create_campaign_空原因() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 空原因
-    let result = env.roller_api
-        .create_campaign(
-            "version_id",
-            "H032",
-            1,
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
-            None,
-            None,
-            "admin",
-            "",
-        );
+    let result = env.roller_api.create_campaign(
+        "version_id",
+        "H032",
+        1,
+        NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
+        None,
+        None,
+        "admin",
+        "",
+    );
 
     assert!(result.is_err(), "空原因应该返回错误");
 }

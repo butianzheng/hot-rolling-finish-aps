@@ -17,8 +17,7 @@ use std::time::Instant;
 fn create_test_importer(
     db_path: &str,
 ) -> MaterialImporterImpl<MaterialImportRepositoryImpl, ConfigManager> {
-    let import_repo =
-        MaterialImportRepositoryImpl::new(db_path).expect("Failed to create repo");
+    let import_repo = MaterialImportRepositoryImpl::new(db_path).expect("Failed to create repo");
     let config = ConfigManager::new(db_path).expect("Failed to create config");
 
     let file_parser = Box::new(CsvParser);

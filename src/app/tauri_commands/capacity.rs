@@ -29,8 +29,8 @@ pub async fn get_capacity_pools(
     use chrono::NaiveDate;
 
     // 解析机组代码列表
-    let codes: Vec<String> = serde_json::from_str(&machine_codes)
-        .map_err(|e| format!("机组代码格式错误: {}", e))?;
+    let codes: Vec<String> =
+        serde_json::from_str(&machine_codes).map_err(|e| format!("机组代码格式错误: {}", e))?;
 
     // 解析日期
     let start_date = NaiveDate::parse_from_str(&date_from, "%Y-%m-%d")
@@ -41,28 +41,30 @@ pub async fn get_capacity_pools(
     let plan_api = state.plan_api.clone();
     let capacity_pool_repo = state.capacity_pool_repo.clone();
 
-    let result = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<crate::domain::capacity::CapacityPool>, String> {
-        let _perf = crate::perf::PerfGuard::new("ipc.get_capacity_pools");
+    let result = tauri::async_runtime::spawn_blocking(
+        move || -> Result<Vec<crate::domain::capacity::CapacityPool>, String> {
+            let _perf = crate::perf::PerfGuard::new("ipc.get_capacity_pools");
 
-        // 获取版本ID（如未提供则使用当前激活版本）
-        let vid = match version_id.as_ref() {
-            Some(v) => v.clone(),
-            None => plan_api
-                .get_latest_active_version_id()
-                .map_err(|e| format!("获取激活版本失败: {}", e))?
-                .ok_or_else(|| "当前没有激活版本".to_string())?,
-        };
+            // 获取版本ID（如未提供则使用当前激活版本）
+            let vid = match version_id.as_ref() {
+                Some(v) => v.clone(),
+                None => plan_api
+                    .get_latest_active_version_id()
+                    .map_err(|e| format!("获取激活版本失败: {}", e))?
+                    .ok_or_else(|| "当前没有激活版本".to_string())?,
+            };
 
-        // 收集所有机组的产能池
-        let mut all_pools = Vec::new();
-        for code in &codes {
-            let pools = capacity_pool_repo
-                .find_by_date_range(&vid, code, start_date, end_date)
-                .map_err(|e| format!("查询产能池失败: {}", e))?;
-            all_pools.extend(pools);
-        }
-        Ok(all_pools)
-    })
+            // 收集所有机组的产能池
+            let mut all_pools = Vec::new();
+            for code in &codes {
+                let pools = capacity_pool_repo
+                    .find_by_date_range(&vid, code, start_date, end_date)
+                    .map_err(|e| format!("查询产能池失败: {}", e))?;
+                all_pools.extend(pools);
+            }
+            Ok(all_pools)
+        },
+    )
     .await
     .map_err(|e| format!("任务执行失败: {}", e))??;
 
@@ -94,9 +96,9 @@ pub async fn update_capacity_pool(
     operator: String,
     version_id: Option<String>,
 ) -> Result<String, String> {
-    use chrono::NaiveDate;
-    use crate::domain::capacity::CapacityPool;
     use crate::domain::action_log::ActionLog;
+    use crate::domain::capacity::CapacityPool;
+    use chrono::NaiveDate;
 
     // 解析日期
     let date = NaiveDate::parse_from_str(&plan_date, "%Y-%m-%d")
@@ -115,13 +117,20 @@ pub async fn update_capacity_pool(
 
     tracing::info!(
         "[update_capacity_pool] 更新产能池: {} {} target={} limit={} reason={} operator={}",
-        machine_code, plan_date, target_capacity_t, limit_capacity_t, reason, operator
+        machine_code,
+        plan_date,
+        target_capacity_t,
+        limit_capacity_t,
+        reason,
+        operator
     );
 
     // 获取版本ID（如未提供则使用当前激活版本）
     let vid = match version_id.as_ref() {
         Some(v) => v.clone(),
-        None => state.plan_api.get_latest_active_version_id()
+        None => state
+            .plan_api
+            .get_latest_active_version_id()
             .map_err(|e| format!("获取激活版本失败: {}", e))?
             .ok_or_else(|| "当前没有激活版本".to_string())?,
     };
@@ -206,8 +215,15 @@ pub async fn update_capacity_pool(
     }
 
     // 可选：触发决策读模型刷新（产能池参数修改可能影响超限/瓶颈等口径）
-    if let Some(version_id) = version_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-        if let Err(e) = state.plan_api.manual_refresh_decision(version_id, &operator) {
+    if let Some(version_id) = version_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        if let Err(e) = state
+            .plan_api
+            .manual_refresh_decision(version_id, &operator)
+        {
             tracing::warn!("产能池更新后触发决策刷新失败: {}", e);
         }
 
@@ -259,9 +275,9 @@ pub async fn batch_update_capacity_pools(
     operator: String,
     version_id: Option<String>,
 ) -> Result<String, String> {
-    use chrono::NaiveDate;
-    use crate::domain::capacity::CapacityPool;
     use crate::domain::action_log::ActionLog;
+    use crate::domain::capacity::CapacityPool;
+    use chrono::NaiveDate;
 
     if reason.trim().is_empty() {
         return Err("请输入调整原因".to_string());
@@ -273,7 +289,9 @@ pub async fn batch_update_capacity_pools(
     // 获取版本ID（如未提供则使用当前激活版本）
     let vid = match version_id.as_ref() {
         Some(v) => v.clone(),
-        None => state.plan_api.get_latest_active_version_id()
+        None => state
+            .plan_api
+            .get_latest_active_version_id()
             .map_err(|e| format!("获取激活版本失败: {}", e))?
             .ok_or_else(|| "当前没有激活版本".to_string())?,
     };
@@ -425,7 +443,11 @@ pub async fn batch_update_capacity_pools(
     // best-effort：若提供 version_id，则触发决策刷新，并 emit 一个事件让前端及时拉取刷新状态。
     let refresh = if updated == 0 {
         None
-    } else if let Some(vid) = version_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+    } else if let Some(vid) = version_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
         let resp = match state.plan_api.manual_refresh_decision(vid, &operator) {
             Ok(r) => r,
             Err(e) => {
@@ -498,21 +520,17 @@ pub async fn get_machine_capacity_configs(
         // 创建仓储和API实例
         let machine_config_repo = std::sync::Arc::new(
             MachineConfigRepository::new(&db_path)
-                .map_err(|e| format!("创建机组配置仓储失败: {}", e))?
+                .map_err(|e| format!("创建机组配置仓储失败: {}", e))?,
         );
 
-        let machine_config_api = MachineConfigApi::new(
-            machine_config_repo,
-            capacity_pool_repo,
-            action_log_repo,
-        );
+        let machine_config_api =
+            MachineConfigApi::new(machine_config_repo, capacity_pool_repo, action_log_repo);
 
         // 解析 machine_codes（如果提供）
         let codes: Option<Vec<String>> = match machine_codes {
-            Some(ref json_str) if !json_str.trim().is_empty() => {
-                Some(serde_json::from_str(json_str)
-                    .map_err(|e| format!("机组代码格式错误: {}", e))?)
-            }
+            Some(ref json_str) if !json_str.trim().is_empty() => Some(
+                serde_json::from_str(json_str).map_err(|e| format!("机组代码格式错误: {}", e))?,
+            ),
             _ => None,
         };
 
@@ -543,9 +561,7 @@ pub async fn create_or_update_machine_config(
     state: tauri::State<'_, AppState>,
     request_json: String,
 ) -> Result<String, String> {
-    use crate::api::machine_config_api::{
-        CreateOrUpdateMachineConfigRequest, MachineConfigApi,
-    };
+    use crate::api::machine_config_api::{CreateOrUpdateMachineConfigRequest, MachineConfigApi};
     use crate::repository::MachineConfigRepository;
 
     let db_path = state.db_path.clone();
@@ -556,20 +572,17 @@ pub async fn create_or_update_machine_config(
         let _perf = crate::perf::PerfGuard::new("ipc.create_or_update_machine_config");
 
         // 解析请求
-        let request: CreateOrUpdateMachineConfigRequest = serde_json::from_str(&request_json)
-            .map_err(|e| format!("请求格式错误: {}", e))?;
+        let request: CreateOrUpdateMachineConfigRequest =
+            serde_json::from_str(&request_json).map_err(|e| format!("请求格式错误: {}", e))?;
 
         // 创建仓储和API实例
         let machine_config_repo = std::sync::Arc::new(
             MachineConfigRepository::new(&db_path)
-                .map_err(|e| format!("创建机组配置仓储失败: {}", e))?
+                .map_err(|e| format!("创建机组配置仓储失败: {}", e))?,
         );
 
-        let machine_config_api = MachineConfigApi::new(
-            machine_config_repo,
-            capacity_pool_repo,
-            action_log_repo,
-        );
+        let machine_config_api =
+            MachineConfigApi::new(machine_config_repo, capacity_pool_repo, action_log_repo);
 
         // 调用API
         let response = machine_config_api
@@ -598,9 +611,7 @@ pub async fn apply_machine_config_to_dates(
     state: tauri::State<'_, AppState>,
     request_json: String,
 ) -> Result<String, String> {
-    use crate::api::machine_config_api::{
-        ApplyConfigToDateRangeRequest, MachineConfigApi,
-    };
+    use crate::api::machine_config_api::{ApplyConfigToDateRangeRequest, MachineConfigApi};
     use crate::repository::MachineConfigRepository;
 
     let db_path = state.db_path.clone();
@@ -611,20 +622,17 @@ pub async fn apply_machine_config_to_dates(
         let _perf = crate::perf::PerfGuard::new("ipc.apply_machine_config_to_dates");
 
         // 解析请求
-        let request: ApplyConfigToDateRangeRequest = serde_json::from_str(&request_json)
-            .map_err(|e| format!("请求格式错误: {}", e))?;
+        let request: ApplyConfigToDateRangeRequest =
+            serde_json::from_str(&request_json).map_err(|e| format!("请求格式错误: {}", e))?;
 
         // 创建仓储和API实例
         let machine_config_repo = std::sync::Arc::new(
             MachineConfigRepository::new(&db_path)
-                .map_err(|e| format!("创建机组配置仓储失败: {}", e))?
+                .map_err(|e| format!("创建机组配置仓储失败: {}", e))?,
         );
 
-        let machine_config_api = MachineConfigApi::new(
-            machine_config_repo,
-            capacity_pool_repo,
-            action_log_repo,
-        );
+        let machine_config_api =
+            MachineConfigApi::new(machine_config_repo, capacity_pool_repo, action_log_repo);
 
         // 调用API
         let response = machine_config_api
@@ -668,14 +676,11 @@ pub async fn get_machine_config_history(
         // 创建仓储和API实例
         let machine_config_repo = std::sync::Arc::new(
             MachineConfigRepository::new(&db_path)
-                .map_err(|e| format!("创建机组配置仓储失败: {}", e))?
+                .map_err(|e| format!("创建机组配置仓储失败: {}", e))?,
         );
 
-        let machine_config_api = MachineConfigApi::new(
-            machine_config_repo,
-            capacity_pool_repo,
-            action_log_repo,
-        );
+        let machine_config_api =
+            MachineConfigApi::new(machine_config_repo, capacity_pool_repo, action_log_repo);
 
         // 调用API
         let history = machine_config_api

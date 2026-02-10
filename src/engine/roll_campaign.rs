@@ -139,11 +139,7 @@ impl RollCampaignEngine {
     ///
     /// # 返回
     /// JSON 格式的原因说明
-    pub fn generate_roll_reason(
-        &self,
-        campaign: &RollerCampaign,
-        status: RollStatus,
-    ) -> String {
+    pub fn generate_roll_reason(&self, campaign: &RollerCampaign, status: RollStatus) -> String {
         match status {
             RollStatus::HardStop => self.generate_hard_stop_reason(campaign),
             RollStatus::Suggest => self.generate_suggest_reason(campaign),
@@ -262,11 +258,7 @@ impl RollCampaignEngine {
     ///
     /// # 返回
     /// 添加后的换辊状态
-    pub fn predict_status_after_add(
-        &self,
-        campaign: &RollerCampaign,
-        weight_t: f64,
-    ) -> RollStatus {
+    pub fn predict_status_after_add(&self, campaign: &RollerCampaign, weight_t: f64) -> RollStatus {
         let new_weight = campaign.cum_weight_t + weight_t;
 
         if new_weight >= campaign.hard_limit_t {

@@ -40,7 +40,9 @@ impl PlanVersionRepository {
                 &version.plan_id,
                 &version.version_no,
                 version.status.to_db_str(),
-                &version.frozen_from_date.map(|d| d.format("%Y-%m-%d").to_string()),
+                &version
+                    .frozen_from_date
+                    .map(|d| d.format("%Y-%m-%d").to_string()),
                 &version.recalc_window_days,
                 &version.config_snapshot_json,
                 &version.created_by,
@@ -57,7 +59,10 @@ impl PlanVersionRepository {
     /// 说明：
     /// - 在同一事务内查询 MAX(version_no) 并写入，保证对同一 plan_id 的 version_no 分配原子性。
     /// - 该方法会覆盖传入的 `version.version_no`。
-    pub fn create_with_next_version_no(&self, version: &mut PlanVersion) -> RepositoryResult<String> {
+    pub fn create_with_next_version_no(
+        &self,
+        version: &mut PlanVersion,
+    ) -> RepositoryResult<String> {
         let mut conn = self.get_conn()?;
         let tx = conn.transaction()?;
 
@@ -80,7 +85,9 @@ impl PlanVersionRepository {
                 &version.plan_id,
                 &version.version_no,
                 version.status.to_db_str(),
-                &version.frozen_from_date.map(|d| d.format("%Y-%m-%d").to_string()),
+                &version
+                    .frozen_from_date
+                    .map(|d| d.format("%Y-%m-%d").to_string()),
                 &version.recalc_window_days,
                 &version.config_snapshot_json,
                 &version.created_by,
@@ -152,7 +159,9 @@ impl PlanVersionRepository {
                WHERE version_id = ? AND revision = ?"#,
             params![
                 version.status.to_db_str(),
-                &version.frozen_from_date.map(|d| d.format("%Y-%m-%d").to_string()),
+                &version
+                    .frozen_from_date
+                    .map(|d| d.format("%Y-%m-%d").to_string()),
                 &version.recalc_window_days,
                 &version.config_snapshot_json,
                 &version.version_id,
@@ -302,8 +311,17 @@ impl PlanVersionRepository {
             recalc_window_days: row.get(5)?,
             config_snapshot_json: row.get(6)?,
             created_by: row.get(7)?,
-            created_at: NaiveDateTime::parse_from_str(&row.get::<_, String>(8)?, "%Y-%m-%d %H:%M:%S")
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(8, rusqlite::types::Type::Text, Box::new(e)))?,
+            created_at: NaiveDateTime::parse_from_str(
+                &row.get::<_, String>(8)?,
+                "%Y-%m-%d %H:%M:%S",
+            )
+            .map_err(|e| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    8,
+                    rusqlite::types::Type::Text,
+                    Box::new(e),
+                )
+            })?,
             revision: row.get(9)?,
         })
     }

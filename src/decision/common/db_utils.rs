@@ -280,26 +280,14 @@ mod tests {
         .unwrap();
 
         // 插入测试数据
-        conn.execute(
-            "INSERT INTO decision_test VALUES ('V001', 'H032', 100)",
-            [],
-        )
-        .unwrap();
-        conn.execute(
-            "INSERT INTO decision_test VALUES ('V001', 'H033', 200)",
-            [],
-        )
-        .unwrap();
-        conn.execute(
-            "INSERT INTO decision_test VALUES ('V001', 'H034', 300)",
-            [],
-        )
-        .unwrap();
-        conn.execute(
-            "INSERT INTO decision_test VALUES ('V002', 'H032', 400)",
-            [],
-        )
-        .unwrap();
+        conn.execute("INSERT INTO decision_test VALUES ('V001', 'H032', 100)", [])
+            .unwrap();
+        conn.execute("INSERT INTO decision_test VALUES ('V001', 'H033', 200)", [])
+            .unwrap();
+        conn.execute("INSERT INTO decision_test VALUES ('V001', 'H034', 300)", [])
+            .unwrap();
+        conn.execute("INSERT INTO decision_test VALUES ('V002', 'H032', 400)", [])
+            .unwrap();
     }
 
     #[test]
@@ -461,11 +449,9 @@ mod tests {
 
         // 验证剩余记录
         let count: i32 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM decision_test_dates",
-                [],
-                |row| row.get(0),
-            )
+            .query_row("SELECT COUNT(*) FROM decision_test_dates", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         assert_eq!(count, 2); // H033 的两条记录保留
     }
@@ -493,11 +479,9 @@ mod tests {
 
         // 验证 2026-01-25 和 2026-01-26 的记录保留
         let count: i32 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM decision_test_dates",
-                [],
-                |row| row.get(0),
-            )
+            .query_row("SELECT COUNT(*) FROM decision_test_dates", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         assert_eq!(count, 2);
     }
@@ -525,11 +509,9 @@ mod tests {
 
         // 验证没有删除任何记录
         let count: i32 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM decision_test_dates",
-                [],
-                |row| row.get(0),
-            )
+            .query_row("SELECT COUNT(*) FROM decision_test_dates", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         assert_eq!(count, 4);
     }

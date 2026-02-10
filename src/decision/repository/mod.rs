@@ -24,9 +24,9 @@ pub mod roll_alert_repo;
 pub mod capacity_opportunity_repo;
 
 // 重导出仓储
-pub use day_summary_repo::DaySummaryRepository;
 pub use bottleneck_repo::BottleneckRepository;
-pub use order_failure_repo::OrderFailureRepository;
-pub use cold_stock_repo::ColdStockRepository;
-pub use roll_alert_repo::RollAlertRepository;
 pub use capacity_opportunity_repo::CapacityOpportunityRepository;
+pub use cold_stock_repo::ColdStockRepository;
+pub use day_summary_repo::DaySummaryRepository;
+pub use order_failure_repo::OrderFailureRepository;
+pub use roll_alert_repo::RollAlertRepository;

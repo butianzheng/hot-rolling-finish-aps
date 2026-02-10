@@ -15,7 +15,6 @@ use chrono::{Duration, NaiveDate};
 use serde_json::json;
 use tracing::instrument;
 
-
 // ==========================================
 // UrgencyEngine - 紧急等级判定引擎
 // ==========================================
@@ -112,15 +111,29 @@ impl UrgencyEngine {
         // 边界处理：contract_nature 缺失或为空
         let nature = match contract_nature {
             Some(n) if !n.is_empty() => n,
-            _ => return (RushLevel::L0, "RUSH_RULE_L0: contract_nature missing or empty".to_string()),
+            _ => {
+                return (
+                    RushLevel::L0,
+                    "RUSH_RULE_L0: contract_nature missing or empty".to_string(),
+                )
+            }
         };
 
         // 检查首字母是否为 Y 或 X（研发/试验合同，不参与催料）
-        let first_char = nature.chars().next().unwrap().to_uppercase().next().unwrap();
+        let first_char = nature
+            .chars()
+            .next()
+            .unwrap()
+            .to_uppercase()
+            .next()
+            .unwrap();
         if first_char == 'Y' || first_char == 'X' {
             return (
                 RushLevel::L0,
-                format!("RUSH_RULE_L0: contract_nature={} (research/test contract)", nature),
+                format!(
+                    "RUSH_RULE_L0: contract_nature={} (research/test contract)",
+                    nature
+                ),
             );
         }
 
@@ -129,7 +142,10 @@ impl UrgencyEngine {
         if let Some("D") = weekly_delivery_flag {
             return (
                 RushLevel::L2,
-                format!("RUSH_RULE_L2: contract_nature={}, weekly_delivery=D", nature),
+                format!(
+                    "RUSH_RULE_L2: contract_nature={}, weekly_delivery=D",
+                    nature
+                ),
             );
         }
 
@@ -140,7 +156,10 @@ impl UrgencyEngine {
             if export == "1" {
                 return (
                     RushLevel::L1,
-                    format!("RUSH_RULE_L1: contract_nature={}, weekly_delivery=A, export=1", nature),
+                    format!(
+                        "RUSH_RULE_L1: contract_nature={}, weekly_delivery=A, export=1",
+                        nature
+                    ),
                 );
             }
         }
@@ -242,13 +261,19 @@ impl UrgencyEngine {
                 }
 
                 // 规则5: 临期N1（紧急）
-                factors.push(format!("near_due_n1: due_date={}, within {} days", due_date, n1_days));
+                factors.push(format!(
+                    "near_due_n1: due_date={}, within {} days",
+                    due_date, n1_days
+                ));
                 current_level = Self::max_level(current_level, UrgentLevel::L2);
             } else {
                 // 规则6: 临期N2（关注）
                 let n2_threshold = today + Duration::days(n2_days as i64);
                 if due_date <= n2_threshold {
-                    factors.push(format!("near_due_n2: due_date={}, within {} days", due_date, n2_days));
+                    factors.push(format!(
+                        "near_due_n2: due_date={}, within {} days",
+                        due_date, n2_days
+                    ));
                     current_level = Self::max_level(current_level, UrgentLevel::L1);
                 }
             }
@@ -361,7 +386,7 @@ mod tests {
             due_date: Some(NaiveDate::from_ymd_opt(2026, 1, 25).unwrap()),
             stock_age_days: Some(10),
             output_age_days_raw: Some(5),
-            rolling_output_date: None,  // v0.7
+            rolling_output_date: None, // v0.7
             status_updated_at: Some(Utc::now()),
             contract_no: Some("C001".to_string()),
             contract_nature: Some("A".to_string()),
@@ -421,8 +446,14 @@ mod tests {
         // 断言
         assert_eq!(urgent_level, UrgentLevel::L3, "人工红线应为L3");
         assert_eq!(rush_level, RushLevel::L0, "无催料条件");
-        assert!(urgent_reason.contains("MANUAL_URGENT"), "原因应包含 MANUAL_URGENT");
-        assert!(urgent_reason.contains("\"level\":\"L3\""), "JSON中level应为L3");
+        assert!(
+            urgent_reason.contains("MANUAL_URGENT"),
+            "原因应包含 MANUAL_URGENT"
+        );
+        assert!(
+            urgent_reason.contains("\"level\":\"L3\""),
+            "JSON中level应为L3"
+        );
     }
 
     #[test]
@@ -441,8 +472,10 @@ mod tests {
         // 断言
         assert!(urgent_level >= UrgentLevel::L2, "冻结区材料至少L2");
         assert_eq!(rush_level, RushLevel::L0, "无催料条件");
-        assert!(urgent_reason.contains("FROZEN_ZONE") || urgent_reason.contains("in_frozen_zone"),
-                "原因应包含冻结区信息");
+        assert!(
+            urgent_reason.contains("FROZEN_ZONE") || urgent_reason.contains("in_frozen_zone"),
+            "原因应包含冻结区信息"
+        );
     }
 
     #[test]
@@ -482,7 +515,10 @@ mod tests {
         // 断言
         assert_eq!(urgent_level, UrgentLevel::L3, "适温阻断应为L3");
         assert_eq!(rush_level, RushLevel::L0, "无催料条件");
-        assert!(urgent_reason.contains("TEMP_BLOCKED"), "原因应包含 TEMP_BLOCKED");
+        assert!(
+            urgent_reason.contains("TEMP_BLOCKED"),
+            "原因应包含 TEMP_BLOCKED"
+        );
     }
 
     #[test]
@@ -501,8 +537,10 @@ mod tests {
         // 断言
         assert_eq!(urgent_level, UrgentLevel::L2, "临期N1应为L2");
         assert_eq!(rush_level, RushLevel::L0, "无催料条件");
-        assert!(urgent_reason.contains("NEAR_DUE_N1") || urgent_reason.contains("near_due_n1"),
-                "原因应包含 NEAR_DUE_N1");
+        assert!(
+            urgent_reason.contains("NEAR_DUE_N1") || urgent_reason.contains("near_due_n1"),
+            "原因应包含 NEAR_DUE_N1"
+        );
     }
 
     #[test]
@@ -521,8 +559,10 @@ mod tests {
         // 断言
         assert_eq!(urgent_level, UrgentLevel::L1, "临期N2应为L1");
         assert_eq!(rush_level, RushLevel::L0, "无催料条件");
-        assert!(urgent_reason.contains("NEAR_DUE_N2") || urgent_reason.contains("near_due_n2"),
-                "原因应包含 NEAR_DUE_N2");
+        assert!(
+            urgent_reason.contains("NEAR_DUE_N2") || urgent_reason.contains("near_due_n2"),
+            "原因应包含 NEAR_DUE_N2"
+        );
     }
 
     #[test]
@@ -543,8 +583,10 @@ mod tests {
         // 断言
         assert_eq!(rush_level, RushLevel::L2, "应判定为L2强催料");
         assert_eq!(urgent_level, UrgentLevel::L2, "催料应抬升至L2");
-        assert!(urgent_reason.contains("rush_elevated") || urgent_reason.contains("RUSH"),
-                "原因应包含催料抬升信息");
+        assert!(
+            urgent_reason.contains("rush_elevated") || urgent_reason.contains("RUSH"),
+            "原因应包含催料抬升信息"
+        );
     }
 
     #[test]
@@ -563,8 +605,10 @@ mod tests {
         // 断言
         assert_eq!(urgent_level, UrgentLevel::L0, "无紧急条件应为L0");
         assert_eq!(rush_level, RushLevel::L0, "无催料条件");
-        assert!(urgent_reason.contains("NORMAL") || urgent_reason.contains("no urgent conditions"),
-                "原因应包含正常信息");
+        assert!(
+            urgent_reason.contains("NORMAL") || urgent_reason.contains("no urgent conditions"),
+            "原因应包含正常信息"
+        );
     }
 
     // ==========================================
@@ -621,8 +665,10 @@ mod tests {
         // 断言：跳过所有交期相关规则
         assert_eq!(urgent_level, UrgentLevel::L0, "缺失交期应为L0");
         assert_eq!(rush_level, RushLevel::L0, "无催料条件");
-        assert!(urgent_reason.contains("NORMAL") || urgent_reason.contains("no urgent"),
-                "原因应包含正常信息");
+        assert!(
+            urgent_reason.contains("NORMAL") || urgent_reason.contains("no urgent"),
+            "原因应包含正常信息"
+        );
     }
 
     #[test]
@@ -636,8 +682,7 @@ mod tests {
         master.contract_nature = None;
         master.weekly_delivery_flag = Some("D".to_string());
 
-        let (_, rush_level, _) =
-            engine.evaluate_single(&master, &state, today(), N1_DAYS, N2_DAYS);
+        let (_, rush_level, _) = engine.evaluate_single(&master, &state, today(), N1_DAYS, N2_DAYS);
 
         // 断言：缺失合同性质时催料等级为L0
         assert_eq!(rush_level, RushLevel::L0, "缺失contract_nature应为L0");
@@ -698,7 +743,10 @@ mod tests {
 
         // 断言：人工红线优先
         assert_eq!(urgent_level, UrgentLevel::L3, "人工红线优先，应为L3");
-        assert!(urgent_reason.contains("MANUAL_URGENT"), "原因应包含 MANUAL_URGENT");
+        assert!(
+            urgent_reason.contains("MANUAL_URGENT"),
+            "原因应包含 MANUAL_URGENT"
+        );
     }
 
     #[test]
@@ -721,8 +769,10 @@ mod tests {
         // 断言：冻结区规则抬升到L2
         assert_eq!(rush_level, RushLevel::L1, "应判定为L1催料");
         assert_eq!(urgent_level, UrgentLevel::L2, "冻结区应抬升至L2");
-        assert!(urgent_reason.contains("FROZEN_ZONE") || urgent_reason.contains("in_frozen_zone"),
-                "原因应包含冻结区信息");
+        assert!(
+            urgent_reason.contains("FROZEN_ZONE") || urgent_reason.contains("in_frozen_zone"),
+            "原因应包含冻结区信息"
+        );
     }
 
     #[test]
@@ -741,7 +791,10 @@ mod tests {
 
         // 断言：适温阻断优先
         assert_eq!(urgent_level, UrgentLevel::L3, "适温阻断应为L3");
-        assert!(urgent_reason.contains("TEMP_BLOCKED"), "原因应包含 TEMP_BLOCKED");
+        assert!(
+            urgent_reason.contains("TEMP_BLOCKED"),
+            "原因应包含 TEMP_BLOCKED"
+        );
     }
 
     #[test]
@@ -782,7 +835,10 @@ mod tests {
 
         // 断言：人工红线优先
         assert_eq!(urgent_level, UrgentLevel::L3, "人工红线优先，应为L3");
-        assert!(urgent_reason.contains("MANUAL_URGENT"), "原因应包含 MANUAL_URGENT");
+        assert!(
+            urgent_reason.contains("MANUAL_URGENT"),
+            "原因应包含 MANUAL_URGENT"
+        );
     }
 
     // ==========================================
@@ -802,7 +858,10 @@ mod tests {
 
         assert_eq!(rush_level, RushLevel::L2, "按周交货D应为L2");
         assert!(reason.contains("RUSH_RULE_L2"), "原因应包含 RUSH_RULE_L2");
-        assert!(reason.contains("weekly_delivery=D"), "原因应包含 weekly_delivery=D");
+        assert!(
+            reason.contains("weekly_delivery=D"),
+            "原因应包含 weekly_delivery=D"
+        );
     }
 
     #[test]
@@ -834,8 +893,10 @@ mod tests {
 
         assert_eq!(rush_level, RushLevel::L0, "研发合同应为L0");
         assert!(reason.contains("RUSH_RULE_L0"), "原因应包含 RUSH_RULE_L0");
-        assert!(reason.contains("research") || reason.contains("test"),
-                "原因应说明研发/试验合同");
+        assert!(
+            reason.contains("research") || reason.contains("test"),
+            "原因应说明研发/试验合同"
+        );
     }
 
     #[test]
@@ -844,9 +905,9 @@ mod tests {
         let engine = UrgencyEngine::new();
 
         let (rush_level, reason) = engine.calculate_rush_level(
-            Some("D"),  // 非Y/X
-            Some("N"),  // 非A/D
-            Some("1"),  // 出口但不满足L1条件
+            Some("D"), // 非Y/X
+            Some("N"), // 非A/D
+            Some("1"), // 出口但不满足L1条件
         );
 
         assert_eq!(rush_level, RushLevel::L0, "不满足催料条件应为L0");
@@ -879,5 +940,3 @@ mod tests {
         assert_eq!(results[1].urgent_level, UrgentLevel::L2, "第二个材料应为L2");
     }
 }
-
-

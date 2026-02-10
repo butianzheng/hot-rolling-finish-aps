@@ -59,13 +59,23 @@ impl BottleneckRepository {
         // 补齐读模型缺失字段（scheduled/pending weight 等）
         // 说明：decision_machine_bottleneck 是 P2 读模型，但早期版本未落全字段。
         //       为保证前端展示口径一致，这里用 plan_item/material_state 进行轻量 enrich。
-        Self::enrich_read_model_profiles(&conn, version_id, machine_code, start_date, end_date, &mut profiles)?;
+        Self::enrich_read_model_profiles(
+            &conn,
+            version_id,
+            machine_code,
+            start_date,
+            end_date,
+            &mut profiles,
+        )?;
 
         Ok(profiles)
     }
 
     /// 映射读模型表行到 MachineBottleneckProfile
-    fn map_read_model_row(row: &rusqlite::Row, version_id: &str) -> rusqlite::Result<MachineBottleneckProfile> {
+    fn map_read_model_row(
+        row: &rusqlite::Row,
+        version_id: &str,
+    ) -> rusqlite::Result<MachineBottleneckProfile> {
         let machine_code: String = row.get(0)?;
         let plan_date: String = row.get(1)?;
         let bottleneck_score: f64 = row.get(2)?;
@@ -79,11 +89,8 @@ impl BottleneckRepository {
         let pending_materials: i32 = row.get(10)?;
         let suggested_actions: Option<String> = row.get(11)?;
 
-        let mut profile = MachineBottleneckProfile::new(
-            version_id.to_string(),
-            machine_code,
-            plan_date,
-        );
+        let mut profile =
+            MachineBottleneckProfile::new(version_id.to_string(), machine_code, plan_date);
 
         profile.bottleneck_score = bottleneck_score;
         profile.bottleneck_level = bottleneck_level;
@@ -132,13 +139,17 @@ impl BottleneckRepository {
                     .and_then(|v| v.as_i64())
                     .unwrap_or(0) as i32;
 
-                if let (Some(code), Some(description), Some(severity)) = (code, description, severity) {
-                    profile.reasons.push(crate::decision::use_cases::d4_machine_bottleneck::BottleneckReason {
-                        code: code.to_string(),
-                        description: description.to_string(),
-                        severity,
-                        affected_materials,
-                    });
+                if let (Some(code), Some(description), Some(severity)) =
+                    (code, description, severity)
+                {
+                    profile.reasons.push(
+                        crate::decision::use_cases::d4_machine_bottleneck::BottleneckReason {
+                            code: code.to_string(),
+                            description: description.to_string(),
+                            severity,
+                            affected_materials,
+                        },
+                    );
                 }
             }
         }
@@ -245,20 +256,21 @@ impl BottleneckRepository {
                 .insert(p.plan_date.clone());
         }
 
-        let pending_incr_map =
-            Self::query_unscheduled_ready_increments(conn, version_id, &machine_codes, start_date, end_date)?;
-        let pending_map = Self::compute_pending_map(
+        let pending_incr_map = Self::query_unscheduled_ready_increments(
+            conn,
+            version_id,
             &machine_codes,
-            &profile_dates,
-            &pending_incr_map,
-        );
+            start_date,
+            end_date,
+        )?;
+        let pending_map =
+            Self::compute_pending_map(&machine_codes, &profile_dates, &pending_incr_map);
 
         // 3) 写回 profiles
         for profile in profiles.iter_mut() {
-            if let Some((count, weight_t)) = scheduled_map.get(&(
-                profile.machine_code.clone(),
-                profile.plan_date.clone(),
-            )) {
+            if let Some((count, weight_t)) =
+                scheduled_map.get(&(profile.machine_code.clone(), profile.plan_date.clone()))
+            {
                 profile.scheduled_materials = *count;
                 profile.scheduled_weight_t = *weight_t;
             } else {
@@ -277,32 +289,34 @@ impl BottleneckRepository {
             }
 
             if profile.pending_materials > 20 {
-                profile.reasons.push(crate::decision::use_cases::d4_machine_bottleneck::BottleneckReason {
-                    code: "HIGH_PENDING_COUNT".to_string(),
-                    description: format!(
-                        "未排材料数量较多 {} 个（到当日仍未排入≤当日）",
-                        profile.pending_materials
-                    ),
-                    severity: 0.0,
-                    affected_materials: profile.pending_materials,
-                });
+                profile.reasons.push(
+                    crate::decision::use_cases::d4_machine_bottleneck::BottleneckReason {
+                        code: "HIGH_PENDING_COUNT".to_string(),
+                        description: format!(
+                            "未排材料数量较多 {} 个（到当日仍未排入≤当日）",
+                            profile.pending_materials
+                        ),
+                        severity: 0.0,
+                        affected_materials: profile.pending_materials,
+                    },
+                );
             }
 
             if profile.remaining_capacity_t < 100.0 && profile.pending_weight_t > 0.0 {
-                profile.reasons.push(crate::decision::use_cases::d4_machine_bottleneck::BottleneckReason {
-                    code: "LOW_REMAINING_CAPACITY".to_string(),
-                    description: format!(
-                        "剩余产能不足 {:.1}t，未排 {:.1}t（到当日仍未排入≤当日）",
-                        profile.remaining_capacity_t,
-                        profile.pending_weight_t
-                    ),
-                    severity: 0.0,
-                    affected_materials: 0,
-                });
+                profile.reasons.push(
+                    crate::decision::use_cases::d4_machine_bottleneck::BottleneckReason {
+                        code: "LOW_REMAINING_CAPACITY".to_string(),
+                        description: format!(
+                            "剩余产能不足 {:.1}t，未排 {:.1}t（到当日仍未排入≤当日）",
+                            profile.remaining_capacity_t, profile.pending_weight_t
+                        ),
+                        severity: 0.0,
+                        affected_materials: 0,
+                    },
+                );
             }
         }
 
         Ok(())
     }
-
 }

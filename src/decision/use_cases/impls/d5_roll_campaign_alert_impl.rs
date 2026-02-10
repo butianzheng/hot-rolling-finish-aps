@@ -325,10 +325,7 @@ mod tests {
         let alerts = use_case.list_roll_campaign_alerts("V001", None).unwrap();
 
         // 验证需要立即换辊的预警
-        let immediate_alerts: Vec<_> = alerts
-            .iter()
-            .filter(|a| a.needs_immediate_change)
-            .collect();
+        let immediate_alerts: Vec<_> = alerts.iter().filter(|a| a.needs_immediate_change).collect();
         assert!(immediate_alerts.len() > 0);
     }
 

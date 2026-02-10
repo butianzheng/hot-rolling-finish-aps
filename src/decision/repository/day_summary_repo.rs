@@ -48,7 +48,9 @@ impl DaySummaryRepository {
         end_date: &str,
     ) -> Result<Vec<DaySummary>, Box<dyn Error>> {
         // 优先尝试从读模型表读取
-        if let Ok(summaries) = self.get_day_summary_from_read_model(version_id, start_date, end_date) {
+        if let Ok(summaries) =
+            self.get_day_summary_from_read_model(version_id, start_date, end_date)
+        {
             if !summaries.is_empty() {
                 tracing::debug!(
                     version_id = version_id,
@@ -60,10 +62,7 @@ impl DaySummaryRepository {
         }
 
         // 回退到 risk_snapshot 实时计算
-        tracing::debug!(
-            version_id = version_id,
-            "D1: 回退到 risk_snapshot 实时计算"
-        );
+        tracing::debug!(version_id = version_id, "D1: 回退到 risk_snapshot 实时计算");
         self.get_day_summary_realtime(version_id, start_date, end_date)
     }
 
@@ -193,13 +192,21 @@ impl DaySummaryRepository {
         let mut day_map: HashMap<String, DayAggregateData> = HashMap::new();
 
         for row_result in rows {
-            let (snapshot_date, machine_code, risk_level, risk_reasons,
-                 target_capacity_t, used_capacity_t, limit_capacity_t,
-                 overflow_t, urgent_total_t) = row_result?;
+            let (
+                snapshot_date,
+                machine_code,
+                risk_level,
+                risk_reasons,
+                target_capacity_t,
+                used_capacity_t,
+                limit_capacity_t,
+                overflow_t,
+                urgent_total_t,
+            ) = row_result?;
 
-            let entry = day_map.entry(snapshot_date.clone()).or_insert_with(|| {
-                DayAggregateData::new(snapshot_date.clone())
-            });
+            let entry = day_map
+                .entry(snapshot_date.clone())
+                .or_insert_with(|| DayAggregateData::new(snapshot_date.clone()));
 
             entry.add_machine_data(
                 machine_code,
@@ -346,12 +353,7 @@ impl DayAggregateData {
 
         // 解析并添加来自 risk_snapshot 的原因
         for reason in self.risk_reasons {
-            summary.add_reason(
-                "RISK_FACTOR".to_string(),
-                reason,
-                0.2,
-                0.7,
-            );
+            summary.add_reason("RISK_FACTOR".to_string(), reason, 0.2, 0.7);
         }
 
         // 添加建议措施
@@ -415,9 +417,19 @@ mod tests {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
             "#,
             params![
-                "V001", "H032", "2026-01-24", "HIGH", "产能紧张",
-                1500.0, 1450.0, 2000.0, 0.0, 800.0,
-                500.0, 200.0, "OK",
+                "V001",
+                "H032",
+                "2026-01-24",
+                "HIGH",
+                "产能紧张",
+                1500.0,
+                1450.0,
+                2000.0,
+                0.0,
+                800.0,
+                500.0,
+                200.0,
+                "OK",
             ],
         )
         .unwrap();
@@ -431,9 +443,19 @@ mod tests {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
             "#,
             params![
-                "V001", "H033", "2026-01-24", "CRITICAL", "严重超载",
-                1500.0, 1800.0, 2000.0, 300.0, 1000.0,
-                600.0, 300.0, "WARNING",
+                "V001",
+                "H033",
+                "2026-01-24",
+                "CRITICAL",
+                "严重超载",
+                1500.0,
+                1800.0,
+                2000.0,
+                300.0,
+                1000.0,
+                600.0,
+                300.0,
+                "WARNING",
             ],
         )
         .unwrap();

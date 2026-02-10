@@ -10,7 +10,9 @@ use hot_rolling_aps::domain::capacity::CapacityPool;
 use hot_rolling_aps::domain::material::{MaterialMaster, MaterialState};
 use hot_rolling_aps::domain::plan::PlanItem;
 use hot_rolling_aps::domain::types::{RiskLevel, RushLevel, SchedState, UrgentLevel};
-use hot_rolling_aps::engine::{CapacityFiller, ImpactSummaryEngine, PrioritySorter, RiskEngine, UrgencyEngine};
+use hot_rolling_aps::engine::{
+    CapacityFiller, ImpactSummaryEngine, PrioritySorter, RiskEngine, UrgencyEngine,
+};
 use std::collections::HashMap;
 
 // ==========================================
@@ -130,23 +132,63 @@ fn test_e2e_basic_scheduling_flow() {
     let materials = vec![
         (
             create_material_master("M001", 45.0, "Q235", due_date, 10, 7), // stock_age=10
-            create_material_state("M001", SchedState::Ready, UrgentLevel::L0, RushLevel::L0, "H032", 0, 10),
+            create_material_state(
+                "M001",
+                SchedState::Ready,
+                UrgentLevel::L0,
+                RushLevel::L0,
+                "H032",
+                0,
+                10,
+            ),
         ),
         (
             create_material_master("M002", 40.0, "Q345", due_date, 8, 5), // stock_age=8
-            create_material_state("M002", SchedState::Ready, UrgentLevel::L1, RushLevel::L0, "H032", 0, 8),
+            create_material_state(
+                "M002",
+                SchedState::Ready,
+                UrgentLevel::L1,
+                RushLevel::L0,
+                "H032",
+                0,
+                8,
+            ),
         ),
         (
             create_material_master("M003", 35.0, "Q235", due_date, 15, 3), // stock_age=15 (最高)
-            create_material_state("M003", SchedState::Ready, UrgentLevel::L2, RushLevel::L0, "H032", 0, 15),
+            create_material_state(
+                "M003",
+                SchedState::Ready,
+                UrgentLevel::L2,
+                RushLevel::L0,
+                "H032",
+                0,
+                15,
+            ),
         ),
         (
             create_material_master("M004", 30.0, "Q345", due_date, 12, 2), // stock_age=12
-            create_material_state("M004", SchedState::Ready, UrgentLevel::L3, RushLevel::L1, "H032", 0, 12),
+            create_material_state(
+                "M004",
+                SchedState::Ready,
+                UrgentLevel::L3,
+                RushLevel::L1,
+                "H032",
+                0,
+                12,
+            ),
         ),
         (
             create_material_master("M005", 25.0, "Q235", due_date, 5, 1), // stock_age=5
-            create_material_state("M005", SchedState::Ready, UrgentLevel::L0, RushLevel::L0, "H032", 0, 5),
+            create_material_state(
+                "M005",
+                SchedState::Ready,
+                UrgentLevel::L0,
+                RushLevel::L0,
+                "H032",
+                0,
+                5,
+            ),
         ),
     ];
 
@@ -161,10 +203,16 @@ fn test_e2e_basic_scheduling_flow() {
     let sorted_materials = priority_sorter.sort(materials.clone());
 
     // 验证排序: stock_age_days越大越优先
-    assert!(sorted_materials[0].0.stock_age_days.unwrap() >= sorted_materials[1].0.stock_age_days.unwrap(),
-        "第1位的stock_age应该>=第2位");
+    assert!(
+        sorted_materials[0].0.stock_age_days.unwrap()
+            >= sorted_materials[1].0.stock_age_days.unwrap(),
+        "第1位的stock_age应该>=第2位"
+    );
     // M003 (stock_age=15) 应该排在最前
-    assert_eq!(sorted_materials[0].0.material_id, "M003", "M003 (stock_age=15) 应该排在第一位");
+    assert_eq!(
+        sorted_materials[0].0.material_id, "M003",
+        "M003 (stock_age=15) 应该排在第一位"
+    );
 
     // Step 4: CapacityFiller - 填充产能池
     let mut capacity_pool = create_capacity_pool("H032", plan_date, 100.0, 120.0);
@@ -176,16 +224,23 @@ fn test_e2e_basic_scheduling_flow() {
     );
 
     // 验证产能填充结果
-    assert!(plan_items.len() >= 3, "应该至少排入3个材料（35+30+45=110吨）");
-    assert!((capacity_pool.used_capacity_t - 110.0).abs() < 0.01 || capacity_pool.used_capacity_t <= 120.0,
-        "已用产能应该约为110吨或在上限内");
+    assert!(
+        plan_items.len() >= 3,
+        "应该至少排入3个材料（35+30+45=110吨）"
+    );
+    assert!(
+        (capacity_pool.used_capacity_t - 110.0).abs() < 0.01
+            || capacity_pool.used_capacity_t <= 120.0,
+        "已用产能应该约为110吨或在上限内"
+    );
 
     // 验证紧急材料被优先排入
     let l3_item = plan_items.iter().find(|i| i.material_id == "M004");
     assert!(l3_item.is_some(), "L3材料应该被排入");
 
     // Step 5: RiskEngine - 生成风险快照
-    let all_materials: Vec<MaterialState> = materials.iter().map(|(_, state)| state.clone()).collect();
+    let all_materials: Vec<MaterialState> =
+        materials.iter().map(|(_, state)| state.clone()).collect();
     let material_weights: HashMap<String, f64> = materials
         .iter()
         .map(|(master, _)| (master.material_id.clone(), master.weight_t.unwrap()))
@@ -214,7 +269,10 @@ fn test_e2e_basic_scheduling_flow() {
 
     println!("✅ 完整排产流程测试通过");
     println!("   - 排入材料数: {}", plan_items.len());
-    println!("   - 已用产能: {:.1}吨 / {:.1}吨", capacity_pool.used_capacity_t, capacity_pool.target_capacity_t);
+    println!(
+        "   - 已用产能: {:.1}吨 / {:.1}吨",
+        capacity_pool.used_capacity_t, capacity_pool.target_capacity_t
+    );
     println!("   - 风险等级: {:?}", risk_snapshot.risk_level);
     println!("   - L2材料数: {}", risk_snapshot.l2_count);
     println!("   - L3材料数: {}", risk_snapshot.l3_count);
@@ -234,44 +292,66 @@ fn test_e2e_scheduling_with_frozen_zone() {
     let due_date = NaiveDate::from_ymd_opt(2026, 1, 25).unwrap();
 
     // Step 1: 准备冻结区材料
-    let frozen_items = vec![
-        PlanItem {
-            version_id: "test_v1".to_string(),
-            material_id: "F001".to_string(),
-            machine_code: "H032".to_string(),
-            plan_date,
-            seq_no: 1,
-            weight_t: 40.0,
-            source_type: "FROZEN".to_string(),
-            locked_in_plan: true,
-            force_release_in_plan: false,
-            violation_flags: None,
-            urgent_level: Some("L1".to_string()),
-            sched_state: Some("LOCKED".to_string()),
-            assign_reason: Some("FROZEN_ZONE".to_string()),
-            steel_grade: None,
-            width_mm: None,
-            thickness_mm: None,
-            contract_no: None,
-            due_date: None,
-            scheduled_date: None,
-            scheduled_machine_code: None,
-        },
-    ];
+    let frozen_items = vec![PlanItem {
+        version_id: "test_v1".to_string(),
+        material_id: "F001".to_string(),
+        machine_code: "H032".to_string(),
+        plan_date,
+        seq_no: 1,
+        weight_t: 40.0,
+        source_type: "FROZEN".to_string(),
+        locked_in_plan: true,
+        force_release_in_plan: false,
+        violation_flags: None,
+        urgent_level: Some("L1".to_string()),
+        sched_state: Some("LOCKED".to_string()),
+        assign_reason: Some("FROZEN_ZONE".to_string()),
+        steel_grade: None,
+        width_mm: None,
+        thickness_mm: None,
+        contract_no: None,
+        due_date: None,
+        scheduled_date: None,
+        scheduled_machine_code: None,
+    }];
 
     // Step 2: 准备候选材料
     let materials = vec![
         (
             create_material_master("M001", 35.0, "Q235", due_date, 10, 7),
-            create_material_state("M001", SchedState::Ready, UrgentLevel::L1, RushLevel::L0, "H032", 0, 10),
+            create_material_state(
+                "M001",
+                SchedState::Ready,
+                UrgentLevel::L1,
+                RushLevel::L0,
+                "H032",
+                0,
+                10,
+            ),
         ),
         (
             create_material_master("M002", 30.0, "Q345", due_date, 8, 5),
-            create_material_state("M002", SchedState::Ready, UrgentLevel::L1, RushLevel::L0, "H032", 0, 8),
+            create_material_state(
+                "M002",
+                SchedState::Ready,
+                UrgentLevel::L1,
+                RushLevel::L0,
+                "H032",
+                0,
+                8,
+            ),
         ),
         (
             create_material_master("M003", 25.0, "Q235", due_date, 6, 3),
-            create_material_state("M003", SchedState::Ready, UrgentLevel::L1, RushLevel::L0, "H032", 0, 6),
+            create_material_state(
+                "M003",
+                SchedState::Ready,
+                UrgentLevel::L1,
+                RushLevel::L0,
+                "H032",
+                0,
+                6,
+            ),
         ),
     ];
 
@@ -294,9 +374,18 @@ fn test_e2e_scheduling_with_frozen_zone() {
     assert!(plan_items[0].is_frozen(), "冻结材料的is_frozen应该返回true");
 
     // Step 5: 风险评估
-    let mut all_materials: Vec<MaterialState> = materials.iter().map(|(_, state)| state.clone()).collect();
+    let mut all_materials: Vec<MaterialState> =
+        materials.iter().map(|(_, state)| state.clone()).collect();
     // 添加冻结材料的状态
-    all_materials.push(create_material_state("F001", SchedState::Locked, UrgentLevel::L1, RushLevel::L0, "H032", 0, 1));
+    all_materials.push(create_material_state(
+        "F001",
+        SchedState::Locked,
+        UrgentLevel::L1,
+        RushLevel::L0,
+        "H032",
+        0,
+        1,
+    ));
 
     let mut material_weights: HashMap<String, f64> = materials
         .iter()
@@ -317,7 +406,10 @@ fn test_e2e_scheduling_with_frozen_zone() {
     );
 
     // 验证风险评估包含冻结区影响
-    assert!(risk_snapshot.used_capacity_t >= 40.0, "已用产能应该包含冻结区");
+    assert!(
+        risk_snapshot.used_capacity_t >= 40.0,
+        "已用产能应该包含冻结区"
+    );
 
     println!("✅ 冻结区排产流程测试通过");
     println!("   - 冻结材料: F001 排在第1位");
@@ -350,7 +442,15 @@ fn test_e2e_scheduling_high_load_scenario() {
             };
             (
                 create_material_master(&material_id, 20.0, "Q235", due_date, 10, 5),
-                create_material_state(&material_id, SchedState::Ready, urgent_level, RushLevel::L0, "H032", 0, 10),
+                create_material_state(
+                    &material_id,
+                    SchedState::Ready,
+                    urgent_level,
+                    RushLevel::L0,
+                    "H032",
+                    0,
+                    10,
+                ),
             )
         })
         .collect();
@@ -365,20 +465,20 @@ fn test_e2e_scheduling_high_load_scenario() {
 
     // Step 3: 填充产能池 (100吨目标,120吨上限)
     let mut capacity_pool = create_capacity_pool("H032", plan_date, 100.0, 120.0);
-    let (plan_items, rejected) = capacity_filler.fill_single_day(
-        &mut capacity_pool,
-        sorted_materials,
-        vec![],
-        "test_v1",
-    );
+    let (plan_items, rejected) =
+        capacity_filler.fill_single_day(&mut capacity_pool, sorted_materials, vec![], "test_v1");
 
     // 验证填充结果
     assert!(plan_items.len() <= 6, "应该只排入不超过6个材料(120吨上限)");
     assert!(rejected.len() >= 4, "应该有至少4个材料被拒绝");
-    assert!(capacity_pool.used_capacity_t <= capacity_pool.limit_capacity_t + 0.01, "不应超过上限(非locked)");
+    assert!(
+        capacity_pool.used_capacity_t <= capacity_pool.limit_capacity_t + 0.01,
+        "不应超过上限(非locked)"
+    );
 
     // Step 4: 风险评估 (高负荷场景)
-    let all_materials: Vec<MaterialState> = materials.iter().map(|(_, state)| state.clone()).collect();
+    let all_materials: Vec<MaterialState> =
+        materials.iter().map(|(_, state)| state.clone()).collect();
     let material_weights: HashMap<String, f64> = materials
         .iter()
         .map(|(master, _)| (master.material_id.clone(), master.weight_t.unwrap()))
@@ -407,7 +507,10 @@ fn test_e2e_scheduling_high_load_scenario() {
     println!("✅ 高负荷排产流程测试通过");
     println!("   - 排入材料: {} / 10", plan_items.len());
     println!("   - 拒绝材料: {}", rejected.len());
-    println!("   - 已用产能: {:.1}吨 / {:.1}吨上限", capacity_pool.used_capacity_t, capacity_pool.limit_capacity_t);
+    println!(
+        "   - 已用产能: {:.1}吨 / {:.1}吨上限",
+        capacity_pool.used_capacity_t, capacity_pool.limit_capacity_t
+    );
     println!("   - 风险等级: {:?}", risk_snapshot.risk_level);
     println!("   - L3红线数: {}", risk_snapshot.l3_count);
 }
@@ -429,25 +532,38 @@ fn test_e2e_scheduling_with_impact_analysis() {
     let materials_before = vec![
         (
             create_material_master("M001", 40.0, "Q235", due_date, 10, 7),
-            create_material_state("M001", SchedState::Ready, UrgentLevel::L1, RushLevel::L0, "H032", 0, 10),
+            create_material_state(
+                "M001",
+                SchedState::Ready,
+                UrgentLevel::L1,
+                RushLevel::L0,
+                "H032",
+                0,
+                10,
+            ),
         ),
         (
             create_material_master("M002", 40.0, "Q345", due_date, 8, 5),
-            create_material_state("M002", SchedState::Ready, UrgentLevel::L2, RushLevel::L0, "H032", 0, 8),
+            create_material_state(
+                "M002",
+                SchedState::Ready,
+                UrgentLevel::L2,
+                RushLevel::L0,
+                "H032",
+                0,
+                8,
+            ),
         ),
     ];
 
     let sorted_before = priority_sorter.sort(materials_before.clone());
 
     let mut pool_before = create_capacity_pool("H032", plan_date, 100.0, 120.0);
-    let (plan_items_before, _) = capacity_filler.fill_single_day(
-        &mut pool_before,
-        sorted_before,
-        vec![],
-        "test_v1",
-    );
+    let (plan_items_before, _) =
+        capacity_filler.fill_single_day(&mut pool_before, sorted_before, vec![], "test_v1");
 
-    let all_materials_before: Vec<MaterialState> = materials_before.iter().map(|(_, s)| s.clone()).collect();
+    let all_materials_before: Vec<MaterialState> =
+        materials_before.iter().map(|(_, s)| s.clone()).collect();
     let material_weights: HashMap<String, f64> = materials_before
         .iter()
         .map(|(m, _)| (m.material_id.clone(), m.weight_t.unwrap()))
@@ -469,20 +585,25 @@ fn test_e2e_scheduling_with_impact_analysis() {
     let mut materials_after = materials_before.clone();
     materials_after.push((
         create_material_master("M003", 30.0, "Q235", due_date, 2, 1),
-        create_material_state("M003", SchedState::Ready, UrgentLevel::L3, RushLevel::L1, "H032", 0, 2),
+        create_material_state(
+            "M003",
+            SchedState::Ready,
+            UrgentLevel::L3,
+            RushLevel::L1,
+            "H032",
+            0,
+            2,
+        ),
     ));
 
     let sorted_after = priority_sorter.sort(materials_after.clone());
 
     let mut pool_after = create_capacity_pool("H032", plan_date, 100.0, 120.0);
-    let (plan_items_after, _) = capacity_filler.fill_single_day(
-        &mut pool_after,
-        sorted_after,
-        vec![],
-        "test_v1",
-    );
+    let (plan_items_after, _) =
+        capacity_filler.fill_single_day(&mut pool_after, sorted_after, vec![], "test_v1");
 
-    let all_materials_after: Vec<MaterialState> = materials_after.iter().map(|(_, s)| s.clone()).collect();
+    let all_materials_after: Vec<MaterialState> =
+        materials_after.iter().map(|(_, s)| s.clone()).collect();
     let mut material_weights_after = material_weights.clone();
     material_weights_after.insert("M003".to_string(), 30.0);
 
@@ -512,17 +633,20 @@ fn test_e2e_scheduling_with_impact_analysis() {
 
     // 验证影响分析
     assert_eq!(impact_summary.added_count, 1, "应该新增1个材料");
+    assert!(impact_summary.capacity_delta_t > 0.0, "产能变化应该为正值");
     assert!(
-        impact_summary.capacity_delta_t > 0.0,
-        "产能变化应该为正值"
+        impact_summary.urgent_material_affected >= 1,
+        "应该影响紧急材料"
     );
-    assert!(impact_summary.urgent_material_affected >= 1, "应该影响紧急材料");
     assert!(impact_summary.l3_critical_count >= 1, "应该有L3材料受影响");
 
     println!("✅ 含影响分析的排产流程测试通过");
     println!("   - 新增材料数: {}", impact_summary.added_count);
     println!("   - 产能变化: {:.1}吨", impact_summary.capacity_delta_t);
-    println!("   - 风险变化: {} → {}", impact_summary.risk_level_before, impact_summary.risk_level_after);
+    println!(
+        "   - 风险变化: {} → {}",
+        impact_summary.risk_level_before, impact_summary.risk_level_after
+    );
     println!("   - L3红线影响: {}", impact_summary.l3_critical_count);
 }
 
@@ -544,7 +668,15 @@ fn test_e2e_multi_day_scheduling() {
             let material_id = format!("M{:03}", i);
             (
                 create_material_master(&material_id, 25.0, "Q235", due_date, 10, 5),
-                create_material_state(&material_id, SchedState::Ready, UrgentLevel::L1, RushLevel::L0, "H032", 0, 10),
+                create_material_state(
+                    &material_id,
+                    SchedState::Ready,
+                    UrgentLevel::L1,
+                    RushLevel::L0,
+                    "H032",
+                    0,
+                    10,
+                ),
             )
         })
         .collect();
@@ -570,12 +702,8 @@ fn test_e2e_multi_day_scheduling() {
     // 从剩余材料中提取
     let remaining_materials: Vec<_> = remaining_day1.into_iter().map(|(m, s, _)| (m, s)).collect();
 
-    let (plan_items_day2, _remaining_day2) = capacity_filler.fill_single_day(
-        &mut pool_day2,
-        remaining_materials,
-        vec![],
-        "test_v1",
-    );
+    let (plan_items_day2, _remaining_day2) =
+        capacity_filler.fill_single_day(&mut pool_day2, remaining_materials, vec![], "test_v1");
 
     // 验证多日排产
     let total_scheduled = plan_items_day1.len() + plan_items_day2.len();
@@ -613,9 +741,17 @@ fn test_e2e_multi_day_scheduling() {
     );
 
     println!("✅ 多日排产流程测试通过");
-    println!("   - Day1: {}个材料, {:.1}吨, 风险={:?}",
-        plan_items_day1.len(), pool_day1.used_capacity_t, risk_day1.risk_level);
-    println!("   - Day2: {}个材料, {:.1}吨, 风险={:?}",
-        plan_items_day2.len(), pool_day2.used_capacity_t, risk_day2.risk_level);
+    println!(
+        "   - Day1: {}个材料, {:.1}吨, 风险={:?}",
+        plan_items_day1.len(),
+        pool_day1.used_capacity_t,
+        risk_day1.risk_level
+    );
+    println!(
+        "   - Day2: {}个材料, {:.1}吨, 风险={:?}",
+        plan_items_day2.len(),
+        pool_day2.used_capacity_t,
+        risk_day2.risk_level
+    );
     println!("   - 总计: {}个材料排产完成", total_scheduled);
 }

@@ -30,11 +30,7 @@ impl DerivationServiceTrait for DerivationService {
     /// - 若 current_machine_code ∉ {H032, H033, H034}
     ///   → rolling_output_age_days = output_age_days_raw + 4
     /// - 否则 → rolling_output_age_days = output_age_days_raw
-    fn derive_rolling_output_age_days(
-        &self,
-        output_age_raw: i32,
-        machine_code: &str,
-    ) -> i32 {
+    fn derive_rolling_output_age_days(&self, output_age_raw: i32, machine_code: &str) -> i32 {
         const STANDARD_MACHINES: &[&str] = &["H032", "H033", "H034"];
 
         if STANDARD_MACHINES.contains(&machine_code) {
@@ -61,9 +57,7 @@ impl DerivationServiceTrait for DerivationService {
         output_age_days_raw: Option<i32>,
     ) -> Option<chrono::NaiveDate> {
         match output_age_days_raw {
-            Some(days) if days >= 0 => {
-                Some(import_date - chrono::Duration::days(days as i64))
-            }
+            Some(days) if days >= 0 => Some(import_date - chrono::Duration::days(days as i64)),
             _ => None,
         }
     }
@@ -120,10 +114,7 @@ mod tests {
 
         // rework 优先
         assert_eq!(
-            service.derive_current_machine_code(
-                Some("H033".to_string()),
-                Some("H032".to_string())
-            ),
+            service.derive_current_machine_code(Some("H033".to_string()), Some("H032".to_string())),
             Some("H033".to_string())
         );
 
@@ -175,10 +166,7 @@ mod tests {
         );
 
         // 错误情况：output_age_days_raw 缺失 → None
-        assert_eq!(
-            service.derive_rolling_output_date(import_date, None),
-            None
-        );
+        assert_eq!(service.derive_rolling_output_date(import_date, None), None);
 
         // 错误情况：负值（非法）→ None
         assert_eq!(
@@ -252,11 +240,13 @@ mod tests {
         let service = DerivationService;
 
         // contract_nature 缺失 → L0
-        let rush_level = service.derive_rush_level(None, Some("D".to_string()), Some("0".to_string()));
+        let rush_level =
+            service.derive_rush_level(None, Some("D".to_string()), Some("0".to_string()));
         assert_eq!(rush_level, RushLevel::L0);
 
         // weekly_flag 缺失 → L0
-        let rush_level = service.derive_rush_level(Some("A".to_string()), None, Some("0".to_string()));
+        let rush_level =
+            service.derive_rush_level(Some("A".to_string()), None, Some("0".to_string()));
         assert_eq!(rush_level, RushLevel::L0);
     }
 }

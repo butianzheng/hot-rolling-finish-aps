@@ -30,9 +30,7 @@ impl PlanApi {
             return Err(ApiError::InvalidInput("方案ID不能为空".to_string()));
         }
         if !(1..=60).contains(&window_days) {
-            return Err(ApiError::InvalidInput(
-                "窗口天数必须在1-60之间".to_string(),
-            ));
+            return Err(ApiError::InvalidInput("窗口天数必须在1-60之间".to_string()));
         }
 
         // 检查Plan是否存在
@@ -75,11 +73,9 @@ impl PlanApi {
         // 写入备注/命名等元信息（不改变表结构，写到 config_snapshot_json.__meta_*）
         if let Some(note_text) = note.as_deref().map(|s| s.trim()).filter(|s| !s.is_empty()) {
             // best-effort: meta 更新失败不影响版本创建，但会影响“命名显示/回滚可解释性”
-            if let Ok(mut map) =
-                serde_json::from_str::<std::collections::HashMap<String, String>>(
-                    version.config_snapshot_json.as_deref().unwrap_or("{}"),
-                )
-            {
+            if let Ok(mut map) = serde_json::from_str::<std::collections::HashMap<String, String>>(
+                version.config_snapshot_json.as_deref().unwrap_or("{}"),
+            ) {
                 map.insert("__meta_version_name_cn".to_string(), note_text.to_string());
                 map.insert("__meta_note".to_string(), note_text.to_string());
                 map.insert(
@@ -318,7 +314,11 @@ impl PlanApi {
         match self.event_publisher.publish(event) {
             Ok(task_id) => {
                 if !task_id.is_empty() {
-                    tracing::info!("版本激活后决策视图刷新事件已发布: task_id={}, version_id={}", task_id, version_id);
+                    tracing::info!(
+                        "版本激活后决策视图刷新事件已发布: task_id={}, version_id={}",
+                        task_id,
+                        version_id
+                    );
                 }
             }
             Err(e) => {
@@ -344,23 +344,29 @@ impl PlanApi {
     /// - Err(ApiError): API错误
     fn recalculate_capacity_pool_for_version(&self, version_id: &str) -> ApiResult<()> {
         // 1. 获取版本的日期窗口
-        let version = self.plan_version_repo.find_by_id(version_id)
+        let version = self
+            .plan_version_repo
+            .find_by_id(version_id)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?
             .ok_or_else(|| ApiError::NotFound(format!("版本{}不存在", version_id)))?;
 
         let window_days = version.recalc_window_days.unwrap_or(30);
-        let frozen_date = version.frozen_from_date
+        let frozen_date = version
+            .frozen_from_date
             .unwrap_or_else(|| chrono::Local::now().date_naive());
         let end_date = frozen_date + chrono::Duration::days(window_days as i64);
 
         // 2. 先清零窗口内所有 capacity_pool 的 used_capacity_t 和 overflow_t
         // 这确保不会有残留值（避免"利用率高但已排为0"的异常显示）
-        self.capacity_repo.reset_used_in_date_range(version_id, frozen_date, end_date)
+        self.capacity_repo
+            .reset_used_in_date_range(version_id, frozen_date, end_date)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         tracing::info!(
             "已清零产能池 used_capacity_t: version_id={}, date_range=[{}, {}]",
-            version_id, frozen_date, end_date
+            version_id,
+            frozen_date,
+            end_date
         );
 
         // 3. 使用 SQL 聚合按 (machine_code, plan_date) 统计吨位，避免拉取全量 plan_item（50k+ 性能瓶颈）
@@ -413,7 +419,11 @@ impl PlanApi {
     /// # 参数
     /// - version_id: 版本ID (P1-1: 版本化改造)
     /// - keys: (machine_code, plan_date) 列表
-    fn reset_capacity_pools(&self, version_id: &str, keys: &[(String, NaiveDate)]) -> ApiResult<()> {
+    fn reset_capacity_pools(
+        &self,
+        version_id: &str,
+        keys: &[(String, NaiveDate)],
+    ) -> ApiResult<()> {
         for (machine_code, plan_date) in keys {
             // 查询产能池（如果不存在则跳过）
             if let Some(mut capacity_pool) = self
@@ -501,7 +511,8 @@ impl PlanApi {
             .filter(|s| !s.is_empty())
         {
             None => {
-                config_restore_skipped = Some("目标版本缺少 config_snapshot_json，已跳过配置恢复".to_string());
+                config_restore_skipped =
+                    Some("目标版本缺少 config_snapshot_json，已跳过配置恢复".to_string());
             }
             Some(snapshot_json) => {
                 // 防御：识别“备注型快照”（旧实现可能把 note 写入 config_snapshot_json）
@@ -509,12 +520,11 @@ impl PlanApi {
                 let mut should_skip = None::<String>;
                 match serde_json::from_str::<serde_json::Value>(snapshot_json) {
                     Ok(serde_json::Value::Object(obj)) => {
-                        let non_meta_key_count = obj
-                            .keys()
-                            .filter(|k| !k.starts_with("__meta_"))
-                            .count();
+                        let non_meta_key_count =
+                            obj.keys().filter(|k| !k.starts_with("__meta_")).count();
                         if non_meta_key_count == 0 {
-                            should_skip = Some("目标版本配置快照为空对象，已跳过配置恢复".to_string());
+                            should_skip =
+                                Some("目标版本配置快照为空对象，已跳过配置恢复".to_string());
                         } else if non_meta_key_count <= 2 && obj.contains_key("note") {
                             should_skip = Some(
                                 "目标版本 config_snapshot_json 更像备注信息（含 note），已跳过配置恢复".to_string(),
@@ -522,8 +532,10 @@ impl PlanApi {
                         }
                     }
                     Ok(_) => {
-                        should_skip =
-                            Some("目标版本 config_snapshot_json 不是 JSON 对象，已跳过配置恢复".to_string());
+                        should_skip = Some(
+                            "目标版本 config_snapshot_json 不是 JSON 对象，已跳过配置恢复"
+                                .to_string(),
+                        );
                     }
                     Err(e) => {
                         should_skip = Some(format!(
@@ -588,7 +600,11 @@ impl PlanApi {
         let event = ScheduleEvent::full_scope(
             target_version_id.to_string(),
             ScheduleEventType::ManualTrigger,
-            Some(format!("rollback_version by {} | {}", operator, reason.trim())),
+            Some(format!(
+                "rollback_version by {} | {}",
+                operator,
+                reason.trim()
+            )),
         );
 
         if let Err(e) = self.event_publisher.publish(event) {
@@ -641,7 +657,11 @@ impl PlanApi {
                 false,
                 "已收到刷新请求，但当前未配置决策刷新组件（可能不会执行）".to_string(),
             ),
-            Ok(id) => (Some(id.clone()), true, format!("已触发决策刷新: task_id={}", id)),
+            Ok(id) => (
+                Some(id.clone()),
+                true,
+                format!("已触发决策刷新: task_id={}", id),
+            ),
             Err(e) => (None, false, format!("触发决策刷新失败: {}", e)),
         };
 
@@ -678,5 +698,4 @@ impl PlanApi {
     }
 
     // ==========================================
-
 }

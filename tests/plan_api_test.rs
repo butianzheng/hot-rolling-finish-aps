@@ -15,12 +15,14 @@ mod test_helpers;
 
 use chrono::{NaiveDate, Utc};
 use helpers::api_test_helper::*;
+use helpers::test_data_builder::{
+    CapacityPoolBuilder, MaterialBuilder, MaterialStateBuilder, PlanItemBuilder,
+};
 use hot_rolling_aps::api::ApiError;
 use hot_rolling_aps::config::strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
 use hot_rolling_aps::domain::risk::RiskSnapshot;
 use hot_rolling_aps::domain::types::{PlanVersionStatus, RiskLevel, SchedState};
 use hot_rolling_aps::repository::RiskSnapshotRepository;
-use helpers::test_data_builder::{CapacityPoolBuilder, MaterialBuilder, MaterialStateBuilder, PlanItemBuilder};
 
 // ==========================================
 // 方案管理测试
@@ -31,14 +33,16 @@ fn test_create_plan_正常创建() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 创建方案
-    let plan_id = env.plan_api
+    let plan_id = env
+        .plan_api
         .create_plan("2026年1月排产方案".to_string(), "admin".to_string())
         .expect("创建方案失败");
 
     assert!(!plan_id.is_empty(), "应该返回方案ID");
 
     // 验证: 方案已创建
-    let plan = env.plan_repo
+    let plan = env
+        .plan_repo
         .find_by_id(&plan_id)
         .expect("查询失败")
         .expect("方案不存在");
@@ -61,9 +65,7 @@ fn test_list_plans_查询方案列表() {
         .expect("创建失败");
 
     // 测试: 查询方案列表
-    let plans = env.plan_api
-        .list_plans()
-        .expect("查询失败");
+    let plans = env.plan_api.list_plans().expect("查询失败");
 
     assert_eq!(plans.len(), 2, "应该返回2个方案");
 }
@@ -73,12 +75,14 @@ fn test_get_plan_detail_查询方案详情() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 创建方案
-    let plan_id = env.plan_api
+    let plan_id = env
+        .plan_api
         .create_plan("测试方案".to_string(), "admin".to_string())
         .expect("创建失败");
 
     // 测试: 查询方案详情
-    let plan = env.plan_api
+    let plan = env
+        .plan_api
         .get_plan_detail(&plan_id)
         .expect("查询失败")
         .expect("方案不存在");
@@ -92,9 +96,7 @@ fn test_get_plan_detail_不存在的方案() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 查询不存在的方案
-    let result = env.plan_api
-        .get_plan_detail("NOT_EXIST")
-        .expect("查询失败");
+    let result = env.plan_api.get_plan_detail("NOT_EXIST").expect("查询失败");
 
     assert!(result.is_none(), "不应该找到方案");
 }
@@ -108,12 +110,14 @@ fn test_create_version_正常创建() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 创建方案
-    let plan_id = env.plan_api
+    let plan_id = env
+        .plan_api
         .create_plan("测试方案".to_string(), "admin".to_string())
         .expect("创建失败");
 
     // 测试: 创建版本
-    let version_id = env.plan_api
+    let version_id = env
+        .plan_api
         .create_version(
             plan_id.clone(),
             30,
@@ -126,7 +130,8 @@ fn test_create_version_正常创建() {
     assert!(!version_id.is_empty(), "应该返回版本ID");
 
     // 验证: 版本已创建
-    let version = env.plan_version_repo
+    let version = env
+        .plan_version_repo
         .find_by_id(&version_id)
         .expect("查询失败")
         .expect("版本不存在");
@@ -140,7 +145,8 @@ fn test_list_versions_查询版本列表() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 创建方案
-    let plan_id = env.plan_api
+    let plan_id = env
+        .plan_api
         .create_plan("测试方案".to_string(), "admin".to_string())
         .expect("创建失败");
 
@@ -166,9 +172,7 @@ fn test_list_versions_查询版本列表() {
         .expect("创建失败");
 
     // 测试: 查询版本列表
-    let versions = env.plan_api
-        .list_versions(&plan_id)
-        .expect("查询失败");
+    let versions = env.plan_api.list_versions(&plan_id).expect("查询失败");
 
     assert_eq!(versions.len(), 2, "应该返回2个版本");
 }
@@ -178,11 +182,13 @@ fn test_activate_version_激活版本() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 创建方案和版本
-    let plan_id = env.plan_api
+    let plan_id = env
+        .plan_api
         .create_plan("测试方案".to_string(), "admin".to_string())
         .expect("创建失败");
 
-    let version_id = env.plan_api
+    let version_id = env
+        .plan_api
         .create_version(
             plan_id,
             30,
@@ -198,7 +204,8 @@ fn test_activate_version_激活版本() {
         .expect("激活失败");
 
     // 验证: 版本状态已更新
-    let version = env.plan_version_repo
+    let version = env
+        .plan_version_repo
         .find_by_id(&version_id)
         .expect("查询失败")
         .expect("版本不存在");
@@ -238,11 +245,13 @@ fn test_recalc_full_基本场景() {
     env.prepare_materials(materials, states).unwrap();
 
     // 创建方案和版本
-    let plan_id = env.plan_api
+    let plan_id = env
+        .plan_api
         .create_plan("测试方案".to_string(), "admin".to_string())
         .expect("创建失败");
 
-    let version_id = env.plan_api
+    let version_id = env
+        .plan_api
         .create_version(
             plan_id,
             7, // 窗口7天
@@ -270,13 +279,9 @@ fn test_recalc_full_基本场景() {
     env.prepare_capacity_pools(pools).unwrap();
 
     // 测试: 一键重算
-    let result = env.plan_api
-        .recalc_full(
-            &version_id,
-            base_date,
-            None,
-            "admin",
-        )
+    let result = env
+        .plan_api
+        .recalc_full(&version_id, base_date, None, "admin")
         .expect("重算失败");
 
     // 验证: 返回结果包含统计信息
@@ -340,8 +345,7 @@ fn prepare_recalc_strategy_test_env() -> (ApiTestEnv, String, NaiveDate) {
             .limit(900.0)
             .build(),
     ];
-    env.prepare_capacity_pools(pools)
-        .expect("准备产能池失败");
+    env.prepare_capacity_pools(pools).expect("准备产能池失败");
 
     (env, version_id, base_date)
 }
@@ -474,14 +478,7 @@ fn test_recalc_full_with_strategy_key_custom空id时回退_balanced() {
 
     let result = env
         .plan_api
-        .recalc_full_with_strategy_key(
-            &version_id,
-            base_date,
-            None,
-            "admin",
-            "custom:   ",
-            None,
-        )
+        .recalc_full_with_strategy_key(&version_id, base_date, None, "admin", "custom:   ", None)
         .expect("重算失败");
 
     assert!(result.success, "重算应成功");
@@ -585,11 +582,13 @@ fn test_list_plan_items_查询排产明细() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 创建方案和版本
-    let plan_id = env.plan_api
+    let plan_id = env
+        .plan_api
         .create_plan("测试方案".to_string(), "admin".to_string())
         .expect("创建失败");
 
-    let version_id = env.plan_api
+    let version_id = env
+        .plan_api
         .create_version(
             plan_id,
             30,
@@ -600,9 +599,7 @@ fn test_list_plan_items_查询排产明细() {
         .expect("创建失败");
 
     // 测试: 查询排产明细（空结果）
-    let items = env.plan_api
-        .list_plan_items(&version_id)
-        .expect("查询失败");
+    let items = env.plan_api.list_plan_items(&version_id).expect("查询失败");
 
     assert_eq!(items.len(), 0, "新版本应该没有排产明细");
 }
@@ -612,11 +609,13 @@ fn test_list_items_by_date_按日期查询() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 创建方案和版本
-    let plan_id = env.plan_api
+    let plan_id = env
+        .plan_api
         .create_plan("测试方案".to_string(), "admin".to_string())
         .expect("创建失败");
 
-    let version_id = env.plan_api
+    let version_id = env
+        .plan_api
         .create_version(
             plan_id,
             30,
@@ -628,7 +627,8 @@ fn test_list_items_by_date_按日期查询() {
 
     // 测试: 按日期查询排产明细
     let date = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
-    let items = env.plan_api
+    let items = env
+        .plan_api
         .list_items_by_date(&version_id, date)
         .expect("查询失败");
 
@@ -644,11 +644,13 @@ fn test_compare_versions_空版本对比() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 创建方案和2个版本
-    let plan_id = env.plan_api
+    let plan_id = env
+        .plan_api
         .create_plan("测试方案".to_string(), "admin".to_string())
         .expect("创建失败");
 
-    let version_a = env.plan_api
+    let version_a = env
+        .plan_api
         .create_version(
             plan_id.clone(),
             30,
@@ -658,7 +660,8 @@ fn test_compare_versions_空版本对比() {
         )
         .expect("创建失败");
 
-    let version_b = env.plan_api
+    let version_b = env
+        .plan_api
         .create_version(
             plan_id,
             30,
@@ -669,7 +672,8 @@ fn test_compare_versions_空版本对比() {
         .expect("创建失败");
 
     // 测试: 版本对比（两个空版本）
-    let result = env.plan_api
+    let result = env
+        .plan_api
         .compare_versions(&version_a, &version_b)
         .expect("对比失败");
 
@@ -743,7 +747,8 @@ fn test_compare_versions_返回风险与产能变化明细() {
     };
 
     // 风险快照：验证按日期聚合均值 + 缺失按0参与delta
-    let risk_repo = RiskSnapshotRepository::new(&env.db_path).expect("创建RiskSnapshotRepository失败");
+    let risk_repo =
+        RiskSnapshotRepository::new(&env.db_path).expect("创建RiskSnapshotRepository失败");
     risk_repo
         .batch_insert(vec![
             mk_snapshot(&version_a, "H032", date_1, RiskLevel::Red),
@@ -871,9 +876,18 @@ fn test_compare_versions_kpi_聚合统计() {
     // 准备 material_master（满足 plan_item 外键）
     env.material_master_repo
         .batch_insert_material_master(vec![
-            MaterialBuilder::new("MAT_KPI_001").weight(10.0).machine("H032").build(),
-            MaterialBuilder::new("MAT_KPI_002").weight(7.0).machine("H032").build(),
-            MaterialBuilder::new("MAT_KPI_003").weight(5.0).machine("H032").build(),
+            MaterialBuilder::new("MAT_KPI_001")
+                .weight(10.0)
+                .machine("H032")
+                .build(),
+            MaterialBuilder::new("MAT_KPI_002")
+                .weight(7.0)
+                .machine("H032")
+                .build(),
+            MaterialBuilder::new("MAT_KPI_003")
+                .weight(5.0)
+                .machine("H032")
+                .build(),
         ])
         .expect("插入material_master失败");
 
@@ -1022,7 +1036,8 @@ fn test_create_plan_空名称不允许() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 创建空名称方案
-    let result = env.plan_api
+    let result = env
+        .plan_api
         .create_plan("".to_string(), "admin".to_string());
 
     // 验证: 应该返回InvalidInput错误
@@ -1034,32 +1049,31 @@ fn test_create_version_无效窗口天数() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 创建方案
-    let plan_id = env.plan_api
+    let plan_id = env
+        .plan_api
         .create_plan("测试方案".to_string(), "admin".to_string())
         .expect("创建失败");
 
     // 测试: 创建版本（窗口天数 = 0）
-    let result = env.plan_api
-        .create_version(
-            plan_id.clone(),
-            0, // 无效窗口天数
-            None,
-            Some("测试版本".to_string()),
-            "admin".to_string(),
-        );
+    let result = env.plan_api.create_version(
+        plan_id.clone(),
+        0, // 无效窗口天数
+        None,
+        Some("测试版本".to_string()),
+        "admin".to_string(),
+    );
 
     // 验证: 应该返回InvalidInput错误
     assert_invalid_input(result);
 
     // 测试: 创建版本（窗口天数 > 60）
-    let result = env.plan_api
-        .create_version(
-            plan_id,
-            100, // 过大的窗口天数
-            None,
-            Some("测试版本".to_string()),
-            "admin".to_string(),
-        );
+    let result = env.plan_api.create_version(
+        plan_id,
+        100, // 过大的窗口天数
+        None,
+        Some("测试版本".to_string()),
+        "admin".to_string(),
+    );
 
     // 验证: 应该返回InvalidInput错误
     assert_invalid_input(result);
@@ -1070,8 +1084,7 @@ fn test_activate_version_不存在的版本() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 激活不存在的版本
-    let result = env.plan_api
-        .activate_version("NOT_EXIST", "admin");
+    let result = env.plan_api.activate_version("NOT_EXIST", "admin");
 
     // 验证: 应该返回错误
     assert!(result.is_err(), "激活不存在的版本应该失败");
@@ -1086,9 +1099,7 @@ fn test_list_versions_不存在的方案() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 查询不存在方案的版本列表
-    let versions = env.plan_api
-        .list_versions("NOT_EXIST")
-        .expect("查询失败");
+    let versions = env.plan_api.list_versions("NOT_EXIST").expect("查询失败");
 
     assert_eq!(versions.len(), 0, "不存在的方案应该返回空列表");
 }
@@ -1098,8 +1109,7 @@ fn test_compare_versions_不存在的版本() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 对比不存在的版本（新实现会检查版本是否存在）
-    let result = env.plan_api
-        .compare_versions("NOT_EXIST_A", "NOT_EXIST_B");
+    let result = env.plan_api.compare_versions("NOT_EXIST_A", "NOT_EXIST_B");
 
     // 验证: 应该返回错误
     assert!(result.is_err(), "对比不存在的版本应该返回错误");
@@ -1120,13 +1130,9 @@ fn test_recalc_full_不存在的版本() {
     let base_date = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
 
     // 测试: 重算不存在的版本
-    let result = env.plan_api
-        .recalc_full(
-            "NOT_EXIST",
-            base_date,
-            None,
-            "admin",
-        );
+    let result = env
+        .plan_api
+        .recalc_full("NOT_EXIST", base_date, None, "admin");
 
     // 验证: 应该返回错误
     assert!(result.is_err(), "重算不存在的版本应该失败");

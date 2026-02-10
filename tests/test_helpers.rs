@@ -47,7 +47,6 @@ pub fn open_test_memory_connection() -> Result<Connection, Box<dyn Error>> {
     Ok(conn)
 }
 
-
 /// 创建临时测试数据库并初始化 schema
 ///
 /// # 返回

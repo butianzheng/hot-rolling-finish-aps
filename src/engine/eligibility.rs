@@ -110,7 +110,8 @@ where
         } else {
             Season::Winter // 默认值,在 Auto 模式下会被覆盖
         };
-        let season = EligibilityCore::determine_season(today, season_mode, manual_season, &winter_months);
+        let season =
+            EligibilityCore::determine_season(today, season_mode, manual_season, &winter_months);
 
         // === 步骤 5: 获取适温阈值 ===
         let min_temp_days = match season {
@@ -119,14 +120,10 @@ where
         };
 
         // === 步骤 6: 计算适温状态 ===
-        let ready_in_days = EligibilityCore::calculate_ready_in_days(
-            actual_output_age_days,
-            min_temp_days,
-        );
-        let earliest_sched_date = EligibilityCore::calculate_earliest_sched_date(
-            today,
-            ready_in_days,
-        );
+        let ready_in_days =
+            EligibilityCore::calculate_ready_in_days(actual_output_age_days, min_temp_days);
+        let earliest_sched_date =
+            EligibilityCore::calculate_earliest_sched_date(today, ready_in_days);
 
         // === 步骤 7: 判定 sched_state (考虑锁定和强制放行) ===
         let (sched_state, state_reasons) = EligibilityCore::determine_sched_state(
@@ -196,14 +193,13 @@ where
 
         Ok(results)
     }
-
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::types::{RushLevel, UrgentLevel};
     use async_trait::async_trait;
-    use crate::domain::types::{UrgentLevel, RushLevel};
 
     // ==========================================
     // Mock ConfigReader
@@ -291,7 +287,7 @@ mod tests {
             due_date: None,
             stock_age_days: Some(10),
             output_age_days_raw: Some(5),
-            rolling_output_date: None,  // v0.7
+            rolling_output_date: None, // v0.7
             status_updated_at: None,
             contract_no: None,
             contract_nature: None,
@@ -417,7 +413,9 @@ mod tests {
 
         // 验证阻断状态
         assert_eq!(updated_state.sched_state, SchedState::Blocked);
-        assert!(reasons.iter().any(|r| r.contains("output_age_days_raw missing")));
+        assert!(reasons
+            .iter()
+            .any(|r| r.contains("output_age_days_raw missing")));
     }
 
     #[tokio::test]

@@ -126,9 +126,7 @@ impl CapacitySlice {
             if constraint.is_violated {
                 self.violations.push(format!(
                     "硬约束违反: {} (当前: {:.1}, 限制: {:.1})",
-                    constraint.description,
-                    constraint.current_value,
-                    constraint.constraint_value
+                    constraint.description, constraint.current_value, constraint.constraint_value
                 ));
             }
         }
@@ -138,9 +136,7 @@ impl CapacitySlice {
             if constraint.is_violated {
                 self.violations.push(format!(
                     "软约束违反: {} (当前: {:.1}, 目标: {:.1})",
-                    constraint.description,
-                    constraint.current_value,
-                    constraint.constraint_value
+                    constraint.description, constraint.current_value, constraint.constraint_value
                 ));
             }
         }
@@ -278,12 +274,8 @@ mod tests {
         );
 
         // 添加硬约束
-        let hard_constraint = CapacityConstraint::new(
-            "limit".to_string(),
-            1200.0,
-            1300.0,
-            "产能限制".to_string(),
-        );
+        let hard_constraint =
+            CapacityConstraint::new("limit".to_string(), 1200.0, 1300.0, "产能限制".to_string());
         slice.add_hard_constraint(hard_constraint);
 
         assert!(slice.has_hard_violations());

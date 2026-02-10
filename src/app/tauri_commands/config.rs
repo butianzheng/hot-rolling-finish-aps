@@ -169,9 +169,7 @@ pub async fn save_custom_strategy(
 
 /// 查询所有自定义策略
 #[tauri::command(rename_all = "snake_case")]
-pub async fn list_custom_strategies(
-    state: tauri::State<'_, AppState>,
-) -> Result<String, String> {
+pub async fn list_custom_strategies(state: tauri::State<'_, AppState>) -> Result<String, String> {
     let result = state
         .config_api
         .list_custom_strategies()

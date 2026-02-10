@@ -67,21 +67,11 @@ async fn test_scenario_1_normal_schedule() {
     ];
 
     let states = vec![
-        MaterialStateBuilder::new("M001")
-            .stock_age_days(10)
-            .build(),
-        MaterialStateBuilder::new("M002")
-            .stock_age_days(8)
-            .build(),
-        MaterialStateBuilder::new("M003")
-            .stock_age_days(12)
-            .build(),
-        MaterialStateBuilder::new("M004")
-            .stock_age_days(5)
-            .build(),
-        MaterialStateBuilder::new("M005")
-            .stock_age_days(15)
-            .build(),
+        MaterialStateBuilder::new("M001").stock_age_days(10).build(),
+        MaterialStateBuilder::new("M002").stock_age_days(8).build(),
+        MaterialStateBuilder::new("M003").stock_age_days(12).build(),
+        MaterialStateBuilder::new("M004").stock_age_days(5).build(),
+        MaterialStateBuilder::new("M005").stock_age_days(15).build(),
     ];
 
     let mut capacity_pool = create_capacity_pool("H032", today, 800.0, 900.0, 0.0);
@@ -113,10 +103,7 @@ async fn test_scenario_1_normal_schedule() {
         result.updated_capacity_pool.used_capacity_t, 750.0,
         "总重量应为750t"
     );
-    assert!(
-        !result.structure_report.is_violated,
-        "结构配比应该达标"
-    );
+    assert!(!result.structure_report.is_violated, "结构配比应该达标");
 
     // 验证紧急等级
     for (_, (level, _)) in &result.urgent_levels {
@@ -180,15 +167,9 @@ async fn test_scenario_2_frozen_zone_protection() {
     ];
 
     let states = vec![
-        MaterialStateBuilder::new("M001")
-            .stock_age_days(10)
-            .build(),
-        MaterialStateBuilder::new("M002")
-            .stock_age_days(8)
-            .build(),
-        MaterialStateBuilder::new("M003")
-            .stock_age_days(12)
-            .build(),
+        MaterialStateBuilder::new("M001").stock_age_days(10).build(),
+        MaterialStateBuilder::new("M002").stock_age_days(8).build(),
+        MaterialStateBuilder::new("M003").stock_age_days(12).build(),
     ];
 
     let mut capacity_pool = create_capacity_pool("H032", today, 800.0, 900.0, 0.0);
@@ -224,7 +205,11 @@ async fn test_scenario_2_frozen_zone_protection() {
     );
     assert!(result.plan_items[0].is_frozen(), "F001应标记为冻结");
     assert!(result.plan_items[1].is_frozen(), "F002应标记为冻结");
-    assert_eq!(result.skipped_materials.len(), 0, "所有候选材料都应被排产（总重600t≤剩余600t）");
+    assert_eq!(
+        result.skipped_materials.len(),
+        0,
+        "所有候选材料都应被排产（总重600t≤剩余600t）"
+    );
 }
 
 // ==========================================
@@ -277,21 +262,11 @@ async fn test_scenario_3_immature_material_blocked() {
     ];
 
     let states = vec![
-        MaterialStateBuilder::new("M001")
-            .stock_age_days(10)
-            .build(),
-        MaterialStateBuilder::new("M002")
-            .stock_age_days(8)
-            .build(),
-        MaterialStateBuilder::new("M003")
-            .stock_age_days(12)
-            .build(),
-        MaterialStateBuilder::new("M004")
-            .stock_age_days(5)
-            .build(),
-        MaterialStateBuilder::new("M005")
-            .stock_age_days(15)
-            .build(),
+        MaterialStateBuilder::new("M001").stock_age_days(10).build(),
+        MaterialStateBuilder::new("M002").stock_age_days(8).build(),
+        MaterialStateBuilder::new("M003").stock_age_days(12).build(),
+        MaterialStateBuilder::new("M004").stock_age_days(5).build(),
+        MaterialStateBuilder::new("M005").stock_age_days(15).build(),
     ];
 
     let mut capacity_pool = create_capacity_pool("H032", today, 800.0, 900.0, 0.0);
@@ -392,24 +367,12 @@ async fn test_scenario_4_capacity_full() {
     ];
 
     let states = vec![
-        MaterialStateBuilder::new("M001")
-            .stock_age_days(20)
-            .build(),
-        MaterialStateBuilder::new("M002")
-            .stock_age_days(18)
-            .build(),
-        MaterialStateBuilder::new("M003")
-            .stock_age_days(15)
-            .build(),
-        MaterialStateBuilder::new("M004")
-            .stock_age_days(12)
-            .build(),
-        MaterialStateBuilder::new("M005")
-            .stock_age_days(10)
-            .build(),
-        MaterialStateBuilder::new("M006")
-            .stock_age_days(8)
-            .build(),
+        MaterialStateBuilder::new("M001").stock_age_days(20).build(),
+        MaterialStateBuilder::new("M002").stock_age_days(18).build(),
+        MaterialStateBuilder::new("M003").stock_age_days(15).build(),
+        MaterialStateBuilder::new("M004").stock_age_days(12).build(),
+        MaterialStateBuilder::new("M005").stock_age_days(10).build(),
+        MaterialStateBuilder::new("M006").stock_age_days(8).build(),
     ];
 
     let mut capacity_pool = create_capacity_pool("H032", today, 800.0, 900.0, 0.0);
@@ -440,10 +403,7 @@ async fn test_scenario_4_capacity_full() {
         "应填充至接近limit (880-900t)，实际: {}t",
         result.updated_capacity_pool.used_capacity_t
     );
-    assert!(
-        result.skipped_materials.len() >= 1,
-        "至少有1个材料被跳过"
-    );
+    assert!(result.skipped_materials.len() >= 1, "至少有1个材料被跳过");
 
     // 验证跳过原因
     for (_, _, reason) in &result.skipped_materials {
@@ -516,12 +476,8 @@ async fn test_scenario_5_locked_material_conflict() {
             .locked()
             .stock_age_days(15)
             .build(),
-        MaterialStateBuilder::new("M004")
-            .stock_age_days(12)
-            .build(),
-        MaterialStateBuilder::new("M005")
-            .stock_age_days(10)
-            .build(),
+        MaterialStateBuilder::new("M004").stock_age_days(12).build(),
+        MaterialStateBuilder::new("M005").stock_age_days(10).build(),
     ];
 
     let mut capacity_pool = create_capacity_pool("H032", today, 800.0, 900.0, 0.0);
@@ -617,18 +573,10 @@ async fn test_scenario_6_structure_violation() {
     ];
 
     let states = vec![
-        MaterialStateBuilder::new("M001")
-            .stock_age_days(20)
-            .build(),
-        MaterialStateBuilder::new("M002")
-            .stock_age_days(18)
-            .build(),
-        MaterialStateBuilder::new("M003")
-            .stock_age_days(15)
-            .build(),
-        MaterialStateBuilder::new("M004")
-            .stock_age_days(12)
-            .build(),
+        MaterialStateBuilder::new("M001").stock_age_days(20).build(),
+        MaterialStateBuilder::new("M002").stock_age_days(18).build(),
+        MaterialStateBuilder::new("M003").stock_age_days(15).build(),
+        MaterialStateBuilder::new("M004").stock_age_days(12).build(),
     ];
 
     let mut capacity_pool = create_capacity_pool("H032", today, 800.0, 900.0, 0.0);
@@ -660,10 +608,7 @@ async fn test_scenario_6_structure_violation() {
     );
 
     // 验证结构违规
-    assert!(
-        result.structure_report.is_violated,
-        "应检测到结构违规"
-    );
+    assert!(result.structure_report.is_violated, "应检测到结构违规");
     assert!(
         result.structure_report.deviation_ratio > 0.15,
         "偏差应超过阈值15%"
@@ -744,21 +689,11 @@ async fn test_scenario_7_urgent_level_escalation() {
     ];
 
     let states = vec![
-        MaterialStateBuilder::new("M001")
-            .stock_age_days(20)
-            .build(),
-        MaterialStateBuilder::new("M002")
-            .stock_age_days(18)
-            .build(),
-        MaterialStateBuilder::new("M003")
-            .stock_age_days(15)
-            .build(),
-        MaterialStateBuilder::new("M004")
-            .stock_age_days(12)
-            .build(),
-        MaterialStateBuilder::new("M005")
-            .stock_age_days(10)
-            .build(),
+        MaterialStateBuilder::new("M001").stock_age_days(20).build(),
+        MaterialStateBuilder::new("M002").stock_age_days(18).build(),
+        MaterialStateBuilder::new("M003").stock_age_days(15).build(),
+        MaterialStateBuilder::new("M004").stock_age_days(12).build(),
+        MaterialStateBuilder::new("M005").stock_age_days(10).build(),
     ];
 
     let mut capacity_pool = create_capacity_pool("H032", today, 800.0, 900.0, 0.0);
@@ -854,12 +789,8 @@ async fn test_scenario_8_multi_machine_parallel() {
     ];
 
     let states_h032 = vec![
-        MaterialStateBuilder::new("M001")
-            .stock_age_days(10)
-            .build(),
-        MaterialStateBuilder::new("M002")
-            .stock_age_days(8)
-            .build(),
+        MaterialStateBuilder::new("M001").stock_age_days(10).build(),
+        MaterialStateBuilder::new("M002").stock_age_days(8).build(),
     ];
 
     let mut capacity_pool_h032 = create_capacity_pool("H032", today, 800.0, 900.0, 0.0);
@@ -883,12 +814,8 @@ async fn test_scenario_8_multi_machine_parallel() {
     ];
 
     let states_h033 = vec![
-        MaterialStateBuilder::new("M003")
-            .stock_age_days(12)
-            .build(),
-        MaterialStateBuilder::new("M004")
-            .stock_age_days(10)
-            .build(),
+        MaterialStateBuilder::new("M003").stock_age_days(12).build(),
+        MaterialStateBuilder::new("M004").stock_age_days(10).build(),
     ];
 
     let mut capacity_pool_h033 = create_capacity_pool("H033", today, 1000.0, 1100.0, 0.0);

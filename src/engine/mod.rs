@@ -8,6 +8,7 @@
 // 红线: Engine 不拼 SQL, 所有规则必须输出 reason
 // ==========================================
 
+pub mod anchor_resolver;
 pub mod capacity_filler;
 pub mod eligibility;
 pub mod eligibility_core;
@@ -15,19 +16,19 @@ pub mod events;
 pub mod impact_summary;
 pub mod importer;
 pub mod material_state_derivation;
-pub mod path_rule;
-pub mod anchor_resolver;
 pub mod orchestrator;
+pub mod path_rule;
 pub mod priority;
 pub mod recalc;
 pub mod repositories;
 pub mod risk;
 pub mod roll_campaign;
-pub mod structure;
 pub mod strategy;
+pub mod structure;
 pub mod urgency;
 
 // 重导出核心引擎
+pub use anchor_resolver::{AnchorResolver, MaterialSummary, ResolvedAnchor, SeedS2Config};
 pub use capacity_filler::CapacityFiller;
 pub use eligibility::EligibilityEngine;
 pub use eligibility_core::EligibilityCore;
@@ -38,14 +39,13 @@ pub use events::{
 pub use impact_summary::ImpactSummaryEngine;
 pub use importer::MaterialImporter;
 pub use material_state_derivation::MaterialStateDerivationService;
-pub use path_rule::{Anchor, PathRuleConfig, PathRuleEngine, PathRuleResult};
-pub use anchor_resolver::{AnchorResolver, MaterialSummary, ResolvedAnchor, SeedS2Config};
 pub use orchestrator::{ScheduleOrchestrator, ScheduleResult};
+pub use path_rule::{Anchor, PathRuleConfig, PathRuleEngine, PathRuleResult};
 pub use priority::PrioritySorter;
 pub use recalc::{RecalcConfig, RecalcEngine, RecalcResult};
 pub use repositories::ScheduleRepositories;
 pub use risk::RiskEngine;
 pub use roll_campaign::RollCampaignEngine;
-pub use structure::{StructureCorrector, StructureViolationReport};
 pub use strategy::ScheduleStrategy;
+pub use structure::{StructureCorrector, StructureViolationReport};
 pub use urgency::UrgencyEngine;

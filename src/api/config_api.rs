@@ -5,17 +5,17 @@
 // 依据: Engine_Specs_v0.3_Integrated.md - 11. 配置项全集
 // ==========================================
 
-use std::sync::Arc;
-use serde::{Deserialize, Serialize};
 use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use std::sync::Mutex;
 
 use crate::api::error::{ApiError, ApiResult};
 use crate::config::config_manager::ConfigManager;
 use crate::config::strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
 use crate::domain::action_log::ActionLog;
-use crate::repository::action_log_repo::ActionLogRepository;
 use crate::engine::ScheduleStrategy;
+use crate::repository::action_log_repo::ActionLogRepository;
 
 // ==========================================
 // ConfigApi - 配置管理 API
@@ -56,7 +56,9 @@ impl ConfigApi {
     /// - Ok(Vec<ConfigItem>): 配置列表
     /// - Err(ApiError): API错误
     pub fn list_configs(&self) -> ApiResult<Vec<ConfigItem>> {
-        let conn = self.conn.lock()
+        let conn = self
+            .conn
+            .lock()
             .map_err(|e| ApiError::DatabaseError(format!("锁获取失败: {}", e)))?;
 
         let mut stmt = conn
@@ -64,7 +66,7 @@ impl ConfigApi {
                 "SELECT kv.scope_id, sc.scope_type, kv.key, kv.value, kv.updated_at
                  FROM config_kv kv
                  JOIN config_scope sc ON kv.scope_id = sc.scope_id
-                 ORDER BY sc.scope_type, kv.scope_id, kv.key"
+                 ORDER BY sc.scope_type, kv.scope_id, kv.key",
             )
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
@@ -96,7 +98,9 @@ impl ConfigApi {
     /// - Ok(None): 配置不存在
     /// - Err(ApiError): API错误
     pub fn get_config(&self, scope_id: &str, key: &str) -> ApiResult<Option<ConfigItem>> {
-        let conn = self.conn.lock()
+        let conn = self
+            .conn
+            .lock()
             .map_err(|e| ApiError::DatabaseError(format!("锁获取失败: {}", e)))?;
 
         let result = conn.query_row(
@@ -154,16 +158,19 @@ impl ConfigApi {
             return Err(ApiError::InvalidInput("操作原因不能为空".to_string()));
         }
 
-        let conn = self.conn.lock()
+        let conn = self
+            .conn
+            .lock()
             .map_err(|e| ApiError::DatabaseError(format!("锁获取失败: {}", e)))?;
 
         // 检查 scope_id 是否存在于 config_scope 表
-        let scope_exists: bool = conn.query_row(
-            "SELECT COUNT(*) FROM config_scope WHERE scope_id = ?1",
-            params![scope_id],
-            |row| row.get::<_, i64>(0).map(|count| count > 0),
-        )
-        .unwrap_or(false);
+        let scope_exists: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM config_scope WHERE scope_id = ?1",
+                params![scope_id],
+                |row| row.get::<_, i64>(0).map(|count| count > 0),
+            )
+            .unwrap_or(false);
 
         if !scope_exists {
             return Err(ApiError::InvalidInput(format!(
@@ -235,7 +242,9 @@ impl ConfigApi {
             return Err(ApiError::InvalidInput("操作原因不能为空".to_string()));
         }
 
-        let conn = self.conn.lock()
+        let conn = self
+            .conn
+            .lock()
             .map_err(|e| ApiError::DatabaseError(format!("锁获取失败: {}", e)))?;
 
         conn.execute("BEGIN TRANSACTION", [])
@@ -386,7 +395,11 @@ impl ConfigApi {
         profile.title = profile.title.trim().to_string();
         if let Some(desc) = profile.description.as_ref() {
             let trimmed = desc.trim().to_string();
-            profile.description = if trimmed.is_empty() { None } else { Some(trimmed) };
+            profile.description = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            };
         }
 
         validate_custom_strategy_profile(&profile)?;
@@ -395,7 +408,9 @@ impl ConfigApi {
         let value = serde_json::to_string(&profile)
             .map_err(|e| ApiError::ValidationError(format!("序列化自定义策略失败: {}", e)))?;
 
-        let conn = self.conn.lock()
+        let conn = self
+            .conn
+            .lock()
             .map_err(|e| ApiError::DatabaseError(format!("锁获取失败: {}", e)))?;
 
         // 判断是新增还是覆盖（用于返回与审计提示）
@@ -464,7 +479,9 @@ impl ConfigApi {
 
     /// 查询所有自定义策略（从 config_kv 扫描 key 前缀）
     pub fn list_custom_strategies(&self) -> ApiResult<Vec<CustomStrategyProfile>> {
-        let conn = self.conn.lock()
+        let conn = self
+            .conn
+            .lock()
             .map_err(|e| ApiError::DatabaseError(format!("锁获取失败: {}", e)))?;
 
         let mut stmt = conn
@@ -487,7 +504,10 @@ impl ConfigApi {
         for row in rows {
             let raw = row.map_err(|e| ApiError::DatabaseError(e.to_string()))?;
             let profile: CustomStrategyProfile = serde_json::from_str(&raw).map_err(|e| {
-                ApiError::ValidationError(format!("解析自定义策略失败（请检查 config_kv 的 JSON）: {}", e))
+                ApiError::ValidationError(format!(
+                    "解析自定义策略失败（请检查 config_kv 的 JSON）: {}",
+                    e
+                ))
             })?;
             // 读取时也做一次基础校验，避免脏数据污染前端
             validate_custom_strategy_profile(&profile)?;
@@ -537,7 +557,9 @@ fn validate_custom_strategy_profile(profile: &CustomStrategyProfile) -> ApiResul
         return Err(ApiError::InvalidInput("strategy_id 不能为空".to_string()));
     }
     if profile.strategy_id.len() > 64 {
-        return Err(ApiError::InvalidInput("strategy_id 过长（最多64字符）".to_string()));
+        return Err(ApiError::InvalidInput(
+            "strategy_id 过长（最多64字符）".to_string(),
+        ));
     }
     if !profile
         .strategy_id
@@ -553,7 +575,9 @@ fn validate_custom_strategy_profile(profile: &CustomStrategyProfile) -> ApiResul
         return Err(ApiError::InvalidInput("title 不能为空".to_string()));
     }
     if profile.title.len() > 80 {
-        return Err(ApiError::InvalidInput("title 过长（最多80字符）".to_string()));
+        return Err(ApiError::InvalidInput(
+            "title 过长（最多80字符）".to_string(),
+        ));
     }
 
     // base_strategy 必须是已知预设之一，避免把“临时字符串”误当作策略导致不可复现。
@@ -587,7 +611,10 @@ fn validate_custom_strategy_parameters(params: &CustomStrategyParameters) -> Api
     check_weight("capacity_weight", params.capacity_weight)?;
     check_weight("cold_stock_weight", params.cold_stock_weight)?;
     check_weight("due_date_weight", params.due_date_weight)?;
-    check_weight("rolling_output_age_weight", params.rolling_output_age_weight)?;
+    check_weight(
+        "rolling_output_age_weight",
+        params.rolling_output_age_weight,
+    )?;
 
     if let Some(days) = params.cold_stock_age_threshold_days {
         if days < 0 || days > 365 {

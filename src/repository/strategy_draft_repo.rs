@@ -155,9 +155,13 @@ impl StrategyDraftRepository {
                 draft.expires_at.format("%Y-%m-%d %H:%M:%S").to_string(),
                 draft.published_as_version_id,
                 draft.published_by,
-                draft.published_at.map(|t| t.format("%Y-%m-%d %H:%M:%S").to_string()),
+                draft
+                    .published_at
+                    .map(|t| t.format("%Y-%m-%d %H:%M:%S").to_string()),
                 draft.locked_by,
-                draft.locked_at.map(|t| t.format("%Y-%m-%d %H:%M:%S").to_string()),
+                draft
+                    .locked_at
+                    .map(|t| t.format("%Y-%m-%d %H:%M:%S").to_string()),
                 draft.summary_json,
                 draft.diff_items_json,
                 draft.diff_items_total,
@@ -403,9 +407,10 @@ fn map_row(row: &Row) -> SqliteResult<StrategyDraftEntity> {
     let diff_items_total: i64 = row.get(19)?;
     let diff_items_truncated_int: i64 = row.get(20)?;
 
-    let plan_date_from = NaiveDate::parse_from_str(&plan_date_from_str, "%Y-%m-%d").map_err(|e| {
-        rusqlite::Error::FromSqlConversionFailure(2, rusqlite::types::Type::Text, Box::new(e))
-    })?;
+    let plan_date_from =
+        NaiveDate::parse_from_str(&plan_date_from_str, "%Y-%m-%d").map_err(|e| {
+            rusqlite::Error::FromSqlConversionFailure(2, rusqlite::types::Type::Text, Box::new(e))
+        })?;
     let plan_date_to = NaiveDate::parse_from_str(&plan_date_to_str, "%Y-%m-%d").map_err(|e| {
         rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, Box::new(e))
     })?;
@@ -418,10 +423,10 @@ fn map_row(row: &Row) -> SqliteResult<StrategyDraftEntity> {
             rusqlite::Error::FromSqlConversionFailure(11, rusqlite::types::Type::Text, Box::new(e))
         })?;
 
-    let published_at = published_at_str
-        .and_then(|s| NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S").ok());
-    let locked_at = locked_at_str
-        .and_then(|s| NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S").ok());
+    let published_at =
+        published_at_str.and_then(|s| NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S").ok());
+    let locked_at =
+        locked_at_str.and_then(|s| NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S").ok());
 
     Ok(StrategyDraftEntity {
         draft_id,

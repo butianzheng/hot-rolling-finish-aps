@@ -8,7 +8,7 @@ pub mod state;
 pub mod tauri_commands;
 
 // 重导出
-pub use state::{AppState, get_default_db_path};
+pub use state::{get_default_db_path, AppState};
 
 #[cfg(feature = "tauri-app")]
 pub use tauri_commands::*;

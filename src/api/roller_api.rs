@@ -5,17 +5,19 @@
 // 依据: Engine_Specs_v0.3_Integrated.md - 7. Roll Campaign Engine
 // ==========================================
 
-use std::sync::Arc;
-use serde::{Deserialize, Serialize};
 use chrono::NaiveDate;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use crate::api::error::{ApiError, ApiResult};
 use crate::config::{config_keys, ConfigManager};
-use crate::domain::roller::{RollerCampaign, RollerCampaignMonitor};
 use crate::domain::action_log::ActionLog;
-use crate::repository::roll_campaign_plan_repo::{RollCampaignPlanEntity, RollCampaignPlanRepository};
-use crate::repository::roller_repo::RollerCampaignRepository;
+use crate::domain::roller::{RollerCampaign, RollerCampaignMonitor};
 use crate::repository::action_log_repo::ActionLogRepository;
+use crate::repository::roll_campaign_plan_repo::{
+    RollCampaignPlanEntity, RollCampaignPlanRepository,
+};
+use crate::repository::roller_repo::RollerCampaignRepository;
 
 // ==========================================
 // RollerApi - 换辊管理 API
@@ -94,7 +96,10 @@ impl RollerApi {
             .find_by_version_id(version_id)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
-        Ok(campaigns.into_iter().map(RollerCampaignInfo::from).collect())
+        Ok(campaigns
+            .into_iter()
+            .map(RollerCampaignInfo::from)
+            .collect())
     }
 
     /// 查询机组当前进行中的换辊窗口
@@ -145,7 +150,10 @@ impl RollerApi {
             .find_needs_roll_change(version_id)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
-        Ok(campaigns.into_iter().map(RollerCampaignInfo::from).collect())
+        Ok(campaigns
+            .into_iter()
+            .map(RollerCampaignInfo::from)
+            .collect())
     }
 
     // ==========================================
@@ -301,7 +309,8 @@ impl RollerApi {
             .filter(|v| *v > 0.0)
             .unwrap_or(2500.0);
 
-        let effective_suggest_threshold_t = suggest_threshold_t.unwrap_or(default_suggest_threshold_t);
+        let effective_suggest_threshold_t =
+            suggest_threshold_t.unwrap_or(default_suggest_threshold_t);
         let effective_hard_limit_t = hard_limit_t.unwrap_or(default_hard_limit_t);
 
         if effective_suggest_threshold_t <= 0.0 {

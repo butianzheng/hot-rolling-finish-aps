@@ -94,14 +94,16 @@ impl FieldMapper {
     ) -> ImportResult<Option<f64>> {
         match self.get_string(row, key) {
             None => Ok(None),
-            Some(value) => value
-                .parse::<f64>()
-                .map(Some)
-                .map_err(|_| ImportError::TypeConversionError {
-                    row: row_number,
-                    field: key.to_string(),
-                    message: format!("无法解析为浮点数: {}", value),
-                }),
+            Some(value) => {
+                value
+                    .parse::<f64>()
+                    .map(Some)
+                    .map_err(|_| ImportError::TypeConversionError {
+                        row: row_number,
+                        field: key.to_string(),
+                        message: format!("无法解析为浮点数: {}", value),
+                    })
+            }
         }
     }
 
@@ -114,14 +116,16 @@ impl FieldMapper {
     ) -> ImportResult<Option<i32>> {
         match self.get_string(row, key) {
             None => Ok(None),
-            Some(value) => value
-                .parse::<i32>()
-                .map(Some)
-                .map_err(|_| ImportError::TypeConversionError {
-                    row: row_number,
-                    field: key.to_string(),
-                    message: format!("无法解析为整数: {}", value),
-                }),
+            Some(value) => {
+                value
+                    .parse::<i32>()
+                    .map(Some)
+                    .map_err(|_| ImportError::TypeConversionError {
+                        row: row_number,
+                        field: key.to_string(),
+                        message: format!("无法解析为整数: {}", value),
+                    })
+            }
         }
     }
 
@@ -174,8 +178,7 @@ impl FieldMapper {
                     })?;
 
                 Ok(Some(DateTime::<Utc>::from_naive_utc_and_offset(
-                    naive_dt,
-                    Utc,
+                    naive_dt, Utc,
                 )))
             }
         }
@@ -234,7 +237,10 @@ mod tests {
         let mapper = FieldMapper;
         let record = mapper.map_to_raw_material(row, 1).unwrap();
 
-        assert_eq!(record.due_date, Some(NaiveDate::from_ymd_opt(2025, 1, 20).unwrap()));
+        assert_eq!(
+            record.due_date,
+            Some(NaiveDate::from_ymd_opt(2025, 1, 20).unwrap())
+        );
     }
 
     #[test]

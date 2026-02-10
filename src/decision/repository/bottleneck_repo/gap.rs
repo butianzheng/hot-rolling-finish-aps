@@ -15,8 +15,10 @@ impl BottleneckRepository {
             return Ok(HashMap::new());
         }
 
-        let has_force_release_flag = Self::table_has_column(conn, "material_state", "force_release_flag")?;
-        let has_earliest_sched_date = Self::table_has_column(conn, "material_state", "earliest_sched_date")?;
+        let has_force_release_flag =
+            Self::table_has_column(conn, "material_state", "force_release_flag")?;
+        let has_earliest_sched_date =
+            Self::table_has_column(conn, "material_state", "earliest_sched_date")?;
 
         let placeholders = vec!["?"; machine_codes.len()].join(", ");
 
@@ -208,8 +210,7 @@ impl BottleneckRepository {
             };
 
             for date in dates {
-                if let Some((cnt, w)) =
-                    pending_incr_map.get(&(machine_code.clone(), date.clone()))
+                if let Some((cnt, w)) = pending_incr_map.get(&(machine_code.clone(), date.clone()))
                 {
                     pending_cnt_cum += *cnt as i64;
                     pending_weight_cum += *w;

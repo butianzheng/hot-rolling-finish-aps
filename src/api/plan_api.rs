@@ -6,27 +6,33 @@
 // 依据: 实施计划 Phase 3
 // ==========================================
 
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use crate::api::error::{ApiError, ApiResult};
 use crate::config::ConfigManager;
-use crate::domain::plan::{Plan, PlanVersion, PlanItem};
-use crate::domain::types::PlanVersionStatus;
 use crate::domain::action_log::ActionLog;
-use crate::repository::plan_repo::{PlanItemRepository, PlanItemVersionAgg, PlanRepository, PlanVersionRepository};
-use crate::repository::action_log_repo::ActionLogRepository;
-use crate::repository::material_repo::{MaterialMasterRepository, MaterialStateRepository, MaterialStateSnapshotLite};
-use crate::repository::risk_repo::RiskSnapshotRepository;
-use crate::repository::capacity_repo::CapacityPoolRepository;
-use crate::repository::{StrategyDraftEntity, StrategyDraftRepository, StrategyDraftStatus};
+use crate::domain::plan::{Plan, PlanItem, PlanVersion};
+use crate::domain::types::PlanVersionStatus;
+use crate::engine::events::{
+    OptionalEventPublisher, ScheduleEvent, ScheduleEventPublisher, ScheduleEventType,
+};
 use crate::engine::recalc::{RecalcEngine, ResolvedStrategyProfile};
 use crate::engine::risk::RiskEngine;
 use crate::engine::ScheduleStrategy;
-use crate::engine::events::{OptionalEventPublisher, ScheduleEvent, ScheduleEventPublisher, ScheduleEventType};
+use crate::repository::action_log_repo::ActionLogRepository;
+use crate::repository::capacity_repo::CapacityPoolRepository;
+use crate::repository::material_repo::{
+    MaterialMasterRepository, MaterialStateRepository, MaterialStateSnapshotLite,
+};
+use crate::repository::plan_repo::{
+    PlanItemRepository, PlanItemVersionAgg, PlanRepository, PlanVersionRepository,
+};
+use crate::repository::risk_repo::RiskSnapshotRepository;
+use crate::repository::{StrategyDraftEntity, StrategyDraftRepository, StrategyDraftStatus};
 
 // ==========================================
 // PlanApi - 排产方案 API
@@ -97,13 +103,13 @@ impl PlanApi {
     }
 }
 
+mod items_query;
+mod operations;
 mod plan_management;
-mod version_management;
 mod recalc;
 mod strategy_drafts;
-mod items_query;
 mod version_comparison;
-mod operations;
+mod version_management;
 
 // ==========================================
 // DTO 类型定义
@@ -231,8 +237,16 @@ impl VersionKpiSummary {
             mature_backlog_t: has_risk.then_some(risk.mature_backlog_t),
             immature_backlog_t: has_risk.then_some(risk.immature_backlog_t),
             urgent_total_t: has_risk.then_some(risk.urgent_total_t),
-            snapshot_date_from: if has_risk { risk.snapshot_date_from } else { None },
-            snapshot_date_to: if has_risk { risk.snapshot_date_to } else { None },
+            snapshot_date_from: if has_risk {
+                risk.snapshot_date_from
+            } else {
+                None
+            },
+            snapshot_date_to: if has_risk {
+                risk.snapshot_date_to
+            } else {
+                None
+            },
         }
     }
 }

@@ -203,9 +203,7 @@ impl ColdStockRepository {
         )?;
 
         let avg_age_days = stmt
-            .query_row(params![version_id], |row| {
-                row.get::<_, Option<f64>>(0)
-            })?
+            .query_row(params![version_id], |row| row.get::<_, Option<f64>>(0))?
             .unwrap_or(0.0);
 
         Ok(ColdStockSummary {
@@ -246,15 +244,15 @@ impl ColdStockRepository {
             let age_bin = determine_age_bin(material.stock_age_days);
             let key = (material.machine_code.clone(), age_bin.clone());
 
-            let profile = profiles
-                .entry(key.clone())
-                .or_insert_with(|| ColdStockProfile::new(
+            let profile = profiles.entry(key.clone()).or_insert_with(|| {
+                ColdStockProfile::new(
                     version_id.to_string(),
                     material.machine_code.clone(),
                     age_bin.clone(),
                     get_age_min(age_bin.as_str()),
                     get_age_max(age_bin.as_str()),
-                ));
+                )
+            });
 
             profile.count += 1;
             profile.weight_t += material.weight_t;
@@ -317,15 +315,15 @@ impl ColdStockRepository {
             let age_bin = determine_age_bin(material.stock_age_days);
             let key = (material.machine_code.clone(), age_bin.clone());
 
-            let profile = profiles
-                .entry(key.clone())
-                .or_insert_with(|| ColdStockProfile::new(
+            let profile = profiles.entry(key.clone()).or_insert_with(|| {
+                ColdStockProfile::new(
                     version_id.to_string(),
                     material.machine_code.clone(),
                     age_bin.clone(),
                     get_age_min(age_bin.as_str()),
                     get_age_max(age_bin.as_str()),
-                ));
+                )
+            });
 
             profile.count += 1;
             profile.weight_t += material.weight_t;
@@ -584,8 +582,10 @@ fn analyze_structure_gap(
         if count >= 5 {
             let width_str = width.map_or("未知".to_string(), |w| format!("{:.0}mm", w));
             let thick_str = thick.map_or("未知".to_string(), |t| format!("{:.1}mm", t));
-            profile.structure_gap =
-                Some(format!("集中在规格 {}×{} ({} 块)", width_str, thick_str, count));
+            profile.structure_gap = Some(format!(
+                "集中在规格 {}×{} ({} 块)",
+                width_str, thick_str, count
+            ));
         }
     }
 

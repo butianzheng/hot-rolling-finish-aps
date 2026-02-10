@@ -55,10 +55,7 @@ impl StructureCorrector {
     /// 2. 所有配比值必须在 [0.0, 1.0] 范围内
     /// 3. 所有配比值之和应接近 1.0 (允许 1% 误差)
     /// 4. 钢种名称不能为空
-    pub fn validate_target_ratio(
-        &self,
-        target_ratio: &HashMap<String, f64>,
-    ) -> Result<(), String> {
+    pub fn validate_target_ratio(&self, target_ratio: &HashMap<String, f64>) -> Result<(), String> {
         // 1. 检查是否为空
         if target_ratio.is_empty() {
             warn!("目标配比为空");
@@ -103,11 +100,7 @@ impl StructureCorrector {
         let tolerance = 0.01; // 1% 误差容忍度
 
         if (sum - 1.0).abs() > tolerance {
-            warn!(
-                sum = sum,
-                tolerance = tolerance,
-                "目标配比之和不等于 1.0"
-            );
+            warn!(sum = sum, tolerance = tolerance, "目标配比之和不等于 1.0");
             return Err(format!(
                 "目标配比之和 {:.4} 不等于 1.0 (允许误差 {})",
                 sum, tolerance
@@ -351,8 +344,7 @@ impl StructureCorrector {
         for item in items {
             if let Some(material) = materials.get(&item.material_id) {
                 if let Some(steel_mark) = &material.steel_mark {
-                    *steel_grade_weights.entry(steel_mark.clone()).or_insert(0.0) +=
-                        item.weight_t;
+                    *steel_grade_weights.entry(steel_mark.clone()).or_insert(0.0) += item.weight_t;
                 } else {
                     // 材料缺失钢种信息
                     missing_steel_mark_count += 1;
@@ -609,8 +601,8 @@ impl StructureCorrector {
                         if item_steel_mark == steel_mark {
                             // 检查是否锁定
                             if let Some(state) = material_states.get(&item.material_id) {
-                                let is_locked = state.sched_state == SchedState::Locked
-                                    || state.lock_flag;
+                                let is_locked =
+                                    state.sched_state == SchedState::Locked || state.lock_flag;
                                 if is_locked {
                                     locked_materials.push(item.material_id.clone());
                                 }

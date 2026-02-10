@@ -17,10 +17,7 @@ use hot_rolling_aps::engine::CapacityFiller;
 // ==========================================
 
 /// 创建测试用的产能池
-fn create_test_capacity_pool(
-    target_capacity: f64,
-    limit_capacity: f64,
-) -> CapacityPool {
+fn create_test_capacity_pool(target_capacity: f64, limit_capacity: f64) -> CapacityPool {
     CapacityPool {
         version_id: "V001".to_string(),
         machine_code: "H032".to_string(),
@@ -119,12 +116,8 @@ fn test_capacity_filler_basic_fill() {
     let version_id = "V001";
 
     // 执行填充
-    let (plan_items, skipped_materials) = filler.fill_single_day(
-        &mut capacity_pool,
-        candidates,
-        frozen_items,
-        version_id,
-    );
+    let (plan_items, skipped_materials) =
+        filler.fill_single_day(&mut capacity_pool, candidates, frozen_items, version_id);
 
     println!("✓ 填充完成");
     println!("  - 已排材料数: {}", plan_items.len());
@@ -169,12 +162,8 @@ fn test_capacity_filler_fill_to_limit() {
     let version_id = "V001";
 
     // 执行填充
-    let (plan_items, skipped_materials) = filler.fill_single_day(
-        &mut capacity_pool,
-        candidates,
-        frozen_items,
-        version_id,
-    );
+    let (plan_items, skipped_materials) =
+        filler.fill_single_day(&mut capacity_pool, candidates, frozen_items, version_id);
 
     println!("✓ 填充完成");
     println!("  - 已排材料数: {}", plan_items.len());
@@ -267,12 +256,8 @@ fn test_capacity_filler_frozen_zone_priority() {
     let version_id = "V001";
 
     // 执行填充
-    let (plan_items, skipped_materials) = filler.fill_single_day(
-        &mut capacity_pool,
-        candidates,
-        frozen_items,
-        version_id,
-    );
+    let (plan_items, skipped_materials) =
+        filler.fill_single_day(&mut capacity_pool, candidates, frozen_items, version_id);
 
     println!("✓ 填充完成");
     println!("  - 已排材料数: {}", plan_items.len());
@@ -320,12 +305,8 @@ fn test_capacity_filler_locked_material_forced() {
     let version_id = "V001";
 
     // 执行填充
-    let (plan_items, skipped_materials) = filler.fill_single_day(
-        &mut capacity_pool,
-        candidates,
-        frozen_items,
-        version_id,
-    );
+    let (plan_items, skipped_materials) =
+        filler.fill_single_day(&mut capacity_pool, candidates, frozen_items, version_id);
 
     println!("✓ 填充完成");
     println!("  - 已排材料数: {}", plan_items.len());
@@ -339,13 +320,12 @@ fn test_capacity_filler_locked_material_forced() {
         capacity_pool.used_capacity_t, 140.0,
         "已用产能应该是140吨（超过limit）"
     );
-    assert_eq!(
-        capacity_pool.overflow_t, 20.0,
-        "超限吨位应该是20吨"
-    );
+    assert_eq!(capacity_pool.overflow_t, 20.0, "超限吨位应该是20吨");
 
     // 验证锁定材料的assign_reason
-    let locked_item = plan_items.iter().find(|item| item.material_id == "MAT003_LOCKED");
+    let locked_item = plan_items
+        .iter()
+        .find(|item| item.material_id == "MAT003_LOCKED");
     assert!(locked_item.is_some(), "应该找到锁定材料");
     assert_eq!(
         locked_item.unwrap().assign_reason.as_deref(),
@@ -378,12 +358,8 @@ fn test_capacity_filler_skip_over_limit() {
     let version_id = "V001";
 
     // 执行填充
-    let (plan_items, skipped_materials) = filler.fill_single_day(
-        &mut capacity_pool,
-        candidates,
-        frozen_items,
-        version_id,
-    );
+    let (plan_items, skipped_materials) =
+        filler.fill_single_day(&mut capacity_pool, candidates, frozen_items, version_id);
 
     println!("✓ 填充完成");
     println!("  - 已排材料数: {}", plan_items.len());
@@ -391,7 +367,11 @@ fn test_capacity_filler_skip_over_limit() {
     println!("  - 已用产能: {} 吨", capacity_pool.used_capacity_t);
 
     // 验证：MAT001, MAT002, MAT004被排入，MAT003被跳过
-    assert_eq!(plan_items.len(), 3, "应该排入3个材料（MAT001, MAT002, MAT004）");
+    assert_eq!(
+        plan_items.len(),
+        3,
+        "应该排入3个材料（MAT001, MAT002, MAT004）"
+    );
     assert_eq!(skipped_materials.len(), 1, "应该跳过1个材料（MAT003）");
     assert_eq!(capacity_pool.used_capacity_t, 110.0, "已用产能应该是110吨");
 
@@ -428,12 +408,8 @@ fn test_capacity_filler_overflow_calculation() {
     let version_id = "V001";
 
     // 执行填充
-    let (plan_items, skipped_materials) = filler.fill_single_day(
-        &mut capacity_pool,
-        candidates,
-        frozen_items,
-        version_id,
-    );
+    let (plan_items, skipped_materials) =
+        filler.fill_single_day(&mut capacity_pool, candidates, frozen_items, version_id);
 
     println!("✓ 填充完成");
     println!("  - 已用产能: {} 吨", capacity_pool.used_capacity_t);
@@ -441,10 +417,7 @@ fn test_capacity_filler_overflow_calculation() {
     println!("  - 超限吨位: {} 吨", capacity_pool.overflow_t);
 
     // 验证 overflow_t 计算
-    assert_eq!(
-        capacity_pool.used_capacity_t, 140.0,
-        "已用产能应该是140吨"
-    );
+    assert_eq!(capacity_pool.used_capacity_t, 140.0, "已用产能应该是140吨");
     assert_eq!(
         capacity_pool.overflow_t, 20.0,
         "超限吨位应该是 140 - 120 = 20吨"
@@ -469,12 +442,8 @@ fn test_capacity_filler_empty_candidates() {
     let version_id = "V001";
 
     // 执行填充
-    let (_plan_items, _skipped_materials) = filler.fill_single_day(
-        &mut capacity_pool,
-        candidates,
-        frozen_items,
-        version_id,
-    );
+    let (_plan_items, _skipped_materials) =
+        filler.fill_single_day(&mut capacity_pool, candidates, frozen_items, version_id);
 
     println!("✓ 填充完成");
     println!("  - 已排材料数: {}", _plan_items.len());

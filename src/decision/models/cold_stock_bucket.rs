@@ -79,7 +79,13 @@ impl ColdStockBucket {
             format!("{}+", age_min_days)
         };
 
-        Self::new(version_id, machine_code, age_bin, age_min_days, age_max_days)
+        Self::new(
+            version_id,
+            machine_code,
+            age_bin,
+            age_min_days,
+            age_max_days,
+        )
     }
 
     /// 添加材料到桶中
@@ -165,11 +171,7 @@ impl std::fmt::Display for ColdStockBucket {
         write!(
             f,
             "{}@{} (count: {}, weight: {:.1}t, pressure: {:.1})",
-            self.machine_code,
-            self.age_bin,
-            self.count,
-            self.weight_t,
-            self.pressure_score
+            self.machine_code, self.age_bin, self.count, self.weight_t, self.pressure_score
         )
     }
 }
@@ -180,12 +182,8 @@ mod tests {
 
     #[test]
     fn test_cold_stock_bucket_creation() {
-        let bucket = ColdStockBucket::from_age_range(
-            "V001".to_string(),
-            "H032".to_string(),
-            7,
-            Some(14),
-        );
+        let bucket =
+            ColdStockBucket::from_age_range("V001".to_string(), "H032".to_string(), 7, Some(14));
 
         assert_eq!(bucket.age_bin, "7-14");
         assert_eq!(bucket.age_min_days, 7);
@@ -196,12 +194,8 @@ mod tests {
 
     #[test]
     fn test_add_material() {
-        let mut bucket = ColdStockBucket::from_age_range(
-            "V001".to_string(),
-            "H032".to_string(),
-            7,
-            Some(14),
-        );
+        let mut bucket =
+            ColdStockBucket::from_age_range("V001".to_string(), "H032".to_string(), 7, Some(14));
 
         bucket.add_material(100.5);
         assert_eq!(bucket.count, 1);
@@ -214,12 +208,8 @@ mod tests {
 
     #[test]
     fn test_pressure_calculation() {
-        let mut bucket = ColdStockBucket::from_age_range(
-            "V001".to_string(),
-            "H032".to_string(),
-            30,
-            None,
-        );
+        let mut bucket =
+            ColdStockBucket::from_age_range("V001".to_string(), "H032".to_string(), 30, None);
 
         // 添加大量冷料
         bucket.add_materials(50, 5000.0);
@@ -231,12 +221,8 @@ mod tests {
 
     #[test]
     fn test_pressure_level() {
-        let mut bucket = ColdStockBucket::from_age_range(
-            "V001".to_string(),
-            "H032".to_string(),
-            30,
-            None,
-        );
+        let mut bucket =
+            ColdStockBucket::from_age_range("V001".to_string(), "H032".to_string(), 30, None);
 
         bucket.pressure_score = 85.0;
         assert_eq!(bucket.pressure_level(), "严重");
@@ -256,12 +242,8 @@ mod tests {
 
     #[test]
     fn test_avg_weight() {
-        let mut bucket = ColdStockBucket::from_age_range(
-            "V001".to_string(),
-            "H032".to_string(),
-            7,
-            Some(14),
-        );
+        let mut bucket =
+            ColdStockBucket::from_age_range("V001".to_string(), "H032".to_string(), 7, Some(14));
 
         bucket.add_materials(10, 1000.0);
         assert_eq!(bucket.avg_weight_per_piece(), 100.0);
@@ -269,12 +251,8 @@ mod tests {
 
     #[test]
     fn test_reasons_and_gap() {
-        let mut bucket = ColdStockBucket::from_age_range(
-            "V001".to_string(),
-            "H032".to_string(),
-            30,
-            None,
-        );
+        let mut bucket =
+            ColdStockBucket::from_age_range("V001".to_string(), "H032".to_string(), 30, None);
 
         bucket.add_reason("产能不足".to_string());
         bucket.add_reason("结构不匹配".to_string());

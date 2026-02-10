@@ -118,4 +118,3 @@ fn test_disabled_rule_always_ok() {
     assert_eq!(r.status, PathRuleStatus::Ok);
     assert!(r.violation_type.is_none());
 }
-

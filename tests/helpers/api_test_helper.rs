@@ -7,51 +7,51 @@
 #[path = "../test_helpers.rs"]
 mod test_helpers;
 
+use chrono::NaiveDate;
 use std::sync::Arc;
 use tempfile::NamedTempFile;
-use chrono::NaiveDate;
 
-use hot_rolling_aps::api::{MaterialApi, PlanApi, DashboardApi, ConfigApi, RollerApi, ApiError, ManualOperationValidator};
-use hot_rolling_aps::repository::{
-    material_repo::{MaterialMasterRepository, MaterialStateRepository},
-    plan_repo::{PlanRepository, PlanVersionRepository, PlanItemRepository},
-    action_log_repo::ActionLogRepository,
-    risk_repo::RiskSnapshotRepository,
-    capacity_repo::CapacityPoolRepository,
-    roller_repo::RollerCampaignRepository,
-    path_override_pending_repo::PathOverridePendingRepository,
-    roll_campaign_plan_repo::RollCampaignPlanRepository,
-    strategy_draft_repo::StrategyDraftRepository,
-    decision_refresh_repo::DecisionRefreshRepository,
-};
-use hot_rolling_aps::engine::{
-    eligibility::EligibilityEngine,
-    urgency::UrgencyEngine,
-    recalc::RecalcEngine,
-    risk::RiskEngine,
-    priority::PrioritySorter,
-    capacity_filler::CapacityFiller,
+use hot_rolling_aps::api::{
+    ApiError, ConfigApi, DashboardApi, ManualOperationValidator, MaterialApi, PlanApi, RollerApi,
 };
 use hot_rolling_aps::config::config_manager::ConfigManager;
-use hot_rolling_aps::engine::events::ScheduleEventPublisher;
-use hot_rolling_aps::decision::services::{DecisionRefreshService, RefreshQueue, RefreshQueueAdapter};
 use hot_rolling_aps::decision::api::{DecisionApi, DecisionApiImpl};
 use hot_rolling_aps::decision::repository::{
-    DaySummaryRepository, BottleneckRepository, OrderFailureRepository,
-    ColdStockRepository, RollAlertRepository, CapacityOpportunityRepository,
+    BottleneckRepository, CapacityOpportunityRepository, ColdStockRepository, DaySummaryRepository,
+    OrderFailureRepository, RollAlertRepository,
+};
+use hot_rolling_aps::decision::services::{
+    DecisionRefreshService, RefreshQueue, RefreshQueueAdapter,
 };
 use hot_rolling_aps::decision::use_cases::impls::{
-    MostRiskyDayUseCaseImpl, MachineBottleneckUseCaseImpl, OrderFailureUseCaseImpl,
-    ColdStockUseCaseImpl, RollCampaignAlertUseCaseImpl, CapacityOpportunityUseCaseImpl,
+    CapacityOpportunityUseCaseImpl, ColdStockUseCaseImpl, MachineBottleneckUseCaseImpl,
+    MostRiskyDayUseCaseImpl, OrderFailureUseCaseImpl, RollCampaignAlertUseCaseImpl,
 };
-use hot_rolling_aps::domain::material::{MaterialMaster, MaterialState};
 use hot_rolling_aps::domain::capacity::CapacityPool;
+use hot_rolling_aps::domain::material::{MaterialMaster, MaterialState};
 use hot_rolling_aps::domain::plan::Plan;
 use hot_rolling_aps::domain::types::SchedState;
+use hot_rolling_aps::engine::events::ScheduleEventPublisher;
+use hot_rolling_aps::engine::{
+    capacity_filler::CapacityFiller, eligibility::EligibilityEngine, priority::PrioritySorter,
+    recalc::RecalcEngine, risk::RiskEngine, urgency::UrgencyEngine,
+};
+use hot_rolling_aps::repository::{
+    action_log_repo::ActionLogRepository,
+    capacity_repo::CapacityPoolRepository,
+    decision_refresh_repo::DecisionRefreshRepository,
+    material_repo::{MaterialMasterRepository, MaterialStateRepository},
+    path_override_pending_repo::PathOverridePendingRepository,
+    plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository},
+    risk_repo::RiskSnapshotRepository,
+    roll_campaign_plan_repo::RollCampaignPlanRepository,
+    roller_repo::RollerCampaignRepository,
+    strategy_draft_repo::StrategyDraftRepository,
+};
 
-use std::sync::Mutex;
-use rusqlite::Connection;
 use hot_rolling_aps::db::open_sqlite_connection;
+use rusqlite::Connection;
+use std::sync::Mutex;
 
 // ==========================================
 // API测试环境
@@ -90,12 +90,12 @@ impl ApiTestEnv {
     /// - 自动执行数据库迁移
     pub fn new() -> Result<Self, String> {
         // 创建临时数据库文件并初始化schema
-        let (temp_file, db_path) = test_helpers::create_test_db()
-            .map_err(|e| format!("创建测试数据库失败: {}", e))?;
+        let (temp_file, db_path) =
+            test_helpers::create_test_db().map_err(|e| format!("创建测试数据库失败: {}", e))?;
 
         // 初始化数据库连接
-        let conn = open_sqlite_connection(&db_path)
-            .map_err(|e| format!("无法打开数据库: {}", e))?;
+        let conn =
+            open_sqlite_connection(&db_path).map_err(|e| format!("无法打开数据库: {}", e))?;
         let conn = Arc::new(Mutex::new(conn));
 
         // ==========================================
@@ -104,12 +104,12 @@ impl ApiTestEnv {
 
         let material_master_repo = Arc::new(
             MaterialMasterRepository::new(&db_path)
-                .map_err(|e| format!("无法创建MaterialMasterRepository: {}", e))?
+                .map_err(|e| format!("无法创建MaterialMasterRepository: {}", e))?,
         );
 
         let material_state_repo = Arc::new(
             MaterialStateRepository::new(&db_path)
-                .map_err(|e| format!("无法创建MaterialStateRepository: {}", e))?
+                .map_err(|e| format!("无法创建MaterialStateRepository: {}", e))?,
         );
 
         let plan_repo = Arc::new(PlanRepository::new(conn.clone()));
@@ -120,17 +120,17 @@ impl ApiTestEnv {
 
         let risk_snapshot_repo = Arc::new(
             RiskSnapshotRepository::new(&db_path)
-                .map_err(|e| format!("无法创建RiskSnapshotRepository: {}", e))?
+                .map_err(|e| format!("无法创建RiskSnapshotRepository: {}", e))?,
         );
 
         let capacity_pool_repo = Arc::new(
             CapacityPoolRepository::new(db_path.clone())
-                .map_err(|e| format!("无法创建CapacityPoolRepository: {}", e))?
+                .map_err(|e| format!("无法创建CapacityPoolRepository: {}", e))?,
         );
 
         let roller_campaign_repo = Arc::new(
             RollerCampaignRepository::new(&db_path)
-                .map_err(|e| format!("无法创建RollerCampaignRepository: {}", e))?
+                .map_err(|e| format!("无法创建RollerCampaignRepository: {}", e))?,
         );
         let path_override_pending_repo = Arc::new(PathOverridePendingRepository::new(conn.clone()));
 
@@ -139,8 +139,7 @@ impl ApiTestEnv {
         // ==========================================
 
         let config_manager = Arc::new(
-            ConfigManager::new(&db_path)
-                .map_err(|e| format!("无法创建ConfigManager: {}", e))?
+            ConfigManager::new(&db_path).map_err(|e| format!("无法创建ConfigManager: {}", e))?,
         );
 
         let eligibility_engine = Arc::new(EligibilityEngine::new(config_manager.clone()));
@@ -155,7 +154,10 @@ impl ApiTestEnv {
         let event_publisher: Option<Arc<dyn ScheduleEventPublisher>> =
             RefreshQueue::new(conn.clone(), decision_refresh_service)
                 .ok()
-                .map(|queue| Arc::new(RefreshQueueAdapter::new(Arc::new(queue))) as Arc<dyn ScheduleEventPublisher>);
+                .map(|queue| {
+                    Arc::new(RefreshQueueAdapter::new(Arc::new(queue)))
+                        as Arc<dyn ScheduleEventPublisher>
+                });
 
         let recalc_engine = Arc::new(RecalcEngine::with_default_config(
             plan_version_repo.clone(),
@@ -225,7 +227,9 @@ impl ApiTestEnv {
         let d3_use_case = Arc::new(ColdStockUseCaseImpl::new(cold_stock_repo));
         let d4_use_case = Arc::new(MachineBottleneckUseCaseImpl::new(bottleneck_repo));
         let d5_use_case = Arc::new(RollCampaignAlertUseCaseImpl::new(roll_alert_repo));
-        let d6_use_case = Arc::new(CapacityOpportunityUseCaseImpl::new(capacity_opportunity_repo));
+        let d6_use_case = Arc::new(CapacityOpportunityUseCaseImpl::new(
+            capacity_opportunity_repo,
+        ));
 
         let decision_api: Arc<dyn DecisionApi> = Arc::new(DecisionApiImpl::new_full(
             d1_use_case,
@@ -254,7 +258,7 @@ impl ApiTestEnv {
         let roller_repo = Arc::new(RollerCampaignRepository::from_connection(conn.clone()));
         let roll_plan_repo = Arc::new(
             RollCampaignPlanRepository::from_connection(conn.clone())
-                .map_err(|e| format!("无法创建RollCampaignPlanRepository: {}", e))?
+                .map_err(|e| format!("无法创建RollCampaignPlanRepository: {}", e))?,
         );
         let roller_api = Arc::new(RollerApi::new(
             roller_repo,
@@ -480,11 +484,13 @@ pub fn assert_action_logged(
     action_type: &str,
     expected_count: usize,
 ) -> Result<(), String> {
-    let logs = env.action_log_repo
+    let logs = env
+        .action_log_repo
         .find_recent(100)
         .map_err(|e| format!("查询ActionLog失败: {}", e))?;
 
-    let matching_logs: Vec<_> = logs.iter()
+    let matching_logs: Vec<_> = logs
+        .iter()
         .filter(|log| log.action_type == action_type)
         .collect();
 
@@ -501,11 +507,9 @@ pub fn assert_action_logged(
 }
 
 /// 验证最近的ActionLog包含指定的operator
-pub fn assert_action_has_operator(
-    env: &ApiTestEnv,
-    operator: &str,
-) -> Result<(), String> {
-    let logs = env.action_log_repo
+pub fn assert_action_has_operator(env: &ApiTestEnv, operator: &str) -> Result<(), String> {
+    let logs = env
+        .action_log_repo
         .find_recent(1)
         .map_err(|e| format!("查询ActionLog失败: {}", e))?;
 
@@ -517,8 +521,7 @@ pub fn assert_action_has_operator(
     if latest_log.actor != operator {
         return Err(format!(
             "预期operator为{}，实际为{}",
-            operator,
-            latest_log.actor
+            operator, latest_log.actor
         ));
     }
 

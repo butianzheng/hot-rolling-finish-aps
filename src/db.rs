@@ -62,7 +62,9 @@ pub fn read_schema_version(conn: &Connection) -> rusqlite::Result<Option<i64>> {
         return Ok(None);
     }
 
-    let v: Option<i64> = conn.query_row("SELECT MAX(version) FROM schema_version", [], |row| row.get(0))?;
+    let v: Option<i64> = conn.query_row("SELECT MAX(version) FROM schema_version", [], |row| {
+        row.get(0)
+    })?;
     Ok(v)
 }
 
@@ -109,6 +111,9 @@ pub fn ensure_schema(conn: &Connection) -> rusqlite::Result<()> {
         rusqlite::params![CURRENT_SCHEMA_VERSION, now],
     )?;
 
-    tracing::info!("完整建表脚本执行成功，schema_version={}", CURRENT_SCHEMA_VERSION);
+    tracing::info!(
+        "完整建表脚本执行成功，schema_version={}",
+        CURRENT_SCHEMA_VERSION
+    );
     Ok(())
 }

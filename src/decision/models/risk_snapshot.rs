@@ -64,11 +64,7 @@ pub struct RiskFactor {
 
 impl RiskSnapshotView {
     /// 创建新的风险快照视图
-    pub fn new(
-        version_id: String,
-        machine_code: String,
-        plan_date: String,
-    ) -> Self {
+    pub fn new(version_id: String, machine_code: String, plan_date: String) -> Self {
         Self {
             version_id,
             machine_code,
@@ -86,12 +82,7 @@ impl RiskSnapshotView {
     }
 
     /// 设置产能信息
-    pub fn set_capacity_info(
-        &mut self,
-        used_t: f64,
-        target_t: f64,
-        limit_t: f64,
-    ) {
+    pub fn set_capacity_info(&mut self, used_t: f64, target_t: f64, limit_t: f64) {
         self.used_capacity_t = used_t;
         self.target_capacity_t = target_t;
         self.limit_capacity_t = limit_t;
@@ -129,7 +120,8 @@ impl RiskSnapshotView {
         }
 
         // 计算加权风险分数
-        let weighted_sum: f64 = self.risk_factors
+        let weighted_sum: f64 = self
+            .risk_factors
             .iter()
             .map(|f| f.severity * f.weight)
             .sum();
@@ -151,12 +143,15 @@ impl RiskSnapshotView {
         };
 
         // 确定主要风险原因
-        self.primary_reason = self.risk_factors
+        self.primary_reason = self
+            .risk_factors
             .iter()
             .max_by(|a, b| {
                 let score_a = a.severity * a.weight;
                 let score_b = b.severity * b.weight;
-                score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
+                score_a
+                    .partial_cmp(&score_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|f| f.description.clone());
     }
@@ -277,18 +272,8 @@ mod tests {
             "2026-01-22".to_string(),
         );
 
-        view.add_risk_factor(
-            "CAP_HIGH".to_string(),
-            "产能利用率高".to_string(),
-            0.9,
-            0.5,
-        );
-        view.add_risk_factor(
-            "COLD_STOCK".to_string(),
-            "冷料压库".to_string(),
-            0.7,
-            0.3,
-        );
+        view.add_risk_factor("CAP_HIGH".to_string(), "产能利用率高".to_string(), 0.9, 0.5);
+        view.add_risk_factor("COLD_STOCK".to_string(), "冷料压库".to_string(), 0.7, 0.3);
 
         assert!(view.risk_score > 0.0);
         assert!(view.is_high_risk());

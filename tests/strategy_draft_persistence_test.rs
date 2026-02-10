@@ -11,18 +11,14 @@ mod test_helpers;
 
 #[cfg(test)]
 mod strategy_draft_persistence_test {
-    use chrono::{Duration, NaiveDateTime};
     use chrono::NaiveDate;
-    use hot_rolling_aps::api::PlanApi;
+    use chrono::{Duration, NaiveDateTime};
     use hot_rolling_aps::api::plan_api::StrategyDraftSummary;
+    use hot_rolling_aps::api::PlanApi;
     use hot_rolling_aps::config::config_manager::ConfigManager;
     use hot_rolling_aps::engine::{
-        capacity_filler::CapacityFiller,
-        eligibility::EligibilityEngine,
-        priority::PrioritySorter,
-        recalc::RecalcEngine,
-        risk::RiskEngine,
-        urgency::UrgencyEngine,
+        capacity_filler::CapacityFiller, eligibility::EligibilityEngine, priority::PrioritySorter,
+        recalc::RecalcEngine, risk::RiskEngine, urgency::UrgencyEngine,
     };
     use hot_rolling_aps::repository::{
         action_log_repo::ActionLogRepository,
@@ -30,8 +26,8 @@ mod strategy_draft_persistence_test {
         material_repo::{MaterialMasterRepository, MaterialStateRepository},
         path_override_pending_repo::PathOverridePendingRepository,
         plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository},
-        roller_repo::RollerCampaignRepository,
         risk_repo::RiskSnapshotRepository,
+        roller_repo::RollerCampaignRepository,
         strategy_draft_repo::{StrategyDraftEntity, StrategyDraftRepository, StrategyDraftStatus},
     };
     use rusqlite::Connection;
@@ -52,7 +48,8 @@ mod strategy_draft_persistence_test {
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
         let strategy_draft_repo = Arc::new(StrategyDraftRepository::new(conn.clone()));
         let risk_snapshot_repo = Arc::new(RiskSnapshotRepository::new(db_path).unwrap());
-        let capacity_pool_repo = Arc::new(CapacityPoolRepository::new(db_path.to_string()).unwrap());
+        let capacity_pool_repo =
+            Arc::new(CapacityPoolRepository::new(db_path.to_string()).unwrap());
         let roller_campaign_repo = Arc::new(RollerCampaignRepository::new(db_path).unwrap());
         let path_override_pending_repo = Arc::new(PathOverridePendingRepository::new(conn.clone()));
 
@@ -123,7 +120,9 @@ mod strategy_draft_persistence_test {
             )
             .unwrap();
 
-        plan_api.activate_version(&base_version_id, operator).unwrap();
+        plan_api
+            .activate_version(&base_version_id, operator)
+            .unwrap();
 
         // ===== 2) 生成草案（落库） =====
         let from = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
@@ -164,7 +163,9 @@ mod strategy_draft_persistence_test {
         assert_eq!(detail.draft_id, draft_id);
 
         // ===== 4) 发布草案：生成正式版本 + 草案标记为 PUBLISHED =====
-        let apply = restarted_api.apply_strategy_draft(&draft_id, operator).unwrap();
+        let apply = restarted_api
+            .apply_strategy_draft(&draft_id, operator)
+            .unwrap();
         assert!(apply.success);
 
         let list_draft_after_apply = restarted_api
@@ -220,7 +221,9 @@ mod strategy_draft_persistence_test {
             )
             .unwrap();
 
-        plan_api.activate_version(&base_version_id, operator).unwrap();
+        plan_api
+            .activate_version(&base_version_id, operator)
+            .unwrap();
 
         // ===== 2) 直接插入一个“已过期但仍是 DRAFT 状态”的草案 =====
         let from = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
@@ -273,7 +276,9 @@ mod strategy_draft_persistence_test {
             diff_items_truncated: false,
         };
 
-        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).unwrap()));
+        let conn = Arc::new(Mutex::new(
+            test_helpers::open_test_connection(&db_path).unwrap(),
+        ));
         let draft_repo = StrategyDraftRepository::new(conn);
         draft_repo.insert(&draft).unwrap();
 
@@ -293,7 +298,9 @@ mod strategy_draft_persistence_test {
         );
 
         // apply_strategy_draft 不应允许发布过期草案
-        let err = plan_api.apply_strategy_draft(&draft_id, operator).unwrap_err();
+        let err = plan_api
+            .apply_strategy_draft(&draft_id, operator)
+            .unwrap_err();
         match err {
             hot_rolling_aps::api::ApiError::InvalidInput(_) => {}
             other => panic!("过期草案发布应返回 InvalidInput，实际: {:?}", other),

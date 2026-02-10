@@ -38,18 +38,22 @@ impl PlanApi {
         }
 
         // 1. 验证版本存在且为草稿状态
-        let version = self.plan_version_repo.find_by_id(version_id)
+        let version = self
+            .plan_version_repo
+            .find_by_id(version_id)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?
             .ok_or_else(|| ApiError::NotFound(format!("版本{}不存在", version_id)))?;
 
         if !version.is_draft() && !version.is_active() {
             return Err(ApiError::BusinessRuleViolation(
-                "只能修改草稿或激活状态的版本".to_string()
+                "只能修改草稿或激活状态的版本".to_string(),
             ));
         }
 
         // 2. 加载当前版本的所有排产明细
-        let current_items = self.plan_item_repo.find_by_version(version_id)
+        let current_items = self
+            .plan_item_repo
+            .find_by_version(version_id)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         // 构建材料ID到PlanItem的映射
@@ -179,13 +183,20 @@ impl PlanApi {
 
         // 4. 批量更新排产项
         if !items_to_update.is_empty() {
-            self.plan_item_repo.batch_upsert(&items_to_update)
+            self.plan_item_repo
+                .batch_upsert(&items_to_update)
                 .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
             // 5. 记录操作日志
-            let actor = if operator.trim().is_empty() { "system" } else { operator };
+            let actor = if operator.trim().is_empty() {
+                "system"
+            } else {
+                operator
+            };
             let detail = match reason {
-                Some(r) if !r.trim().is_empty() => format!("移动{}个排产项 | {}", success_count, r.trim()),
+                Some(r) if !r.trim().is_empty() => {
+                    format!("移动{}个排产项 | {}", success_count, r.trim())
+                }
                 _ => format!("移动{}个排产项", success_count),
             };
 
@@ -239,5 +250,4 @@ impl PlanApi {
             ),
         })
     }
-
 }

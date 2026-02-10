@@ -16,27 +16,29 @@ mod api_integration_e2e_test {
     use hot_rolling_aps::api::{DashboardApi, MaterialApi, PlanApi, ValidationMode};
     use hot_rolling_aps::config::config_manager::ConfigManager;
     use hot_rolling_aps::decision::api::{DecisionApi, DecisionApiImpl};
-    use hot_rolling_aps::decision::repository::{DaySummaryRepository, BottleneckRepository};
-    use hot_rolling_aps::decision::use_cases::impls::{MostRiskyDayUseCaseImpl, MachineBottleneckUseCaseImpl};
+    use hot_rolling_aps::decision::repository::{BottleneckRepository, DaySummaryRepository};
+    use hot_rolling_aps::decision::use_cases::impls::{
+        MachineBottleneckUseCaseImpl, MostRiskyDayUseCaseImpl,
+    };
     use hot_rolling_aps::engine::{
-        CapacityFiller, EligibilityEngine, MaterialStateDerivationService, PrioritySorter, RecalcEngine, RiskEngine,
-        UrgencyEngine,
+        CapacityFiller, EligibilityEngine, MaterialStateDerivationService, PrioritySorter,
+        RecalcEngine, RiskEngine, UrgencyEngine,
     };
     use hot_rolling_aps::importer::{
-        MaterialImporter, MaterialImporterImpl, CsvParser, FieldMapperImpl, DataCleanerImpl,
-        DerivationServiceImpl, DqValidatorImpl, ConflictHandlerImpl,
+        ConflictHandlerImpl, CsvParser, DataCleanerImpl, DerivationServiceImpl, DqValidatorImpl,
+        FieldMapperImpl, MaterialImporter, MaterialImporterImpl,
     };
     use hot_rolling_aps::repository::MaterialImportRepositoryImpl;
     use hot_rolling_aps::repository::{
         action_log_repo::ActionLogRepository,
         capacity_repo::CapacityPoolRepository,
+        decision_refresh_repo::DecisionRefreshRepository,
         material_repo::{MaterialMasterRepository, MaterialStateRepository},
         path_override_pending_repo::PathOverridePendingRepository,
         plan_repo::{PlanItemRepository, PlanRepository, PlanVersionRepository},
-        roller_repo::RollerCampaignRepository,
         risk_repo::RiskSnapshotRepository,
+        roller_repo::RollerCampaignRepository,
         strategy_draft_repo::StrategyDraftRepository,
-        decision_refresh_repo::DecisionRefreshRepository,
     };
     use rusqlite::Connection;
     use std::sync::{Arc, Mutex};
@@ -56,24 +58,21 @@ mod api_integration_e2e_test {
         Arc<CapacityPoolRepository>,
     ) {
         let (temp_file, db_path) = create_test_db().unwrap();
-        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).unwrap()));
+        let conn = Arc::new(Mutex::new(
+            test_helpers::open_test_connection(&db_path).unwrap(),
+        ));
 
         // Repositories
-        let material_master_repo =
-            Arc::new(MaterialMasterRepository::new(&db_path).unwrap());
-        let material_state_repo =
-            Arc::new(MaterialStateRepository::new(&db_path).unwrap());
+        let material_master_repo = Arc::new(MaterialMasterRepository::new(&db_path).unwrap());
+        let material_state_repo = Arc::new(MaterialStateRepository::new(&db_path).unwrap());
         let plan_repo = Arc::new(PlanRepository::new(conn.clone()));
         let plan_version_repo = Arc::new(PlanVersionRepository::new(conn.clone()));
         let plan_item_repo = Arc::new(PlanItemRepository::new(conn.clone()));
         let action_log_repo = Arc::new(ActionLogRepository::new(conn.clone()));
         let strategy_draft_repo = Arc::new(StrategyDraftRepository::new(conn.clone()));
-        let risk_snapshot_repo =
-            Arc::new(RiskSnapshotRepository::new(&db_path).unwrap());
-        let capacity_pool_repo =
-            Arc::new(CapacityPoolRepository::new(db_path.clone()).unwrap());
-        let roller_campaign_repo =
-            Arc::new(RollerCampaignRepository::new(&db_path).unwrap());
+        let risk_snapshot_repo = Arc::new(RiskSnapshotRepository::new(&db_path).unwrap());
+        let capacity_pool_repo = Arc::new(CapacityPoolRepository::new(db_path.clone()).unwrap());
+        let roller_campaign_repo = Arc::new(RollerCampaignRepository::new(&db_path).unwrap());
         let path_override_pending_repo = Arc::new(PathOverridePendingRepository::new(conn.clone()));
 
         // Engines
@@ -357,7 +356,10 @@ mod api_integration_e2e_test {
             let items_after = plan_api.list_plan_items(&version_id).unwrap();
 
             // 验证冻结材料数量
-            let locked_count = items_after.iter().filter(|item| item.locked_in_plan).count();
+            let locked_count = items_after
+                .iter()
+                .filter(|item| item.locked_in_plan)
+                .count();
             assert_eq!(locked_count, 3, "应该有3条冻结材料");
             println!("✓ 步骤 5: 冻结区保护验证通过（{}条冻结）", locked_count);
         }

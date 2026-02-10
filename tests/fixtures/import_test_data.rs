@@ -38,7 +38,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 1500.0,
                 25.0 + (i as f64 * 0.5),
                 "M01",
-                (today + chrono::Duration::days((i % 10) as i64)).format("%Y-%m-%d").to_string(),
+                (today + chrono::Duration::days((i % 10) as i64))
+                    .format("%Y-%m-%d")
+                    .to_string(),
                 "N",
                 Utc::now().to_rfc3339(),
                 Utc::now().to_rfc3339(),
@@ -65,7 +67,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 urgent_level,
                 0,
                 in_frozen,
-                (today + chrono::Duration::days((i % 5) as i64)).format("%Y-%m-%d").to_string(),
+                (today + chrono::Duration::days((i % 5) as i64))
+                    .format("%Y-%m-%d")
+                    .to_string(),
                 Utc::now().to_rfc3339(),
             ],
         )?;
@@ -133,7 +137,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 1200.0,
                 20.0,
                 "M01",
-                (today + chrono::Duration::days(5)).format("%Y-%m-%d").to_string(),
+                (today + chrono::Duration::days(5))
+                    .format("%Y-%m-%d")
+                    .to_string(),
                 "N",
                 Utc::now().to_rfc3339(),
                 Utc::now().to_rfc3339(),
@@ -176,7 +182,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 1600.0,
                 28.0,
                 "M03",
-                (today + chrono::Duration::days(15)).format("%Y-%m-%d").to_string(),
+                (today + chrono::Duration::days(15))
+                    .format("%Y-%m-%d")
+                    .to_string(),
                 "N",
                 Utc::now().to_rfc3339(),
                 Utc::now().to_rfc3339(),
@@ -193,7 +201,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "L3",
                 0,
                 1,
-                (today + chrono::Duration::days(10)).format("%Y-%m-%d").to_string(),
+                (today + chrono::Duration::days(10))
+                    .format("%Y-%m-%d")
+                    .to_string(),
                 Utc::now().to_rfc3339(),
             ],
         )?;
@@ -218,7 +228,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 1900.0,
                 35.0,
                 "M02",
-                (today + chrono::Duration::days(7)).format("%Y-%m-%d").to_string(),
+                (today + chrono::Duration::days(7))
+                    .format("%Y-%m-%d")
+                    .to_string(),
                 "N",
                 Utc::now().to_rfc3339(),
                 Utc::now().to_rfc3339(),
@@ -236,7 +248,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 0,
                 0,
                 3,
-                (today + chrono::Duration::days(3)).format("%Y-%m-%d").to_string(),
+                (today + chrono::Duration::days(3))
+                    .format("%Y-%m-%d")
+                    .to_string(),
                 Utc::now().to_rfc3339(),
             ],
         )?;
@@ -263,7 +277,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 1400.0,
                 22.0,
                 machine,
-                (today + chrono::Duration::days(3)).format("%Y-%m-%d").to_string(),
+                (today + chrono::Duration::days(3))
+                    .format("%Y-%m-%d")
+                    .to_string(),
                 "N",
                 Utc::now().to_rfc3339(),
                 Utc::now().to_rfc3339(),
@@ -286,7 +302,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         )?;
     }
 
-    let count: i64 = conn.query_row("SELECT COUNT(*) FROM material_master", [], |row| row.get(0))?;
+    let count: i64 =
+        conn.query_row("SELECT COUNT(*) FROM material_master", [], |row| row.get(0))?;
 
     println!("✓ 数据导入完成！");
     println!("  - 总计导入: {} 条材料", count);

@@ -207,10 +207,7 @@ impl RollAlert {
         // 超过建议阈值
         if self.cum_weight_t >= self.suggest_threshold_t {
             self.alert_level = "CRITICAL".to_string();
-            self.reason = Some(format!(
-                "已超过建议阈值 {:.1} 吨",
-                self.suggest_threshold_t
-            ));
+            self.reason = Some(format!("已超过建议阈值 {:.1} 吨", self.suggest_threshold_t));
             return;
         }
 

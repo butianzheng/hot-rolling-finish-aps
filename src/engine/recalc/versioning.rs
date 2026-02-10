@@ -93,7 +93,8 @@ impl RecalcEngine {
         };
 
         // 3. 保存版本
-        self.version_repo.create_with_next_version_no(&mut version)?;
+        self.version_repo
+            .create_with_next_version_no(&mut version)?;
 
         Ok(version)
     }
@@ -151,4 +152,3 @@ impl RecalcEngine {
         base_date - chrono::Duration::days(self.config.frozen_days_before_today as i64)
     }
 }
-

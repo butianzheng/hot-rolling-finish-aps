@@ -49,7 +49,11 @@ fn create_test_plan_item(
         plan_date,
         seq_no: 1,
         weight_t,
-        source_type: if is_frozen { "FROZEN".to_string() } else { "CALC".to_string() },
+        source_type: if is_frozen {
+            "FROZEN".to_string()
+        } else {
+            "CALC".to_string()
+        },
         locked_in_plan: is_frozen,
         force_release_in_plan: false,
         violation_flags: None,
@@ -85,7 +89,7 @@ fn create_test_material_master(material_id: &str, steel_mark: Option<&str>) -> M
         due_date: None,
         stock_age_days: Some(10),
         output_age_days_raw: Some(5),
-        rolling_output_date: None,  // v0.7
+        rolling_output_date: None, // v0.7
         status_updated_at: None,
         contract_no: None,
         contract_nature: None,
@@ -1336,8 +1340,14 @@ fn test_scenario_17_batch_multi_day() {
     let material_states = HashMap::new();
     let target_ratios = HashMap::new();
 
-    let reports =
-        corrector.check_batch(pools, items_by_date, &materials, &material_states, &target_ratios, 0.15);
+    let reports = corrector.check_batch(
+        pools,
+        items_by_date,
+        &materials,
+        &material_states,
+        &target_ratios,
+        0.15,
+    );
 
     assert_eq!(reports.len(), 3);
     assert_eq!(
@@ -1388,8 +1398,14 @@ fn test_scenario_18_batch_multi_machine() {
     let material_states = HashMap::new();
     let target_ratios = HashMap::new();
 
-    let reports =
-        corrector.check_batch(pools, items_by_date, &materials, &material_states, &target_ratios, 0.15);
+    let reports = corrector.check_batch(
+        pools,
+        items_by_date,
+        &materials,
+        &material_states,
+        &target_ratios,
+        0.15,
+    );
 
     assert_eq!(reports.len(), 3);
     assert_eq!(reports[0].machine_code, "H032");

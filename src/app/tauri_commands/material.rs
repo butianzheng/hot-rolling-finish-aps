@@ -184,7 +184,11 @@ pub async fn batch_force_release(
         }
     }
 
-    emit_frontend_event(&app, "material_state_changed", serde_json::json!({ "count": material_count }));
+    emit_frontend_event(
+        &app,
+        "material_state_changed",
+        serde_json::json!({ "count": material_count }),
+    );
 
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }

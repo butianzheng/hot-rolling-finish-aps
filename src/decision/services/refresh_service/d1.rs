@@ -1,7 +1,6 @@
 use super::*;
 
 impl DecisionRefreshService {
-
     /// 刷新 D1: 哪天最危险
     pub(super) fn refresh_d1(
         &self,
@@ -32,12 +31,16 @@ impl DecisionRefreshService {
             if let Some((start_date, end_date)) = &scope.affected_date_range {
                 let start_idx = params.len() + 1;
                 let end_idx = params.len() + 2;
-                delete_conditions.push(format!("plan_date BETWEEN ?{} AND ?{}", start_idx, end_idx));
+                delete_conditions
+                    .push(format!("plan_date BETWEEN ?{} AND ?{}", start_idx, end_idx));
                 risk_conditions.push(format!(
                     "snapshot_date BETWEEN ?{} AND ?{}",
                     start_idx, end_idx
                 ));
-                cp_conditions.push(format!("cp.plan_date BETWEEN ?{} AND ?{}", start_idx, end_idx));
+                cp_conditions.push(format!(
+                    "cp.plan_date BETWEEN ?{} AND ?{}",
+                    start_idx, end_idx
+                ));
                 params.push(start_date.clone());
                 params.push(end_date.clone());
             }
@@ -203,5 +206,4 @@ impl DecisionRefreshService {
             tx.execute(&insert_sql, rusqlite::params_from_iter(params_refs.iter()))?;
         Ok(rows_affected)
     }
-
 }

@@ -11,10 +11,10 @@ mod helpers;
 mod test_helpers;
 
 use chrono::NaiveDate;
-use hot_rolling_aps::api::ValidationMode;
-use hot_rolling_aps::domain::types::SchedState;
 use helpers::api_test_helper::*;
 use helpers::test_data_builder::{MaterialBuilder, MaterialStateBuilder};
+use hot_rolling_aps::api::ValidationMode;
+use hot_rolling_aps::domain::types::SchedState;
 
 // ==========================================
 // 查询接口测试
@@ -43,33 +43,17 @@ fn test_list_materials_正常查询() {
     env.prepare_materials(materials, vec![]).unwrap();
 
     // 测试: 查询M1机组材料
-    let result = env.material_api
-        .list_materials(
-            Some("M1".to_string()),
-            None,
-            None,
-            None,
-            None,
-            None,
-            100,
-            0,
-        )
+    let result = env
+        .material_api
+        .list_materials(Some("M1".to_string()), None, None, None, None, None, 100, 0)
         .expect("查询失败");
 
     assert_eq!(result.len(), 2, "M1机组应该有2个材料");
 
     // 测试: 按机组过滤M2
-    let result = env.material_api
-        .list_materials(
-            Some("M2".to_string()),
-            None,
-            None,
-            None,
-            None,
-            None,
-            100,
-            0,
-        )
+    let result = env
+        .material_api
+        .list_materials(Some("M2".to_string()), None, None, None, None, None, 100, 0)
         .expect("查询失败");
 
     assert_eq!(result.len(), 1, "M2机组应该有1个材料");
@@ -93,17 +77,9 @@ fn test_list_materials_分页查询() {
 
     // 注意: 当前实现不支持分页，返回所有结果
     // TODO: 实现分页支持后更新此测试
-    let result = env.material_api
-        .list_materials(
-            Some("M1".to_string()),
-            None,
-            None,
-            None,
-            None,
-            None,
-            100,
-            0,
-        )
+    let result = env
+        .material_api
+        .list_materials(Some("M1".to_string()), None, None, None, None, None, 100, 0)
         .expect("查询失败");
 
     assert_eq!(result.len(), 10, "应该返回M1机组的所有10个材料");
@@ -132,7 +108,8 @@ fn test_get_material_detail_存在的材料() {
     env.prepare_materials(vec![master], vec![state]).unwrap();
 
     // 测试: 查询材料详情
-    let result = env.material_api
+    let result = env
+        .material_api
         .get_material_detail("M001")
         .expect("查询失败");
 
@@ -147,7 +124,8 @@ fn test_get_material_detail_不存在的材料() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 查询不存在的材料
-    let result = env.material_api
+    let result = env
+        .material_api
         .get_material_detail("NOT_EXIST")
         .expect("查询失败");
 
@@ -180,7 +158,8 @@ fn test_list_ready_materials_只返回Ready状态() {
     env.prepare_materials(materials, states).unwrap();
 
     // 测试: 查询Ready材料
-    let result = env.material_api
+    let result = env
+        .material_api
         .list_ready_materials(Some("M1".to_string()))
         .expect("查询失败");
 
@@ -218,7 +197,8 @@ fn test_batch_lock_materials_正常锁定() {
     env.prepare_materials(materials, states).unwrap();
 
     // 测试: 批量锁定
-    let result = env.material_api
+    let result = env
+        .material_api
         .batch_lock_materials(
             vec!["M001".to_string(), "M002".to_string()],
             true,
@@ -232,7 +212,8 @@ fn test_batch_lock_materials_正常锁定() {
     assert_eq!(result.fail_count, 0, "不应该有失败的材料");
 
     // 验证材料状态已更新
-    let state = env.material_state_repo
+    let state = env
+        .material_state_repo
         .find_by_id("M001")
         .expect("查询失败")
         .expect("材料不存在");
@@ -251,17 +232,16 @@ fn test_batch_lock_materials_解锁() {
 
     // 准备已锁定的材料
     let materials = vec![MaterialBuilder::new("M001").machine("M1").build()];
-    let states = vec![
-        MaterialStateBuilder::new("M001")
-            .sched_state(SchedState::Locked)
-            .locked()
-            .build(),
-    ];
+    let states = vec![MaterialStateBuilder::new("M001")
+        .sched_state(SchedState::Locked)
+        .locked()
+        .build()];
 
     env.prepare_materials(materials, states).unwrap();
 
     // 测试: 解锁
-    let result = env.material_api
+    let result = env
+        .material_api
         .batch_lock_materials(
             vec!["M001".to_string()],
             false,
@@ -274,7 +254,8 @@ fn test_batch_lock_materials_解锁() {
     assert_eq!(result.success_count, 1);
 
     // 验证材料状态已更新
-    let state = env.material_state_repo
+    let state = env
+        .material_state_repo
         .find_by_id("M001")
         .expect("查询失败")
         .expect("材料不存在");
@@ -289,17 +270,16 @@ fn test_batch_force_release_正常放行() {
 
     // 准备锁定的材料
     let materials = vec![MaterialBuilder::new("M001").machine("M1").build()];
-    let states = vec![
-        MaterialStateBuilder::new("M001")
-            .sched_state(SchedState::Locked)
-            .locked()
-            .build(),
-    ];
+    let states = vec![MaterialStateBuilder::new("M001")
+        .sched_state(SchedState::Locked)
+        .locked()
+        .build()];
 
     env.prepare_materials(materials, states).unwrap();
 
     // 测试: 强制放行
-    let result = env.material_api
+    let result = env
+        .material_api
         .batch_force_release(
             vec!["M001".to_string()],
             "admin",
@@ -311,7 +291,8 @@ fn test_batch_force_release_正常放行() {
     assert_eq!(result.success_count, 1);
 
     // 验证材料状态已更新
-    let state = env.material_state_repo
+    let state = env
+        .material_state_repo
         .find_by_id("M001")
         .expect("查询失败")
         .expect("材料不存在");
@@ -329,28 +310,23 @@ fn test_batch_set_urgent_设置紧急标志() {
 
     // 准备材料
     let materials = vec![MaterialBuilder::new("M001").machine("M1").build()];
-    let states = vec![
-        MaterialStateBuilder::new("M001")
-            .sched_state(SchedState::Ready)
-            .build(),
-    ];
+    let states = vec![MaterialStateBuilder::new("M001")
+        .sched_state(SchedState::Ready)
+        .build()];
 
     env.prepare_materials(materials, states).unwrap();
 
     // 测试: 设置紧急标志
-    let result = env.material_api
-        .batch_set_urgent(
-            vec!["M001".to_string()],
-            true,
-            "admin",
-            "客户紧急要求",
-        )
+    let result = env
+        .material_api
+        .batch_set_urgent(vec!["M001".to_string()], true, "admin", "客户紧急要求")
         .expect("设置失败");
 
     assert_eq!(result.success_count, 1);
 
     // 验证材料状态已更新
-    let state = env.material_state_repo
+    let state = env
+        .material_state_repo
         .find_by_id("M001")
         .expect("查询失败")
         .expect("材料不存在");
@@ -370,11 +346,8 @@ fn test_红线1_冻结区保护_不允许锁定已排产材料() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 准备已排产且在冻结区的材料
-    let (master, mut state) = create_scheduled_material(
-        "M001",
-        "M1",
-        NaiveDate::from_ymd_opt(2026, 1, 20).unwrap(),
-    );
+    let (master, mut state) =
+        create_scheduled_material("M001", "M1", NaiveDate::from_ymd_opt(2026, 1, 20).unwrap());
     state.in_frozen_zone = true;
 
     env.prepare_materials(vec![master], vec![state]).unwrap();
@@ -404,11 +377,9 @@ fn test_红线5_可解释性_空原因不允许() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     let materials = vec![MaterialBuilder::new("M001").machine("M1").build()];
-    let states = vec![
-        MaterialStateBuilder::new("M001")
-            .sched_state(SchedState::Ready)
-            .build(),
-    ];
+    let states = vec![MaterialStateBuilder::new("M001")
+        .sched_state(SchedState::Ready)
+        .build()];
 
     env.prepare_materials(materials, states).unwrap();
 
@@ -467,18 +438,11 @@ fn test_红线5_可解释性_所有写操作都有ActionLog() {
         .unwrap();
 
     env.material_api
-        .batch_set_urgent(
-            vec!["M001".to_string()],
-            true,
-            "admin",
-            "设置紧急操作",
-        )
+        .batch_set_urgent(vec!["M001".to_string()], true, "admin", "设置紧急操作")
         .unwrap();
 
     // 验证: 应该有3条ActionLog
-    let logs = env.action_log_repo
-        .find_recent(10)
-        .expect("查询失败");
+    let logs = env.action_log_repo.find_recent(10).expect("查询失败");
 
     assert!(logs.len() >= 3, "应该至少有3条ActionLog");
 
@@ -514,7 +478,8 @@ fn test_batch_lock_materials_不存在的材料() {
     let env = ApiTestEnv::new().expect("无法创建测试环境");
 
     // 测试: 锁定不存在的材料
-    let result = env.material_api
+    let result = env
+        .material_api
         .batch_lock_materials(
             vec!["NOT_EXIST".to_string()],
             true,
@@ -535,16 +500,15 @@ fn test_batch_操作_部分成功() {
 
     // 准备一个存在的材料和一个不存在的材料
     let materials = vec![MaterialBuilder::new("M001").machine("M1").build()];
-    let states = vec![
-        MaterialStateBuilder::new("M001")
-            .sched_state(SchedState::Ready)
-            .build(),
-    ];
+    let states = vec![MaterialStateBuilder::new("M001")
+        .sched_state(SchedState::Ready)
+        .build()];
 
     env.prepare_materials(materials, states).unwrap();
 
     // 测试: 批量锁定（包含存在和不存在的材料）
-    let result = env.material_api
+    let result = env
+        .material_api
         .batch_lock_materials(
             vec!["M001".to_string(), "NOT_EXIST".to_string()],
             true,

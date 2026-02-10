@@ -25,8 +25,8 @@ pub mod d6_capacity_opportunity_impl;
 
 // 重导出用例实现
 pub use d1_most_risky_day_impl::MostRiskyDayUseCaseImpl;
-pub use d4_machine_bottleneck_impl::MachineBottleneckUseCaseImpl;
 pub use d2_order_failure_impl::OrderFailureUseCaseImpl;
 pub use d3_cold_stock_impl::ColdStockUseCaseImpl;
+pub use d4_machine_bottleneck_impl::MachineBottleneckUseCaseImpl;
 pub use d5_roll_campaign_alert_impl::RollCampaignAlertUseCaseImpl;
 pub use d6_capacity_opportunity_impl::CapacityOpportunityUseCaseImpl;

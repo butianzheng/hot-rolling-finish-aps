@@ -24,11 +24,7 @@ pub async fn import_materials(
 
     let result = state
         .import_api
-        .import_materials(
-            &file_path,
-            &source_batch_id,
-            mapping_profile_id.as_deref(),
-        )
+        .import_materials(&file_path, &source_batch_id, mapping_profile_id.as_deref())
         .await
         .map_err(|e| {
             tracing::error!("[import_materials] 导入失败: {:?}", e);
@@ -204,8 +200,8 @@ pub async fn batch_resolve_import_conflicts(
     emit_frontend_event(&app, "material_state_changed", serde_json::json!({}));
 
     // 返回结果JSON
-    let response_json = serde_json::to_string(&result)
-        .map_err(|e| format!("序列化批量处理结果失败: {}", e))?;
+    let response_json =
+        serde_json::to_string(&result).map_err(|e| format!("序列化批量处理结果失败: {}", e))?;
 
     Ok(response_json)
 }
@@ -265,9 +261,8 @@ pub async fn cancel_import_batch(
     emit_frontend_event(&app, "material_state_changed", serde_json::json!({}));
 
     // 返回结果JSON
-    let response_json = serde_json::to_string(&result)
-        .map_err(|e| format!("序列化取消导入结果失败: {}", e))?;
+    let response_json =
+        serde_json::to_string(&result).map_err(|e| format!("序列化取消导入结果失败: {}", e))?;
 
     Ok(response_json)
 }
-

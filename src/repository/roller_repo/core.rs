@@ -5,9 +5,9 @@
 // 红线: Repository 不含业务逻辑
 // ==========================================
 
+use crate::db::open_sqlite_connection;
 use crate::domain::roller::RollerCampaign;
 use crate::domain::types::{AnchorSource, RollStatus};
-use crate::db::open_sqlite_connection;
 use crate::repository::error::{RepositoryError, RepositoryResult};
 use chrono::NaiveDate;
 use rusqlite::{params, Connection, OptionalExtension, Result as SqliteResult};
@@ -145,10 +145,7 @@ impl RollerCampaignRepository {
     /// # 返回
     /// - Ok(Vec<RollerCampaign>): 换辊窗口列表
     /// - Err: 数据库错误
-    pub fn find_by_version_id(
-        &self,
-        version_id: &str,
-    ) -> RepositoryResult<Vec<RollerCampaign>> {
+    pub fn find_by_version_id(&self, version_id: &str) -> RepositoryResult<Vec<RollerCampaign>> {
         let conn = self.get_conn()?;
         let mut stmt = conn.prepare(
             r#"
@@ -466,12 +463,7 @@ impl RollerCampaignRepository {
             SET end_date = ?4
             WHERE version_id = ?1 AND machine_code = ?2 AND campaign_no = ?3
             "#,
-            params![
-                version_id,
-                machine_code,
-                campaign_no,
-                end_date.to_string()
-            ],
+            params![version_id, machine_code, campaign_no, end_date.to_string()],
         )?;
         Ok(())
     }
@@ -539,19 +531,20 @@ impl RollerCampaignRepository {
             )
             .optional()?;
 
-        let (suggest_threshold_t, hard_limit_t) = if let Some((active_no, suggest_t, hard_t)) = active {
-            tx.execute(
-                r#"
+        let (suggest_threshold_t, hard_limit_t) =
+            if let Some((active_no, suggest_t, hard_t)) = active {
+                tx.execute(
+                    r#"
                 UPDATE roller_campaign
                 SET end_date = ?4
                 WHERE version_id = ?1 AND machine_code = ?2 AND campaign_no = ?3
                 "#,
-                params![version_id, machine_code, active_no, start_date.to_string()],
-            )?;
-            (suggest_t, hard_t)
-        } else {
-            (1500.0, 2500.0)
-        };
+                    params![version_id, machine_code, active_no, start_date.to_string()],
+                )?;
+                (suggest_t, hard_t)
+            } else {
+                (1500.0, 2500.0)
+            };
 
         // 2) 插入新 campaign（锚点重置）
         tx.execute(

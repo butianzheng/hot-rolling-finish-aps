@@ -8,8 +8,8 @@
 use std::sync::Arc;
 
 use crate::repository::{
-    ActionLogRepository, CapacityPoolRepository, MaterialMasterRepository,
-    MaterialStateRepository, PlanItemRepository, PlanVersionRepository,
+    ActionLogRepository, CapacityPoolRepository, MaterialMasterRepository, MaterialStateRepository,
+    PlanItemRepository, PlanVersionRepository,
 };
 
 /// 排产引擎仓储集合

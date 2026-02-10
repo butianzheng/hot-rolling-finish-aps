@@ -1,7 +1,6 @@
 use super::*;
 
 impl DecisionRefreshService {
-
     /// 刷新 D6: 是否存在产能优化空间
     pub(super) fn refresh_d6(
         &self,
@@ -14,9 +13,8 @@ impl DecisionRefreshService {
         let mut params: Vec<String> = vec![scope.version_id.clone()];
 
         if let Some(machines) = &scope.affected_machines {
-            let placeholders: Vec<String> = (0..machines.len())
-                .map(|i| format!("?{}", i + 2))
-                .collect();
+            let placeholders: Vec<String> =
+                (0..machines.len()).map(|i| format!("?{}", i + 2)).collect();
             delete_conditions.push(format!("machine_code IN ({})", placeholders.join(", ")));
             insert_conditions.push(format!("cp.machine_code IN ({})", placeholders.join(", ")));
             params.extend(machines.clone());
@@ -26,7 +24,10 @@ impl DecisionRefreshService {
             let start_idx = params.len() + 1;
             let end_idx = params.len() + 2;
             delete_conditions.push(format!("plan_date BETWEEN ?{} AND ?{}", start_idx, end_idx));
-            insert_conditions.push(format!("cp.plan_date BETWEEN ?{} AND ?{}", start_idx, end_idx));
+            insert_conditions.push(format!(
+                "cp.plan_date BETWEEN ?{} AND ?{}",
+                start_idx, end_idx
+            ));
             params.push(start_date.clone());
             params.push(end_date.clone());
         }
@@ -40,7 +41,8 @@ impl DecisionRefreshService {
         tx.execute(&delete_sql, rusqlite::params_from_iter(params_refs.iter()))?;
 
         // 2. 构建 INSERT WHERE 条件
-        insert_conditions.push("cp.used_capacity_t / NULLIF(cp.target_capacity_t, 0) < 0.9".to_string());
+        insert_conditions
+            .push("cp.used_capacity_t / NULLIF(cp.target_capacity_t, 0) < 0.9".to_string());
         let has_cp_version_id: i32 = tx.query_row(
             "SELECT COUNT(*) FROM pragma_table_info('capacity_pool') WHERE name = 'version_id'",
             [],
@@ -49,7 +51,8 @@ impl DecisionRefreshService {
         if has_cp_version_id > 0 {
             insert_conditions.push("cp.version_id = ?1".to_string());
         }
-        let insert_where_clause = format!("\n            WHERE {}", insert_conditions.join(" AND "));
+        let insert_where_clause =
+            format!("\n            WHERE {}", insert_conditions.join(" AND "));
 
         // 3. 从 capacity_pool 计算产能优化空间
         let insert_sql = format!(
@@ -96,9 +99,9 @@ impl DecisionRefreshService {
             insert_where_clause
         );
 
-        let rows_affected = tx.execute(&insert_sql, rusqlite::params_from_iter(params_refs.iter()))?;
+        let rows_affected =
+            tx.execute(&insert_sql, rusqlite::params_from_iter(params_refs.iter()))?;
 
         Ok(rows_affected)
     }
-
 }

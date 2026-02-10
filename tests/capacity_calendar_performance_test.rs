@@ -2,7 +2,6 @@
  * 产能池日历性能测试
  * 验证365天数据加载性能和批量查询优化
  */
-
 mod test_helpers;
 
 use chrono::NaiveDate;
@@ -30,7 +29,8 @@ fn test_capacity_calendar_365_days_performance() {
     conn.execute(
         "INSERT INTO plan (plan_id, plan_name, plan_type, created_by) VALUES (?, ?, ?, ?)",
         rusqlite::params!["plan1", "测试计划", "PRODUCTION", "test_user"],
-    ).unwrap();
+    )
+    .unwrap();
 
     conn.execute(
         "INSERT INTO plan_version (version_id, plan_id, version_no, status, created_by) VALUES (?, ?, ?, ?, ?)",
@@ -74,21 +74,25 @@ fn test_capacity_calendar_365_days_performance() {
 
     let end_date = start_date + chrono::Duration::days(364);
 
-    let result = capacity_repo.find_by_date_range(
-        "v1",
-        "H031",
-        start_date,
-        end_date
-    ).unwrap();
+    let result = capacity_repo
+        .find_by_date_range("v1", "H031", start_date, end_date)
+        .unwrap();
 
     let query_duration = query_start.elapsed();
 
     println!("  - 返回记录数: {}", result.len());
     println!("  - 查询耗时: {:?}", query_duration);
-    println!("  - 性能指标: {:.2} records/ms", result.len() as f64 / query_duration.as_millis() as f64);
+    println!(
+        "  - 性能指标: {:.2} records/ms",
+        result.len() as f64 / query_duration.as_millis() as f64
+    );
 
     assert_eq!(result.len(), 365, "应返回365条记录");
-    assert!(query_duration.as_secs() < 1, "365天单机组查询应在1秒内完成，实际: {:?}", query_duration);
+    assert!(
+        query_duration.as_secs() < 1,
+        "365天单机组查询应在1秒内完成，实际: {:?}",
+        query_duration
+    );
 
     // ==========================================
     // 测试2: 分批查询策略（模拟前端分批加载）
@@ -101,12 +105,9 @@ fn test_capacity_calendar_365_days_performance() {
         let batch_date_from = start_date + chrono::Duration::days(batch_idx * 90);
         let batch_date_to = start_date + chrono::Duration::days((batch_idx + 1) * 90 - 1);
 
-        let batch_result = capacity_repo.find_by_date_range(
-            "v1",
-            "H031",
-            batch_date_from,
-            batch_date_to
-        ).unwrap();
+        let batch_result = capacity_repo
+            .find_by_date_range("v1", "H031", batch_date_from, batch_date_to)
+            .unwrap();
 
         total_records += batch_result.len();
         println!("  - 批次{}: {} records", batch_idx + 1, batch_result.len());
@@ -115,9 +116,16 @@ fn test_capacity_calendar_365_days_performance() {
     let batch_duration = batch_start.elapsed();
     println!("  - 总记录数: {}", total_records);
     println!("  - 总耗时: {:?}", batch_duration);
-    println!("  - 性能指标: {:.2} records/ms", total_records as f64 / batch_duration.as_millis() as f64);
+    println!(
+        "  - 性能指标: {:.2} records/ms",
+        total_records as f64 / batch_duration.as_millis() as f64
+    );
 
-    assert!(batch_duration.as_secs() < 2, "分批查询应在2秒内完成，实际: {:?}", batch_duration);
+    assert!(
+        batch_duration.as_secs() < 2,
+        "分批查询应在2秒内完成，实际: {:?}",
+        batch_duration
+    );
 
     // ==========================================
     // 测试3: 机组配置查询性能
@@ -132,8 +140,14 @@ fn test_capacity_calendar_365_days_performance() {
         default_daily_target_t: 1200.0,
         default_daily_limit_pct: 1.05,
         effective_date: None,
-        created_at: chrono::Local::now().naive_local().format("%Y-%m-%d %H:%M:%S").to_string(),
-        updated_at: chrono::Local::now().naive_local().format("%Y-%m-%d %H:%M:%S").to_string(),
+        created_at: chrono::Local::now()
+            .naive_local()
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string(),
+        updated_at: chrono::Local::now()
+            .naive_local()
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string(),
         created_by: "test_user".to_string(),
         reason: Some("测试配置".to_string()),
     };
@@ -148,7 +162,10 @@ fn test_capacity_calendar_365_days_performance() {
     println!("  - 查询耗时: {:?}", config_query_duration);
 
     assert_eq!(configs.len(), 1);
-    assert!(config_query_duration.as_millis() < 100, "配置查询应在100ms内完成");
+    assert!(
+        config_query_duration.as_millis() < 100,
+        "配置查询应在100ms内完成"
+    );
 
     // ==========================================
     // 测试4: 多机组顺序查询
@@ -158,12 +175,9 @@ fn test_capacity_calendar_365_days_performance() {
     let mut total_multi_records = 0;
 
     for machine_code in &machine_codes {
-        let result = capacity_repo.find_by_date_range(
-            "v1",
-            machine_code,
-            start_date,
-            end_date
-        ).unwrap();
+        let result = capacity_repo
+            .find_by_date_range("v1", machine_code, start_date, end_date)
+            .unwrap();
         total_multi_records += result.len();
     }
 
@@ -171,10 +185,20 @@ fn test_capacity_calendar_365_days_performance() {
 
     println!("  - 返回记录数: {}", total_multi_records);
     println!("  - 查询耗时: {:?}", multi_query_duration);
-    println!("  - 性能指标: {:.2} records/ms", total_multi_records as f64 / multi_query_duration.as_millis() as f64);
+    println!(
+        "  - 性能指标: {:.2} records/ms",
+        total_multi_records as f64 / multi_query_duration.as_millis() as f64
+    );
 
-    assert_eq!(total_multi_records, 1095, "应返回1095条记录 (3机组 × 365天)");
-    assert!(multi_query_duration.as_secs() < 2, "多机组查询应在2秒内完成，实际: {:?}", multi_query_duration);
+    assert_eq!(
+        total_multi_records, 1095,
+        "应返回1095条记录 (3机组 × 365天)"
+    );
+    assert!(
+        multi_query_duration.as_secs() < 2,
+        "多机组查询应在2秒内完成，实际: {:?}",
+        multi_query_duration
+    );
 
     // ==========================================
     // 性能基准报告
@@ -183,7 +207,10 @@ fn test_capacity_calendar_365_days_performance() {
     println!("=====================================");
     println!("✅ 单机组365天查询: {:?} (目标: <1s)", query_duration);
     println!("✅ 分批查询(4×90天): {:?} (目标: <2s)", batch_duration);
-    println!("✅ 机组配置查询: {:?} (目标: <100ms)", config_query_duration);
+    println!(
+        "✅ 机组配置查询: {:?} (目标: <100ms)",
+        config_query_duration
+    );
     println!("✅ 多机组顺序查询: {:?} (目标: <2s)", multi_query_duration);
     println!("=====================================");
 
@@ -210,7 +237,8 @@ fn test_batch_update_performance() {
     conn.execute(
         "INSERT INTO plan (plan_id, plan_name, plan_type, created_by) VALUES (?, ?, ?, ?)",
         rusqlite::params!["plan1", "测试计划", "PRODUCTION", "test_user"],
-    ).unwrap();
+    )
+    .unwrap();
 
     conn.execute(
         "INSERT INTO plan_version (version_id, plan_id, version_no, status, created_by) VALUES (?, ?, ?, ?, ?)",
@@ -244,11 +272,14 @@ fn test_batch_update_performance() {
     let update_start = Instant::now();
 
     // 批量更新
-    let updated_pools: Vec<CapacityPool> = pools.into_iter().map(|mut p| {
-        p.target_capacity_t = 1300.0;
-        p.limit_capacity_t = 1365.0;
-        p
-    }).collect();
+    let updated_pools: Vec<CapacityPool> = pools
+        .into_iter()
+        .map(|mut p| {
+            p.target_capacity_t = 1300.0;
+            p.limit_capacity_t = 1365.0;
+            p
+        })
+        .collect();
 
     capacity_repo.upsert_batch(updated_pools).unwrap();
 
@@ -256,9 +287,16 @@ fn test_batch_update_performance() {
 
     println!("  - 更新记录数: 100");
     println!("  - 更新耗时: {:?}", update_duration);
-    println!("  - 性能指标: {:.2} updates/ms", 100.0 / update_duration.as_millis() as f64);
+    println!(
+        "  - 性能指标: {:.2} updates/ms",
+        100.0 / update_duration.as_millis() as f64
+    );
 
-    assert!(update_duration.as_millis() < 500, "批量更新100条应在500ms内完成，实际: {:?}", update_duration);
+    assert!(
+        update_duration.as_millis() < 500,
+        "批量更新100条应在500ms内完成，实际: {:?}",
+        update_duration
+    );
 
     println!("\n✅ 批量更新性能达标");
 }

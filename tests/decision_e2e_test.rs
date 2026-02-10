@@ -15,7 +15,9 @@ mod decision_e2e_test {
     use hot_rolling_aps::decision::api::dto::*;
     use hot_rolling_aps::decision::api::{DecisionApi, DecisionApiImpl};
     use hot_rolling_aps::decision::repository::*;
-    use hot_rolling_aps::decision::services::{DecisionRefreshService, RefreshScope, RefreshTrigger};
+    use hot_rolling_aps::decision::services::{
+        DecisionRefreshService, RefreshScope, RefreshTrigger,
+    };
     use hot_rolling_aps::decision::use_cases::impls::*;
     use rusqlite::Connection;
     use std::sync::{Arc, Mutex};
@@ -37,7 +39,9 @@ mod decision_e2e_test {
         Arc<DecisionRefreshService>,
     ) {
         let (temp_file, db_path) = create_test_db().unwrap();
-        let conn = Arc::new(Mutex::new(test_helpers::open_test_connection(&db_path).unwrap()));
+        let conn = Arc::new(Mutex::new(
+            test_helpers::open_test_connection(&db_path).unwrap(),
+        ));
 
         // 决策层 Repositories
         let day_summary_repo = Arc::new(DaySummaryRepository::new(conn.clone()));
@@ -53,7 +57,9 @@ mod decision_e2e_test {
         let d3_use_case = Arc::new(ColdStockUseCaseImpl::new(cold_stock_repo));
         let d4_use_case = Arc::new(MachineBottleneckUseCaseImpl::new(bottleneck_repo));
         let d5_use_case = Arc::new(RollCampaignAlertUseCaseImpl::new(roll_alert_repo));
-        let d6_use_case = Arc::new(CapacityOpportunityUseCaseImpl::new(capacity_opportunity_repo));
+        let d6_use_case = Arc::new(CapacityOpportunityUseCaseImpl::new(
+            capacity_opportunity_repo,
+        ));
 
         // 刷新服务
         let refresh_service = Arc::new(DecisionRefreshService::new(conn.clone()));
@@ -106,7 +112,11 @@ mod decision_e2e_test {
             RefreshTrigger::ManualRefresh,
             Some("e2e_test".to_string()),
         );
-        assert!(refresh_result.is_ok(), "刷新失败: {:?}", refresh_result.err());
+        assert!(
+            refresh_result.is_ok(),
+            "刷新失败: {:?}",
+            refresh_result.err()
+        );
 
         // 3. 测试 D1 API 可访问性
         let d1_request = GetDecisionDaySummaryRequest {
@@ -133,7 +143,9 @@ mod decision_e2e_test {
             limit: None,
         };
         assert!(
-            decision_api.get_machine_bottleneck_profile(d4_request).is_ok(),
+            decision_api
+                .get_machine_bottleneck_profile(d4_request)
+                .is_ok(),
             "D4 API 应该可访问"
         );
     }
@@ -191,7 +203,11 @@ mod decision_e2e_test {
             affected_date_range: None,
         };
         refresh_service
-            .refresh_all(scope, RefreshTrigger::ManualRefresh, Some("e2e_test".to_string()))
+            .refresh_all(
+                scope,
+                RefreshTrigger::ManualRefresh,
+                Some("e2e_test".to_string()),
+            )
             .unwrap();
 
         // 4. 查询最危险的日期
@@ -209,10 +225,21 @@ mod decision_e2e_test {
         // 注意: 风险分数是基于 refresh_service 的算法（HIGH=70）从 decision_day_summary 读模型表读取的
         // 而不是原始的 risk 值(85)，这是因为 P2 阶段优先从读模型表读取
         assert_eq!(response.items.len(), 3, "应该返回 3 天数据");
-        assert_eq!(response.items[0].plan_date, dates[1].to_string(), "最危险的日期应该是 2026-01-26");
-        assert!((response.items[0].risk_score - 70.0).abs() < 6.0, "最高风险分数应该接近 70.0（HIGH 映射），实际: {}", response.items[0].risk_score);
+        assert_eq!(
+            response.items[0].plan_date,
+            dates[1].to_string(),
+            "最危险的日期应该是 2026-01-26"
+        );
+        assert!(
+            (response.items[0].risk_score - 70.0).abs() < 6.0,
+            "最高风险分数应该接近 70.0（HIGH 映射），实际: {}",
+            response.items[0].risk_score
+        );
         assert_eq!(response.items[0].risk_level, "HIGH", "风险等级应该是 HIGH");
-        assert!(!response.items[0].top_reasons.is_empty(), "应该包含风险原因");
+        assert!(
+            !response.items[0].top_reasons.is_empty(),
+            "应该包含风险原因"
+        );
     }
 
     // ==========================================
@@ -303,7 +330,11 @@ mod decision_e2e_test {
             affected_date_range: None,
         };
         refresh_service
-            .refresh_all(scope, RefreshTrigger::ManualRefresh, Some("e2e_test".to_string()))
+            .refresh_all(
+                scope,
+                RefreshTrigger::ManualRefresh,
+                Some("e2e_test".to_string()),
+            )
             .unwrap();
 
         // 6. 查询机组堵塞情况
@@ -316,17 +347,32 @@ mod decision_e2e_test {
             bottleneck_type_filter: None,
             limit: Some(2),
         };
-        let response = decision_api.get_machine_bottleneck_profile(request).unwrap();
+        let response = decision_api
+            .get_machine_bottleneck_profile(request)
+            .unwrap();
 
         // 7. 验证结果
         assert_eq!(response.items.len(), 2, "应该返回 2 个机组数据");
-        assert_eq!(response.items[0].machine_code, "M01", "最堵塞的机组应该是 M01");
-        assert!(response.items[0].bottleneck_score >= 60.0, "M01 的堵塞分数应该较高，实际: {}", response.items[0].bottleneck_score);
-        assert!(
-            response.items[0].bottleneck_level == "CRITICAL" || response.items[0].bottleneck_level == "HIGH",
-            "M01 应该是 CRITICAL 或 HIGH 级别，实际: {}", response.items[0].bottleneck_level
+        assert_eq!(
+            response.items[0].machine_code, "M01",
+            "最堵塞的机组应该是 M01"
         );
-        assert!(response.items[0].capacity_util_pct >= 90.0, "M01 利用率应该 >= 90%，实际: {}", response.items[0].capacity_util_pct);
+        assert!(
+            response.items[0].bottleneck_score >= 60.0,
+            "M01 的堵塞分数应该较高，实际: {}",
+            response.items[0].bottleneck_score
+        );
+        assert!(
+            response.items[0].bottleneck_level == "CRITICAL"
+                || response.items[0].bottleneck_level == "HIGH",
+            "M01 应该是 CRITICAL 或 HIGH 级别，实际: {}",
+            response.items[0].bottleneck_level
+        );
+        assert!(
+            response.items[0].capacity_util_pct >= 90.0,
+            "M01 利用率应该 >= 90%，实际: {}",
+            response.items[0].capacity_util_pct
+        );
     }
 
     // ==========================================
@@ -486,7 +532,11 @@ mod decision_e2e_test {
             affected_date_range: None,
         };
         refresh_service
-            .refresh_all(scope, RefreshTrigger::ManualRefresh, Some("e2e_test".to_string()))
+            .refresh_all(
+                scope,
+                RefreshTrigger::ManualRefresh,
+                Some("e2e_test".to_string()),
+            )
             .unwrap();
 
         // 5. 查询订单失败情况
@@ -505,10 +555,19 @@ mod decision_e2e_test {
 
         // 6. 验证结果
         assert!(!response.items.is_empty(), "应该检测到失败订单");
-        assert_eq!(response.items[0].contract_no, "C_URGENT_001", "失败订单应该是 C_URGENT_001");
+        assert_eq!(
+            response.items[0].contract_no, "C_URGENT_001",
+            "失败订单应该是 C_URGENT_001"
+        );
         assert!(response.items[0].days_to_due < 0, "应该已经超期");
-        assert_eq!(response.items[0].fail_type, "Overdue", "失败类型应该是 Overdue");
-        assert!(response.summary.total_failures > 0, "统计应该显示失败订单数");
+        assert_eq!(
+            response.items[0].fail_type, "Overdue",
+            "失败类型应该是 Overdue"
+        );
+        assert!(
+            response.summary.total_failures > 0,
+            "统计应该显示失败订单数"
+        );
     }
 
     // ==========================================
@@ -567,7 +626,11 @@ mod decision_e2e_test {
             affected_date_range: None,
         };
         refresh_service
-            .refresh_all(scope, RefreshTrigger::ManualRefresh, Some("e2e_test".to_string()))
+            .refresh_all(
+                scope,
+                RefreshTrigger::ManualRefresh,
+                Some("e2e_test".to_string()),
+            )
             .unwrap();
 
         // 5. 查询冷料压库情况
@@ -582,8 +645,14 @@ mod decision_e2e_test {
 
         // 6. 验证结果
         assert!(!response.items.is_empty(), "应该检测到冷料压库");
-        assert!(response.summary.total_cold_stock_count > 0, "总冷料数应该大于 0");
-        assert!(response.summary.avg_age_days >= 15.0, "平均库龄应该 >= 15 天");
+        assert!(
+            response.summary.total_cold_stock_count > 0,
+            "总冷料数应该大于 0"
+        );
+        assert!(
+            response.summary.avg_age_days >= 15.0,
+            "平均库龄应该 >= 15 天"
+        );
 
         // 验证年龄分桶
         let has_15_30_bin = response.items.iter().any(|item| item.age_bin == "15-30");
@@ -694,7 +763,11 @@ mod decision_e2e_test {
             affected_date_range: None,
         };
         refresh_service
-            .refresh_all(scope, RefreshTrigger::ManualRefresh, Some("e2e_test".to_string()))
+            .refresh_all(
+                scope,
+                RefreshTrigger::ManualRefresh,
+                Some("e2e_test".to_string()),
+            )
             .unwrap();
 
         // 4. 查询换辊预警
@@ -714,11 +787,17 @@ mod decision_e2e_test {
         assert!(response.summary.total_alerts > 0, "总预警数应该大于 0");
 
         // 验证 EMERGENCY 级别预警（超过硬限制）
-        let has_emergency = response.items.iter().any(|item| item.alert_level == "EMERGENCY");
+        let has_emergency = response
+            .items
+            .iter()
+            .any(|item| item.alert_level == "EMERGENCY");
         assert!(has_emergency, "应该包含 EMERGENCY 级别预警");
 
         // 验证 WARNING 级别预警（接近建议阈值）
-        let has_warning = response.items.iter().any(|item| item.machine_code == "M01" && item.alert_level == "WARNING");
+        let has_warning = response
+            .items
+            .iter()
+            .any(|item| item.machine_code == "M01" && item.alert_level == "WARNING");
         assert!(has_warning, "应该包含 M01 的 WARNING 级别预警");
 
         // 验证超过硬限制的机组（M02）
@@ -798,7 +877,11 @@ mod decision_e2e_test {
             affected_date_range: None,
         };
         refresh_service
-            .refresh_all(scope, RefreshTrigger::ManualRefresh, Some("e2e_test".to_string()))
+            .refresh_all(
+                scope,
+                RefreshTrigger::ManualRefresh,
+                Some("e2e_test".to_string()),
+            )
             .unwrap();
 
         // 4. 查询产能优化机会
@@ -815,19 +898,30 @@ mod decision_e2e_test {
 
         // 5. 验证结果
         assert!(!response.items.is_empty(), "应该检测到产能优化机会");
-        assert!(response.summary.total_opportunities > 0, "总优化机会数应该大于 0");
+        assert!(
+            response.summary.total_opportunities > 0,
+            "总优化机会数应该大于 0"
+        );
 
         // 验证 M01 有高优化空间
-        let m01_opportunity = response.items.iter().find(|item| item.machine_code == "M01");
+        let m01_opportunity = response
+            .items
+            .iter()
+            .find(|item| item.machine_code == "M01");
         if let Some(opp) = m01_opportunity {
             assert!(opp.current_util_pct < 50.0, "M01 利用率应该 < 50%");
             assert!(opp.opportunity_space_t > 500.0, "M01 应该有较大优化空间");
         }
 
         // 验证 M03 没有或只有很少优化空间
-        let m03_opportunity = response.items.iter().find(|item| item.machine_code == "M03");
-        assert!(m03_opportunity.is_none() || m03_opportunity.unwrap().opportunity_space_t < 100.0,
-                "M03 应该没有或只有很少优化空间");
+        let m03_opportunity = response
+            .items
+            .iter()
+            .find(|item| item.machine_code == "M03");
+        assert!(
+            m03_opportunity.is_none() || m03_opportunity.unwrap().opportunity_space_t < 100.0,
+            "M03 应该没有或只有很少优化空间"
+        );
     }
 
     // ==========================================
@@ -861,8 +955,11 @@ mod decision_e2e_test {
             affected_machines: None,
             affected_date_range: None,
         };
-        let refresh_result = refresh_service
-            .refresh_all(scope, RefreshTrigger::ManualRefresh, Some("e2e_integration_test".to_string()));
+        let refresh_result = refresh_service.refresh_all(
+            scope,
+            RefreshTrigger::ManualRefresh,
+            Some("e2e_integration_test".to_string()),
+        );
 
         assert!(refresh_result.is_ok(), "完整刷新应该成功");
 
@@ -906,15 +1003,16 @@ mod decision_e2e_test {
         assert!(d3_result.is_ok(), "D3 API 应该可用");
 
         // D4
-        let d4_result = decision_api.get_machine_bottleneck_profile(GetMachineBottleneckProfileRequest {
-            version_id: version_id.to_string(),
-            date_from: "2026-01-25".to_string(),
-            date_to: "2026-01-26".to_string(),
-            machine_codes: None,
-            bottleneck_level_filter: None,
-            bottleneck_type_filter: None,
-            limit: None,
-        });
+        let d4_result =
+            decision_api.get_machine_bottleneck_profile(GetMachineBottleneckProfileRequest {
+                version_id: version_id.to_string(),
+                date_from: "2026-01-25".to_string(),
+                date_to: "2026-01-26".to_string(),
+                machine_codes: None,
+                bottleneck_level_filter: None,
+                bottleneck_type_filter: None,
+                limit: None,
+            });
         assert!(d4_result.is_ok(), "D4 API 应该可用");
 
         // D5

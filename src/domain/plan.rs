@@ -5,9 +5,9 @@
 // 依据: Engine_Specs_v0.3_Integrated.md - plan/plan_version/plan_item
 // ==========================================
 
+use crate::domain::types::PlanVersionStatus;
 use chrono::{NaiveDate, NaiveDateTime};
 use serde::{Deserialize, Serialize};
-use crate::domain::types::PlanVersionStatus;
 
 // ==========================================
 // Plan - 排产方案
@@ -29,16 +29,16 @@ pub struct Plan {
 // 用途: 沙盘模拟,历史回溯
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlanVersion {
-    pub version_id: String,                  // 版本ID
-    pub plan_id: String,                     // 关联方案
-    pub version_no: i32,                     // 版本号
-    pub status: PlanVersionStatus,           // 状态 (类型安全的枚举)
-    pub frozen_from_date: Option<NaiveDate>, // 冻结区起始日期
-    pub recalc_window_days: Option<i32>,     // 重算窗口天数
-    pub config_snapshot_json: Option<String>,// 配置快照 (JSON)
-    pub created_by: Option<String>,          // 创建人
-    pub created_at: NaiveDateTime,           // 创建时间
-    pub revision: i32,                       // 乐观锁：版本修订号
+    pub version_id: String,                   // 版本ID
+    pub plan_id: String,                      // 关联方案
+    pub version_no: i32,                      // 版本号
+    pub status: PlanVersionStatus,            // 状态 (类型安全的枚举)
+    pub frozen_from_date: Option<NaiveDate>,  // 冻结区起始日期
+    pub recalc_window_days: Option<i32>,      // 重算窗口天数
+    pub config_snapshot_json: Option<String>, // 配置快照 (JSON)
+    pub created_by: Option<String>,           // 创建人
+    pub created_at: NaiveDateTime,            // 创建时间
+    pub revision: i32,                        // 乐观锁：版本修订号
 }
 
 impl PlanVersion {
@@ -65,31 +65,31 @@ impl PlanVersion {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlanItem {
     // ===== 主键字段 (复合主键: version_id + material_id) =====
-    pub version_id: String,        // 关联版本
-    pub material_id: String,       // 材料ID
+    pub version_id: String,  // 关联版本
+    pub material_id: String, // 材料ID
 
     // ===== 排产信息 =====
-    pub machine_code: String,      // 机组代码
-    pub plan_date: NaiveDate,      // 排产日期
-    pub seq_no: i32,               // 序号 (对齐schema: seq_no)
-    pub weight_t: f64,             // 吨位
+    pub machine_code: String, // 机组代码
+    pub plan_date: NaiveDate, // 排产日期
+    pub seq_no: i32,          // 序号 (对齐schema: seq_no)
+    pub weight_t: f64,        // 吨位
 
     // ===== 来源与标志 (对齐schema) =====
-    pub source_type: String,       // 来源类型 (CALC/FROZEN/MANUAL)
-    pub locked_in_plan: bool,      // 计划中锁定 (对齐schema)
-    pub force_release_in_plan: bool, // 计划中强制放行 (对齐schema)
+    pub source_type: String,             // 来源类型 (CALC/FROZEN/MANUAL)
+    pub locked_in_plan: bool,            // 计划中锁定 (对齐schema)
+    pub force_release_in_plan: bool,     // 计划中强制放行 (对齐schema)
     pub violation_flags: Option<String>, // 违规标志 (JSON字符串, 对齐schema)
 
     // ===== 快照字段 (业务逻辑需要，但不存储在schema中) =====
     // 注: 这些字段由 API 层从 material_state / material_master 动态补充
-    pub urgent_level: Option<String>,  // 紧急等级快照 (可选，用于可解释性)
-    pub sched_state: Option<String>,   // 状态快照 (可选，用于可解释性)
+    pub urgent_level: Option<String>, // 紧急等级快照 (可选，用于可解释性)
+    pub sched_state: Option<String>,  // 状态快照 (可选，用于可解释性)
     pub assign_reason: Option<String>, // 落位原因 (可选，用于可解释性)
-    pub steel_grade: Option<String>,   // 钢种/出钢记号 (来自 material_master.steel_mark)
-    pub width_mm: Option<f64>,         // 宽度快照 (来自 material_master.width_mm)
-    pub thickness_mm: Option<f64>,     // 厚度快照 (来自 material_master.thickness_mm)
-    pub contract_no: Option<String>,   // 合同号快照
-    pub due_date: Option<String>,      // 合同交期快照 (YYYY-MM-DD)
+    pub steel_grade: Option<String>,  // 钢种/出钢记号 (来自 material_master.steel_mark)
+    pub width_mm: Option<f64>,        // 宽度快照 (来自 material_master.width_mm)
+    pub thickness_mm: Option<f64>,    // 厚度快照 (来自 material_master.thickness_mm)
+    pub contract_no: Option<String>,  // 合同号快照
+    pub due_date: Option<String>,     // 合同交期快照 (YYYY-MM-DD)
     pub scheduled_date: Option<String>, // 当前排程日期快照
     pub scheduled_machine_code: Option<String>, // 当前排程机组快照
 }

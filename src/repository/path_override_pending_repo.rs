@@ -14,8 +14,8 @@
 use std::sync::{Arc, Mutex};
 
 use chrono::NaiveDate;
-use rusqlite::{params, params_from_iter, Connection};
 use rusqlite::types::Value;
+use rusqlite::{params, params_from_iter, Connection};
 
 use crate::repository::error::{RepositoryError, RepositoryResult};
 
@@ -108,7 +108,10 @@ impl PathOverridePendingRepository {
         Ok(changed)
     }
 
-    pub fn insert_ignore_many(&self, records: &[PathOverridePendingRecord]) -> RepositoryResult<usize> {
+    pub fn insert_ignore_many(
+        &self,
+        records: &[PathOverridePendingRecord],
+    ) -> RepositoryResult<usize> {
         if records.is_empty() {
             return Ok(0);
         }
@@ -207,8 +210,13 @@ impl PathOverridePendingRepository {
         let rows = stmt
             .query_map(params_from_iter(params.iter()), |row| {
                 let date_str: String = row.get(1)?;
-                let plan_date = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(1, rusqlite::types::Type::Text, Box::new(e)))?;
+                let plan_date = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        1,
+                        rusqlite::types::Type::Text,
+                        Box::new(e),
+                    )
+                })?;
                 Ok(PathOverridePendingSummaryRow {
                     machine_code: row.get(0)?,
                     plan_date,
@@ -273,7 +281,9 @@ impl PathOverridePendingRepository {
 
         let mut stmt = conn.prepare(&sql)?;
         let ids = stmt
-            .query_map(params_from_iter(params.iter()), |row| row.get::<_, String>(0))?
+            .query_map(params_from_iter(params.iter()), |row| {
+                row.get::<_, String>(0)
+            })?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(ids)
     }
@@ -314,8 +324,14 @@ impl PathOverridePendingRepository {
         let rows = stmt
             .query_map(params![version_id, machine_code, date_str], |row| {
                 let plan_date_str: String = row.get(2)?;
-                let plan_date = NaiveDate::parse_from_str(&plan_date_str, "%Y-%m-%d")
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(2, rusqlite::types::Type::Text, Box::new(e)))?;
+                let plan_date =
+                    NaiveDate::parse_from_str(&plan_date_str, "%Y-%m-%d").map_err(|e| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            2,
+                            rusqlite::types::Type::Text,
+                            Box::new(e),
+                        )
+                    })?;
                 Ok(PathOverridePendingRecord {
                     version_id: row.get(0)?,
                     machine_code: row.get(1)?,
@@ -366,8 +382,9 @@ impl PathOverridePendingRepository {
         };
 
         let plan_date_str: String = row.get(2)?;
-        let plan_date = NaiveDate::parse_from_str(&plan_date_str, "%Y-%m-%d")
-            .map_err(|e| rusqlite::Error::FromSqlConversionFailure(2, rusqlite::types::Type::Text, Box::new(e)))?;
+        let plan_date = NaiveDate::parse_from_str(&plan_date_str, "%Y-%m-%d").map_err(|e| {
+            rusqlite::Error::FromSqlConversionFailure(2, rusqlite::types::Type::Text, Box::new(e))
+        })?;
 
         Ok(Some(PathOverridePendingRecord {
             version_id: row.get(0)?,

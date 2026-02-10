@@ -239,7 +239,10 @@ mod tests {
                         ) VALUES ('V001', 'H03{}', '2026-01-24', {}, 0.{},
                             '{}', '[]')
                     "#,
-                        i, slack_t, i * 15, level
+                        i,
+                        slack_t,
+                        i * 15,
+                        level
                     ),
                     [],
                 )
