@@ -162,9 +162,9 @@ describe('EventBus', () => {
       const handler2 = vi.fn();
       const handler3 = vi.fn();
 
-      const unlisten1 = await EventBus.subscribe('test_event', handler1);
+      const _unlisten1 = await EventBus.subscribe('test_event', handler1);
       const unlisten2 = await EventBus.subscribe('test_event', handler2);
-      const unlisten3 = await EventBus.subscribe('test_event', handler3);
+      const _unlisten3 = await EventBus.subscribe('test_event', handler3);
 
       // 移除中间的监听器
       unlisten2();
