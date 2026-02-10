@@ -1,0 +1,168 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（如 v1.1.0）'
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  create-release:
+    name: 创建 Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: 获取版本号
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 创建 Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          release_name: 热轧精整排产系统 ${{ steps.get_version.outputs.version }}
+          body: |
+            ## 🎉 热轧精整排产系统 ${{ steps.get_version.outputs.version }}
+
+            ### 📦 安装包下载
+
+            请根据您的操作系统选择对应的安装包：
+
+            - **Windows**: `.exe` 或 `.msi` 文件
+            - **macOS**: `.dmg` 文件
+            - **Linux**: `.AppImage` 或 `.deb` 文件
+
+            ### 📝 更新内容
+
+            详见 [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+
+            ### ⚠️ 注意事项
+
+            - 首次安装请参考 [README.md](https://github.com/${{ github.repository }}/blob/main/README.md)
+            - 升级前请备份数据库文件
+
+            ---
+
+            **完整更新日志**: https://github.com/${{ github.repository }}/compare/v1.0.0...${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: false
+
+  build-tauri:
+    name: 构建 ${{ matrix.platform }}
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            args: '--target universal-apple-darwin'
+            rust_target: 'universal-apple-darwin'
+          - platform: 'ubuntu-22.04'
+            args: ''
+            rust_target: 'x86_64-unknown-linux-gnu'
+          - platform: 'windows-latest'
+            args: ''
+            rust_target: 'x86_64-pc-windows-msvc'
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: 安装 Linux 依赖
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Rust 缓存
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: 安装前端依赖
+        run: npm ci
+
+      - name: 运行前端测试
+        run: npm run test -- --run
+
+      - name: 构建 Tauri 应用
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          releaseId: ${{ needs.create-release.outputs.id }}
+          args: ${{ matrix.args }}
+
+      - name: 上传构建产物（macOS）
+        if: matrix.platform == 'macos-latest'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./target/universal-apple-darwin/release/bundle/dmg/热轧精整排产系统_${{ needs.create-release.outputs.version }}_universal.dmg
+          asset_name: hot-rolling-aps_${{ needs.create-release.outputs.version }}_macos_universal.dmg
+          asset_content_type: application/octet-stream
+
+      - name: 上传构建产物（Windows）
+        if: matrix.platform == 'windows-latest'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./target/release/bundle/nsis/热轧精整排产系统_${{ needs.create-release.outputs.version }}_x64-setup.exe
+          asset_name: hot-rolling-aps_${{ needs.create-release.outputs.version }}_windows_x64-setup.exe
+          asset_content_type: application/octet-stream
+
+      - name: 上传构建产物（Linux AppImage）
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./target/release/bundle/appimage/hot-rolling-aps_${{ needs.create-release.outputs.version }}_amd64.AppImage
+          asset_name: hot-rolling-aps_${{ needs.create-release.outputs.version }}_linux_amd64.AppImage
+          asset_content_type: application/octet-stream
+
+      - name: 上传构建产物（Linux deb）
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./target/release/bundle/deb/hot-rolling-aps_${{ needs.create-release.outputs.version }}_amd64.deb
+          asset_name: hot-rolling-aps_${{ needs.create-release.outputs.version }}_linux_amd64.deb
+          asset_content_type: application/octet-stream

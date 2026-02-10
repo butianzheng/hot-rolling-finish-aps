@@ -4,10 +4,23 @@
 
 ## [未发布]
 
+### 基础设施
+- 添加 GitHub Actions 自动化部署配置
+  - 多平台构建发布工作流（Windows、macOS、Linux）
+  - PR 构建测试工作流
+  - 自动创建 GitHub Release 并上传安装包
+- 添加应用图标（512x512 占位图标）
+- 添加完整的发布流程文档
+
 ### 测试改进
 - 补充 `src/types/strategy.ts` 工具函数的完整测试覆盖
 - `src/types` 目录测试覆盖率达到 100%
 - 新增 `src/types/strategy.test.ts` 测试文件，包含 normalizeStrategyKey、getStrategyLabelByKey 和 BUILTIN_STRATEGY_OPTIONS 的全面测试
+
+### 文档
+- 新增 [DEPLOYMENT_SETUP.md](DEPLOYMENT_SETUP.md) - 部署配置快速开始指南
+- 新增 [docs/guides/RELEASE_GUIDE.md](docs/guides/RELEASE_GUIDE.md) - 完整发布流程文档
+- 新增 [icons/ICON_GUIDE.md](icons/ICON_GUIDE.md) - 图标准备指南
 
 ## [v1.1.0] - 2026-01-31
 
