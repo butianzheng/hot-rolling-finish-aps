@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1770693809115" clover="3.2.0">
-  <project timestamp="1770693809115" name="All files">
-    <metrics statements="1451" coveredstatements="858" conditionals="1434" coveredconditionals="726" methods="424" coveredmethods="205" elements="3309" coveredelements="1789" complexity="0" loc="1451" ncloc="1451" packages="19" files="61" classes="61"/>
+<coverage generated="1770695332391" clover="3.2.0">
+  <project timestamp="1770695332391" name="All files">
+    <metrics statements="1451" coveredstatements="880" conditionals="1434" coveredconditionals="754" methods="424" coveredmethods="209" elements="3309" coveredelements="1843" complexity="0" loc="1451" ncloc="1451" packages="19" files="61" classes="61"/>
     <package name="src">
       <metrics statements="140" coveredstatements="14" conditionals="132" coveredconditionals="14" methods="33" coveredmethods="1"/>
       <file name="App.tsx" path="/Users/butianzheng/Documents/trae_projects/hot-rolling-finish-aps/src/App.tsx">
@@ -260,13 +260,13 @@
       </file>
     </package>
     <package name="src.components">
-      <metrics statements="128" coveredstatements="42" conditionals="129" coveredconditionals="17" methods="31" coveredmethods="12"/>
+      <metrics statements="128" coveredstatements="51" conditionals="129" coveredconditionals="31" methods="31" coveredmethods="15"/>
       <file name="AdminOverrideToggle.tsx" path="/Users/butianzheng/Documents/trae_projects/hot-rolling-finish-aps/src/components/AdminOverrideToggle.tsx">
-        <metrics statements="4" coveredstatements="1" conditionals="6" coveredconditionals="0" methods="1" coveredmethods="0"/>
-        <line num="13" count="1" type="stmt"/>
-        <line num="14" count="0" type="stmt"/>
-        <line num="15" count="0" type="stmt"/>
-        <line num="17" count="0" type="stmt"/>
+        <metrics statements="4" coveredstatements="4" conditionals="6" coveredconditionals="6" methods="1" coveredmethods="1"/>
+        <line num="13" count="2" type="stmt"/>
+        <line num="14" count="5" type="stmt"/>
+        <line num="15" count="5" type="stmt"/>
+        <line num="17" count="5" type="stmt"/>
       </file>
       <file name="CustomEmpty.tsx" path="/Users/butianzheng/Documents/trae_projects/hot-rolling-finish-aps/src/components/CustomEmpty.tsx">
         <metrics statements="6" coveredstatements="6" conditionals="1" coveredconditionals="1" methods="1" coveredmethods="1"/>
@@ -388,14 +388,14 @@
         <line num="5" count="5" type="stmt"/>
       </file>
       <file name="ThemeToggle.tsx" path="/Users/butianzheng/Documents/trae_projects/hot-rolling-finish-aps/src/components/ThemeToggle.tsx">
-        <metrics statements="7" coveredstatements="1" conditionals="8" coveredconditionals="0" methods="2" coveredmethods="0"/>
-        <line num="13" count="1" type="stmt"/>
-        <line num="14" count="0" type="stmt"/>
-        <line num="15" count="0" type="stmt"/>
-        <line num="17" count="0" type="stmt"/>
-        <line num="23" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="24" count="0" type="stmt"/>
-        <line num="25" count="0" type="stmt"/>
+        <metrics statements="7" coveredstatements="7" conditionals="8" coveredconditionals="8" methods="2" coveredmethods="2"/>
+        <line num="13" count="2" type="stmt"/>
+        <line num="14" count="4" type="stmt"/>
+        <line num="15" count="4" type="stmt"/>
+        <line num="17" count="4" type="stmt"/>
+        <line num="23" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="24" count="2" type="stmt"/>
+        <line num="25" count="2" type="stmt"/>
       </file>
       <file name="UrgencyTag.tsx" path="/Users/butianzheng/Documents/trae_projects/hot-rolling-finish-aps/src/components/UrgencyTag.tsx">
         <metrics statements="8" coveredstatements="8" conditionals="4" coveredconditionals="4" methods="3" coveredmethods="3"/>
@@ -1188,41 +1188,41 @@
       </file>
     </package>
     <package name="src.services">
-      <metrics statements="57" coveredstatements="43" conditionals="48" coveredconditionals="22" methods="9" coveredmethods="7"/>
+      <metrics statements="57" coveredstatements="56" conditionals="48" coveredconditionals="35" methods="9" coveredmethods="8"/>
       <file name="frontendRuntimeConfig.ts" path="/Users/butianzheng/Documents/trae_projects/hot-rolling-finish-aps/src/services/frontendRuntimeConfig.ts">
-        <metrics statements="14" coveredstatements="1" conditionals="14" coveredconditionals="0" methods="1" coveredmethods="0"/>
-        <line num="8" count="1" type="stmt"/>
-        <line num="14" count="0" type="stmt"/>
-        <line num="15" count="0" type="stmt"/>
-        <line num="16" count="0" type="stmt"/>
-        <line num="18" count="0" type="stmt"/>
-        <line num="19" count="0" type="cond" truecount="0" falsecount="4"/>
-        <line num="20" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="21" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="22" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="25" count="0" type="stmt"/>
-        <line num="28" count="0" type="stmt"/>
-        <line num="33" count="0" type="stmt"/>
-        <line num="34" count="0" type="stmt"/>
-        <line num="35" count="0" type="stmt"/>
+        <metrics statements="14" coveredstatements="14" conditionals="14" coveredconditionals="13" methods="1" coveredmethods="1"/>
+        <line num="8" count="2" type="stmt"/>
+        <line num="14" count="7" type="stmt"/>
+        <line num="15" count="7" type="stmt"/>
+        <line num="16" count="6" type="stmt"/>
+        <line num="18" count="6" type="stmt"/>
+        <line num="19" count="9" type="cond" truecount="3" falsecount="1"/>
+        <line num="20" count="8" type="cond" truecount="2" falsecount="0"/>
+        <line num="21" count="9" type="cond" truecount="2" falsecount="0"/>
+        <line num="22" count="6" type="cond" truecount="2" falsecount="0"/>
+        <line num="25" count="6" type="stmt"/>
+        <line num="28" count="7" type="stmt"/>
+        <line num="33" count="1" type="stmt"/>
+        <line num="34" count="1" type="stmt"/>
+        <line num="35" count="1" type="stmt"/>
       </file>
       <file name="stalePlanRev.ts" path="/Users/butianzheng/Documents/trae_projects/hot-rolling-finish-aps/src/services/stalePlanRev.ts">
         <metrics statements="43" coveredstatements="42" conditionals="34" coveredconditionals="22" methods="8" coveredmethods="7"/>
-        <line num="3" count="2" type="stmt"/>
-        <line num="27" count="2" type="stmt"/>
-        <line num="28" count="2" type="stmt"/>
-        <line num="30" count="2" type="stmt"/>
-        <line num="31" count="2" type="stmt"/>
-        <line num="32" count="2" type="stmt"/>
-        <line num="33" count="2" type="stmt"/>
-        <line num="36" count="7" type="stmt"/>
-        <line num="37" count="7" type="cond" truecount="1" falsecount="1"/>
-        <line num="39" count="7" type="stmt"/>
-        <line num="40" count="7" type="cond" truecount="1" falsecount="1"/>
-        <line num="41" count="7" type="cond" truecount="1" falsecount="1"/>
-        <line num="42" count="7" type="stmt"/>
-        <line num="46" count="7" type="stmt"/>
-        <line num="47" count="7" type="stmt"/>
+        <line num="3" count="3" type="stmt"/>
+        <line num="27" count="3" type="stmt"/>
+        <line num="28" count="3" type="stmt"/>
+        <line num="30" count="3" type="stmt"/>
+        <line num="31" count="3" type="stmt"/>
+        <line num="32" count="3" type="stmt"/>
+        <line num="33" count="3" type="stmt"/>
+        <line num="36" count="14" type="stmt"/>
+        <line num="37" count="14" type="cond" truecount="1" falsecount="1"/>
+        <line num="39" count="14" type="stmt"/>
+        <line num="40" count="14" type="cond" truecount="1" falsecount="1"/>
+        <line num="41" count="14" type="cond" truecount="1" falsecount="1"/>
+        <line num="42" count="14" type="stmt"/>
+        <line num="46" count="14" type="stmt"/>
+        <line num="47" count="14" type="stmt"/>
         <line num="51" count="0" type="stmt"/>
         <line num="57" count="12" type="stmt"/>
         <line num="61" count="11" type="cond" truecount="3" falsecount="1"/>
@@ -1254,21 +1254,21 @@
       </file>
     </package>
     <package name="src.stores">
-      <metrics statements="110" coveredstatements="73" conditionals="119" coveredconditionals="73" methods="67" coveredmethods="27"/>
+      <metrics statements="110" coveredstatements="73" conditionals="119" coveredconditionals="74" methods="67" coveredmethods="27"/>
       <file name="latestRun.ts" path="/Users/butianzheng/Documents/trae_projects/hot-rolling-finish-aps/src/stores/latestRun.ts">
-        <metrics statements="38" coveredstatements="35" conditionals="76" coveredconditionals="58" methods="10" coveredmethods="9"/>
-        <line num="1" count="4" type="stmt"/>
-        <line num="3" count="4" type="stmt"/>
-        <line num="4" count="4" type="stmt"/>
-        <line num="6" count="4" type="stmt"/>
-        <line num="9" count="2" type="stmt"/>
-        <line num="10" count="2" type="cond" truecount="1" falsecount="1"/>
-        <line num="12" count="2" type="stmt"/>
-        <line num="13" count="2" type="cond" truecount="1" falsecount="1"/>
-        <line num="14" count="2" type="cond" truecount="1" falsecount="1"/>
-        <line num="15" count="2" type="stmt"/>
-        <line num="19" count="2" type="stmt"/>
-        <line num="20" count="2" type="stmt"/>
+        <metrics statements="38" coveredstatements="35" conditionals="76" coveredconditionals="59" methods="10" coveredmethods="9"/>
+        <line num="1" count="5" type="stmt"/>
+        <line num="3" count="5" type="stmt"/>
+        <line num="4" count="5" type="stmt"/>
+        <line num="6" count="5" type="stmt"/>
+        <line num="9" count="9" type="stmt"/>
+        <line num="10" count="9" type="cond" truecount="1" falsecount="1"/>
+        <line num="12" count="9" type="stmt"/>
+        <line num="13" count="9" type="cond" truecount="2" falsecount="0"/>
+        <line num="14" count="8" type="cond" truecount="1" falsecount="1"/>
+        <line num="15" count="8" type="stmt"/>
+        <line num="19" count="9" type="stmt"/>
+        <line num="20" count="9" type="stmt"/>
         <line num="24" count="1" type="stmt"/>
         <line num="54" count="8" type="stmt"/>
         <line num="67" count="17" type="cond" truecount="2" falsecount="0"/>

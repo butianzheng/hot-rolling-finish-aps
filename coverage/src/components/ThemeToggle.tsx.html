@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">14.28% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>1/7</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/8</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">14.28% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>1/7</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -109,19 +109,19 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -143,19 +143,19 @@ import { BulbOutlined, BulbFilled } from '@ant-design/icons';
 import { useTheme } from '../theme';
 import { useGlobalActions } from '../stores/use-global-store';
 &nbsp;
-export const ThemeToggle: React.FC = <span class="fstat-no" title="function not covered" >() =&gt; {</span>
-  const { theme, toggleTheme <span class="cstat-no" title="statement not covered" >} = useTheme();</span>
-  const { updateUserPreferences <span class="cstat-no" title="statement not covered" >} = useGlobalActions();</span>
+export const ThemeToggle: React.FC = () =&gt; {
+  const { theme, toggleTheme } = useTheme();
+  const { updateUserPreferences } = useGlobalActions();
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  return (</span>
+  return (
     &lt;Tooltip title={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}&gt;
       &lt;Button
         type="text"
         icon={theme === 'dark' ? &lt;BulbOutlined /&gt; : &lt;BulbFilled /&gt;}
-        onClick={<span class="fstat-no" title="function not covered" >() =&gt; {</span>
-          const nextTheme = <span class="cstat-no" title="statement not covered" >theme === 'dark' ? 'light' : 'dark';</span>
-<span class="cstat-no" title="statement not covered" >          toggleTheme();</span>
-<span class="cstat-no" title="statement not covered" >          updateUserPreferences({ defaultTheme: nextTheme });</span>
+        onClick={() =&gt; {
+          const nextTheme = theme === 'dark' ? 'light' : 'dark';
+          toggleTheme();
+          updateUserPreferences({ defaultTheme: nextTheme });
         }}
         style={{
           color: theme === 'dark' ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.85)',
@@ -172,7 +172,7 @@ export const ThemeToggle: React.FC = <span class="fstat-no" title="function not 
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-02-10T03:23:29.084Z
+                at 2026-02-10T03:48:52.359Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

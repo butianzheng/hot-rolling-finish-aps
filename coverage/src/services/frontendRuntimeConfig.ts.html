@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">6.25% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>1/16</span>
+                <span class='fraction'>16/16</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">92.85% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/14</span>
+                <span class='fraction'>13/14</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/1</span>
+                <span class='fraction'>1/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">7.14% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>1/14</span>
+                <span class='fraction'>14/14</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -108,34 +108,34 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -151,29 +151,29 @@ const FRONTEND_CONFIG_KEYS = {
   stalePlanRevToastCooldownMs: 'stale_plan_rev_toast_cooldown_ms',
 } as const;
 &nbsp;
-export async function <span class="fstat-no" title="function not covered" >bootstrapFrontendRuntimeConfig(): Promise&lt;void&gt; {</span>
-<span class="cstat-no" title="statement not covered" >  try {</span>
-    const configs = <span class="cstat-no" title="statement not covered" >await configApi.listConfigs();</span>
-    const globalMap = <span class="cstat-no" title="statement not covered" >new Map&lt;string, string&gt;();</span>
+export async function bootstrapFrontendRuntimeConfig(): Promise&lt;void&gt; {
+  try {
+    const configs = await configApi.listConfigs();
+    const globalMap = new Map&lt;string, string&gt;();
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    for (const item of configs) {</span>
-<span class="cstat-no" title="statement not covered" >      if (String(item.scope_id || '').trim() !== 'global') <span class="cstat-no" title="statement not covered" >continue;</span></span>
-      const key = <span class="cstat-no" title="statement not covered" >String(item.key || '').trim();</span>
-<span class="cstat-no" title="statement not covered" >      if (!key) <span class="cstat-no" title="statement not covered" >continue;</span></span>
-<span class="cstat-no" title="statement not covered" >      globalMap.set(key, String(item.value ?? '').trim());</span>
+    for (const item of configs) {
+      if (String(item.scope_id || <span class="branch-1 cbranch-no" title="branch not covered" >'')</span>.trim() !== 'global') continue;
+      const key = String(item.key || '').trim();
+      if (!key) continue;
+      globalMap.set(key, String(item.value ?? '').trim());
     }
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    configureLatestRunTtlMs(</span>
+    configureLatestRunTtlMs(
       globalMap.get(FRONTEND_CONFIG_KEYS.latestRunTtlMs) ?? DEFAULT_LATEST_RUN_TTL_MS,
     );
-<span class="cstat-no" title="statement not covered" >    configureStalePlanRevToastCooldownMs(</span>
+    configureStalePlanRevToastCooldownMs(
       globalMap.get(FRONTEND_CONFIG_KEYS.stalePlanRevToastCooldownMs)
         ?? DEFAULT_STALE_PLAN_REV_TOAST_COOLDOWN_MS,
     );
   } catch (error) {
-<span class="cstat-no" title="statement not covered" >    console.warn('前端运行治理配置加载失败，使用默认值:', error);</span>
-<span class="cstat-no" title="statement not covered" >    configureLatestRunTtlMs(DEFAULT_LATEST_RUN_TTL_MS);</span>
-<span class="cstat-no" title="statement not covered" >    configureStalePlanRevToastCooldownMs(DEFAULT_STALE_PLAN_REV_TOAST_COOLDOWN_MS);</span>
+    console.warn('前端运行治理配置加载失败，使用默认值:', error);
+    configureLatestRunTtlMs(DEFAULT_LATEST_RUN_TTL_MS);
+    configureStalePlanRevToastCooldownMs(DEFAULT_STALE_PLAN_REV_TOAST_COOLDOWN_MS);
   }
 }
 &nbsp;
@@ -184,7 +184,7 @@ export async function <span class="fstat-no" title="function not covered" >boots
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-02-10T03:23:29.084Z
+                at 2026-02-10T03:48:52.359Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
