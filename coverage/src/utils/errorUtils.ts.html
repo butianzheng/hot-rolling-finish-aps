@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/11</span>
+                <span class='fraction'>11/11</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/11</span>
+                <span class='fraction'>11/11</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/3</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/11</span>
+                <span class='fraction'>11/11</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -128,27 +128,25 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -159,14 +157,16 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -181,17 +181,17 @@
  * @param error - 捕获的错误（类型为 unknown）
  * @returns 错误消息字符串
  */
-export function <span class="fstat-no" title="function not covered" >getErrorMessage(e</span>rror: unknown): string {
-<span class="cstat-no" title="statement not covered" >  if (error instanceof Error) {</span>
-<span class="cstat-no" title="statement not covered" >    return error.message;</span>
+export function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
   }
-<span class="cstat-no" title="statement not covered" >  if (typeof error === 'string') {</span>
-<span class="cstat-no" title="statement not covered" >    return error;</span>
+  if (typeof error === 'string') {
+    return error;
   }
-<span class="cstat-no" title="statement not covered" >  if (error &amp;&amp; typeof error === 'object' &amp;&amp; 'message' in error) {</span>
-<span class="cstat-no" title="statement not covered" >    return String((error as { message: unknown }).message);</span>
+  if (error &amp;&amp; typeof error === 'object' &amp;&amp; 'message' in error) {
+    return String((error as { message: unknown }).message);
   }
-<span class="cstat-no" title="statement not covered" >  return String(error);</span>
+  return String(error);
 }
 &nbsp;
 /**
@@ -199,8 +199,8 @@ export function <span class="fstat-no" title="function not covered" >getErrorMes
  * @param error - 捕获的错误
  * @returns 是否为 Error 实例
  */
-export function <span class="fstat-no" title="function not covered" >isError(e</span>rror: unknown): error is Error {
-<span class="cstat-no" title="statement not covered" >  return error instanceof Error;</span>
+export function isError(error: unknown): error is Error {
+  return error instanceof Error;
 }
 &nbsp;
 /**
@@ -208,19 +208,19 @@ export function <span class="fstat-no" title="function not covered" >isError(e</
  * @param error - 捕获的错误
  * @returns 包含 name、message、stack 的对象
  */
-export function <span class="fstat-no" title="function not covered" >normalizeError(e</span>rror: unknown): {
+export function normalizeError(error: unknown): {
   name: string;
   message: string;
   stack?: string;
 } {
-<span class="cstat-no" title="statement not covered" >  if (error instanceof Error) {</span>
-<span class="cstat-no" title="statement not covered" >    return {</span>
+  if (error instanceof Error) {
+    return {
       name: error.name,
       message: error.message,
       stack: error.stack,
     };
   }
-<span class="cstat-no" title="statement not covered" >  return {</span>
+  return {
     name: 'UnknownError',
     message: getErrorMessage(error),
   };
@@ -232,7 +232,7 @@ export function <span class="fstat-no" title="function not covered" >normalizeEr
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-02-10T01:42:21.261Z
+                at 2026-02-10T03:00:59.285Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
