@@ -55,9 +55,12 @@ impl EligibilityCore {
     ///
     /// # 示例
     /// ```
+    /// use hot_rolling_aps::engine::EligibilityCore;
+    /// use chrono::NaiveDate;
+    ///
     /// // 产出日期 2025-01-13，今天 2025-01-20 → 7天
-    /// let output_date = chrono::NaiveDate::from_ymd_opt(2025, 1, 13).unwrap();
-    /// let today = chrono::NaiveDate::from_ymd_opt(2025, 1, 20).unwrap();
+    /// let output_date = NaiveDate::from_ymd_opt(2025, 1, 13).unwrap();
+    /// let today = NaiveDate::from_ymd_opt(2025, 1, 20).unwrap();
     /// let age_days = EligibilityCore::calculate_actual_output_age_days(
     ///     Some(output_date),
     ///     today,
