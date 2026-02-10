@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1770692799091" clover="3.2.0">
-  <project timestamp="1770692799091" name="All files">
-    <metrics statements="1451" coveredstatements="821" conditionals="1434" coveredconditionals="694" methods="424" coveredmethods="190" elements="3309" coveredelements="1705" complexity="0" loc="1451" ncloc="1451" packages="19" files="61" classes="61"/>
+<coverage generated="1770693809115" clover="3.2.0">
+  <project timestamp="1770693809115" name="All files">
+    <metrics statements="1451" coveredstatements="858" conditionals="1434" coveredconditionals="726" methods="424" coveredmethods="205" elements="3309" coveredelements="1789" complexity="0" loc="1451" ncloc="1451" packages="19" files="61" classes="61"/>
     <package name="src">
       <metrics statements="140" coveredstatements="14" conditionals="132" coveredconditionals="14" methods="33" coveredmethods="1"/>
       <file name="App.tsx" path="/Users/butianzheng/Documents/trae_projects/hot-rolling-finish-aps/src/App.tsx">
@@ -767,7 +767,7 @@
       </file>
     </package>
     <package name="src.hooks">
-      <metrics statements="107" coveredstatements="18" conditionals="113" coveredconditionals="11" methods="25" coveredmethods="6"/>
+      <metrics statements="107" coveredstatements="30" conditionals="113" coveredconditionals="13" methods="25" coveredmethods="12"/>
       <file name="useDecisionRefreshStatus.ts" path="/Users/butianzheng/Documents/trae_projects/hot-rolling-finish-aps/src/hooks/useDecisionRefreshStatus.ts">
         <metrics statements="28" coveredstatements="0" conditionals="37" coveredconditionals="0" methods="4" coveredmethods="0"/>
         <line num="52" count="0" type="stmt"/>
@@ -837,19 +837,19 @@
         <line num="77" count="0" type="stmt"/>
       </file>
       <file name="useOnlineStatus.ts" path="/Users/butianzheng/Documents/trae_projects/hot-rolling-finish-aps/src/hooks/useOnlineStatus.ts">
-        <metrics statements="12" coveredstatements="0" conditionals="2" coveredconditionals="0" methods="6" coveredmethods="0"/>
-        <line num="4" count="0" type="stmt"/>
-        <line num="5" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="6" count="0" type="stmt"/>
-        <line num="9" count="0" type="stmt"/>
-        <line num="10" count="0" type="stmt"/>
-        <line num="11" count="0" type="stmt"/>
-        <line num="13" count="0" type="stmt"/>
-        <line num="14" count="0" type="stmt"/>
-        <line num="16" count="0" type="stmt"/>
-        <line num="17" count="0" type="stmt"/>
-        <line num="18" count="0" type="stmt"/>
-        <line num="22" count="0" type="stmt"/>
+        <metrics statements="12" coveredstatements="12" conditionals="2" coveredconditionals="2" methods="6" coveredmethods="6"/>
+        <line num="4" count="8" type="stmt"/>
+        <line num="5" count="6" type="cond" truecount="2" falsecount="0"/>
+        <line num="6" count="5" type="stmt"/>
+        <line num="9" count="8" type="stmt"/>
+        <line num="10" count="6" type="stmt"/>
+        <line num="11" count="6" type="stmt"/>
+        <line num="13" count="6" type="stmt"/>
+        <line num="14" count="6" type="stmt"/>
+        <line num="16" count="6" type="stmt"/>
+        <line num="17" count="6" type="stmt"/>
+        <line num="18" count="6" type="stmt"/>
+        <line num="22" count="8" type="stmt"/>
       </file>
       <file name="useStalePlanRevBootstrap.ts" path="/Users/butianzheng/Documents/trae_projects/hot-rolling-finish-aps/src/hooks/useStalePlanRevBootstrap.ts">
         <metrics statements="19" coveredstatements="18" conditionals="14" coveredconditionals="11" methods="6" coveredmethods="6"/>
@@ -1454,7 +1454,7 @@
       </file>
     </package>
     <package name="src.types.decision">
-      <metrics statements="87" coveredstatements="21" conditionals="53" coveredconditionals="0" methods="43" coveredmethods="0"/>
+      <metrics statements="87" coveredstatements="46" conditionals="53" coveredconditionals="30" methods="43" coveredmethods="9"/>
       <file name="d1-day-summary.ts" path="/Users/butianzheng/Documents/trae_projects/hot-rolling-finish-aps/src/types/decision/d1-day-summary.ts">
         <metrics statements="6" coveredstatements="2" conditionals="2" coveredconditionals="0" methods="4" coveredmethods="0"/>
         <line num="121" count="1" type="stmt"/>
@@ -1526,39 +1526,39 @@
         <line num="241" count="0" type="stmt"/>
       </file>
       <file name="d5-roll-campaign.ts" path="/Users/butianzheng/Documents/trae_projects/hot-rolling-finish-aps/src/types/decision/d5-roll-campaign.ts">
-        <metrics statements="21" coveredstatements="2" conditionals="24" coveredconditionals="0" methods="6" coveredmethods="0"/>
-        <line num="160" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="164" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="165" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="166" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="167" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="170" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="171" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="172" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="175" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="176" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="177" count="0" type="stmt"/>
-        <line num="188" count="0" type="stmt"/>
-        <line num="195" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="201" count="1" type="stmt"/>
-        <line num="212" count="0" type="stmt"/>
-        <line num="213" count="0" type="stmt"/>
-        <line num="219" count="1" type="stmt"/>
-        <line num="230" count="0" type="stmt"/>
-        <line num="231" count="0" type="stmt"/>
-        <line num="241" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="242" count="0" type="stmt"/>
+        <metrics statements="21" coveredstatements="21" conditionals="24" coveredconditionals="24" methods="6" coveredmethods="6"/>
+        <line num="160" count="27" type="cond" truecount="2" falsecount="0"/>
+        <line num="164" count="27" type="cond" truecount="2" falsecount="0"/>
+        <line num="165" count="23" type="cond" truecount="2" falsecount="0"/>
+        <line num="166" count="19" type="cond" truecount="2" falsecount="0"/>
+        <line num="167" count="15" type="cond" truecount="2" falsecount="0"/>
+        <line num="170" count="12" type="cond" truecount="2" falsecount="0"/>
+        <line num="171" count="11" type="cond" truecount="2" falsecount="0"/>
+        <line num="172" count="10" type="cond" truecount="2" falsecount="0"/>
+        <line num="175" count="9" type="cond" truecount="2" falsecount="0"/>
+        <line num="176" count="8" type="cond" truecount="2" falsecount="0"/>
+        <line num="177" count="7" type="stmt"/>
+        <line num="188" count="4" type="stmt"/>
+        <line num="195" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="201" count="2" type="stmt"/>
+        <line num="212" count="5" type="stmt"/>
+        <line num="213" count="5" type="stmt"/>
+        <line num="219" count="2" type="stmt"/>
+        <line num="230" count="5" type="stmt"/>
+        <line num="231" count="5" type="stmt"/>
+        <line num="241" count="10" type="cond" truecount="2" falsecount="0"/>
+        <line num="242" count="8" type="stmt"/>
       </file>
       <file name="d6-capacity-opportunity.ts" path="/Users/butianzheng/Documents/trae_projects/hot-rolling-finish-aps/src/types/decision/d6-capacity-opportunity.ts">
-        <metrics statements="8" coveredstatements="2" conditionals="6" coveredconditionals="0" methods="3" coveredmethods="0"/>
-        <line num="181" count="0" type="stmt"/>
-        <line num="188" count="0" type="stmt"/>
-        <line num="194" count="1" type="stmt"/>
-        <line num="205" count="1" type="stmt"/>
-        <line num="217" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="218" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="219" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="220" count="0" type="stmt"/>
+        <metrics statements="8" coveredstatements="8" conditionals="6" coveredconditionals="6" methods="3" coveredmethods="3"/>
+        <line num="181" count="9" type="stmt"/>
+        <line num="188" count="9" type="stmt"/>
+        <line num="194" count="2" type="stmt"/>
+        <line num="205" count="2" type="stmt"/>
+        <line num="217" count="18" type="cond" truecount="2" falsecount="0"/>
+        <line num="218" count="14" type="cond" truecount="2" falsecount="0"/>
+        <line num="219" count="9" type="cond" truecount="2" falsecount="0"/>
+        <line num="220" count="4" type="stmt"/>
       </file>
       <file name="index.ts" path="/Users/butianzheng/Documents/trae_projects/hot-rolling-finish-aps/src/types/decision/index.ts">
         <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>

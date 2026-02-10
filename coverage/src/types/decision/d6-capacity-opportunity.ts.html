@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">18.18% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>2/11</span>
+                <span class='fraction'>11/11</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/6</span>
+                <span class='fraction'>6/6</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/3</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">25% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>2/8</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -464,31 +464,20 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -499,11 +488,22 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">18x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// ==========================================
 // D6: 容量机会 TypeScript 类型定义
@@ -684,15 +684,15 @@ export type DailyCapacityOpportunity = CapacityOpportunity;
 /**
  * 判断容量是否未充分利用
  */
-export function <span class="fstat-no" title="function not covered" >isUnderutilized(u</span>tilizationPct: number): boolean {
-<span class="cstat-no" title="statement not covered" >  return utilizationPct &lt; 70; // 利用率低于70%视为未充分利用</span>
+export function isUnderutilized(utilizationPct: number): boolean {
+  return utilizationPct &lt; 70; // 利用率低于70%视为未充分利用
 }
 &nbsp;
 /**
  * 判断是否为高优先级机会
  */
-export function <span class="fstat-no" title="function not covered" >isHighPriorityOpportunity(p</span>riorityScore: number): boolean {
-<span class="cstat-no" title="statement not covered" >  return priorityScore &gt;= 70;</span>
+export function isHighPriorityOpportunity(priorityScore: number): boolean {
+  return priorityScore &gt;= 70;
 }
 &nbsp;
 /**
@@ -720,11 +720,11 @@ export const OPPORTUNITY_TYPE_LABELS: Record&lt;OpportunityType, string&gt; = {
 /**
  * 根据利用率获取状态颜色
  */
-export function <span class="fstat-no" title="function not covered" >getUtilizationColor(u</span>tilizationPct: number): string {
-<span class="cstat-no" title="statement not covered" >  if (utilizationPct &lt; 60) <span class="cstat-no" title="statement not covered" >return '#52c41a';  // 绿色 - 容量充裕</span></span>
-<span class="cstat-no" title="statement not covered" >  if (utilizationPct &lt; 80) <span class="cstat-no" title="statement not covered" >return '#1677ff';  // 蓝色 - 正常</span></span>
-<span class="cstat-no" title="statement not covered" >  if (utilizationPct &lt; 100) <span class="cstat-no" title="statement not covered" >return '#faad14'; // 橙色 - 接近满载</span></span>
-<span class="cstat-no" title="statement not covered" >  return '#ff4d4f'; // 红色 - 超载</span>
+export function getUtilizationColor(utilizationPct: number): string {
+  if (utilizationPct &lt; 60) return '#52c41a';  // 绿色 - 容量充裕
+  if (utilizationPct &lt; 80) return '#1677ff';  // 蓝色 - 正常
+  if (utilizationPct &lt; 100) return '#faad14'; // 橙色 - 接近满载
+  return '#ff4d4f'; // 红色 - 超载
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -733,7 +733,7 @@ export function <span class="fstat-no" title="function not covered" >getUtilizat
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-02-10T03:06:39.058Z
+                at 2026-02-10T03:23:29.084Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>
