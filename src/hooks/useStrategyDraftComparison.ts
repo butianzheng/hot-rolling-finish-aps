@@ -396,7 +396,7 @@ export function useStrategyDraftComparison(): UseStrategyDraftComparisonReturn {
 
       Modal.confirm({
         title: '确认发布该草案？',
-        content: '发布后将生成一个新的正式版本（会落库），可在历史版本中对比/激活。',
+        content: '发布后将生成新的正式版本（会落库），默认不会自动激活；可在弹窗中选择仅切换或激活。',
         okText: '发布并生成版本',
         cancelText: '取消',
         onOk: async () => {
@@ -534,7 +534,7 @@ export function useStrategyDraftComparison(): UseStrategyDraftComparisonReturn {
     setPostActionLoading('switch');
     try {
       setActiveVersion(createdVersionId);
-      message.success('已切换到新版本');
+      message.success('已切换到新版本（仅本地切换，未激活）');
       setPostPublishOpen(false);
       navigate('/workbench');
     } finally {
@@ -548,7 +548,7 @@ export function useStrategyDraftComparison(): UseStrategyDraftComparisonReturn {
     try {
       await planApi.activateVersion(createdVersionId, currentUser || 'admin');
       setActiveVersion(createdVersionId);
-      message.success('已激活并切换到新版本');
+      message.success('已激活并切换到新版本（全局生效）');
       setPostPublishOpen(false);
       navigate('/workbench');
     } finally {

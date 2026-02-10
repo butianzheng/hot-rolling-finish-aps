@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import ErrorBoundary from '../components/ErrorBoundary';
 import NoActiveVersionGuide from '../components/NoActiveVersionGuide';
 import DecisionFlowGuide from '../components/flow/DecisionFlowGuide';
+import { IpcClient } from '../api/ipcClient';
 import KPIBand from '../components/overview/KPIBand';
 import DimensionTabs, { DimensionTabKey } from '../components/overview/DimensionTabs';
 import DrilldownDrawer from '../components/overview/DrilldownDrawer';
@@ -136,6 +137,7 @@ const RiskOverview: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const isOnline = useOnlineStatus();
   const activeVersionId = useActiveVersionId();
+  const [effectiveVersionId, setEffectiveVersionId] = React.useState<string | null>(null);
   const { setWorkbenchFilters, setWorkbenchViewMode } = useGlobalActions();
   const data = useRiskOverviewData(activeVersionId);
 
@@ -298,11 +300,52 @@ const RiskOverview: React.FC = () => {
     );
   }, [data.problems]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const latest = await IpcClient.call<string | null>(
+          'get_latest_active_version_id',
+          {},
+          { showError: false }
+        );
+        if (cancelled) return;
+        setEffectiveVersionId(String(latest || '').trim() || null);
+      } catch {
+        // ignore
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeVersionId]);
+
+  const versionDiverged = useMemo(() => {
+    if (!activeVersionId || !effectiveVersionId) return false;
+    return activeVersionId !== effectiveVersionId;
+  }, [activeVersionId, effectiveVersionId]);
+
   return (
     <ErrorBoundary>
       <Space direction="vertical" size={12} style={{ width: '100%' }}>
         {!isOnline && (
           <Alert type="warning" showIcon message="当前处于离线状态，数据可能无法刷新" />
+        )}
+
+        {versionDiverged && (
+          <Alert
+            type="warning"
+            showIcon
+            message="当前查看的是未激活工作版本"
+            description={`工作版本 ${activeVersionId}；系统生效版本 ${effectiveVersionId}。仅切换不会改变全局生效版本。`}
+            action={
+              <Button size="small" type="primary" onClick={() => navigate('/comparison')}>
+                去版本对比激活
+              </Button>
+            }
+          />
         )}
 
         {/* H2修复：显示详细的错误信息，明确哪些维度加载失败 */}
@@ -342,7 +385,7 @@ const RiskOverview: React.FC = () => {
               {problemCounts.P1 > 0 ? <Tag color="orange">P1 {problemCounts.P1}</Tag> : null}
             </Space>
           }
-          description="处理完后建议到「策略草案对比」生成多方案预览，选择推荐方案发布并激活。"
+          description="处理完后建议到「策略草案对比」生成多方案预览，选择推荐方案发布，并按需激活。"
           primaryAction={{
             label: '去工作台',
             onClick: () => {

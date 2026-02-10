@@ -5,8 +5,8 @@
 // 红线: Repository 不含业务逻辑
 // ==========================================
 
-use crate::domain::capacity::CapacityPool;
 use crate::db::open_sqlite_connection;
+use crate::domain::capacity::CapacityPool;
 use crate::repository::error::{RepositoryError, RepositoryResult};
 use chrono::NaiveDate;
 use rusqlite::{params, Connection, OptionalExtension, Result as SqliteResult};
@@ -145,11 +145,8 @@ impl CapacityPoolRepository {
                     Ok(CapacityPool {
                         version_id: row.get(0)?,
                         machine_code: row.get(1)?,
-                        plan_date: NaiveDate::parse_from_str(
-                            &row.get::<_, String>(2)?,
-                            "%Y-%m-%d",
-                        )
-                        .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
+                        plan_date: NaiveDate::parse_from_str(&row.get::<_, String>(2)?, "%Y-%m-%d")
+                            .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
                         target_capacity_t: row.get(3)?,
                         limit_capacity_t: row.get(4)?,
                         used_capacity_t: row.get(5)?,
@@ -160,6 +157,50 @@ impl CapacityPoolRepository {
                     })
                 },
             )?
+            .collect::<SqliteResult<Vec<CapacityPool>>>()?;
+
+        Ok(pools)
+    }
+
+    /// 查询指定版本全部产能池
+    ///
+    /// # 参数
+    /// - version_id: 版本ID
+    ///
+    /// # 返回
+    /// - Ok(Vec<CapacityPool>): 产能池列表
+    /// - Err: 数据库错误
+    pub fn find_by_version_id(&self, version_id: &str) -> RepositoryResult<Vec<CapacityPool>> {
+        let conn = self.get_conn()?;
+
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT
+                version_id, machine_code, plan_date, target_capacity_t, limit_capacity_t,
+                used_capacity_t, overflow_t, frozen_capacity_t,
+                accumulated_tonnage_t, roll_campaign_id
+            FROM capacity_pool
+            WHERE version_id = ?1
+            ORDER BY plan_date ASC, machine_code ASC
+            "#,
+        )?;
+
+        let pools = stmt
+            .query_map(params![version_id], |row| {
+                Ok(CapacityPool {
+                    version_id: row.get(0)?,
+                    machine_code: row.get(1)?,
+                    plan_date: NaiveDate::parse_from_str(&row.get::<_, String>(2)?, "%Y-%m-%d")
+                        .unwrap_or_else(|_| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
+                    target_capacity_t: row.get(3)?,
+                    limit_capacity_t: row.get(4)?,
+                    used_capacity_t: row.get(5)?,
+                    overflow_t: row.get(6)?,
+                    frozen_capacity_t: row.get(7)?,
+                    accumulated_tonnage_t: row.get(8)?,
+                    roll_campaign_id: row.get(9)?,
+                })
+            })?
             .collect::<SqliteResult<Vec<CapacityPool>>>()?;
 
         Ok(pools)

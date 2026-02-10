@@ -45,7 +45,7 @@ export const PostPublishModal: React.FC<PostPublishModalProps> = ({
           loading={postActionLoading === 'switch'}
           onClick={onSwitch}
         >
-          去工作台继续
+          去工作台（仅切换）
         </Button>,
         <Button
           key="activate"
@@ -54,7 +54,7 @@ export const PostPublishModal: React.FC<PostPublishModalProps> = ({
           loading={postActionLoading === 'activate'}
           onClick={onActivate}
         >
-          去工作台并激活
+          去工作台并激活（全局生效）
         </Button>,
       ]}
     >
@@ -68,7 +68,7 @@ export const PostPublishModal: React.FC<PostPublishModalProps> = ({
               <Text type="secondary">新版本ID</Text>
               <Text code>{createdVersionId || '-'}</Text>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                你可以先切换到该版本继续在工作台做人工微调；也可以直接激活使其成为当前生效版本。
+                你可以先仅切换到该版本继续微调（不改变当前激活版本）；也可以直接激活为当前生效版本。
               </Text>
             </Space>
           }

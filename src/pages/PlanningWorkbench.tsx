@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Space, Tag, message } from 'antd';
+import { Alert, Button, Space, Tag, message } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import ErrorBoundary from '../components/ErrorBoundary';
 import NoActiveVersionGuide from '../components/NoActiveVersionGuide';
+import { IpcClient } from '../api/ipcClient';
 import {
   useActivePlanRev,
   useActiveVersionId,
@@ -64,6 +65,7 @@ const PlanningWorkbench: React.FC = () => {
     machineCode: workbenchFilters.machineCode,
     schedState: null,
   }));
+  const [effectiveVersionId, setEffectiveVersionId] = useState<string | null>(null);
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
   const [scheduleStatusFilter, setScheduleStatusFilter] = useState<PlanItemStatusFilter>('ALL');
 
@@ -302,6 +304,33 @@ const PlanningWorkbench: React.FC = () => {
     [navigateToOverview]
   );
 
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const latest = await IpcClient.call<string | null>(
+          'get_latest_active_version_id',
+          {},
+          { showError: false }
+        );
+        if (cancelled) return;
+        setEffectiveVersionId(String(latest || '').trim() || null);
+      } catch {
+        // ignore
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeVersionId]);
+
+  const versionDiverged = useMemo(() => {
+    if (!activeVersionId || !effectiveVersionId) return false;
+    return activeVersionId !== effectiveVersionId;
+  }, [activeVersionId, effectiveVersionId]);
+
   if (!activeVersionId) {
     return (
       <NoActiveVersionGuide
@@ -330,10 +359,24 @@ const PlanningWorkbench: React.FC = () => {
               ) : null}
             </Space>
           }
-          description="建议先在工作台处理零级/一级优先问题物料（移位/锁定/紧急/强制放行），再去草案对比选择推荐方案发布并激活。"
+          description="建议先在工作台处理零级/一级优先问题物料（移位/锁定/紧急/强制放行），再去草案对比选择推荐方案发布，并按需激活。"
           primaryAction={decisionPrimaryAction}
           secondaryAction={decisionSecondaryAction}
         />
+
+        {versionDiverged ? (
+          <Alert
+            type="warning"
+            showIcon
+            message="当前工作版本未激活"
+            description={`工作版本 ${activeVersionId}；系统生效版本 ${effectiveVersionId}。仅切换不会改变全局生效版本。`}
+            action={
+              <Button size="small" type="primary" onClick={() => navigate('/comparison')}>
+                去版本对比激活
+              </Button>
+            }
+          />
+        ) : null}
 
         {/* 工具栏 */}
         <WorkbenchTopToolbar

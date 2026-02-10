@@ -70,6 +70,10 @@ export const VersionComparisonModal: React.FC<VersionComparisonModalProps> = ({
     return diffs;
   }, [localDiffResult, diffTypeFilter, diffSearchText]);
 
+  const hasBackendRiskDelta = Array.isArray(compareResult?.risk_delta) && compareResult.risk_delta.length > 0;
+  const hasBackendCapacityDelta =
+    Array.isArray(compareResult?.capacity_delta) && compareResult.capacity_delta.length > 0;
+
   return (
     <Modal
       title="版本对比结果"
@@ -161,16 +165,16 @@ export const VersionComparisonModal: React.FC<VersionComparisonModalProps> = ({
           </Card>
 
           {/* 风险/产能变化卡片 */}
-          <Card title="风险/产能变化" size="small">
+          <Card title="风险/产能变化（后端口径）" size="small">
             <Space direction="vertical" style={{ width: '100%' }} size={10}>
-              {compareResult.risk_delta ? (
+              {hasBackendRiskDelta ? (
                 <Space direction="vertical" style={{ width: '100%' }} size={10}>
                   {riskTrendOption ? <Chart option={riskTrendOption} height={220} /> : null}
                   <Table
                     size="small"
                     pagination={false}
                     rowKey={(r) => `${r.date}`}
-                    dataSource={compareResult.risk_delta}
+                    dataSource={compareResult.risk_delta ?? []}
                     columns={[
                       { title: '日期', dataIndex: 'date', width: 120 },
                       { title: '版本甲风险', dataIndex: 'risk_score_a', width: 120 },
@@ -184,17 +188,17 @@ export const VersionComparisonModal: React.FC<VersionComparisonModalProps> = ({
                 <Alert
                   type="info"
                   showIcon
-                  message="风险变化对比暂不可用"
-                  description="后端版本对比接口当前未返回风险变化明细（待风险快照仓储支持）。"
+                  message="风险变化明细暂不可用"
+                  description="当前对比版本缺少风险快照数据。可结合物料变更明细和本地补算卡片辅助判断。"
                 />
               )}
 
-              {compareResult.capacity_delta ? (
+              {hasBackendCapacityDelta ? (
                 <Table
                   size="small"
                   pagination={false}
                   rowKey={(r) => `${r.machine_code}__${r.date}`}
-                  dataSource={compareResult.capacity_delta}
+                  dataSource={compareResult.capacity_delta ?? []}
                   columns={[
                     { title: '机组', dataIndex: 'machine_code', width: 90 },
                     { title: '日期', dataIndex: 'date', width: 120 },
@@ -208,8 +212,8 @@ export const VersionComparisonModal: React.FC<VersionComparisonModalProps> = ({
                 <Alert
                   type="info"
                   showIcon
-                  message="产能变化对比暂不可用"
-                  description="后端版本对比接口当前未返回产能变化明细（待产能池仓储支持）。"
+                  message="产能变化明细暂不可用"
+                  description="当前对比版本缺少产能池快照数据。可在「产能变化（后端优先，缺失时本地补算）」卡片查看本地补算结果。"
                 />
               )}
             </Space>

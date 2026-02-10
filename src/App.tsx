@@ -105,6 +105,7 @@ const App: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const activeVersionId = useActiveVersionId();
+  const [effectiveVersionId, setEffectiveVersionId] = React.useState<string | null>(null);
   const isImporting = useIsImporting();
   const isRecalculating = useIsRecalculating();
   const {
@@ -126,15 +127,46 @@ const App: React.FC = () => {
   // 全局注册：统一处理 STALE_PLAN_REV
   useStalePlanRevBootstrap();
 
-  const activeVersionLabel = React.useMemo(() => {
-    if (!activeVersionId) return '未激活版本';
+  const refreshEffectiveVersion = React.useCallback(async () => {
+    try {
+      const latest = await IpcClient.call<string | null>(
+        'get_latest_active_version_id',
+        {},
+        { showError: false }
+      );
+      setEffectiveVersionId(String(latest || '').trim() || null);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isOnline) return;
+    void refreshEffectiveVersion();
+  }, [activeVersionId, isOnline, refreshEffectiveVersion]);
+
+  const workingVersionLabel = React.useMemo(() => {
+    if (!activeVersionId) return '工作: 未选择';
     const text = String(activeVersionId);
-    if (text.length <= 16) return `版本: ${text}`;
-    return `版本: ${text.slice(0, 8)}…${text.slice(-4)}`;
+    if (text.length <= 16) return `工作: ${text}`;
+    return `工作: ${text.slice(0, 8)}…${text.slice(-4)}`;
   }, [activeVersionId]);
+
+  const effectiveVersionLabel = React.useMemo(() => {
+    if (!effectiveVersionId) return '生效: 无';
+    const text = String(effectiveVersionId);
+    if (text.length <= 16) return `生效: ${text}`;
+    return `生效: ${text.slice(0, 8)}…${text.slice(-4)}`;
+  }, [effectiveVersionId]);
+
+  const versionDiverged = React.useMemo(() => {
+    if (!activeVersionId || !effectiveVersionId) return false;
+    return activeVersionId !== effectiveVersionId;
+  }, [activeVersionId, effectiveVersionId]);
 
   // 关键事件触发时刷新 KPI（联动：导入/重算/移单后 Header 指标应同步变化）
   useEvent('plan_updated', (payload: unknown) => {
+    void refreshEffectiveVersion();
     expireLatestRunIfNeeded();
 
     const raw = payload && typeof payload === 'object'
@@ -239,7 +271,7 @@ const App: React.FC = () => {
     };
   }, [activeVersionId, setActiveVersion]);
 
-  // 同步当前激活版本的 plan_rev，作为查询一致性上下文
+  // 同步当前工作版本的 plan_rev，作为查询一致性上下文
   useEffect(() => {
     if (!activeVersionId) {
       setPlanContext({ versionId: null, planRev: null });
@@ -367,15 +399,31 @@ const App: React.FC = () => {
 
             {/* 右侧:管理员覆盖模式 + 主题切换 + 用户选择器 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <Tooltip title={activeVersionId ? `当前激活版本: ${activeVersionId}` : '尚未激活排产版本'}>
+              <Tooltip title={activeVersionId ? `当前工作版本: ${activeVersionId}` : '尚未选择工作版本'}>
                 <Tag
                   color={activeVersionId ? 'blue' : 'orange'}
                   style={{ cursor: 'pointer', margin: 0 }}
                   onClick={() => navigate('/comparison')}
                 >
-                  {activeVersionLabel}
+                  {workingVersionLabel}
                 </Tag>
               </Tooltip>
+              <Tooltip title={effectiveVersionId ? `当前生效版本: ${effectiveVersionId}` : '尚无生效版本'}>
+                <Tag
+                  color={effectiveVersionId ? 'green' : 'default'}
+                  style={{ cursor: 'pointer', margin: 0 }}
+                  onClick={() => navigate('/comparison')}
+                >
+                  {effectiveVersionLabel}
+                </Tag>
+              </Tooltip>
+              {versionDiverged ? (
+                <Tooltip title={`当前仅切换到工作版本 ${activeVersionId}；系统生效版本仍为 ${effectiveVersionId}`}>
+                  <Tag color="gold" style={{ margin: 0 }}>
+                    工作≠生效
+                  </Tag>
+                </Tooltip>
+              ) : null}
               {isImporting && (
                 <Tooltip title="正在导入数据，请稍候…">
                   <Tag color="processing" style={{ margin: 0 }}>

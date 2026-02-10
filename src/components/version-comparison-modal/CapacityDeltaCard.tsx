@@ -49,7 +49,7 @@ export const CapacityDeltaCard: React.FC<CapacityDeltaCardProps> = ({
 }) => {
   return (
     <Card
-      title="产能变化（本地计算）"
+      title="产能变化（后端优先，缺失时本地补算）"
       size="small"
       extra={
         <Space>
@@ -74,12 +74,15 @@ export const CapacityDeltaCard: React.FC<CapacityDeltaCardProps> = ({
           type="info"
           showIcon
           message="未加载排产明细"
-          description="点击上方「物料变更明细」区域右上角的「加载明细」，即可生成本地产能变化分析。"
+          description="点击上方「物料变更明细」区域右上角的「加载明细」，即可生成本地补算产能变化（用于后端缺失时兜底）。"
         />
       ) : !localCapacityRowsBase ? (
         <Alert type="info" showIcon message="暂无产能差异数据" />
       ) : (
         <Space direction="vertical" style={{ width: '100%' }} size={10}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            说明：该卡片为本地补算口径，若“风险/产能变化”卡片已返回后端结果，请以后端口径为准。
+          </Text>
           {capacityTrendOption ? (
             <Chart option={capacityTrendOption} height={220} />
           ) : (

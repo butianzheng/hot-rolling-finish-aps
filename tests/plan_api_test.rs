@@ -13,12 +13,14 @@
 mod helpers;
 mod test_helpers;
 
-use chrono::NaiveDate;
+use chrono::{NaiveDate, Utc};
 use helpers::api_test_helper::*;
-use helpers::test_data_builder::{CapacityPoolBuilder, MaterialBuilder, MaterialStateBuilder, PlanItemBuilder};
-use hot_rolling_aps::config::strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
 use hot_rolling_aps::api::ApiError;
-use hot_rolling_aps::domain::types::{PlanVersionStatus, SchedState};
+use hot_rolling_aps::config::strategy_profile::{CustomStrategyParameters, CustomStrategyProfile};
+use hot_rolling_aps::domain::risk::RiskSnapshot;
+use hot_rolling_aps::domain::types::{PlanVersionStatus, RiskLevel, SchedState};
+use hot_rolling_aps::repository::RiskSnapshotRepository;
+use helpers::test_data_builder::{CapacityPoolBuilder, MaterialBuilder, MaterialStateBuilder, PlanItemBuilder};
 
 // ==========================================
 // 方案管理测试
@@ -675,6 +677,163 @@ fn test_compare_versions_空版本对比() {
     assert_eq!(result.added_count, 0);
     assert_eq!(result.removed_count, 0);
     assert_eq!(result.moved_count, 0);
+}
+
+#[test]
+fn test_compare_versions_返回风险与产能变化明细() {
+    let env = ApiTestEnv::new().expect("无法创建测试环境");
+
+    let plan_id = env
+        .plan_api
+        .create_plan("版本对比明细测试".to_string(), "admin".to_string())
+        .expect("创建失败");
+
+    let version_a = env
+        .plan_api
+        .create_version(
+            plan_id.clone(),
+            30,
+            None,
+            Some("版本A".to_string()),
+            "admin".to_string(),
+        )
+        .expect("创建版本A失败");
+
+    let version_b = env
+        .plan_api
+        .create_version(
+            plan_id,
+            30,
+            None,
+            Some("版本B".to_string()),
+            "admin".to_string(),
+        )
+        .expect("创建版本B失败");
+
+    let date_1 = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
+    let date_2 = NaiveDate::from_ymd_opt(2026, 1, 21).unwrap();
+    let date_3 = NaiveDate::from_ymd_opt(2026, 1, 22).unwrap();
+    let now = Utc::now().naive_utc();
+
+    let mk_snapshot = |version_id: &str,
+                       machine_code: &str,
+                       snapshot_date: NaiveDate,
+                       risk_level: RiskLevel|
+     -> RiskSnapshot {
+        RiskSnapshot {
+            snapshot_id: format!("{}_{}_{}", version_id, machine_code, snapshot_date),
+            version_id: version_id.to_string(),
+            machine_code: machine_code.to_string(),
+            snapshot_date,
+            used_capacity_t: 0.0,
+            target_capacity_t: 800.0,
+            limit_capacity_t: 900.0,
+            overflow_t: 0.0,
+            urgent_total_t: 0.0,
+            l3_count: 0,
+            l2_count: 0,
+            mature_backlog_t: 0.0,
+            immature_backlog_t: 0.0,
+            risk_level,
+            risk_reason: "test".to_string(),
+            roll_status: None,
+            roll_risk: None,
+            created_at: now,
+        }
+    };
+
+    // 风险快照：验证按日期聚合均值 + 缺失按0参与delta
+    let risk_repo = RiskSnapshotRepository::new(&env.db_path).expect("创建RiskSnapshotRepository失败");
+    risk_repo
+        .batch_insert(vec![
+            mk_snapshot(&version_a, "H032", date_1, RiskLevel::Red),
+            mk_snapshot(&version_a, "H033", date_1, RiskLevel::Yellow),
+            mk_snapshot(&version_a, "H032", date_2, RiskLevel::Green),
+            mk_snapshot(&version_b, "H032", date_1, RiskLevel::Orange),
+            mk_snapshot(&version_b, "H033", date_1, RiskLevel::Green),
+            mk_snapshot(&version_b, "H032", date_3, RiskLevel::Red),
+        ])
+        .expect("写入risk_snapshot失败");
+
+    // 产能池：验证按机组+日期聚合 + 缺失按0参与delta
+    env.prepare_capacity_pools(vec![
+        CapacityPoolBuilder::new("H032", date_1)
+            .version_id(&version_a)
+            .used(100.0)
+            .build(),
+        CapacityPoolBuilder::new("H033", date_2)
+            .version_id(&version_a)
+            .used(50.0)
+            .build(),
+        CapacityPoolBuilder::new("H032", date_1)
+            .version_id(&version_b)
+            .used(130.0)
+            .build(),
+        CapacityPoolBuilder::new("H034", date_2)
+            .version_id(&version_b)
+            .used(70.0)
+            .build(),
+    ])
+    .expect("写入capacity_pool失败");
+
+    let result = env
+        .plan_api
+        .compare_versions(&version_a, &version_b)
+        .expect("版本对比失败");
+
+    let risk_rows = result.risk_delta.expect("risk_delta 应返回 Some");
+    assert_eq!(risk_rows.len(), 3);
+
+    let row_d1 = risk_rows
+        .iter()
+        .find(|r| r.date == "2026-01-20")
+        .expect("缺少2026-01-20");
+    assert!((row_d1.risk_score_a.expect("A应有值") - 65.0).abs() < 1e-9);
+    assert!((row_d1.risk_score_b.expect("B应有值") - 45.0).abs() < 1e-9);
+    assert!((row_d1.risk_score_delta - (-20.0)).abs() < 1e-9);
+
+    let row_d2 = risk_rows
+        .iter()
+        .find(|r| r.date == "2026-01-21")
+        .expect("缺少2026-01-21");
+    assert!((row_d2.risk_score_a.expect("A应有值") - 20.0).abs() < 1e-9);
+    assert!(row_d2.risk_score_b.is_none());
+    assert!((row_d2.risk_score_delta - (-20.0)).abs() < 1e-9);
+
+    let row_d3 = risk_rows
+        .iter()
+        .find(|r| r.date == "2026-01-22")
+        .expect("缺少2026-01-22");
+    assert!(row_d3.risk_score_a.is_none());
+    assert!((row_d3.risk_score_b.expect("B应有值") - 90.0).abs() < 1e-9);
+    assert!((row_d3.risk_score_delta - 90.0).abs() < 1e-9);
+
+    let capacity_rows = result.capacity_delta.expect("capacity_delta 应返回 Some");
+    assert_eq!(capacity_rows.len(), 3);
+
+    let cap_1 = capacity_rows
+        .iter()
+        .find(|r| r.machine_code == "H032" && r.date == "2026-01-20")
+        .expect("缺少 H032@2026-01-20");
+    assert!((cap_1.used_capacity_a.expect("A应有值") - 100.0).abs() < 1e-9);
+    assert!((cap_1.used_capacity_b.expect("B应有值") - 130.0).abs() < 1e-9);
+    assert!((cap_1.capacity_delta - 30.0).abs() < 1e-9);
+
+    let cap_2 = capacity_rows
+        .iter()
+        .find(|r| r.machine_code == "H033" && r.date == "2026-01-21")
+        .expect("缺少 H033@2026-01-21");
+    assert!((cap_2.used_capacity_a.expect("A应有值") - 50.0).abs() < 1e-9);
+    assert!(cap_2.used_capacity_b.is_none());
+    assert!((cap_2.capacity_delta - (-50.0)).abs() < 1e-9);
+
+    let cap_3 = capacity_rows
+        .iter()
+        .find(|r| r.machine_code == "H034" && r.date == "2026-01-21")
+        .expect("缺少 H034@2026-01-21");
+    assert!(cap_3.used_capacity_a.is_none());
+    assert!((cap_3.used_capacity_b.expect("B应有值") - 70.0).abs() < 1e-9);
+    assert!((cap_3.capacity_delta - 70.0).abs() < 1e-9);
 }
 
 #[test]

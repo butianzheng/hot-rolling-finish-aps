@@ -10,6 +10,9 @@ type MoveItemsResponseLike = {
 
 export function showMoveSubmitResult(res: MoveItemsResponseLike, missing: string[]) {
   const failedCount = Number(res?.failed_count ?? 0);
+  const successCount = Number((res as { success_count?: unknown })?.success_count ?? 0);
+  const movedHint = successCount > 0 ? '（已更新当前工作版本，决策同步中）' : '';
+
   if (failedCount > 0) {
     const rawResults = Array.isArray(res?.results) ? res.results : [];
     const results: MoveItemResultRow[] = rawResults.map((r: any) => ({
@@ -28,7 +31,7 @@ export function showMoveSubmitResult(res: MoveItemsResponseLike, missing: string
       width: 920,
       content: (
         <Space direction="vertical" style={{ width: '100%' }} size={12}>
-          <Alert type="warning" showIcon message={String(res?.message || '移动完成')} />
+          <Alert type="warning" showIcon message={`${String(res?.message || '移动完成')}${movedHint}`} />
           {missing.length > 0 && <Alert type="info" showIcon message={`有 ${missing.length} 个物料不在当前版本排程中，已跳过`} />}
           <Table<MoveItemResultRow>
             size="small"
@@ -65,9 +68,8 @@ export function showMoveSubmitResult(res: MoveItemsResponseLike, missing: string
     return;
   }
 
-  message.success(String(res?.message || '移动完成'));
+  message.success(`${String(res?.message || '移动完成')}${movedHint}`);
   if (missing.length > 0) {
     message.info(`有 ${missing.length} 个物料不在当前版本排程中，已跳过`);
   }
 }
-

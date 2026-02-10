@@ -155,19 +155,19 @@ export function useWorkbenchBatchOperations(params: {
 
           if (type === 'lock') {
             await materialApi.batchLockMaterials(materialIds, true, operator, trimmed, lockMode);
-            message.success('锁定成功');
+            message.success('锁定成功（全局物料状态，决策同步中）');
           } else if (type === 'unlock') {
             await materialApi.batchLockMaterials(materialIds, false, operator, trimmed, lockMode);
-            message.success('解锁成功');
+            message.success('解锁成功（全局物料状态，决策同步中）');
           } else if (type === 'urgent_on') {
             await materialApi.batchSetUrgent(materialIds, true, operator, trimmed);
-            message.success('已设置紧急标志');
+            message.success('已设置紧急标志（全局物料状态，决策同步中）');
           } else if (type === 'urgent_off') {
             await materialApi.batchSetUrgent(materialIds, false, operator, trimmed);
-            message.success('已取消紧急标志');
+            message.success('已取消紧急标志（全局物料状态，决策同步中）');
           } else {
             await materialApi.batchClearForceRelease(materialIds, operator, trimmed);
-            message.success('已取消强制放行');
+            message.success('已取消强制放行（全局物料状态，决策同步中）');
           }
 
           // 使用统一刷新协调器
@@ -267,7 +267,7 @@ export function useWorkbenchBatchOperations(params: {
           const operator = currentUser || 'admin';
           const res: IpcImpactSummary = await materialApi.batchForceRelease(materialIds, operator, trimmed, mode);
 
-          message.success(String(res?.message || '强制放行完成'));
+          message.success(`${String(res?.message || '强制放行完成')}（全局物料状态，决策同步中）`);
 
           const violations = extractForceReleaseViolations(res?.details);
           if (violations.length > 0) {

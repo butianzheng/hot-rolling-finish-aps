@@ -119,7 +119,7 @@ export const StrategyDraftControls: React.FC<StrategyDraftControlsProps> = ({
             重新计算策略草案
           </Button>
           <Text type="secondary" style={{ fontSize: 12 }}>
-            说明：草案为临时对象，不会写入数据库；确认后才生成正式版本。
+            说明：草案会持久化保存（用于恢复/审计），但不会改写正式排产；发布后才生成正式版本。
           </Text>
           <Text type="secondary" style={{ fontSize: 12 }}>
             自定义策略：后端已支持"参数化排序"（仅影响等级内排序，不触碰冻结区/适温/产能硬约束）。

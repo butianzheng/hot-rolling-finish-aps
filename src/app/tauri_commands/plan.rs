@@ -101,12 +101,10 @@ pub async fn delete_plan(
     operator: String,
 ) -> Result<String, String> {
     let plan_api = state.plan_api.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        plan_api.delete_plan(&plan_id, &operator)
-    })
-    .await
-    .map_err(|e| format!("任务执行失败: {}", e))?
-    .map_err(map_api_error)?;
+    tauri::async_runtime::spawn_blocking(move || plan_api.delete_plan(&plan_id, &operator))
+        .await
+        .map_err(|e| format!("任务执行失败: {}", e))?
+        .map_err(map_api_error)?;
 
     Ok("{}".to_string())
 }
@@ -119,12 +117,10 @@ pub async fn delete_version(
     operator: String,
 ) -> Result<String, String> {
     let plan_api = state.plan_api.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        plan_api.delete_version(&version_id, &operator)
-    })
-    .await
-    .map_err(|e| format!("任务执行失败: {}", e))?
-    .map_err(map_api_error)?;
+    tauri::async_runtime::spawn_blocking(move || plan_api.delete_version(&version_id, &operator))
+        .await
+        .map_err(|e| format!("任务执行失败: {}", e))?
+        .map_err(map_api_error)?;
 
     Ok("{}".to_string())
 }
@@ -139,9 +135,7 @@ pub async fn create_version(
     note: Option<String>,
     created_by: String,
 ) -> Result<String, String> {
-    let frozen_date = frozen_from_date
-        .map(|s| parse_date(&s))
-        .transpose()?;
+    let frozen_date = frozen_from_date.map(|s| parse_date(&s)).transpose()?;
 
     let plan_api = state.plan_api.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -314,11 +308,7 @@ pub async fn recalc_full(
     .map_err(|e| format!("任务执行失败: {}", e))?
     .map_err(map_api_error)?;
 
-    if let Some(client_run_id) = run_id
-        .as_deref()
-        .map(str::trim)
-        .filter(|v| !v.is_empty())
-    {
+    if let Some(client_run_id) = run_id.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
         result.run_id = client_run_id.to_string();
     }
 
@@ -340,9 +330,7 @@ pub async fn recalc_full(
 
 /// 获取预设策略列表（用于策略草案对比）
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_strategy_presets(
-    state: tauri::State<'_, AppState>,
-) -> Result<String, String> {
+pub async fn get_strategy_presets(state: tauri::State<'_, AppState>) -> Result<String, String> {
     let result = state
         .plan_api
         .get_strategy_presets()
@@ -351,7 +339,7 @@ pub async fn get_strategy_presets(
     serde_json::to_string(&result).map_err(|e| format!("序列化失败: {}", e))
 }
 
-/// 生成多策略草案（dry-run，不落库）
+/// 生成多策略草案（dry-run 试算；不写正式排产，但会持久化草案）
 #[tauri::command(rename_all = "snake_case")]
 pub async fn generate_strategy_drafts(
     state: tauri::State<'_, AppState>,
@@ -625,12 +613,12 @@ pub async fn move_items(
     operator: String,
     reason: Option<String>,
 ) -> Result<String, String> {
-    use crate::api::ValidationMode;
     use crate::api::plan_api::MoveItemRequest;
+    use crate::api::ValidationMode;
 
     // 解析移动项列表
-    let move_requests: Vec<MoveItemRequest> = serde_json::from_str(&moves)
-        .map_err(|e| format!("解析移动项失败: {}", e))?;
+    let move_requests: Vec<MoveItemRequest> =
+        serde_json::from_str(&moves).map_err(|e| format!("解析移动项失败: {}", e))?;
 
     // 解析校验模式，默认为Strict（兼容 AutoFix 和 AUTO_FIX 两种格式）
     let validation_mode = match mode.as_deref() {

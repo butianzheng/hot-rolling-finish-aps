@@ -25,9 +25,13 @@ impl PlanApi {
         }
 
         // 1. 加载两个版本的排产明细
-        let items_a = self.plan_item_repo.find_by_version(version_id_a)
+        let items_a = self
+            .plan_item_repo
+            .find_by_version(version_id_a)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
-        let items_b = self.plan_item_repo.find_by_version(version_id_b)
+        let items_b = self
+            .plan_item_repo
+            .find_by_version(version_id_b)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         // 2. 构建材料ID到PlanItem的映射
@@ -50,7 +54,9 @@ impl PlanApi {
         for (material_id, item_a) in map_a.iter() {
             if let Some(item_b) = map_b.get(material_id) {
                 // 材料在两个版本中都存在
-                if item_a.plan_date != item_b.plan_date || item_a.machine_code != item_b.machine_code {
+                if item_a.plan_date != item_b.plan_date
+                    || item_a.machine_code != item_b.machine_code
+                {
                     // 日期或机组变化 = 移动
                     moved_count += 1;
                 }
@@ -72,10 +78,14 @@ impl PlanApi {
         let removed_count = squeezed_out_count;
 
         // 4. 加载两个版本信息（用于配置对比）
-        let version_a = self.plan_version_repo.find_by_id(version_id_a)
+        let version_a = self
+            .plan_version_repo
+            .find_by_id(version_id_a)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?
             .ok_or_else(|| ApiError::NotFound(format!("版本{}不存在", version_id_a)))?;
-        let version_b = self.plan_version_repo.find_by_id(version_id_b)
+        let version_b = self
+            .plan_version_repo
+            .find_by_id(version_id_b)
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?
             .ok_or_else(|| ApiError::NotFound(format!("版本{}不存在", version_id_b)))?;
 
@@ -85,11 +95,11 @@ impl PlanApi {
             version_b.config_snapshot_json.as_deref(),
         )?;
 
-        // 6. 对比风险快照（TODO: 需要RiskSnapshotRepository支持）
-        let risk_delta = None; // 暂时返回None，待RiskEngine实现后补充
+        // 6. 对比风险快照（按日期聚合）
+        let risk_delta = self.build_risk_delta(version_id_a, version_id_b)?;
 
-        // 7. 对比产能变化（TODO: 需要CapacityPoolRepository支持）
-        let capacity_delta = None; // 暂时返回None，待实现后补充
+        // 7. 对比产能变化（按机组+日期）
+        let capacity_delta = self.build_capacity_delta(version_id_a, version_id_b)?;
 
         Ok(VersionComparisonResult {
             version_id_a: version_id_a.to_string(),
@@ -106,6 +116,158 @@ impl PlanApi {
                 moved_count, added_count, removed_count, squeezed_out_count
             ),
         })
+    }
+
+    /// 构建风险变化（按日期）
+    ///
+    /// 口径：
+    /// - 使用 risk_snapshot 风险等级映射为分值后，按日期取机组均值
+    /// - 变化值 = 版本乙 - 版本甲（缺失版本按 0 参与 delta 计算）
+    fn build_risk_delta(
+        &self,
+        version_id_a: &str,
+        version_id_b: &str,
+    ) -> ApiResult<Option<Vec<RiskDelta>>> {
+        let snapshots_a = self
+            .risk_snapshot_repo
+            .find_by_version_id(version_id_a)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+        let snapshots_b = self
+            .risk_snapshot_repo
+            .find_by_version_id(version_id_b)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        if snapshots_a.is_empty() && snapshots_b.is_empty() {
+            return Ok(None);
+        }
+
+        let mut daily_a: std::collections::BTreeMap<NaiveDate, (f64, usize)> =
+            std::collections::BTreeMap::new();
+        let mut daily_b: std::collections::BTreeMap<NaiveDate, (f64, usize)> =
+            std::collections::BTreeMap::new();
+
+        for snapshot in snapshots_a.iter() {
+            let score = Self::risk_level_to_score(snapshot.risk_level);
+            let entry = daily_a.entry(snapshot.snapshot_date).or_insert((0.0, 0));
+            entry.0 += score;
+            entry.1 += 1;
+        }
+
+        for snapshot in snapshots_b.iter() {
+            let score = Self::risk_level_to_score(snapshot.risk_level);
+            let entry = daily_b.entry(snapshot.snapshot_date).or_insert((0.0, 0));
+            entry.0 += score;
+            entry.1 += 1;
+        }
+
+        let mut all_dates: std::collections::BTreeSet<NaiveDate> =
+            daily_a.keys().cloned().collect();
+        all_dates.extend(daily_b.keys().cloned());
+
+        if all_dates.is_empty() {
+            return Ok(None);
+        }
+
+        let avg_score = |daily: &std::collections::BTreeMap<NaiveDate, (f64, usize)>,
+                         date: &NaiveDate|
+         -> Option<f64> {
+            daily.get(date).map(|(sum, count)| {
+                if *count == 0 {
+                    0.0
+                } else {
+                    *sum / *count as f64
+                }
+            })
+        };
+
+        let rows = all_dates
+            .into_iter()
+            .map(|date| {
+                let risk_score_a = avg_score(&daily_a, &date);
+                let risk_score_b = avg_score(&daily_b, &date);
+                RiskDelta {
+                    date: date.format("%Y-%m-%d").to_string(),
+                    risk_score_a,
+                    risk_score_b,
+                    risk_score_delta: risk_score_b.unwrap_or(0.0) - risk_score_a.unwrap_or(0.0),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        Ok(Some(rows))
+    }
+
+    /// 构建产能变化（按机组+日期）
+    ///
+    /// 口径：
+    /// - 对比 capacity_pool.used_capacity_t
+    /// - used_capacity_a/b 为空表示该版本缺失该键
+    /// - 变化值 = 版本乙 - 版本甲（缺失按 0 参与 delta 计算）
+    fn build_capacity_delta(
+        &self,
+        version_id_a: &str,
+        version_id_b: &str,
+    ) -> ApiResult<Option<Vec<CapacityDelta>>> {
+        let pools_a = self
+            .capacity_repo
+            .find_by_version_id(version_id_a)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+        let pools_b = self
+            .capacity_repo
+            .find_by_version_id(version_id_b)
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        if pools_a.is_empty() && pools_b.is_empty() {
+            return Ok(None);
+        }
+
+        let mut used_a: std::collections::BTreeMap<(NaiveDate, String), f64> =
+            std::collections::BTreeMap::new();
+        let mut used_b: std::collections::BTreeMap<(NaiveDate, String), f64> =
+            std::collections::BTreeMap::new();
+
+        for pool in pools_a.into_iter() {
+            used_a.insert((pool.plan_date, pool.machine_code), pool.used_capacity_t);
+        }
+        for pool in pools_b.into_iter() {
+            used_b.insert((pool.plan_date, pool.machine_code), pool.used_capacity_t);
+        }
+
+        let mut all_keys: std::collections::BTreeSet<(NaiveDate, String)> =
+            used_a.keys().cloned().collect();
+        all_keys.extend(used_b.keys().cloned());
+
+        if all_keys.is_empty() {
+            return Ok(None);
+        }
+
+        let rows = all_keys
+            .into_iter()
+            .map(|(date, machine_code)| {
+                let key = (date, machine_code.clone());
+                let used_capacity_a = used_a.get(&key).copied();
+                let used_capacity_b = used_b.get(&key).copied();
+
+                CapacityDelta {
+                    machine_code,
+                    date: date.format("%Y-%m-%d").to_string(),
+                    used_capacity_a,
+                    used_capacity_b,
+                    capacity_delta: used_capacity_b.unwrap_or(0.0) - used_capacity_a.unwrap_or(0.0),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        Ok(Some(rows))
+    }
+
+    fn risk_level_to_score(level: crate::domain::types::RiskLevel) -> f64 {
+        match level {
+            crate::domain::types::RiskLevel::Red => 90.0,
+            crate::domain::types::RiskLevel::Orange => 70.0,
+            crate::domain::types::RiskLevel::Yellow => 40.0,
+            crate::domain::types::RiskLevel::Green => 20.0,
+        }
     }
 
     /// 版本对比 KPI 汇总（聚合接口，避免前端全量拉取 plan_item 再本地计算）
@@ -311,5 +473,4 @@ impl PlanApi {
     }
 
     // ==========================================
-
 }
