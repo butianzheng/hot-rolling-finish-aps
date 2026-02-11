@@ -26,12 +26,14 @@ import { MaterialInspector } from '../MaterialInspector';
 import { RedLineGuard } from '../guards/RedLineGuard';
 import { useCurrentUser, useAdminOverrideMode } from '../../stores/use-global-store';
 import { normalizeSchedState } from '../../utils/schedState';
+import { formatDate } from '../../utils/formatters';
 
 import { useMaterialTimeline } from './useMaterialTimeline';
 import { CapacityTimelineSection } from './CapacityTimelineSection';
 import { MaterialOperationModal } from './MaterialOperationModal';
 import { createMaterialTableColumns } from './materialTableColumns';
 import { checkRedLineViolations, type Material, type OperationType } from './materialTypes';
+import type { OpenScheduleCellOptions } from '../capacity-timeline/types';
 
 const MATERIAL_FETCH_PAGE_SIZE = 1000;
 const MACHINE_COVERAGE_ALERT_THRESHOLD_DEFAULT = 4;
@@ -64,11 +66,20 @@ interface MaterialSearchParams {
   steel_mark?: string;
 }
 
+interface TimelineLinkFilter {
+  machineCode?: string;
+  date?: string;
+  urgencyLevel?: 'L0' | 'L1' | 'L2' | 'L3';
+  materialIds?: string[];
+  statusFilter?: OpenScheduleCellOptions['statusFilter'];
+}
+
 const { Text } = Typography;
 
 const MaterialManagement: React.FC = () => {
   const actionRef = useRef<ActionType>();
   const formRef = useRef<FormInstance<MaterialSearchParams>>();
+  const timelineLinkFilterRef = useRef<TimelineLinkFilter>({});
   const queryClient = useQueryClient();
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
@@ -83,6 +94,7 @@ const MaterialManagement: React.FC = () => {
     MACHINE_COVERAGE_ALERT_THRESHOLD_DEFAULT
   );
   const [savingThreshold, setSavingThreshold] = useState(false);
+  const [timelineLinkFilter, setTimelineLinkFilter] = useState<TimelineLinkFilter>({});
 
   const currentUser = useCurrentUser();
   const adminOverrideMode = useAdminOverrideMode();
@@ -112,20 +124,33 @@ const MaterialManagement: React.FC = () => {
   });
 
 
+  const applyTimelineLinkFilter = useCallback((next: TimelineLinkFilter) => {
+    timelineLinkFilterRef.current = next;
+    setTimelineLinkFilter(next);
+  }, []);
+
   useEffect(() => {
+    const linkedMachineRaw = String(timeline.timelineMachine || '').trim();
+    const machineCode = linkedMachineRaw && linkedMachineRaw !== 'all' ? linkedMachineRaw : undefined;
+    const nextFilter: TimelineLinkFilter = {
+      machineCode,
+      date: formatDate(timeline.timelineDate),
+    };
+    applyTimelineLinkFilter(nextFilter);
+
     const form = formRef.current;
-    const linkedMachine = String(timeline.timelineMachine || '').trim();
     if (!form) {
-      if (linkedMachine) actionRef.current?.reload();
+      actionRef.current?.reload();
       return;
     }
 
     const currentMachine = String(form.getFieldValue('machine_code') || '').trim();
-    if (linkedMachine === currentMachine) return;
-
-    form.setFieldsValue({ machine_code: linkedMachine || undefined });
+    const linkedMachine = machineCode || '';
+    if (linkedMachine !== currentMachine) {
+      form.setFieldsValue({ machine_code: linkedMachine || undefined });
+    }
     form.submit();
-  }, [timeline.timelineMachine]);
+  }, [applyTimelineLinkFilter, timeline.timelineDate, timeline.timelineMachine]);
   useEffect(() => {
     let mounted = true;
     const loadThreshold = async () => {
@@ -315,6 +340,44 @@ const MaterialManagement: React.FC = () => {
     }
   }, [adminOverrideMode, currentUser, modalType, reason, selectedRowKeys, queryClient]);
 
+  const handleTimelineOpenScheduleCell = useCallback(
+    (
+      machineCode: string,
+      date: string,
+      materialIds: string[],
+      options?: OpenScheduleCellOptions
+    ) => {
+      const normalizedMachine = String(machineCode || '').trim();
+      const normalizedDate = String(date || '').trim();
+      const rawUrgency = String(options?.urgencyLevel || '').toUpperCase().trim();
+      const urgencyLevel =
+        rawUrgency === 'L0' || rawUrgency === 'L1' || rawUrgency === 'L2' || rawUrgency === 'L3'
+          ? rawUrgency
+          : undefined;
+
+      applyTimelineLinkFilter({
+        machineCode: normalizedMachine || undefined,
+        date: normalizedDate || undefined,
+        urgencyLevel,
+        materialIds: Array.isArray(materialIds) && materialIds.length > 0 ? materialIds : undefined,
+        statusFilter: options?.statusFilter,
+      });
+
+      const form = formRef.current;
+      if (!form) {
+        actionRef.current?.reload();
+        return;
+      }
+
+      form.setFieldsValue({
+        machine_code: normalizedMachine || undefined,
+        urgent_level: urgencyLevel,
+      });
+      form.submit();
+    },
+    [applyTimelineLinkFilter]
+  );
+
   // C8修复：基于缓存数据进行前端筛选，而不是每次调用API
   // M4修复：loadMaterials参数使用明确的MaterialSearchParams类型 + 兼容ProTable分页参数
   const loadMaterials = useCallback(
@@ -387,6 +450,49 @@ const MaterialManagement: React.FC = () => {
           });
         }
 
+        const activeTimelineFilter = timelineLinkFilterRef.current;
+
+        if (activeTimelineFilter.machineCode) {
+          filtered = filtered.filter((m: Material) => {
+            const scheduledMachine = String(m.scheduled_machine_code || '').trim();
+            if (scheduledMachine) return scheduledMachine === activeTimelineFilter.machineCode;
+            return String(m.machine_code || '').trim() === activeTimelineFilter.machineCode;
+          });
+        }
+
+        if (activeTimelineFilter.date) {
+          const hasMaterialIds = Array.isArray(activeTimelineFilter.materialIds) && activeTimelineFilter.materialIds.length > 0;
+          filtered = filtered.filter((m: Material) => {
+            const scheduledDate = String(m.scheduled_date || '').trim();
+            if (scheduledDate) return scheduledDate === activeTimelineFilter.date;
+            return hasMaterialIds;
+          });
+        }
+
+        if (activeTimelineFilter.urgencyLevel) {
+          filtered = filtered.filter(
+            (m: Material) =>
+              String(m.urgent_level || '').toUpperCase() === activeTimelineFilter.urgencyLevel
+          );
+        }
+
+        if (activeTimelineFilter.statusFilter && activeTimelineFilter.statusFilter !== 'ALL') {
+          if (activeTimelineFilter.statusFilter === 'LOCKED') {
+            filtered = filtered.filter((m: Material) => m.lock_flag === true);
+          } else if (activeTimelineFilter.statusFilter === 'FORCE_RELEASE') {
+            filtered = filtered.filter(
+              (m: Material) => normalizeSchedState(m.sched_state) === 'FORCE_RELEASE'
+            );
+          } else if (activeTimelineFilter.statusFilter === 'ADJUSTABLE') {
+            filtered = filtered.filter((m: Material) => m.lock_flag === false);
+          }
+        }
+
+        if (activeTimelineFilter.materialIds && activeTimelineFilter.materialIds.length > 0) {
+          const idSet = new Set(activeTimelineFilter.materialIds);
+          filtered = filtered.filter((m: Material) => idSet.has(m.material_id));
+        }
+
         // 默认按材料号排序，避免首页集中展示单机组导致“仅有H031”的误判
         filtered = [...filtered].sort((a, b) =>
           String(a.material_id || '').localeCompare(String(b.material_id || ''))
@@ -434,6 +540,17 @@ const MaterialManagement: React.FC = () => {
     [allMaterials.length, coverageAlertThreshold, machineCoverage.length]
   );
 
+  const timelineLinkageText = useMemo(() => {
+    const parts: string[] = [];
+    if (timelineLinkFilter.machineCode) parts.push(`机组 ${timelineLinkFilter.machineCode}`);
+    if (timelineLinkFilter.date) parts.push(`日期 ${timelineLinkFilter.date}`);
+    if (timelineLinkFilter.urgencyLevel) parts.push(`紧急 ${timelineLinkFilter.urgencyLevel}`);
+    if (timelineLinkFilter.statusFilter && timelineLinkFilter.statusFilter !== 'ALL') {
+      parts.push(`状态 ${timelineLinkFilter.statusFilter}`);
+    }
+    return parts.length > 0 ? parts.join(' / ') : '未联动';
+  }, [timelineLinkFilter]);
+
   const saveCoverageAlertThreshold = useCallback(async () => {
     const next = Number(coverageAlertThresholdInput);
     if (!Number.isFinite(next) || next < 1) {
@@ -476,6 +593,7 @@ const MaterialManagement: React.FC = () => {
         onMachineChange={timeline.setTimelineMachine}
         onDateChange={timeline.setTimelineDate}
         onReload={() => timeline.loadTimeline()}
+        onOpenScheduleCell={handleTimelineOpenScheduleCell}
       />
 
       {/* 材料表格 */}
@@ -493,8 +611,14 @@ const MaterialManagement: React.FC = () => {
             <Button
               key="reset"
               onClick={() => {
+                const linkedMachineRaw = String(timeline.timelineMachine || '').trim();
+                const machineCode = linkedMachineRaw && linkedMachineRaw !== 'all' ? linkedMachineRaw : undefined;
+                applyTimelineLinkFilter({
+                  machineCode,
+                  date: formatDate(timeline.timelineDate),
+                });
                 formProps.form?.resetFields();
-                formProps.form?.setFieldsValue({ machine_code: timeline.timelineMachine || undefined });
+                formProps.form?.setFieldsValue({ machine_code: machineCode });
                 formProps.form?.submit();
               }}
             >
@@ -560,6 +684,9 @@ const MaterialManagement: React.FC = () => {
               {isCoverageAbnormal ? <WarningOutlined /> : null}
               {isCoverageAbnormal ? ` 机组覆盖异常（阈值<${coverageAlertThreshold}）: ` : '机组覆盖: '}
               {machineCoverageText}
+            </Text>,
+            <Text key="timeline-link" type="secondary">
+              时间线联动: {timelineLinkageText}
             </Text>,
             <Space key="coverage-threshold" size={6}>
               <Text type="secondary">覆盖告警阈值</Text>

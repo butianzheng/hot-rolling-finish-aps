@@ -78,6 +78,31 @@ impl RollerApi {
         ))
     }
 
+    fn format_datetime_for_ipc(value: &str) -> String {
+        let raw = value.trim();
+        if raw.is_empty() {
+            return String::new();
+        }
+
+        if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S") {
+            return dt.format("%Y-%m-%dT%H:%M:%S").to_string();
+        }
+        if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M") {
+            return dt.format("%Y-%m-%dT%H:%M:%S").to_string();
+        }
+        if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%dT%H:%M:%S") {
+            return dt.format("%Y-%m-%dT%H:%M:%S").to_string();
+        }
+        if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%dT%H:%M") {
+            return dt.format("%Y-%m-%dT%H:%M:%S").to_string();
+        }
+        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(raw) {
+            return dt.naive_local().format("%Y-%m-%dT%H:%M:%S").to_string();
+        }
+
+        raw.replace(' ', "T")
+    }
+
     /// 查询版本的所有换辊窗口
     ///
     /// # 参数
@@ -454,10 +479,13 @@ impl From<RollCampaignPlanEntity> for RollCampaignPlanInfo {
         Self {
             version_id: v.version_id,
             machine_code: v.machine_code,
-            initial_start_at: v.initial_start_at,
-            next_change_at: v.next_change_at,
+            initial_start_at: RollerApi::format_datetime_for_ipc(&v.initial_start_at),
+            next_change_at: v
+                .next_change_at
+                .as_deref()
+                .map(RollerApi::format_datetime_for_ipc),
             downtime_minutes: v.downtime_minutes,
-            updated_at: v.updated_at,
+            updated_at: RollerApi::format_datetime_for_ipc(&v.updated_at),
             updated_by: v.updated_by,
         }
     }
@@ -538,5 +566,22 @@ mod tests {
     fn test_roller_api_structure() {
         // 这个测试只是验证结构是否正确定义
         // 实际的集成测试在 tests/ 目录
+    }
+
+    #[test]
+    fn test_roll_campaign_plan_info_datetime_for_ipc() {
+        let dto = RollCampaignPlanInfo::from(RollCampaignPlanEntity {
+            version_id: "v1".to_string(),
+            machine_code: "H032".to_string(),
+            initial_start_at: "2026-02-10 08:30:00".to_string(),
+            next_change_at: Some("2026-02-11 09:40".to_string()),
+            downtime_minutes: Some(45),
+            updated_at: "2026-02-10 10:11:12".to_string(),
+            updated_by: Some("tester".to_string()),
+        });
+
+        assert_eq!(dto.initial_start_at, "2026-02-10T08:30:00");
+        assert_eq!(dto.next_change_at.as_deref(), Some("2026-02-11T09:40:00"));
+        assert_eq!(dto.updated_at, "2026-02-10T10:11:12");
     }
 }

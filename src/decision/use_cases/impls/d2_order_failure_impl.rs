@@ -5,7 +5,7 @@
 // 职责: \"哪些紧急单无法完成\" 用例的具体实现
 // ==========================================
 
-use crate::decision::repository::order_failure_repo::OrderFailureRepository;
+use crate::decision::repository::order_failure_repo::{MaterialFailureRecord, OrderFailureRepository};
 use crate::decision::use_cases::d2_order_failure::{
     FailureStats, OrderFailure, OrderFailureUseCase,
 };
@@ -32,6 +32,45 @@ impl OrderFailureUseCaseImpl {
         self.repo
             .get_primary_machine_codes(contract_nos)
             .map_err(|e| format!("查询合同主机组失败: {}", e))
+    }
+
+    /// 批量获取合同主材料号（用于 API 层精确定位物料）
+    ///
+    /// 策略：
+    /// - 优先选择未排产的材料（更能代表“失败待处理目标”）；
+    /// - 若都已排产，回退到合同内稳定排序后的首个材料。
+    pub fn get_primary_material_ids(
+        &self,
+        version_id: &str,
+        contract_nos: &[String],
+    ) -> Result<HashMap<String, String>, String> {
+        self.repo
+            .get_primary_material_ids(version_id, contract_nos)
+            .map_err(|e| format!("查询合同主材料失败: {}", e))
+    }
+
+    /// 批量查询失败合同内的材料明细（材料维度）
+    pub fn list_material_failures(
+        &self,
+        version_id: &str,
+        contract_nos: &[String],
+        urgency_levels: Option<&[String]>,
+        machine_codes: Option<&[String]>,
+        due_date_from: Option<&str>,
+        due_date_to: Option<&str>,
+        only_unscheduled: Option<bool>,
+    ) -> Result<Vec<MaterialFailureRecord>, String> {
+        self.repo
+            .list_material_failures(
+                version_id,
+                contract_nos,
+                urgency_levels,
+                machine_codes,
+                due_date_from,
+                due_date_to,
+                only_unscheduled,
+            )
+            .map_err(|e| format!("查询材料失败明细失败: {}", e))
     }
 }
 

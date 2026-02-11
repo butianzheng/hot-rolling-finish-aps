@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { workbenchQueryKeys } from '../queryKeys';
+import { decisionQueryKeys } from '../../../hooks/queries/use-decision-queries';
 
 /**
  * Workbench 统一刷新协调器
@@ -18,7 +19,7 @@ export function useWorkbenchRefreshActions(): {
 } {
   const queryClient = useQueryClient();
 
-  // 刷新所有 Workbench 数据（操作完成后的全量刷新）
+  // 刷新所有 Workbench + 风险概览依赖数据（操作完成后的全量刷新）
   const refreshAll = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: workbenchQueryKeys.all }),
@@ -26,6 +27,9 @@ export function useWorkbenchRefreshActions(): {
       // TODO(M1): 统一所有组件到 workbenchQueryKeys 后可移除
       queryClient.invalidateQueries({ queryKey: ['planItems'] }),
       queryClient.invalidateQueries({ queryKey: ['materials'] }),
+      queryClient.invalidateQueries({ queryKey: decisionQueryKeys.all }),
+      queryClient.invalidateQueries({ queryKey: ['globalKpi'] }),
+      queryClient.invalidateQueries({ queryKey: ['decisionRefreshStatus'] }),
     ]);
   }, [queryClient]);
 
@@ -59,4 +63,3 @@ export function useWorkbenchRefreshActions(): {
 
   return { refreshAll, refreshPlanItems, refreshMaterials, refreshPathOverride, refreshRollCycleAnchor };
 }
-

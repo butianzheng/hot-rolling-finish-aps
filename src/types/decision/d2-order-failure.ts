@@ -44,6 +44,47 @@ export interface ListOrderFailureSetRequest {
   offset?: number;
 }
 
+/**
+ * D2M 请求: 查询材料失败集合（材料维度）
+ */
+export interface ListMaterialFailureSetRequest {
+  /** 方案版本 ID（必填） */
+  versionId: string;
+
+  /** 期望计划修订号（可选，用于防陈旧读取） */
+  expectedPlanRev?: number;
+
+  /** 失败类型过滤（可选） */
+  failTypeFilter?: FailType[];
+
+  /** 紧急等级过滤（可选） */
+  urgencyLevelFilter?: UrgencyLevel[];
+
+  /** 机组代码过滤（可选） */
+  machineCodes?: string[];
+
+  /** 交货日期范围起始（可选） */
+  dueDateFrom?: string;
+
+  /** 交货日期范围结束（可选） */
+  dueDateTo?: string;
+
+  /** 完成率阈值过滤（可选） */
+  completionRateThreshold?: number;
+
+  /** 问题范围（可选，默认 UNSCHEDULED_ONLY） */
+  problemScope?: MaterialFailureProblemScope;
+
+  /** 仅看未排产材料（可选） */
+  onlyUnscheduled?: boolean;
+
+  /** 分页：限制条数（可选，默认 50） */
+  limit?: number;
+
+  /** 分页：偏移量（可选，默认 0） */
+  offset?: number;
+}
+
 // ==========================================
 // D2 响应类型
 // ==========================================
@@ -64,6 +105,11 @@ export type FailType =
  * 紧急等级枚举（分层制，非评分）
  */
 export type UrgencyLevel = 'L0' | 'L1' | 'L2' | 'L3';
+
+/**
+ * D2M 问题范围
+ */
+export type MaterialFailureProblemScope = 'UNSCHEDULED_ONLY' | 'DUE_WINDOW_CRITICAL';
 
 /**
  * 阻塞因素 DTO
@@ -88,6 +134,9 @@ export interface BlockingFactor {
 export interface OrderFailure {
   /** 合同号 */
   contractNo: string;
+
+  /** 主材料号（优先未排产材料，用于精确定位） */
+  materialId?: string;
 
   /** 交期 */
   dueDate: string;
@@ -161,6 +210,64 @@ export interface OrderFailureSetResponse {
   items: OrderFailure[];
   totalCount: number;
   summary: OrderFailureSummary;
+}
+
+/**
+ * 材料失败 DTO（材料维度）
+ */
+export interface MaterialFailure {
+  materialId: string;
+  contractNo: string;
+  dueDate: string;
+  daysToDue: number;
+  urgencyLevel: UrgencyLevel;
+  failType: FailType;
+  completionRate: number;
+  weightT: number;
+  unscheduledWeightT: number;
+  machineCode: string;
+  isScheduled: boolean;
+  blockingFactors: BlockingFactor[];
+  failureReasons: string[];
+  recommendedActions?: string[];
+}
+
+/**
+ * 材料失败摘要 DTO
+ */
+export interface MaterialFailureSummary {
+  totalFailedMaterials: number;
+  totalFailedContracts: number;
+  overdueMaterials: number;
+  unscheduledMaterials: number;
+  totalUnscheduledWeightT: number;
+  byFailType: TypeCount[];
+  byUrgency: TypeCount[];
+}
+
+/**
+ * 材料失败-合同聚合 DTO
+ */
+export interface MaterialFailureContractAggregate {
+  contractNo: string;
+  materialCount: number;
+  unscheduledCount: number;
+  overdueCount: number;
+  earliestDueDate: string;
+  maxUrgencyLevel: UrgencyLevel;
+  representativeMaterialId: string;
+}
+
+/**
+ * D2M 响应: 材料失败集合
+ */
+export interface MaterialFailureSetResponse {
+  versionId: string;
+  asOf: string;
+  items: MaterialFailure[];
+  totalCount: number;
+  summary: MaterialFailureSummary;
+  contractAggregates: MaterialFailureContractAggregate[];
 }
 
 // ==========================================

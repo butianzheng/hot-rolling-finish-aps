@@ -137,6 +137,14 @@ const PlanningWorkbench: React.FC = () => {
 
   const jumpSelfCheckDoneRef = useRef<string>('');
 
+  // 深链接目标到达时，重置矩阵状态快筛，避免保留旧状态导致“定位成功但列表看不见”。
+  useEffect(() => {
+    const materialId = String(deepLinkContext?.materialId || '').trim();
+    const contractNo = String(deepLinkContext?.contractNo || '').trim();
+    if (!materialId && !contractNo) return;
+    setScheduleStatusFilter('ALL');
+  }, [deepLinkContext?.contractNo, deepLinkContext?.materialId]);
+
   useEffect(() => {
     const materialId = String(deepLinkContext?.materialId || '').trim();
     const contractNo = String(deepLinkContext?.contractNo || '').trim();
@@ -160,6 +168,9 @@ const PlanningWorkbench: React.FC = () => {
     const scopeText = materialId ? `材料 ${materialId}` : `合同 ${contractNo}`;
     if (hitInMaterials || hitInPlanItems) {
       message.info(`跳转自检通过：已命中${scopeText}`);
+    } else if (materialId && hitInMaterials) {
+      // material_id 深链进入时，排程可能不在当前默认时间窗内；后续由矩阵定位模式继续精确定位。
+      message.info(`跳转自检：已命中${scopeText}，正在按排程坐标定位`);
     } else {
       const hasLoadError = !!materialsQuery.error || !!planItemsQuery.error;
       const suffix = hasLoadError ? '（数据加载异常，请点“重试”）' : '（可点“刷新”后重试）';

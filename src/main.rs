@@ -148,10 +148,11 @@ fn main() {
             apply_rhythm_preset,
             get_daily_rhythm_profile,
             // ==========================================
-            // 决策支持相关命令 (6个)
+            // 决策支持相关命令 (7个)
             // ==========================================
             get_decision_day_summary,       // D1: 哪天最危险
             list_order_failure_set,         // D2: 哪些紧急单无法完成
+            list_material_failure_set,      // D2M: 哪些材料无法满足
             get_cold_stock_profile,         // D3: 哪些冷料压库
             get_machine_bottleneck_profile, // D4: 哪个机组最堵
             get_roll_campaign_alert,        // D5: 换辊是否异常

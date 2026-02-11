@@ -47,7 +47,15 @@ export interface PlanItemVisualizationProps {
   defaultDateRange?: [Dayjs, Dayjs] | null;
   statusFilter?: PlanItemStatusFilter;
   onStatusFilterChange?: (next: PlanItemStatusFilter) => void;
-  focusRequest?: { machine?: string; date: string; nonce: string | number; searchText?: string } | null;
+  focusRequest?: {
+    machine?: string;
+    date?: string;
+    nonce: string | number;
+    searchText?: string;
+    materialId?: string;
+    contractNo?: string;
+    mode?: 'MATERIAL_LOCATE' | 'SEARCH' | 'DATE';
+  } | null;
   selectedMaterialIds?: string[];
   onSelectedMaterialIdsChange?: (ids: string[]) => void;
 }

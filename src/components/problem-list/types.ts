@@ -17,6 +17,7 @@ export type { DrilldownSpec, ProblemSeverity, RiskProblem, WorkbenchTabKey };
 
 export interface ProblemListProps {
   loading?: boolean;
+  snapshotKey?: string;
   problems: RiskProblem[];
   onOpenDrilldown: (spec: DrilldownSpec) => void;
   onGoWorkbench: (problem: RiskProblem) => void;

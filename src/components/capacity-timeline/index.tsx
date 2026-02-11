@@ -15,8 +15,8 @@ import { StackedBarChart } from './StackedBarChart';
 import { Legend } from './Legend';
 import { CapacityImpactPanel } from '../CapacityImpactPanel';
 import { predictRemovalImpact } from '../../services/capacityImpactService';
-import type { PlanItemStatusFilter } from '../../utils/planItemStatus';
 import { formatPercent, formatWeight } from '../../utils/formatters';
+import type { OpenScheduleCellOptions } from './types';
 
 const { Text, Title } = Typography;
 
@@ -66,7 +66,7 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
     return Math.max(0, statusSummary.totalCount - statusSummary.lockedInPlanCount);
   }, [statusSummary]);
 
-  const openScheduleCell = (options?: { statusFilter?: PlanItemStatusFilter }) => {
+  const openScheduleCell = (options?: OpenScheduleCellOptions) => {
     onOpenScheduleCell?.(data.machineCode, data.date, materialIds, options);
   };
 
@@ -186,6 +186,7 @@ const CapacityTimelineComponent: React.FC<CapacityTimelineProps> = ({
             segments={segments}
             utilizationPercent={utilizationPercent}
             height={height}
+            onSegmentClick={(urgencyLevel) => clickable && openScheduleCell({ urgencyLevel })}
           />
         </div>
 

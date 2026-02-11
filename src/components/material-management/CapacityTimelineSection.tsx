@@ -8,18 +8,25 @@ import { ReloadOutlined } from '@ant-design/icons';
 import type { Dayjs } from 'dayjs';
 import { CapacityTimeline } from '../CapacityTimeline';
 import type { CapacityTimelineData } from '../../types/capacity';
+import type { OpenScheduleCellOptions } from '../capacity-timeline/types';
 
 export interface CapacityTimelineSectionProps {
   machineOptions: Array<{ label: string; value: string }>;
-  timelineMachine: string | undefined;
+  timelineMachine: string;
   timelineDate: Dayjs;
-  timelineData: CapacityTimelineData | null;
+  timelineData: CapacityTimelineData[];
   timelineLoading: boolean;
   timelineError: string | null;
   activeVersionId: string | null;
-  onMachineChange: (machine: string | undefined) => void;
+  onMachineChange: (machine: string) => void;
   onDateChange: (date: Dayjs) => void;
   onReload: () => void;
+  onOpenScheduleCell?: (
+    machineCode: string,
+    date: string,
+    materialIds: string[],
+    options?: OpenScheduleCellOptions
+  ) => void;
 }
 
 export const CapacityTimelineSection: React.FC<CapacityTimelineSectionProps> = ({
@@ -33,6 +40,7 @@ export const CapacityTimelineSection: React.FC<CapacityTimelineSectionProps> = (
   onMachineChange,
   onDateChange,
   onReload,
+  onOpenScheduleCell,
 }) => {
   return (
     <Collapse
@@ -50,7 +58,7 @@ export const CapacityTimelineSection: React.FC<CapacityTimelineSectionProps> = (
                   value={timelineMachine}
                   style={{ width: 160 }}
                   placeholder="请选择机组"
-                  options={machineOptions}
+                  options={[{ label: '全部机组', value: 'all' }, ...machineOptions]}
                   showSearch
                   optionFilterProp="label"
                   onChange={(value) => onMachineChange(value)}
@@ -79,8 +87,16 @@ export const CapacityTimelineSection: React.FC<CapacityTimelineSectionProps> = (
               ) : (
                 <Spin spinning={timelineLoading}>
                   <div style={{ minHeight: 80 }}>
-                    {timelineData ? (
-                      <CapacityTimeline data={timelineData} />
+                    {timelineData.length > 0 ? (
+                      <Space direction="vertical" style={{ width: '100%' }} size={8}>
+                        {timelineData.map((row) => (
+                          <CapacityTimeline
+                            key={`${row.machineCode}__${row.date}`}
+                            data={row}
+                            onOpenScheduleCell={onOpenScheduleCell}
+                          />
+                        ))}
+                      </Space>
                     ) : (
                       <Empty description="暂无产能时间线数据" />
                     )}

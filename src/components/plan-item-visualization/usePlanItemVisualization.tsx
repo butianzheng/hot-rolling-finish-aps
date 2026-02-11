@@ -203,6 +203,7 @@ export function usePlanItemVisualization(
     },
     [onSelectedMaterialIdsChange]
   );
+  const pendingLocateMaterialRef = useRef<string | null>(null);
 
   // 详情模态框
   const [selectedItem, setSelectedItem] = useState<PlanItem | null>(null);
@@ -266,7 +267,7 @@ export function usePlanItemVisualization(
   const loadPlanItems = useCallback(
     async (_versionId?: string, _date?: string) => {
       if (!_versionId && !activeVersionId) {
-        message.warning('请先���活一个版本');
+        message.warning('请先激活一个版本');
         return;
       }
       // 忽略参数（原实现支持 date 参数但实际未使用）
@@ -302,16 +303,10 @@ export function usePlanItemVisualization(
         const materialId = String(item.material_id || '').toLowerCase();
         const steelGrade = String(item.steel_grade || '').toLowerCase();
         const contractNo = String(item.contract_no || '').toLowerCase();
-        const dueDate = String(item.due_date || '').toLowerCase();
-        const scheduledDate = String(item.scheduled_date || '').toLowerCase();
-        const scheduledMachine = String(item.scheduled_machine_code || '').toLowerCase();
         return (
           materialId.includes(searchLower) ||
           steelGrade.includes(searchLower) ||
-          contractNo.includes(searchLower) ||
-          dueDate.includes(searchLower) ||
-          scheduledDate.includes(searchLower) ||
-          scheduledMachine.includes(searchLower)
+          contractNo.includes(searchLower)
         );
       });
     }
@@ -340,6 +335,36 @@ export function usePlanItemVisualization(
     statusFilter,
     calculateStatistics,
   ]);
+
+  const applyMaterialLocation = useCallback(
+    (item: PlanItem, materialId: string) => {
+      const machine = String(item.machine_code || '').trim();
+      const planDate = String(item.plan_date || '').trim();
+      const d = dayjs(planDate);
+
+      setSelectedUrgentLevel('all');
+      setSearchText('');
+      if (machine) setSelectedMachine(machine);
+      if (d.isValid()) {
+        setSelectedDate(d);
+        setDateRange(null);
+      }
+      setSelectedMaterialIds([materialId]);
+      message.success(`已定位材料 ${materialId}：${machine || '-'} / ${planDate || '-'}`);
+    },
+    [setSelectedMaterialIds]
+  );
+
+  const findPlanItemByMaterialId = useCallback(
+    (materialId: string) => {
+      const target = String(materialId || '').trim().toLowerCase();
+      if (!target) return null;
+      return (
+        planItems.find((it) => String(it.material_id || '').trim().toLowerCase() === target) ?? null
+      );
+    },
+    [planItems]
+  );
 
   // 查看详情
   const handleViewDetail = useCallback((item: PlanItem) => {
@@ -527,12 +552,84 @@ export function usePlanItemVisualization(
     setSelectedUrgentLevel(urgentLevel ?? 'all');
   }, [urgentLevel]);
 
-  // 外部聚焦（从产能概览/甘特同日明细跳转到矩阵时）
+  const resolveMaterialFocus = useCallback(
+    async (materialIdRaw: string) => {
+      const materialId = String(materialIdRaw || '').trim();
+      if (!materialId) return;
+
+      const matched = findPlanItemByMaterialId(materialId);
+      if (matched) {
+        pendingLocateMaterialRef.current = null;
+        applyMaterialLocation(matched, materialId);
+        return;
+      }
+
+      try {
+        const detail: any = await materialApi.getMaterialDetail(materialId);
+        const state = detail?.state ?? null;
+        const master = detail?.master ?? null;
+
+        const scheduledMachine = String(
+          state?.scheduled_machine_code || master?.current_machine_code || ''
+        ).trim();
+        const scheduledDate = String(state?.scheduled_date || '').trim();
+        const d = dayjs(scheduledDate);
+
+        setSelectedUrgentLevel('all');
+        setSearchText('');
+        if (scheduledMachine) setSelectedMachine(scheduledMachine);
+        if (d.isValid()) {
+          setSelectedDate(d);
+          setDateRange(null);
+          pendingLocateMaterialRef.current = materialId;
+          message.info(`正在定位材料 ${materialId} 的排程单元`);
+          return;
+        }
+
+        pendingLocateMaterialRef.current = null;
+        setSelectedMaterialIds([]);
+        message.warning(`材料 ${materialId} 未排产，已定位到物料池`);
+      } catch (error) {
+        pendingLocateMaterialRef.current = null;
+        console.error('材料定位失败:', error);
+        message.warning(`材料 ${materialId} 定位失败，已定位到物料池`);
+      }
+    },
+    [applyMaterialLocation, findPlanItemByMaterialId, setSelectedMaterialIds]
+  );
+
+  useEffect(() => {
+    const pendingMaterialId = pendingLocateMaterialRef.current;
+    if (!pendingMaterialId) return;
+    if (planItemsQuery.isFetching) return;
+
+    const matched = findPlanItemByMaterialId(pendingMaterialId);
+    if (matched) {
+      pendingLocateMaterialRef.current = null;
+      applyMaterialLocation(matched, pendingMaterialId);
+      return;
+    }
+
+    pendingLocateMaterialRef.current = null;
+    setSelectedMaterialIds([]);
+    message.warning(`材料 ${pendingMaterialId} 未排产，已定位到物料池`);
+  }, [applyMaterialLocation, findPlanItemByMaterialId, planItemsQuery.isFetching, setSelectedMaterialIds]);
+
+  // 外部聚焦（从风险/问题卡片跳转到矩阵时）
   useEffect(() => {
     if (!focusRequest) return;
+    const mode = String(focusRequest.mode || '').trim();
+    const materialId = String(focusRequest.materialId || '').trim();
+    const contractNo = String(focusRequest.contractNo || '').trim();
     const machine = String(focusRequest.machine || '').trim();
     const date = String(focusRequest.date || '').trim();
-    const nextSearchText = String(focusRequest.searchText || '').trim();
+    const nextSearchText = String(focusRequest.searchText || contractNo || '').trim();
+
+    if (materialId && mode !== 'SEARCH') {
+      void resolveMaterialFocus(materialId);
+      return;
+    }
+
     if (machine) setSelectedMachine(machine);
     if (date) {
       const d = dayjs(date);
@@ -541,14 +638,22 @@ export function usePlanItemVisualization(
         setDateRange(null);
       }
     }
+
     if (nextSearchText) {
       setSearchText(nextSearchText);
       setSelectedUrgentLevel('all');
-      setSelectedMachine('all');
-      setSelectedDate(null);
-      setDateRange(defaultDateRange ?? null);
+      if (materialId) {
+        setSelectedMaterialIds([materialId]);
+      } else {
+        setSelectedMaterialIds([]);
+      }
+      if (!machine) setSelectedMachine('all');
+      if (!date) {
+        setSelectedDate(null);
+        setDateRange(defaultDateRange ?? null);
+      }
     }
-  }, [focusRequest?.nonce, defaultDateRange]);
+  }, [defaultDateRange, focusRequest?.nonce, resolveMaterialFocus]);
 
   // 筛选条件变化时重新筛选
   useEffect(() => {

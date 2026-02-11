@@ -86,6 +86,7 @@ pub(super) fn bottleneck_type_to_string(
 pub(super) fn convert_order_failure_to_dto(
     failure: &crate::decision::use_cases::d2_order_failure::OrderFailure,
     machine_code: &str,
+    material_id: Option<&str>,
 ) -> OrderFailureDto {
     let scheduled_weight_t = (failure.total_materials - failure.unscheduled_count) as f64
         * (failure.unscheduled_weight_t / failure.unscheduled_count.max(1) as f64);
@@ -93,6 +94,7 @@ pub(super) fn convert_order_failure_to_dto(
 
     OrderFailureDto {
         contract_no: failure.contract_no.clone(),
+        material_id: material_id.map(|v| v.to_string()),
         due_date: failure.due_date.clone(),
         days_to_due: failure.days_to_due,
         urgency_level: failure.urgency_level.clone(),

@@ -12,7 +12,7 @@ function getDeepLinkContextLabel(context: string): string {
   if (context === 'risk') return '风险日';
   if (context === 'bottleneck') return '瓶颈点';
   if (context === 'capacityOpportunity') return '容量优化机会';
-  if (context === 'orders') return '订单失败';
+  if (context === 'orders') return '材料失败';
   if (context === 'coldStock') return '冷坨高压力';
   if (context === 'roll') return '换辊警报';
   return '';
@@ -60,20 +60,32 @@ export function useWorkbenchDeepLink(params: {
     });
   }, [globalMachineCode, setPoolSelection]);
 
-  // 深链接：从“策略对比/变更明细”等页面跳转到工作台时，可携带 material_id 自动打开详情侧栏
-  // 并将物料池搜索词置为 material_id，提升“精准定位”命中率。
+  // 深链接：material_id 进入工作台
+  // - matrix/决策上下文：统一走矩阵定位，不自动开详情，不写左侧搜索词
+  // - 其他上下文：保持原行为（可自动开详情）
   useEffect(() => {
     const materialId = searchParams.get('material_id');
     const id = String(materialId || '').trim();
     if (!id) return;
-    setInspectedMaterialId(id);
-    setInspectorOpen(true);
+    const context = String(searchParams.get('context') || '').trim();
+    const focus = normalizeDeepLinkFocus(searchParams.get('focus'));
+    const matrixLocateMode = focus === 'matrix' || context === 'orders' || context === 'risk' || context === 'bottleneck' || context === 'capacityOpportunity' || context === 'coldStock' || context === 'roll';
+    const skipAutoInspect =
+      matrixLocateMode;
+    if (skipAutoInspect) {
+      setInspectedMaterialId(null);
+      setInspectorOpen(false);
+    } else {
+      setInspectedMaterialId(id);
+      setInspectorOpen(true);
+    }
     setWorkbenchViewMode('MATRIX');
     setPoolSelection((prev) => {
       const next = {
         ...prev,
         machineCode: null,
-        searchText: id,
+        // matrix 定位时，左侧不再按单材料过滤，避免“只剩一条”的错觉
+        searchText: matrixLocateMode ? '' : id,
         schedState: null,
       };
       if (
@@ -97,6 +109,7 @@ export function useWorkbenchDeepLink(params: {
   ]);
 
   // 深链接：contract_no 回退定位（无法直接定位 material_id 时）
+  // 统一走矩阵定位，不再改左侧搜索词（右侧矩阵由 focusRequest 驱动合同搜索）。
   useEffect(() => {
     const materialId = String(searchParams.get('material_id') || '').trim();
     if (materialId) return; // material_id 优先
@@ -108,7 +121,7 @@ export function useWorkbenchDeepLink(params: {
       const next = {
         ...prev,
         machineCode: null,
-        searchText: contractNo,
+        searchText: '',
         schedState: null,
       };
       if (

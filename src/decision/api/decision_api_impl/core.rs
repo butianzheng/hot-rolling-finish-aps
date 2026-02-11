@@ -1,14 +1,17 @@
 use crate::decision::api::decision_api::DecisionApi;
 use crate::decision::api::dto::*;
 use crate::decision::use_cases::{
-    d1_most_risky_day::MostRiskyDayUseCase, d2_order_failure::OrderFailureUseCase,
-    d3_cold_stock::ColdStockUseCase, d4_machine_bottleneck::MachineBottleneckProfile,
+    d1_most_risky_day::MostRiskyDayUseCase,
+    d2_order_failure::{FailureType, OrderFailureUseCase},
+    d3_cold_stock::ColdStockUseCase,
+    d4_machine_bottleneck::{BottleneckReason, MachineBottleneckProfile},
     d4_machine_bottleneck::MachineBottleneckUseCase,
     d5_roll_campaign_alert::RollCampaignAlertUseCase,
-    d6_capacity_opportunity::CapacityOpportunityUseCase, impls::*,
+    d6_capacity_opportunity::CapacityOpportunityUseCase,
+    impls::*,
 };
 use chrono::NaiveDate;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use super::conversions::{
@@ -16,6 +19,26 @@ use super::conversions::{
     convert_capacity_opportunity_to_dto, convert_cold_stock_to_dto, convert_day_summary_to_dto,
     convert_order_failure_to_dto, convert_roll_alert_to_dto, generate_heatmap_stats,
 };
+
+fn failure_type_code(ft: &FailureType) -> &'static str {
+    match ft {
+        FailureType::Overdue => "Overdue",
+        FailureType::NearDueImpossible => "NearDueImpossible",
+        FailureType::CapacityShortage => "CapacityShortage",
+        FailureType::StructureConflict => "StructureConflict",
+        FailureType::ColdStockNotReady => "ColdStockNotReady",
+        FailureType::Other => "Other",
+    }
+}
+
+fn urgency_rank(level: &str) -> i32 {
+    match level {
+        "L3" => 3,
+        "L2" => 2,
+        "L1" => 1,
+        _ => 0,
+    }
+}
 
 /// DecisionApi 实现 (P2 版本: 支持 D1-D6)
 pub struct DecisionApiImpl {
@@ -139,11 +162,21 @@ impl DecisionApiImpl {
         let dates = Self::build_date_axis(&request.date_from, &request.date_to);
         for machine_code in missing_machines {
             for plan_date in &dates {
-                profiles.push(MachineBottleneckProfile::new(
+                let mut profile = MachineBottleneckProfile::new(
                     request.version_id.clone(),
                     machine_code.clone(),
                     plan_date.clone(),
-                ));
+                );
+                profile.reasons.push(BottleneckReason {
+                    code: "NO_CAPACITY_POOL_CONFIG".to_string(),
+                    description: "该机组无产能池配置，当前仅作为缺失行展示".to_string(),
+                    severity: 0.0,
+                    affected_materials: 0,
+                });
+                profile
+                    .suggested_actions
+                    .push("补齐该机组 capacity_pool 配置".to_string());
+                profiles.push(profile);
             }
         }
     }
@@ -335,6 +368,9 @@ impl DecisionApi for DecisionApiImpl {
         let machine_code_map = d2_use_case
             .get_primary_machine_codes(&contract_nos)
             .unwrap_or_default();
+        let material_id_map = d2_use_case
+            .get_primary_material_ids(&request.version_id, &contract_nos)
+            .unwrap_or_default();
 
         // 转换为 DTO
         let dto_items: Vec<OrderFailureDto> = items
@@ -344,7 +380,8 @@ impl DecisionApi for DecisionApiImpl {
                     .get(&f.contract_no)
                     .map(|s| s.as_str())
                     .unwrap_or("UNKNOWN");
-                convert_order_failure_to_dto(&f, machine_code)
+                let material_id = material_id_map.get(&f.contract_no).map(|s| s.as_str());
+                convert_order_failure_to_dto(&f, machine_code, material_id)
             })
             .collect();
 
@@ -382,6 +419,331 @@ impl DecisionApi for DecisionApiImpl {
             items: dto_items,
             total_count,
             summary: summary_dto,
+        })
+    }
+
+    fn list_material_failure_set(
+        &self,
+        request: ListMaterialFailureSetRequest,
+    ) -> Result<MaterialFailureSetResponse, String> {
+        let d2_use_case = self
+            .d2_use_case
+            .as_ref()
+            .ok_or("D2 用例未配置,请使用 new_full() 创建 DecisionApiImpl 实例".to_string())?;
+
+        let zero_summary = MaterialFailureSummaryDto {
+            total_failed_materials: 0,
+            total_failed_contracts: 0,
+            overdue_materials: 0,
+            unscheduled_materials: 0,
+            total_unscheduled_weight_t: 0.0,
+            by_fail_type: vec![],
+            by_urgency: vec![],
+        };
+
+        let raw_problem_scope = request
+            .problem_scope
+            .as_deref()
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .unwrap_or("UNSCHEDULED_ONLY")
+            .to_ascii_uppercase();
+        let problem_scope = if raw_problem_scope == "DUE_WINDOW_CRITICAL" {
+            "DUE_WINDOW_CRITICAL"
+        } else {
+            "UNSCHEDULED_ONLY"
+        };
+        let only_unscheduled = match request.only_unscheduled {
+            Some(v) => Some(v),
+            None if problem_scope == "UNSCHEDULED_ONLY" => Some(true),
+            None => None,
+        };
+        // DUE_WINDOW_CRITICAL：聚焦临期窗口（含逾期）
+        const DUE_WINDOW_CRITICAL_DAYS: i32 = 3;
+
+        // 先按合同维度取失败集合，再下钻到材料维度，保证 D2 口径一致。
+        let mut contract_failures = d2_use_case.list_order_failures(&request.version_id, None)?;
+
+        if let Some(ref fail_types) = request.fail_type_filter {
+            let allowed: HashSet<&str> = fail_types.iter().map(|s| s.as_str()).collect();
+            if !allowed.is_empty() {
+                contract_failures.retain(|f| allowed.contains(failure_type_code(&f.fail_type)));
+            }
+        }
+
+        if let Some(ref levels) = request.urgency_level_filter {
+            if !levels.is_empty() {
+                contract_failures.retain(|f| levels.contains(&f.urgency_level));
+            }
+        }
+
+        if let Some(threshold) = request.completion_rate_threshold {
+            // 与 list_order_failure_set 保持一致：沿用现有阈值口径（领域对象 completion_rate）。
+            contract_failures.retain(|f| f.completion_rate <= threshold);
+        }
+
+        if contract_failures.is_empty() {
+            return Ok(MaterialFailureSetResponse {
+                version_id: request.version_id,
+                as_of: chrono::Utc::now().to_rfc3339(),
+                items: vec![],
+                total_count: 0,
+                summary: zero_summary,
+                contract_aggregates: vec![],
+            });
+        }
+
+        let mut failure_by_contract: HashMap<
+            String,
+            crate::decision::use_cases::d2_order_failure::OrderFailure,
+        > = HashMap::with_capacity(contract_failures.len());
+        for f in contract_failures {
+            failure_by_contract.insert(f.contract_no.clone(), f);
+        }
+
+        let contract_nos: Vec<String> = failure_by_contract.keys().cloned().collect();
+        let mut material_rows = d2_use_case.list_material_failures(
+            &request.version_id,
+            &contract_nos,
+            request.urgency_level_filter.as_deref(),
+            request.machine_codes.as_deref(),
+            request.due_date_from.as_deref(),
+            request.due_date_to.as_deref(),
+            only_unscheduled,
+        )?;
+        if problem_scope == "DUE_WINDOW_CRITICAL" {
+            material_rows.retain(|row| row.days_to_due <= DUE_WINDOW_CRITICAL_DAYS);
+        }
+
+        let mut all_items: Vec<MaterialFailureDto> = material_rows
+            .into_iter()
+            .filter_map(|row| {
+                let failure = failure_by_contract.get(&row.contract_no)?;
+                let unscheduled_weight_t = if row.is_scheduled { 0.0 } else { row.weight_t };
+                let denom = failure.unscheduled_weight_t.max(1.0);
+                let blocking_factors = failure
+                    .blocking_factors
+                    .iter()
+                    .map(|bf| BlockingFactorDto {
+                        factor_type: bf.code.clone(),
+                        description: bf.description.clone(),
+                        impact: (bf.affected_weight_t / denom).clamp(0.0, 1.0),
+                        affected_material_count: bf.affected_count.max(0) as u32,
+                    })
+                    .collect::<Vec<_>>();
+                let recommended_actions = if failure.suggested_actions.is_empty() {
+                    None
+                } else {
+                    Some(failure.suggested_actions.clone())
+                };
+
+                Some(MaterialFailureDto {
+                    material_id: row.material_id,
+                    contract_no: row.contract_no,
+                    due_date: row.due_date,
+                    days_to_due: row.days_to_due,
+                    urgency_level: row.urgency_level,
+                    fail_type: failure_type_code(&failure.fail_type).to_string(),
+                    completion_rate: failure.completion_rate * 100.0,
+                    weight_t: row.weight_t,
+                    unscheduled_weight_t,
+                    machine_code: row.machine_code,
+                    is_scheduled: row.is_scheduled,
+                    blocking_factors,
+                    failure_reasons: failure.failure_reasons.clone(),
+                    recommended_actions,
+                })
+            })
+            .collect();
+
+        all_items.sort_by(|a, b| {
+            let u = urgency_rank(&b.urgency_level).cmp(&urgency_rank(&a.urgency_level));
+            if u != std::cmp::Ordering::Equal {
+                return u;
+            }
+            let unscheduled =
+                (if !b.is_scheduled { 1 } else { 0 }).cmp(&(if !a.is_scheduled { 1 } else { 0 }));
+            if unscheduled != std::cmp::Ordering::Equal {
+                return unscheduled;
+            }
+            let due = a.due_date.cmp(&b.due_date);
+            if due != std::cmp::Ordering::Equal {
+                return due;
+            }
+            let contract = a.contract_no.cmp(&b.contract_no);
+            if contract != std::cmp::Ordering::Equal {
+                return contract;
+            }
+            a.material_id.cmp(&b.material_id)
+        });
+
+        let mut by_fail_type_map: HashMap<String, (u32, f64)> = HashMap::new();
+        let mut by_urgency_map: HashMap<String, (u32, f64)> = HashMap::new();
+        let mut contract_set: HashSet<String> = HashSet::new();
+        let mut overdue_materials: u32 = 0;
+        let mut unscheduled_materials: u32 = 0;
+        let mut total_unscheduled_weight_t: f64 = 0.0;
+
+        #[derive(Clone)]
+        struct ContractAggTmp {
+            contract_no: String,
+            material_count: u32,
+            unscheduled_count: u32,
+            overdue_count: u32,
+            earliest_due_date: String,
+            max_urgency_level: String,
+            representative_material_id: String,
+            rep_unscheduled: i32,
+            rep_urgency: i32,
+            rep_due_date: String,
+        }
+
+        let mut contract_aggs: HashMap<String, ContractAggTmp> = HashMap::new();
+
+        for item in &all_items {
+            contract_set.insert(item.contract_no.clone());
+            if item.days_to_due < 0 {
+                overdue_materials += 1;
+            }
+            if !item.is_scheduled {
+                unscheduled_materials += 1;
+            }
+            total_unscheduled_weight_t += item.unscheduled_weight_t;
+
+            let fail_entry = by_fail_type_map
+                .entry(item.fail_type.clone())
+                .or_insert((0, 0.0));
+            fail_entry.0 += 1;
+            fail_entry.1 += item.unscheduled_weight_t;
+
+            let urgency_entry = by_urgency_map
+                .entry(item.urgency_level.clone())
+                .or_insert((0, 0.0));
+            urgency_entry.0 += 1;
+            urgency_entry.1 += item.unscheduled_weight_t;
+
+            let candidate_unscheduled = if !item.is_scheduled { 1 } else { 0 };
+            let candidate_urgency = urgency_rank(&item.urgency_level);
+            let candidate_due = item.due_date.clone();
+            let candidate_material_id = item.material_id.clone();
+
+            let entry = contract_aggs
+                .entry(item.contract_no.clone())
+                .or_insert_with(|| ContractAggTmp {
+                    contract_no: item.contract_no.clone(),
+                    material_count: 0,
+                    unscheduled_count: 0,
+                    overdue_count: 0,
+                    earliest_due_date: item.due_date.clone(),
+                    max_urgency_level: item.urgency_level.clone(),
+                    representative_material_id: item.material_id.clone(),
+                    rep_unscheduled: candidate_unscheduled,
+                    rep_urgency: candidate_urgency,
+                    rep_due_date: candidate_due.clone(),
+                });
+
+            entry.material_count += 1;
+            if !item.is_scheduled {
+                entry.unscheduled_count += 1;
+            }
+            if item.days_to_due < 0 {
+                entry.overdue_count += 1;
+            }
+            if item.due_date < entry.earliest_due_date {
+                entry.earliest_due_date = item.due_date.clone();
+            }
+            if urgency_rank(&item.urgency_level) > urgency_rank(&entry.max_urgency_level) {
+                entry.max_urgency_level = item.urgency_level.clone();
+            }
+
+            let should_replace_rep = if candidate_unscheduled != entry.rep_unscheduled {
+                candidate_unscheduled > entry.rep_unscheduled
+            } else if candidate_urgency != entry.rep_urgency {
+                candidate_urgency > entry.rep_urgency
+            } else if candidate_due != entry.rep_due_date {
+                candidate_due < entry.rep_due_date
+            } else {
+                candidate_material_id < entry.representative_material_id
+            };
+
+            if should_replace_rep {
+                entry.representative_material_id = candidate_material_id;
+                entry.rep_unscheduled = candidate_unscheduled;
+                entry.rep_urgency = candidate_urgency;
+                entry.rep_due_date = candidate_due;
+            }
+        }
+
+        let mut by_fail_type: Vec<TypeCountDto> = by_fail_type_map
+            .into_iter()
+            .map(|(type_name, (count, weight_t))| TypeCountDto {
+                type_name,
+                count,
+                weight_t,
+            })
+            .collect();
+        by_fail_type.sort_by(|a, b| {
+            b.count
+                .cmp(&a.count)
+                .then_with(|| a.type_name.cmp(&b.type_name))
+        });
+
+        let mut by_urgency: Vec<TypeCountDto> = by_urgency_map
+            .into_iter()
+            .map(|(type_name, (count, weight_t))| TypeCountDto {
+                type_name,
+                count,
+                weight_t,
+            })
+            .collect();
+        by_urgency.sort_by(|a, b| {
+            urgency_rank(&b.type_name)
+                .cmp(&urgency_rank(&a.type_name))
+                .then_with(|| a.type_name.cmp(&b.type_name))
+        });
+
+        let mut contract_aggregates: Vec<MaterialFailureContractAggregateDto> = contract_aggs
+            .into_values()
+            .map(|it| MaterialFailureContractAggregateDto {
+                contract_no: it.contract_no,
+                material_count: it.material_count,
+                unscheduled_count: it.unscheduled_count,
+                overdue_count: it.overdue_count,
+                earliest_due_date: it.earliest_due_date,
+                max_urgency_level: it.max_urgency_level,
+                representative_material_id: it.representative_material_id,
+            })
+            .collect();
+        contract_aggregates.sort_by(|a, b| {
+            b.unscheduled_count
+                .cmp(&a.unscheduled_count)
+                .then_with(|| b.overdue_count.cmp(&a.overdue_count))
+                .then_with(|| a.earliest_due_date.cmp(&b.earliest_due_date))
+                .then_with(|| a.contract_no.cmp(&b.contract_no))
+        });
+
+        let total_count = all_items.len() as u32;
+        let offset = request.offset.unwrap_or(0) as usize;
+        let limit = request.limit.unwrap_or(50) as usize;
+        let items = all_items.into_iter().skip(offset).take(limit).collect();
+
+        let summary = MaterialFailureSummaryDto {
+            total_failed_materials: total_count,
+            total_failed_contracts: contract_set.len() as u32,
+            overdue_materials,
+            unscheduled_materials,
+            total_unscheduled_weight_t,
+            by_fail_type,
+            by_urgency,
+        };
+
+        Ok(MaterialFailureSetResponse {
+            version_id: request.version_id,
+            as_of: chrono::Utc::now().to_rfc3339(),
+            items,
+            total_count,
+            summary,
+            contract_aggregates,
         })
     }
 

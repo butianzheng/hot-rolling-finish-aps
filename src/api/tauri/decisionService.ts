@@ -12,6 +12,7 @@ import {
   DecisionDaySummaryResponseSchema,
   MachineBottleneckProfileResponseSchema,
   OrderFailureSetResponseSchema,
+  MaterialFailureSetResponseSchema,
   ColdStockProfileResponseSchema,
   RollCampaignAlertResponseSchema,
   CapacityOpportunityResponseSchema,
@@ -24,6 +25,8 @@ import type {
   MachineBottleneckProfileResponse,
   ListOrderFailureSetRequest,
   OrderFailureSetResponse,
+  ListMaterialFailureSetRequest,
+  MaterialFailureSetResponse,
   GetColdStockProfileRequest,
   ColdStockProfileResponse,
   GetRollCampaignAlertRequest,
@@ -252,6 +255,19 @@ export async function listOrderFailureSet(
   );
 }
 
+/**
+ * 获取材料失败集合（D2M）
+ */
+export async function listMaterialFailureSet(
+  request: ListMaterialFailureSetRequest
+): Promise<MaterialFailureSetResponse> {
+  return callWithValidation<MaterialFailureSetResponse>(
+    'list_material_failure_set',
+    request,
+    MaterialFailureSetResponseSchema
+  );
+}
+
 // ==========================================
 // D3: 冷料压库概况 API
 // ==========================================
@@ -405,6 +421,22 @@ export async function getAllFailedOrders(
 }
 
 /**
+ * 获取所有失败材料（不分页）
+ */
+export async function getAllFailedMaterials(
+  versionId: string,
+  expectedPlanRev?: number,
+): Promise<MaterialFailureSetResponse> {
+  return listMaterialFailureSet({
+    versionId,
+    expectedPlanRev,
+    problemScope: 'UNSCHEDULED_ONLY',
+    onlyUnscheduled: true,
+    limit: 5000,
+  });
+}
+
+/**
  * 获取“哪些紧急单无法完成”（兼容旧 dashboard_api.get_unsatisfied_urgent_materials 语义）
  *
  * 默认:
@@ -543,8 +575,10 @@ export const decisionService = {
 
   // D2: 订单失败集合
   listOrderFailureSet,
+  listMaterialFailureSet,
   getUnsatisfiedUrgentMaterials,
   getAllFailedOrders,
+  getAllFailedMaterials,
 
   // D3: 冷料压库概况
   getColdStockProfile,

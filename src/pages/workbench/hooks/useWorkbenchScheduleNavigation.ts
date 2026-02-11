@@ -47,20 +47,46 @@ export function useWorkbenchScheduleNavigation(params: {
   const deepLinkMatrixFocus = useMemo<WorkbenchMatrixFocusRequest | null>(() => {
     const materialId = String(deepLinkContext?.materialId || '').trim();
     const contractNo = String(deepLinkContext?.contractNo || '').trim();
-    const searchText = materialId || contractNo;
-    if (!searchText) return null;
-
+    const context = String(deepLinkContext?.context || '').trim();
     const machine = String(deepLinkContext?.machine || '').trim();
     const dateRaw = String(deepLinkContext?.date || '').trim();
-    const date = dayjs(dateRaw).isValid() ? dateRaw : '';
+    const date = dayjs(dateRaw).isValid() ? dateRaw : undefined;
+
+    // D2/风险问题跳转：优先展示“对应材料清单”（合同搜索），不直接进入单材料定位态。
+    if (context === 'orders' && contractNo) {
+      return {
+        machine: machine || undefined,
+        date,
+        searchText: contractNo,
+        contractNo,
+        materialId: materialId || undefined,
+        mode: 'SEARCH',
+        nonce: `${Date.now()}-${contractNo}`,
+      };
+    }
+
+    if (materialId) {
+      return {
+        machine: machine || undefined,
+        date,
+        materialId,
+        contractNo: contractNo || undefined,
+        mode: 'MATERIAL_LOCATE',
+        nonce: `${Date.now()}-${materialId}`,
+      };
+    }
+
+    if (!contractNo) return null;
 
     return {
       machine: machine || undefined,
       date,
-      searchText,
-      nonce: `${Date.now()}-${searchText}`,
+      searchText: contractNo,
+      contractNo,
+      mode: 'SEARCH',
+      nonce: `${Date.now()}-${contractNo}`,
     };
-  }, [deepLinkContext?.contractNo, deepLinkContext?.date, deepLinkContext?.machine, deepLinkContext?.materialId]);
+  }, [deepLinkContext?.context, deepLinkContext?.contractNo, deepLinkContext?.date, deepLinkContext?.machine, deepLinkContext?.materialId]);
 
   const [calendarOpenCellRequest, setCalendarOpenCellRequest] = useState<WorkbenchGanttAutoOpenCell | null>(null);
   const autoOpenCell = calendarOpenCellRequest || deepLinkAutoOpenCell;

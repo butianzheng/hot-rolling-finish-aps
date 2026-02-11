@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Layout, Menu, Tag, Tooltip } from 'antd';
 import type { MenuProps } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
@@ -36,6 +37,7 @@ import { useGlobalKPI } from './hooks/useGlobalKPI';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useVersionSwitchInvalidation } from './hooks/useVersionSwitchInvalidation';
 import { useStalePlanRevBootstrap } from './hooks/useStalePlanRevBootstrap';
+import { decisionQueryKeys } from './hooks/queries/use-decision-queries';
 import { bootstrapFrontendRuntimeConfig } from './services/frontendRuntimeConfig';
 import { reportFrontendError } from './utils/telemetry';
 
@@ -101,6 +103,7 @@ export function shouldBackfillPlanContextFromRunEvent(params: {
 }
 
 const App: React.FC = () => {
+  const queryClient = useQueryClient();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -164,7 +167,14 @@ const App: React.FC = () => {
     return activeVersionId !== effectiveVersionId;
   }, [activeVersionId, effectiveVersionId]);
 
-  // 关键事件触发时刷新 KPI（联动：导入/重算/移单后 Header 指标应同步变化）
+  const invalidateDecisionViews = React.useCallback(() => {
+    // 决策相关页面（风险概览/问题列表）默认 staleTime 较长，必须在关键事件后主动失效。
+    void queryClient.invalidateQueries({ queryKey: decisionQueryKeys.all });
+    void queryClient.invalidateQueries({ queryKey: ['decisionRefreshStatus'] });
+    void queryClient.invalidateQueries({ queryKey: ['globalKpi'] });
+  }, [queryClient]);
+
+  // 关键事件触发时刷新 KPI + 失效决策缓存（联动：导入/重算/移单后风险视图应同步变化）
   useEvent('plan_updated', (payload: unknown) => {
     void refreshEffectiveVersion();
     expireLatestRunIfNeeded();
@@ -208,12 +218,15 @@ const App: React.FC = () => {
       }
     }
 
+    invalidateDecisionViews();
     if (activeVersionId) refetchGlobalKPI();
   });
   useEvent('risk_snapshot_updated', () => {
+    invalidateDecisionViews();
     if (activeVersionId) refetchGlobalKPI();
   });
   useEvent('material_state_changed', () => {
+    invalidateDecisionViews();
     if (activeVersionId) refetchGlobalKPI();
   });
 

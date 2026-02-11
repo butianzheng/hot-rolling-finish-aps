@@ -259,6 +259,53 @@ pub struct ListOrderFailureSetRequest {
     pub offset: Option<u32>,
 }
 
+/// D2M 请求: 查询材料失败集合（材料维度）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListMaterialFailureSetRequest {
+    /// 方案版本 ID（必填）
+    pub version_id: String,
+
+    /// 失败类型过滤（可选）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fail_type_filter: Option<Vec<String>>,
+
+    /// 紧急等级过滤（可选）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub urgency_level_filter: Option<Vec<String>>,
+
+    /// 机组代码过滤（可选）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub machine_codes: Option<Vec<String>>,
+
+    /// 交货日期范围起始（可选）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub due_date_from: Option<String>,
+
+    /// 交货日期范围结束（可选）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub due_date_to: Option<String>,
+
+    /// 完成率阈值过滤（可选）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completion_rate_threshold: Option<f64>,
+
+    /// 问题范围（可选，默认 UNSCHEDULED_ONLY）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub problem_scope: Option<String>,
+
+    /// 仅看未排产材料（可选）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub only_unscheduled: Option<bool>,
+
+    /// 分页：限制条数（可选，默认 50）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+
+    /// 分页：偏移量（可选，默认 0）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offset: Option<u32>,
+}
+
 /// D2 响应: 订单失败集合
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderFailureSetResponse {
@@ -269,10 +316,23 @@ pub struct OrderFailureSetResponse {
     pub summary: OrderFailureSummaryDto,
 }
 
+/// D2M 响应: 材料失败集合（材料维度）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MaterialFailureSetResponse {
+    pub version_id: String,
+    pub as_of: String,
+    pub items: Vec<MaterialFailureDto>,
+    pub total_count: u32,
+    pub summary: MaterialFailureSummaryDto,
+    pub contract_aggregates: Vec<MaterialFailureContractAggregateDto>,
+}
+
 /// 订单失败 DTO
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderFailureDto {
     pub contract_no: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub material_id: Option<String>,
     pub due_date: String,
     pub days_to_due: i32,
     pub urgency_level: String,
@@ -282,6 +342,26 @@ pub struct OrderFailureDto {
     pub scheduled_weight_t: f64,
     pub unscheduled_weight_t: f64,
     pub machine_code: String,
+    pub blocking_factors: Vec<BlockingFactorDto>,
+    pub failure_reasons: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recommended_actions: Option<Vec<String>>,
+}
+
+/// 材料失败 DTO
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MaterialFailureDto {
+    pub material_id: String,
+    pub contract_no: String,
+    pub due_date: String,
+    pub days_to_due: i32,
+    pub urgency_level: String,
+    pub fail_type: String,
+    pub completion_rate: f64,
+    pub weight_t: f64,
+    pub unscheduled_weight_t: f64,
+    pub machine_code: String,
+    pub is_scheduled: bool,
     pub blocking_factors: Vec<BlockingFactorDto>,
     pub failure_reasons: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -304,6 +384,30 @@ pub struct OrderFailureSummaryDto {
     pub by_fail_type: Vec<TypeCountDto>,
     pub by_urgency: Vec<TypeCountDto>,
     pub total_unscheduled_weight_t: f64,
+}
+
+/// 材料失败摘要 DTO
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MaterialFailureSummaryDto {
+    pub total_failed_materials: u32,
+    pub total_failed_contracts: u32,
+    pub overdue_materials: u32,
+    pub unscheduled_materials: u32,
+    pub total_unscheduled_weight_t: f64,
+    pub by_fail_type: Vec<TypeCountDto>,
+    pub by_urgency: Vec<TypeCountDto>,
+}
+
+/// 合同聚合 DTO（用于材料维度的上层聚合展示）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MaterialFailureContractAggregateDto {
+    pub contract_no: String,
+    pub material_count: u32,
+    pub unscheduled_count: u32,
+    pub overdue_count: u32,
+    pub earliest_due_date: String,
+    pub max_urgency_level: String,
+    pub representative_material_id: String,
 }
 
 // ==========================================

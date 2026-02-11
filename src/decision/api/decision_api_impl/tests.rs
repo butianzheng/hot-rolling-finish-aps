@@ -241,6 +241,17 @@ fn test_get_machine_bottleneck_profile() {
     assert_eq!(h031.plan_date, "2026-01-24");
     assert_eq!(h031.bottleneck_level, "NONE");
     assert_eq!(h031.bottleneck_score, 0.0);
+    assert!(
+        h031.reasons.iter().any(|r| r.code == "NO_CAPACITY_POOL_CONFIG"),
+        "H031 should expose NO_CAPACITY_POOL_CONFIG reason"
+    );
+    let actions = h031.recommended_actions.clone().unwrap_or_default();
+    assert!(
+        actions
+            .iter()
+            .any(|a| a.contains("capacity_pool") || a.contains("产能池")),
+        "H031 placeholder should suggest filling capacity_pool config"
+    );
 }
 
 #[test]

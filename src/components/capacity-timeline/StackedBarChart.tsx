@@ -14,6 +14,7 @@ export interface StackedBarChartProps {
   segments: SegmentWithWidth[];
   utilizationPercent: number;
   height: number;
+  onSegmentClick?: (urgencyLevel: 'L0' | 'L1' | 'L2' | 'L3') => void;
 }
 
 export const StackedBarChart: React.FC<StackedBarChartProps> = ({
@@ -21,6 +22,7 @@ export const StackedBarChart: React.FC<StackedBarChartProps> = ({
   segments,
   utilizationPercent,
   height,
+  onSegmentClick,
 }) => {
   return (
     <div
@@ -156,7 +158,7 @@ export const StackedBarChart: React.FC<StackedBarChartProps> = ({
                 style={{
                   flex: seg.widthPercent,
                   backgroundColor: color,
-                  cursor: 'help',
+                  cursor: onSegmentClick ? 'pointer' : 'help',
                   transition: 'opacity 0.2s',
                   display: 'flex',
                   alignItems: 'center',
@@ -164,6 +166,11 @@ export const StackedBarChart: React.FC<StackedBarChartProps> = ({
                   color: '#fff',
                   fontWeight: 'bold',
                   fontSize: 12,
+                }}
+                onClick={(e) => {
+                  if (!onSegmentClick) return;
+                  e.stopPropagation();
+                  onSegmentClick(seg.urgencyLevel as 'L0' | 'L1' | 'L2' | 'L3');
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
                 onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}

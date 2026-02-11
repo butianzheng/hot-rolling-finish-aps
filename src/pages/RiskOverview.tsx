@@ -13,6 +13,7 @@ import { useRiskOverviewData } from '../hooks/useRiskOverviewData';
 import type { DrilldownSpec, RiskProblem, WorkbenchTabKey } from '../hooks/useRiskOverviewData';
 import { useActiveVersionId, useGlobalActions } from '../stores/use-global-store';
 import type { AgeBin, PressureLevel, UrgencyLevel } from '../types/decision';
+import { useEvent } from '../api/eventBus';
 
 function normalizeDimensionTabKey(value: string | null): DimensionTabKey {
   const aliases: Record<string, DimensionTabKey> = {
@@ -141,6 +142,20 @@ const RiskOverview: React.FC = () => {
   const { setWorkbenchFilters, setWorkbenchViewMode } = useGlobalActions();
   const data = useRiskOverviewData(activeVersionId);
 
+  // 页面可见时，关键事件发生后主动刷新，避免用户感知到“操作成功但概览未变化”。
+  useEvent('plan_updated', () => {
+    if (!activeVersionId) return;
+    data.refetchAll();
+  });
+  useEvent('risk_snapshot_updated', () => {
+    if (!activeVersionId) return;
+    data.refetchAll();
+  });
+  useEvent('material_state_changed', () => {
+    if (!activeVersionId) return;
+    data.refetchAll();
+  });
+
   // C1修复：过滤出高压力和严重压力的冷坨数据，避免DrilldownDrawer显示无关数据
   const severeColdStockBuckets = useMemo(() =>
     data.coldStockBuckets.filter(b =>
@@ -264,6 +279,7 @@ const RiskOverview: React.FC = () => {
       urgencyLevel: urgency,
       planDate: planDate ?? problem.workbenchPlanDate ?? null,
       context: problem.workbenchContext ?? context,
+      materialId: problem.workbenchMaterialId ?? null,
       contractNo: problem.workbenchContractNo ?? null,
     });
   };
@@ -327,6 +343,11 @@ const RiskOverview: React.FC = () => {
     return activeVersionId !== effectiveVersionId;
   }, [activeVersionId, effectiveVersionId]);
 
+  useEffect(() => {
+    if (!activeVersionId) return;
+    data.refetchAll();
+  }, [activeVersionId]);
+
   return (
     <ErrorBoundary>
       <Space direction="vertical" size={12} style={{ width: '100%' }}>
@@ -345,6 +366,15 @@ const RiskOverview: React.FC = () => {
                 去版本对比激活
               </Button>
             }
+          />
+        )}
+
+        {data.unscheduledMachineGaps.length > 0 && (
+          <Alert
+            type="info"
+            showIcon
+            message="机组口径提示：存在未排材料机组未纳入瓶颈覆盖"
+            description={`未排统计涉及机组 ${data.unscheduledMachineGaps.join('、')}，但当前瓶颈/利用率未覆盖。请补齐产能池配置，或按“未配置机组”口径解读。`}
           />
         )}
 
@@ -409,6 +439,7 @@ const RiskOverview: React.FC = () => {
           activeKey={activeTab}
           onChange={setTab}
           loading={data.isLoading}
+          snapshotKey={activeVersionId}
           problems={data.problems}
           onOpenDrilldown={openDrilldown}
           onGoWorkbench={goWorkbench}
@@ -425,6 +456,7 @@ const RiskOverview: React.FC = () => {
           riskDays={data.riskDays}
           bottlenecks={data.bottlenecks}
           orderFailures={data.orderFailures}
+          orderFailureContractAggregates={data.orderFailureContractAggregates}
           coldStockBuckets={severeColdStockBuckets}
           rollAlerts={data.rollAlerts}
           capacityOpportunities={data.capacityOpportunities}

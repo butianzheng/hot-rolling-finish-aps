@@ -20,7 +20,7 @@ interface ProblemCardProps {
   onGoWorkbench: (problem: RiskProblem) => void;
 }
 
-// M6修复：使用React.memo优化ProblemCard，避免不必要的重渲染
+// 保留 React.memo，但使用默认浅比较，避免遗漏关键字段导致卡片“看似不更新”。
 export const ProblemCard: React.FC<ProblemCardProps> = React.memo(
   ({
     problem: p,
@@ -291,12 +291,5 @@ export const ProblemCard: React.FC<ProblemCardProps> = React.memo(
       </div>
     </div>
   );
-},
-// M6修复：自定义比较函数，仅在问题关键属性或状态变化时重新渲染
-(prev, next) =>
-  prev.problem.id === next.problem.id &&
-  prev.problem.severity === next.problem.severity &&
-  prev.problem.count === next.problem.count &&
-  prev.entered === next.entered &&
-  prev.compact === next.compact
+}
 );

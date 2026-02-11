@@ -81,9 +81,12 @@ export type WorkbenchScheduleFocus = {
 
 export type WorkbenchMatrixFocusRequest = {
   machine?: string;
-  date: string;
+  date?: string;
   nonce: string | number;
   searchText?: string;
+  materialId?: string;
+  contractNo?: string;
+  mode?: 'MATERIAL_LOCATE' | 'SEARCH' | 'DATE';
 };
 
 export type WorkbenchGanttAutoOpenCell = {

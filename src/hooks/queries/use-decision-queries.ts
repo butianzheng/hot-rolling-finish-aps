@@ -12,7 +12,9 @@ import {
   getMachineBottleneckProfile,
   getBottleneckForRecentDays,
   listOrderFailureSet,
+  listMaterialFailureSet,
   getAllFailedOrders,
+  getAllFailedMaterials,
   getColdStockProfile,
   getHighPressureColdStock,
   getRollCampaignAlert,
@@ -29,6 +31,8 @@ import type {
   MachineBottleneckProfileResponse,
   ListOrderFailureSetRequest,
   OrderFailureSetResponse,
+  ListMaterialFailureSetRequest,
+  MaterialFailureSetResponse,
   GetColdStockProfileRequest,
   ColdStockProfileResponse,
   GetRollCampaignAlertRequest,
@@ -79,8 +83,12 @@ export const decisionQueryKeys = {
   orderFailures: () => [...decisionQueryKeys.all, 'order-failures'] as const,
   orderFailureSet: (request: ListOrderFailureSetRequest) =>
     [...decisionQueryKeys.orderFailures(), request] as const,
+  materialFailureSet: (request: ListMaterialFailureSetRequest) =>
+    [...decisionQueryKeys.orderFailures(), 'materials', request] as const,
   allFailedOrders: (versionId: string) =>
     [...decisionQueryKeys.orderFailures(), 'all', versionId] as const,
+  allFailedMaterials: (versionId: string) =>
+    [...decisionQueryKeys.orderFailures(), 'materials-all', versionId] as const,
 
   // D3: 冷料压库概况
   coldStocks: () => [...decisionQueryKeys.all, 'cold-stocks'] as const,
@@ -279,6 +287,53 @@ export function useAllFailedOrders(
         throw new DecisionApiError('MISSING_VERSION_ID', '未选择排产版本');
       }
       return getAllFailedOrders(versionId, activePlanRev ?? undefined);
+    },
+    enabled: !!versionId,
+    ...DEFAULT_DECISION_QUERY_OPTIONS,
+    ...options,
+  });
+}
+
+/**
+ * 获取材料失败集合（D2M）
+ */
+export function useMaterialFailureSet(
+  request: ListMaterialFailureSetRequest,
+  options?: Omit<
+    UseQueryOptions<MaterialFailureSetResponse, DecisionApiError | ValidationError>,
+    'queryKey' | 'queryFn'
+  >
+): UseQueryResult<MaterialFailureSetResponse, DecisionApiError | ValidationError> {
+  const activePlanRev = useActivePlanRev();
+  const requestWithRev = withExpectedPlanRev(request, activePlanRev);
+
+  return useQuery({
+    queryKey: decisionQueryKeys.materialFailureSet(requestWithRev),
+    queryFn: () => listMaterialFailureSet(requestWithRev),
+    ...DEFAULT_DECISION_QUERY_OPTIONS,
+    ...options,
+  });
+}
+
+/**
+ * 获取所有失败材料（简化版）
+ */
+export function useAllFailedMaterials(
+  versionId: string | null,
+  options?: Omit<
+    UseQueryOptions<MaterialFailureSetResponse, DecisionApiError | ValidationError>,
+    'queryKey' | 'queryFn'
+  >
+): UseQueryResult<MaterialFailureSetResponse, DecisionApiError | ValidationError> {
+  const activePlanRev = useActivePlanRev();
+
+  return useQuery({
+    queryKey: [...decisionQueryKeys.allFailedMaterials(versionId || ''), activePlanRev] as const,
+    queryFn: () => {
+      if (!versionId) {
+        throw new DecisionApiError('MISSING_VERSION_ID', '未选择排产版本');
+      }
+      return getAllFailedMaterials(versionId, activePlanRev ?? undefined);
     },
     enabled: !!versionId,
     ...DEFAULT_DECISION_QUERY_OPTIONS,

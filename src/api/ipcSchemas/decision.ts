@@ -162,6 +162,7 @@ export const BlockingFactorSchema = z.object({
  */
 export const OrderFailureSchema = z.object({
   contract_no: z.string(),
+  material_id: z.string().optional(),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   days_to_due: z.number().int(),
   urgency_level: UrgencyLevelSchema,
@@ -178,6 +179,26 @@ export const OrderFailureSchema = z.object({
 });
 
 /**
+ * 材料失败 Schema（材料维度）
+ */
+export const MaterialFailureSchema = z.object({
+  material_id: z.string(),
+  contract_no: z.string(),
+  due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  days_to_due: z.number().int(),
+  urgency_level: UrgencyLevelSchema,
+  fail_type: FailTypeSchema,
+  completion_rate: z.number().min(0).max(100),
+  weight_t: z.number().nonnegative(),
+  unscheduled_weight_t: z.number().nonnegative(),
+  machine_code: z.string(),
+  is_scheduled: z.boolean(),
+  blocking_factors: z.array(BlockingFactorSchema),
+  failure_reasons: z.array(z.string()),
+  recommended_actions: z.array(z.string()).optional(),
+});
+
+/**
  * 订单失败摘要 Schema
  */
 export const OrderFailureSummarySchema = z.object({
@@ -185,6 +206,32 @@ export const OrderFailureSummarySchema = z.object({
   by_fail_type: z.array(TypeCountSchema),
   by_urgency: z.array(TypeCountSchema),
   total_unscheduled_weight_t: z.number().nonnegative(),
+});
+
+/**
+ * 材料失败摘要 Schema
+ */
+export const MaterialFailureSummarySchema = z.object({
+  total_failed_materials: z.number().int().nonnegative(),
+  total_failed_contracts: z.number().int().nonnegative(),
+  overdue_materials: z.number().int().nonnegative(),
+  unscheduled_materials: z.number().int().nonnegative(),
+  total_unscheduled_weight_t: z.number().nonnegative(),
+  by_fail_type: z.array(TypeCountSchema),
+  by_urgency: z.array(TypeCountSchema),
+});
+
+/**
+ * 材料失败合同聚合 Schema
+ */
+export const MaterialFailureContractAggregateSchema = z.object({
+  contract_no: z.string(),
+  material_count: z.number().int().nonnegative(),
+  unscheduled_count: z.number().int().nonnegative(),
+  overdue_count: z.number().int().nonnegative(),
+  earliest_due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  max_urgency_level: UrgencyLevelSchema,
+  representative_material_id: z.string(),
 });
 
 /**
@@ -196,6 +243,18 @@ export const OrderFailureSetResponseSchema = z.object({
   items: z.array(OrderFailureSchema),
   total_count: z.number().int().nonnegative(),
   summary: OrderFailureSummarySchema,
+});
+
+/**
+ * D2M 响应 Schema（材料维度）
+ */
+export const MaterialFailureSetResponseSchema = z.object({
+  version_id: z.string(),
+  as_of: z.string(),
+  items: z.array(MaterialFailureSchema),
+  total_count: z.number().int().nonnegative(),
+  summary: MaterialFailureSummarySchema,
+  contract_aggregates: z.array(MaterialFailureContractAggregateSchema),
 });
 
 // ==========================================
@@ -459,6 +518,7 @@ export type MachineBottleneckProfileResponseRaw = z.infer<
   typeof MachineBottleneckProfileResponseSchema
 >;
 export type OrderFailureSetResponseRaw = z.infer<typeof OrderFailureSetResponseSchema>;
+export type MaterialFailureSetResponseRaw = z.infer<typeof MaterialFailureSetResponseSchema>;
 export type ColdStockProfileResponseRaw = z.infer<typeof ColdStockProfileResponseSchema>;
 export type RollCampaignAlertResponseRaw = z.infer<typeof RollCampaignAlertResponseSchema>;
 export type CapacityOpportunityResponseRaw = z.infer<typeof CapacityOpportunityResponseSchema>;

@@ -8,6 +8,7 @@ import type { PlanItemStatusFilter } from '../../utils/planItemStatus';
 
 export interface OpenScheduleCellOptions {
   statusFilter?: PlanItemStatusFilter;
+  urgencyLevel?: 'L0' | 'L1' | 'L2' | 'L3';
 }
 
 export interface CapacityTimelineProps {

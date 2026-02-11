@@ -13,7 +13,8 @@ import type {
   CapacityOpportunity,
   ColdStockBucket,
   DaySummary,
-  OrderFailure,
+  MaterialFailure,
+  MaterialFailureContractAggregate,
   RollCampaignAlert,
   ReasonItem,
 } from '../../../types/decision';
@@ -76,15 +77,15 @@ const FIELD_LABEL_MAP: Record<string, string> = {
   topReasons: '主要原因',
   involvedMachines: '涉及机组',
 
-  // OrderFailure - 订单失败
+  // MaterialFailure - 材料失败
+  materialId: '材料号',
   contractNo: '合同号',
   dueDate: '交货日期',
   daysToDue: '到期天数',
   urgencyLevel: '紧急等级',
   failType: '失败类型',
   completionRate: '完成率',
-  totalWeightT: '总重量（吨）',
-  scheduledWeightT: '已排重量（吨）',
+  isScheduled: '是否已排产',
   unscheduledWeightT: '未排重量（吨）',
   blockingFactors: '阻塞因素',
   failureReasons: '失败原因',
@@ -370,7 +371,8 @@ interface DrilldownDrawerProps {
 
   riskDays: DaySummary[];
   bottlenecks: BottleneckPoint[];
-  orderFailures: OrderFailure[];
+  orderFailures: MaterialFailure[];
+  orderFailureContractAggregates: MaterialFailureContractAggregate[];
   coldStockBuckets: ColdStockBucket[];
   rollAlerts: RollCampaignAlert[];
   capacityOpportunities: CapacityOpportunity[];
@@ -380,7 +382,7 @@ function titleFor(spec: DrilldownSpec | null) {
   if (!spec) return '详情';
   switch (spec.kind) {
     case 'orders':
-      return '订单失败集合';
+      return '材料失败集合';
     case 'coldStock':
       return '冷坨高压力';
     case 'bottleneck':
@@ -407,6 +409,7 @@ const DrilldownDrawer: React.FC<DrilldownDrawerProps> = ({
   riskDays,
   bottlenecks,
   orderFailures,
+  orderFailureContractAggregates,
   coldStockBuckets,
   rollAlerts,
   capacityOpportunities,
@@ -426,6 +429,7 @@ const DrilldownDrawer: React.FC<DrilldownDrawerProps> = ({
       return (
         <OrdersContent
           rows={orderFailures}
+          contractAggregates={orderFailureContractAggregates}
           urgencyFilter={spec.urgency}
           onGoWorkbench={onGoWorkbench}
           onViewDetail={handleViewDetail}
@@ -493,7 +497,7 @@ const DrilldownDrawer: React.FC<DrilldownDrawerProps> = ({
     }
 
     return null;
-  }, [spec, orderFailures, coldStockBuckets, bottlenecks, rollAlerts, riskDays, capacityOpportunities, onGoWorkbench]);
+  }, [spec, orderFailures, orderFailureContractAggregates, coldStockBuckets, bottlenecks, rollAlerts, riskDays, capacityOpportunities, onGoWorkbench]);
 
   return (
     <>

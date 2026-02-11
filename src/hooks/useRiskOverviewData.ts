@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
-  useAllFailedOrders,
+  useAllFailedMaterials,
   useAllRollCampaignAlerts,
   useColdStockProfile,
   useRecentDaysBottleneck,
@@ -19,7 +19,8 @@ import type {
   AgeBin,
   ColdStockBucket,
   DaySummary,
-  OrderFailure,
+  MaterialFailure,
+  MaterialFailureContractAggregate,
   PressureLevel,
   RollCampaignAlert,
 } from '../types/decision';
@@ -49,6 +50,7 @@ export interface RiskProblem {
   workbenchMachineCode?: string | null;
   workbenchPlanDate?: string | null;
   workbenchContext?: string | null;
+  workbenchMaterialId?: string | null;
   workbenchContractNo?: string | null;
 }
 
@@ -67,7 +69,9 @@ export interface RiskOverviewData {
 
   riskDays: DaySummary[];
   bottlenecks: BottleneckPoint[];
-  orderFailures: OrderFailure[];
+  orderFailures: MaterialFailure[];
+  orderFailureContractAggregates: MaterialFailureContractAggregate[];
+  unscheduledMachineGaps: string[];
   coldStockBuckets: ColdStockBucket[];
   rollAlerts: RollCampaignAlert[];
   capacityOpportunities: CapacityOpportunity[];
@@ -132,7 +136,7 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
   const kpiQuery = useGlobalKPI(versionId);
   const riskQuery = useRecentDaysRisk(versionId, 30);
   const bottleneckQuery = useRecentDaysBottleneck(versionId, 30);
-  const ordersQuery = useAllFailedOrders(versionId);
+  const ordersQuery = useAllFailedMaterials(versionId);
   const coldStockQuery = useColdStockProfile(
     { versionId: versionId || '', expectedPlanRev: activePlanRev ?? undefined },
     { enabled: !!versionId },
@@ -144,15 +148,37 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
   const riskDays = riskQuery.data?.items ?? [];
   const bottlenecks = bottleneckQuery.data?.items ?? [];
   const orderFailures = ordersQuery.data?.items ?? [];
+  const orderFailureContractAggregates = ordersQuery.data?.contractAggregates ?? [];
   const coldStockBuckets = coldStockQuery.data?.items ?? [];
   const rollAlerts = rollQuery.data?.items ?? [];
   const capacityOpportunities = capacityOpportunityQuery.data?.items ?? [];
+  const unscheduledMachineGaps = useMemo(() => {
+    const bottleneckMachineSet = new Set(
+      bottlenecks
+        .map((it) => String(it.machineCode || '').trim())
+        .filter(Boolean),
+    );
+    const unscheduledMachines = new Set(
+      orderFailures
+        .filter((it) => !it.isScheduled)
+        .map((it) => String(it.machineCode || '').trim())
+        .filter(Boolean),
+    );
+    return [...unscheduledMachines]
+      .filter((mc) => !bottleneckMachineSet.has(mc))
+      .sort((a, b) => a.localeCompare(b));
+  }, [bottlenecks, orderFailures]);
 
   const problems = useMemo<RiskProblem[]>(() => {
     const out: RiskProblem[] = [];
 
     const l3Failures = orderFailures.filter((o) => o.urgencyLevel === 'L3');
     if (l3Failures.length > 0) {
+      const involvedContracts = new Set(
+        l3Failures
+          .map((o) => String(o.contractNo || '').trim())
+          .filter(Boolean),
+      ).size;
       const overdue = l3Failures.filter((o) => o.failType === 'Overdue').length;
       const unscheduledT = l3Failures.reduce((sum, o) => sum + Number(o.unscheduledWeightT || 0), 0);
       const minDaysToDue = l3Failures.reduce((min, o) => Math.min(min, Number(o.daysToDue)), Number.POSITIVE_INFINITY);
@@ -160,13 +186,29 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
         .map((o) => String(o.dueDate || ''))
         .filter(Boolean)
         .sort()[0];
+      const primaryFailure = [...l3Failures].sort((a, b) => {
+        const dayDiff = Number(a.daysToDue ?? 0) - Number(b.daysToDue ?? 0);
+        if (dayDiff !== 0) return dayDiff;
+        const dueA = String(a.dueDate || '');
+        const dueB = String(b.dueDate || '');
+        if (dueA !== dueB) return dueA < dueB ? -1 : 1;
+        const mA = String(a.materialId || '');
+        const mB = String(b.materialId || '');
+        if (mA !== mB) return mA < mB ? -1 : 1;
+        const cA = String(a.contractNo || '');
+        const cB = String(b.contractNo || '');
+        return cA < cB ? -1 : cA > cB ? 1 : 0;
+      })[0];
+      const primaryMaterialId = String(primaryFailure?.materialId || '').trim();
+      const primaryContractNo = String(primaryFailure?.contractNo || '').trim();
       out.push({
-        id: 'l3-order-failures',
+        id: primaryMaterialId ? `l3-order-failures:${primaryMaterialId}` : 'l3-order-failures',
         severity: 'P0',
-        title: '三级紧急订单未满足',
+        title: '三级紧急材料未满足',
         count: l3Failures.length,
         detail: earliestDueDate ? `最早交期 ${earliestDueDate}` : undefined,
         impact: [
+          involvedContracts > 0 ? `涉及合同 ${involvedContracts}` : null,
           overdue > 0 ? `${overdue} 个逾期` : null,
           unscheduledT > 0 ? `未排 ${formatTonnage(unscheduledT)}` : null,
         ].filter(Boolean).join(' · ') || undefined,
@@ -176,9 +218,10 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
             : undefined,
         drilldown: { kind: 'orders', urgency: 'L3' },
         workbenchTab: 'materials',
-        workbenchMachineCode: l3Failures[0]?.machineCode ?? null,
+        workbenchMachineCode: primaryFailure?.machineCode ?? null,
         workbenchContext: 'orders',
-        workbenchContractNo: l3Failures[0]?.contractNo ?? null,
+        workbenchMaterialId: primaryMaterialId || null,
+        workbenchContractNo: primaryContractNo || null,
       });
     }
 
@@ -335,7 +378,7 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
     capacityOpportunity: capacityOpportunityQuery.error,
   };
 
-  const refetchAll = () => {
+  const refetchAll = useCallback(() => {
     void kpiQuery.refetch();
     void riskQuery.refetch();
     void bottleneckQuery.refetch();
@@ -343,7 +386,7 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
     void coldStockQuery.refetch();
     void rollQuery.refetch();
     void capacityOpportunityQuery.refetch();
-  };
+  }, [bottleneckQuery, capacityOpportunityQuery, coldStockQuery, kpiQuery, ordersQuery, riskQuery, rollQuery]);
 
   return {
     kpi,
@@ -355,6 +398,8 @@ export function useRiskOverviewData(versionId: string | null): RiskOverviewData 
     riskDays,
     bottlenecks,
     orderFailures,
+    orderFailureContractAggregates,
+    unscheduledMachineGaps,
     coldStockBuckets,
     rollAlerts,
     capacityOpportunities,

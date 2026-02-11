@@ -19,6 +19,18 @@ pub struct OrderFailureRepository {
     conn: Arc<Mutex<Connection>>,
 }
 
+#[derive(Debug, Clone)]
+pub struct MaterialFailureRecord {
+    pub material_id: String,
+    pub contract_no: String,
+    pub due_date: String,
+    pub days_to_due: i32,
+    pub urgency_level: String,
+    pub machine_code: String,
+    pub is_scheduled: bool,
+    pub weight_t: f64,
+}
+
 impl OrderFailureRepository {
     /// 创建新的仓储实例
     pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
@@ -196,6 +208,209 @@ impl OrderFailureRepository {
         }
 
         Ok(map)
+    }
+
+    /// 批量获取合同主材料号（用于 D2 DTO material_id 字段补齐）
+    ///
+    /// 规则：
+    /// 1. 优先未排产材料（pi.material_id IS NULL）；
+    /// 2. 紧急度高优先（L3 > L2 > L1 > L0）；
+    /// 3. 交期更早优先；
+    /// 4. material_id 字典序兜底，保证稳定。
+    pub fn get_primary_material_ids(
+        &self,
+        version_id: &str,
+        contract_nos: &[String],
+    ) -> SqlResult<HashMap<String, String>> {
+        if contract_nos.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let conn = self.conn.lock().expect("锁获取失败");
+        let in_clause = build_in_clause("ms.contract_no", contract_nos);
+        let sql = format!(
+            r#"
+            SELECT
+                ms.contract_no,
+                ms.material_id,
+                CASE WHEN pi.material_id IS NULL THEN 1 ELSE 0 END AS unscheduled_first,
+                CASE ms.urgency_level
+                    WHEN 'L3' THEN 3
+                    WHEN 'L2' THEN 2
+                    WHEN 'L1' THEN 1
+                    ELSE 0
+                END AS urgency_rank,
+                COALESCE(ms.due_date, '9999-12-31') AS due_date_sort
+            FROM material_state ms
+            LEFT JOIN plan_item pi
+                ON pi.version_id = ?
+               AND pi.material_id = ms.material_id
+            WHERE {}
+              AND ms.material_id IS NOT NULL
+              AND TRIM(ms.material_id) != ''
+            ORDER BY
+                ms.contract_no ASC,
+                unscheduled_first DESC,
+                urgency_rank DESC,
+                due_date_sort ASC,
+                ms.material_id ASC
+            "#,
+            in_clause
+        );
+
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::with_capacity(contract_nos.len() + 1);
+        params.push(Box::new(version_id.to_string()));
+        for c in contract_nos {
+            params.push(Box::new(c.clone()));
+        }
+
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(params), |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+
+        let mut map = HashMap::new();
+        for row_result in rows {
+            let (contract_no, material_id) = row_result?;
+            map.entry(contract_no).or_insert(material_id);
+        }
+
+        Ok(map)
+    }
+
+    /// 批量查询“失败合同内”的材料明细（材料维度）
+    pub fn list_material_failures(
+        &self,
+        version_id: &str,
+        contract_nos: &[String],
+        urgency_levels: Option<&[String]>,
+        machine_codes: Option<&[String]>,
+        due_date_from: Option<&str>,
+        due_date_to: Option<&str>,
+        only_unscheduled: Option<bool>,
+    ) -> SqlResult<Vec<MaterialFailureRecord>> {
+        if contract_nos.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let conn = self.conn.lock().expect("锁获取失败");
+        let contract_in_clause = build_in_clause("ms.contract_no", contract_nos);
+        let mut sql = format!(
+            r#"
+            SELECT
+                ms.material_id,
+                ms.contract_no,
+                COALESCE(ms.due_date, '9999-12-31') AS due_date,
+                CAST(COALESCE(julianday(ms.due_date) - julianday('now'), 9999) AS INTEGER) AS days_to_due,
+                COALESCE(ms.urgency_level, 'L0') AS urgency_level,
+                COALESCE(
+                    pi.machine_code,
+                    ms.scheduled_machine_code,
+                    mm.next_machine_code,
+                    mm.current_machine_code,
+                    ms.machine_code,
+                    'UNKNOWN'
+                ) AS machine_code,
+                CASE WHEN pi.material_id IS NULL THEN 0 ELSE 1 END AS is_scheduled,
+                COALESCE(ms.weight_t, 0.0) AS weight_t
+            FROM material_state ms
+            LEFT JOIN plan_item pi
+                ON pi.version_id = ?
+               AND pi.material_id = ms.material_id
+            LEFT JOIN material_master mm
+                ON mm.material_id = ms.material_id
+            WHERE {}
+              AND ms.material_id IS NOT NULL
+              AND TRIM(ms.material_id) != ''
+            "#,
+            contract_in_clause
+        );
+
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+        params.push(Box::new(version_id.to_string()));
+        for c in contract_nos {
+            params.push(Box::new(c.clone()));
+        }
+
+        if let Some(levels) = urgency_levels {
+            if !levels.is_empty() {
+                sql.push_str(&format!(
+                    " AND {}",
+                    build_in_clause("COALESCE(ms.urgency_level, 'L0')", levels)
+                ));
+                for lvl in levels {
+                    params.push(Box::new(lvl.clone()));
+                }
+            }
+        }
+
+        if let Some(codes) = machine_codes {
+            if !codes.is_empty() {
+                sql.push_str(&format!(
+                    " AND {}",
+                    build_in_clause(
+                        "COALESCE(pi.machine_code, ms.scheduled_machine_code, mm.next_machine_code, mm.current_machine_code, ms.machine_code, 'UNKNOWN')",
+                        codes
+                    )
+                ));
+                for code in codes {
+                    params.push(Box::new(code.clone()));
+                }
+            }
+        }
+
+        if let Some(from) = due_date_from {
+            if !from.trim().is_empty() {
+                sql.push_str(" AND COALESCE(ms.due_date, '9999-12-31') >= ?");
+                params.push(Box::new(from.to_string()));
+            }
+        }
+
+        if let Some(to) = due_date_to {
+            if !to.trim().is_empty() {
+                sql.push_str(" AND COALESCE(ms.due_date, '9999-12-31') <= ?");
+                params.push(Box::new(to.to_string()));
+            }
+        }
+
+        match only_unscheduled {
+            Some(true) => sql.push_str(" AND pi.material_id IS NULL"),
+            Some(false) => sql.push_str(" AND pi.material_id IS NOT NULL"),
+            None => {}
+        }
+
+        sql.push_str(
+            r#"
+            ORDER BY
+                CASE COALESCE(ms.urgency_level, 'L0')
+                    WHEN 'L3' THEN 3
+                    WHEN 'L2' THEN 2
+                    WHEN 'L1' THEN 1
+                    ELSE 0
+                END DESC,
+                CASE WHEN pi.material_id IS NULL THEN 1 ELSE 0 END DESC,
+                due_date ASC,
+                ms.contract_no ASC,
+                ms.material_id ASC
+            "#,
+        );
+
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(params), |row| {
+            let is_scheduled_raw: i32 = row.get(6)?;
+            Ok(MaterialFailureRecord {
+                material_id: row.get(0)?,
+                contract_no: row.get(1)?,
+                due_date: row.get(2)?,
+                days_to_due: row.get(3)?,
+                urgency_level: row.get(4)?,
+                machine_code: row.get(5)?,
+                is_scheduled: is_scheduled_raw != 0,
+                weight_t: row.get(7)?,
+            })
+        })?;
+
+        rows.collect::<SqlResult<Vec<_>>>()
     }
 
     /// 将数据库行转换为 OrderFailure

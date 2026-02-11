@@ -85,6 +85,19 @@ pub trait DecisionApi: Send + Sync {
         request: ListOrderFailureSetRequest,
     ) -> Result<OrderFailureSetResponse, String>;
 
+    /// D2M: 查询材料失败集合 - "哪些材料无法满足"
+    ///
+    /// # 参数
+    /// - `request`: 查询请求，包含版本 ID 和过滤条件
+    ///
+    /// # 返回
+    /// - 成功: 材料失败列表 + 聚合摘要 + 合同聚合
+    /// - 失败: 错误消息
+    fn list_material_failure_set(
+        &self,
+        request: ListMaterialFailureSetRequest,
+    ) -> Result<MaterialFailureSetResponse, String>;
+
     /// D3: 查询冷料压库概况 - "哪些冷料压库"
     ///
     /// # 参数

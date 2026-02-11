@@ -24,6 +24,7 @@ interface DimensionTabsProps {
   activeKey: DimensionTabKey;
   onChange: (key: DimensionTabKey) => void;
   loading?: boolean;
+  snapshotKey?: string;
   problems: RiskProblem[];
   onOpenDrilldown: (spec: DrilldownSpec) => void;
   onGoWorkbench: (problem: RiskProblem) => void;
@@ -33,6 +34,7 @@ const DimensionTabs: React.FC<DimensionTabsProps> = ({
   activeKey,
   onChange,
   loading,
+  snapshotKey,
   problems,
   onOpenDrilldown,
   onGoWorkbench,
@@ -89,6 +91,7 @@ const DimensionTabs: React.FC<DimensionTabsProps> = ({
           children: (
             <ProblemList
               loading={loading}
+              snapshotKey={snapshotKey}
               problems={problems}
               onOpenDrilldown={onOpenDrilldown}
               onGoWorkbench={onGoWorkbench}
@@ -97,7 +100,7 @@ const DimensionTabs: React.FC<DimensionTabsProps> = ({
         },
         {
           key: 'orders',
-          label: makeLabel('orders', <ProfileOutlined />, '订单维度'),
+          label: makeLabel('orders', <ProfileOutlined />, '材料维度'),
           children: (
             <React.Suspense fallback={<PageSkeleton />}>
               <D2OrderFailure embedded onOpenDrilldown={onOpenDrilldown} />

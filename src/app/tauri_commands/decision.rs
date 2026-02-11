@@ -243,6 +243,69 @@ pub async fn list_order_failure_set(
     serde_json::to_string(&response).map_err(|e| format!("序列化失败: {}", e))
 }
 
+/// D2M: 查询材料失败集合（材料维度）
+#[tauri::command(rename_all = "snake_case")]
+pub async fn list_material_failure_set(
+    state: tauri::State<'_, AppState>,
+    version_id: String,
+    expected_plan_rev: Option<i32>,
+    fail_type_filter: Option<String>,
+    urgency_level_filter: Option<String>,
+    machine_codes: Option<String>,
+    due_date_from: Option<String>,
+    due_date_to: Option<String>,
+    completion_rate_threshold: Option<f64>,
+    problem_scope: Option<String>,
+    only_unscheduled: Option<bool>,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> Result<String, String> {
+    use crate::decision::api::{DecisionApi, ListMaterialFailureSetRequest};
+
+    validate_expected_plan_rev(&state, &version_id, expected_plan_rev)?;
+
+    let fail_type_filter = if let Some(filter_str) = fail_type_filter {
+        let parsed: Vec<String> = serde_json::from_str(&filter_str)
+            .map_err(|e| format!("失败类型过滤器格式错误: {}", e))?;
+        Some(parsed)
+    } else {
+        None
+    };
+
+    let urgency_level_filter = if let Some(filter_str) = urgency_level_filter {
+        let parsed: Vec<String> = serde_json::from_str(&filter_str)
+            .map_err(|e| format!("紧急等级过滤器格式错误: {}", e))?;
+        Some(parsed)
+    } else {
+        None
+    };
+
+    let machine_codes = if let Some(codes_str) = machine_codes {
+        let parsed: Vec<String> = serde_json::from_str(&codes_str)
+            .map_err(|e| format!("机组代码过滤器格式错误: {}", e))?;
+        Some(parsed)
+    } else {
+        None
+    };
+
+    let request = ListMaterialFailureSetRequest {
+        version_id,
+        fail_type_filter,
+        urgency_level_filter,
+        machine_codes,
+        due_date_from,
+        due_date_to,
+        completion_rate_threshold,
+        problem_scope,
+        only_unscheduled,
+        limit,
+        offset,
+    };
+
+    let response = state.decision_api.list_material_failure_set(request)?;
+    serde_json::to_string(&response).map_err(|e| format!("序列化失败: {}", e))
+}
+
 /// D3: 查询冷料压库概况 - "哪些冷料压库"
 ///
 /// # 参数
